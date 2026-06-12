@@ -1,0 +1,1941 @@
+✓ Done
+- main
+  - StaticText "FuelFlow OS"
+  - StaticText "/"
+  - StaticText "Fuel Sales"
+  - heading "Fuel Sales & Shifts" [level=2, ref=e10]
+  - paragraph
+    - StaticText "Shift management, transaction processing, and sales reporting"
+  - tablist [ref=e11] focusable [tabindex]
+    - tab "Fuel Sales" [selected, ref=e28]
+    - tab "Shifts" [ref=e29]
+  - tabpanel "Fuel Sales" [ref=e12] focusable [tabindex]
+    - paragraph
+      - StaticText "Today's Revenue"
+    - paragraph
+      - StaticText "Rs. 382,099"
+    - paragraph
+      - StaticText "Today's Volume"
+    - paragraph
+      - StaticText "1,352 L"
+    - paragraph
+      - StaticText "Transactions"
+    - paragraph
+      - StaticText "45"
+    - StaticText "Payment Method Breakdown"
+    - paragraph
+      - StaticText "RFID"
+    - paragraph
+      - StaticText "5 txn · Rs. 35,205"
+    - paragraph
+      - StaticText "Card"
+    - paragraph
+      - StaticText "8 txn · Rs. 58,774"
+    - paragraph
+      - StaticText "Fleet"
+    - paragraph
+      - StaticText "9 txn · Rs. 92,571"
+    - paragraph
+      - StaticText "Cash"
+    - paragraph
+      - StaticText "14 txn · Rs. 91,282"
+    - paragraph
+      - StaticText "Mobile"
+    - paragraph
+      - StaticText "9 txn · Rs. 104,268"
+    - StaticText "Recent Fuel Transactions"
+    - table
+      - rowgroup
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+      - row
+- StaticText "FuelFlow OS"
+- StaticText "/"
+- StaticText "Fuel Sales"
+- heading "Fuel Sales & Shifts" [level=2, ref=e10]
+- paragraph
+  - StaticText "Shift management, transaction processing, and sales reporting"
+- tablist [ref=e11] focusable [tabindex]
+  - tab "Fuel Sales" [selected, ref=e28]
+  - tab "Shifts" [ref=e29]
+- tabpanel "Fuel Sales" [ref=e12] focusable [tabindex]
+  - paragraph
+    - StaticText "Today's Revenue"
+  - paragraph
+    - StaticText "Rs. 382,099"
+  - paragraph
+    - StaticText "Today's Volume"
+  - paragraph
+    - StaticText "1,352 L"
+  - paragraph
+    - StaticText "Transactions"
+  - paragraph
+    - StaticText "45"
+  - StaticText "Payment Method Breakdown"
+  - paragraph
+    - StaticText "RFID"
+  - paragraph
+    - StaticText "5 txn · Rs. 35,205"
+  - paragraph
+    - StaticText "Card"
+  - paragraph
+    - StaticText "8 txn · Rs. 58,774"
+  - paragraph
+    - StaticText "Fleet"
+  - paragraph
+    - StaticText "9 txn · Rs. 92,571"
+  - paragraph
+    - StaticText "Cash"
+  - paragraph
+    - StaticText "14 txn · Rs. 91,282"
+  - paragraph
+    - StaticText "Mobile"
+  - paragraph
+    - StaticText "9 txn · Rs. 104,268"
+  - StaticText "Recent Fuel Transactions"
+  - table
+    - rowgroup
+      - row
+    - row
+      - cell "13:48" [ref=e31]
+      - cell "Pump 2" [ref=e32]
+      - cell "N2" [ref=e33]
+      - cell "Petrol" [ref=e34]
+      - cell "24.0" [ref=e35]
+      - cell "Rs. 272.50" [ref=e36]
+      - cell "Rs. 6,540" [ref=e37]
+      - cell "RFID" [ref=e38]
+      - cell "Bilal Hussain" [ref=e39]
+    - row
+      - cell "13:47" [ref=e40]
+      - cell "Pump 3" [ref=e41]
+      - cell "N1" [ref=e42]
+      - cell "Diesel" [ref=e43]
+      - cell "18.0" [ref=e44]
+      - cell "Rs. 268.00" [ref=e45]
+      - cell "Rs. 4,824" [ref=e46]
+      - cell "Card" [ref=e47]
+      - cell "Zain Ahmed" [ref=e48]
+    - row
+      - cell "13:51" [ref=e49]
+      - cell "Pump 6" [ref=e50]
+      - cell "N2" [ref=e51]
+      - cell "Premium" [ref=e52]
+      - cell "35.0" [ref=e53]
+      - cell "Rs. 302.50" [ref=e54]
+      - cell "Rs. 10,588" [ref=e55]
+      - cell "Fleet" [ref=e56]
+      - cell "Zain Ahmed" [ref=e57]
+    - row
+      - cell "13:47" [ref=e58]
+      - cell "Pump 1" [ref=e59]
+      - cell "N2" [ref=e60]
+      - cell "Premium" [ref=e61]
+      - cell "57.0" [ref=e62]
+      - cell "Rs. 302.50" [ref=e63]
+      - cell "Rs. 17,243" [ref=e64]
+      - cell "Fleet" [ref=e65]
+      - cell "Usman Sheikh" [ref=e66]
+    - row
+      - cell "13:50" [ref=e67]
+      - cell "Pump 8" [ref=e68]
+      - cell "N1" [ref=e69]
+      - cell "Hsd" [ref=e70]
+      - cell "9.0" [ref=e71]
+      - cell "Rs. 275.00" [ref=e72]
+      - cell "Rs. 2,475" [ref=e73]
+      - cell "Cash" [ref=e74]
+      - cell "Bilal Hussain" [ref=e75]
+    - row
+      - cell "13:50" [ref=e76]
+      - cell "Pump 8" [ref=e77]
+      - cell "N2" [ref=e78]
+      - cell "Petrol" [ref=e79]
+      - cell "30.0" [ref=e80]
+      - cell "Rs. 272.50" [ref=e81]
+      - cell "Rs. 8,175" [ref=e82]
+      - cell "Fleet" [ref=e83]
+      - cell "Zain Ahmed" [ref=e84]
+    - row
+      - cell "13:52" [ref=e85]
+      - cell "Pump 7" [ref=e86]
+      - cell "N1" [ref=e87]
+      - cell "Petrol" [ref=e88]
+      - cell "15.0" [ref=e89]
+      - cell "Rs. 272.50" [ref=e90]
+      - cell "Rs. 4,088" [ref=e91]
+      - cell "RFID" [ref=e92]
+      - cell "Farhan Raza" [ref=e93]
+    - row
+      - cell "13:47" [ref=e94]
+      - cell "Pump 5" [ref=e95]
+      - cell "N1" [ref=e96]
+      - cell "Premium" [ref=e97]
+      - cell "57.0" [ref=e98]
+      - cell "Rs. 302.50" [ref=e99]
+      - cell "Rs. 17,243" [ref=e100]
+      - cell "Mobile" [ref=e101]
+      - cell "Usman Sheikh" [ref=e102]
+    - row
+      - cell "13:48" [ref=e103]
+      - cell "Pump 7" [ref=e104]
+      - cell "N2" [ref=e105]
+      - cell "Hsd" [ref=e106]
+      - cell "6.0" [ref=e107]
+      - cell "Rs. 275.00" [ref=e108]
+      - cell "Rs. 1,650" [ref=e109]
+      - cell "Cash" [ref=e110]
+      - cell "Farhan Raza" [ref=e111]
+    - row
+      - cell "12:52" [ref=e112]
+      - cell "Pump 2" [ref=e113]
+      - cell "N1" [ref=e114]
+      - cell "Petrol" [ref=e115]
+      - cell "37.0" [ref=e116]
+      - cell "Rs. 272.50" [ref=e117]
+      - cell "Rs. 10,083" [ref=e118]
+      - cell "Fleet" [ref=e119]
+      - cell "Usman Sheikh" [ref=e120]
+    - row
+      - cell "12:49" [ref=e121]
+      - cell "Pump 4" [ref=e122]
+      - cell "N1" [ref=e123]
+      - cell "Petrol" [ref=e124]
+      - cell "11.0" [ref=e125]
+      - cell "Rs. 272.50" [ref=e126]
+      - cell "Rs. 2,998" [ref=e127]
+      - cell "Card" [ref=e128]
+      - cell "Zain Ahmed" [ref=e129]
+    - row
+      - cell "12:48" [ref=e130]
+      - cell "Pump 6" [ref=e131]
+      - cell "N2" [ref=e132]
+      - cell "Petrol" [ref=e133]
+      - cell "39.0" [ref=e134]
+      - cell "Rs. 272.50" [ref=e135]
+      - cell "Rs. 10,628" [ref=e136]
+      - cell "Mobile" [ref=e137]
+      - cell "Zain Ahmed" [ref=e138]
+    - row
+      - cell "11:49" [ref=e139]
+      - cell "Pump 7" [ref=e140]
+      - cell "N2" [ref=e141]
+      - cell "Premium" [ref=e142]
+      - cell "11.0" [ref=e143]
+      - cell "Rs. 302.50" [ref=e144]
+      - cell "Rs. 3,328" [ref=e145]
+      - cell "Cash" [ref=e146]
+      - cell "Bilal Hussain" [ref=e147]
+    - row
+      - cell "11:50" [ref=e148]
+      - cell "Pump 4" [ref=e149]
+      - cell "N2" [ref=e150]
+      - cell "Premium" [ref=e151]
+      - cell "35.0" [ref=e152]
+      - cell "Rs. 302.50" [ref=e153]
+      - cell "Rs. 10,588" [ref=e154]
+      - cell "Cash" [ref=e155]
+      - cell "Usman Sheikh" [ref=e156]
+    - row
+      - cell "11:50" [ref=e157]
+      - cell "Pump 4" [ref=e158]
+      - cell "N2" [ref=e159]
+      - cell "Premium" [ref=e160]
+      - cell "33.0" [ref=e161]
+      - cell "Rs. 302.50" [ref=e162]
+      - cell "Rs. 9,983" [ref=e163]
+      - cell "Cash" [ref=e164]
+      - cell "Bilal Hussain" [ref=e165]
+    - row
+      - cell "11:52" [ref=e166]
+      - cell "Pump 5" [ref=e167]
+      - cell "N2" [ref=e168]
+      - cell "Hsd" [ref=e169]
+      - cell "29.0" [ref=e170]
+      - cell "Rs. 275.00" [ref=e171]
+      - cell "Rs. 7,975" [ref=e172]
+      - cell "Card" [ref=e173]
+      - cell "Farhan Raza" [ref=e174]
+    - row
+      - cell "11:49" [ref=e175]
+      - cell "Pump 8" [ref=e176]
+      - cell "N2" [ref=e177]
+      - cell "Petrol" [ref=e178]
+      - cell "21.0" [ref=e179]
+      - cell "Rs. 272.50" [ref=e180]
+      - cell "Rs. 5,723" [ref=e181]
+      - cell "Cash" [ref=e182]
+      - cell "Bilal Hussain" [ref=e183]
+    - row
+      - cell "10:49" [ref=e184]
+      - cell "Pump 2" [ref=e185]
+      - cell "N2" [ref=e186]
+      - cell "Premium" [ref=e187]
+      - cell "53.0" [ref=e188]
+      - cell "Rs. 302.50" [ref=e189]
+      - cell "Rs. 16,033" [ref=e190]
+      - cell "Cash" [ref=e191]
+      - cell "Usman Sheikh" [ref=e192]
+    - row
+      - cell "10:52" [ref=e193]
+      - cell "Pump 8" [ref=e194]
+      - cell "N2" [ref=e195]
+      - cell "Hsd" [ref=e196]
+      - cell "30.0" [ref=e197]
+      - cell "Rs. 275.00" [ref=e198]
+      - cell "Rs. 8,250" [ref=e199]
+      - cell "Cash" [ref=e200]
+      - cell "Bilal Hussain" [ref=e201]
+    - row
+      - cell "10:47" [ref=e202]
+      - cell "Pump 1" [ref=e203]
+      - cell "N2" [ref=e204]
+      - cell "Premium" [ref=e205]
+      - cell "16.0" [ref=e206]
+      - cell "Rs. 302.50" [ref=e207]
+      - cell "Rs. 4,840" [ref=e208]
+      - cell "Cash" [ref=e209]
+      - cell "Bilal Hussain" [ref=e210]
+    - row
+      - cell "10:47" [ref=e211]
+      - cell "Pump 7" [ref=e212]
+      - cell "N1" [ref=e213]
+      - cell "Hsd" [ref=e214]
+      - cell "48.0" [ref=e215]
+      - cell "Rs. 275.00" [ref=e216]
+      - cell "Rs. 13,200" [ref=e217]
+      - cell "Fleet" [ref=e218]
+      - cell "Zain Ahmed" [ref=e219]
+    - row
+      - cell "10:52" [ref=e220]
+      - cell "Pump 2" [ref=e221]
+      - cell "N1" [ref=e222]
+      - cell "Diesel" [ref=e223]
+      - cell "52.0" [ref=e224]
+      - cell "Rs. 268.00" [ref=e225]
+      - cell "Rs. 13,936" [ref=e226]
+      - cell "Fleet" [ref=e227]
+      - cell "Farhan Raza" [ref=e228]
+    - row
+      - cell "09:52" [ref=e229]
+      - cell "Pump 5" [ref=e230]
+      - cell "N1" [ref=e231]
+      - cell "Hsd" [ref=e232]
+      - cell "8.0" [ref=e233]
+      - cell "Rs. 275.00" [ref=e234]
+      - cell "Rs. 2,200" [ref=e235]
+      - cell "Cash" [ref=e236]
+      - cell "Farhan Raza" [ref=e237]
+    - row
+      - cell "09:51" [ref=e238]
+      - cell "Pump 8" [ref=e239]
+      - cell "N1" [ref=e240]
+      - cell "Petrol" [ref=e241]
+      - cell "43.0" [ref=e242]
+      - cell "Rs. 272.50" [ref=e243]
+      - cell "Rs. 11,718" [ref=e244]
+      - cell "Card" [ref=e245]
+      - cell "Zain Ahmed" [ref=e246]
+    - row
+      - cell "09:52" [ref=e247]
+      - cell "Pump 7" [ref=e248]
+      - cell "N2" [ref=e249]
+      - cell "Hsd" [ref=e250]
+      - cell "35.0" [ref=e251]
+      - cell "Rs. 275.00" [ref=e252]
+      - cell "Rs. 9,625" [ref=e253]
+      - cell "Cash" [ref=e254]
+      - cell "Bilal Hussain" [ref=e255]
+    - row
+      - cell "08:50" [ref=e256]
+      - cell "Pump 3" [ref=e257]
+      - cell "N2" [ref=e258]
+      - cell "Premium" [ref=e259]
+      - cell "45.0" [ref=e260]
+      - cell "Rs. 302.50" [ref=e261]
+      - cell "Rs. 13,613" [ref=e262]
+      - cell "Mobile" [ref=e263]
+      - cell "Zain Ahmed" [ref=e264]
+    - row
+      - cell "08:49" [ref=e265]
+      - cell "Pump 7" [ref=e266]
+      - cell "N1" [ref=e267]
+      - cell "Diesel" [ref=e268]
+      - cell "14.0" [ref=e269]
+      - cell "Rs. 268.00" [ref=e270]
+      - cell "Rs. 3,752" [ref=e271]
+      - cell "Cash" [ref=e272]
+      - cell "Farhan Raza" [ref=e273]
+    - row
+      - cell "08:52" [ref=e274]
+      - cell "Pump 8" [ref=e275]
+      - cell "N2" [ref=e276]
+      - cell "Diesel" [ref=e277]
+      - cell "49.0" [ref=e278]
+      - cell "Rs. 268.00" [ref=e279]
+      - cell "Rs. 13,132" [ref=e280]
+      - cell "RFID" [ref=e281]
+      - cell "Bilal Hussain" [ref=e282]
+    - row
+      - cell "08:51" [ref=e283]
+      - cell "Pump 7" [ref=e284]
+      - cell "N1" [ref=e285]
+      - cell "Premium" [ref=e286]
+      - cell "29.0" [ref=e287]
+      - cell "Rs. 302.50" [ref=e288]
+      - cell "Rs. 8,773" [ref=e289]
+      - cell "Card" [ref=e290]
+      - cell "Farhan Raza" [ref=e291]
+    - row
+      - cell "08:48" [ref=e292]
+      - cell "Pump 7" [ref=e293]
+      - cell "N2" [ref=e294]
+      - cell "Diesel" [ref=e295]
+      - cell "40.0" [ref=e296]
+      - cell "Rs. 268.00" [ref=e297]
+      - cell "Rs. 10,720" [ref=e298]
+      - cell "Cash" [ref=e299]
+      - cell "Zain Ahmed" [ref=e300]
+    - row
+      - cell "08:47" [ref=e301]
+      - cell "Pump 8" [ref=e302]
+      - cell "N1" [ref=e303]
+      - cell "Premium" [ref=e304]
+      - cell "18.0" [ref=e305]
+      - cell "Rs. 302.50" [ref=e306]
+      - cell "Rs. 5,445" [ref=e307]
+      - cell "Mobile" [ref=e308]
+      - cell "Bilal Hussain" [ref=e309]
+    - row
+      - cell "08:51" [ref=e310]
+      - cell "Pump 3" [ref=e311]
+      - cell "N2" [ref=e312]
+      - cell "Premium" [ref=e313]
+      - cell "7.0" [ref=e314]
+      - cell "Rs. 302.50" [ref=e315]
+      - cell "Rs. 2,118" [ref=e316]
+      - cell "Cash" [ref=e317]
+      - cell "Farhan Raza" [ref=e318]
+    - row
+      - cell "07:47" [ref=e319]
+      - cell "Pump 6" [ref=e320]
+      - cell "N1" [ref=e321]
+      - cell "Petrol" [ref=e322]
+      - cell "10.0" [ref=e323]
+      - cell "Rs. 272.50" [ref=e324]
+      - cell "Rs. 2,725" [ref=e325]
+      - cell "Card" [ref=e326]
+      - cell "Usman Sheikh" [ref=e327]
+    - row
+      - cell "07:50" [ref=e328]
+      - cell "Pump 6" [ref=e329]
+      - cell "N1" [ref=e330]
+      - cell "Diesel" [ref=e331]
+      - cell "35.0" [ref=e332]
+      - cell "Rs. 268.00" [ref=e333]
+      - cell "Rs. 9,380" [ref=e334]
+      - cell "Mobile" [ref=e335]
+      - cell "Usman Sheikh" [ref=e336]
+    - row
+      - cell "07:48" [ref=e337]
+      - cell "Pump 1" [ref=e338]
+      - cell "N2" [ref=e339]
+      - cell "Hsd" [ref=e340]
+      - cell "21.0" [ref=e341]
+      - cell "Rs. 275.00" [ref=e342]
+      - cell "Rs. 5,775" [ref=e343]
+      - cell "Fleet" [ref=e344]
+      - cell "Zain Ahmed" [ref=e345]
+    - row
+      - cell "07:52" [ref=e346]
+      - cell "Pump 4" [ref=e347]
+      - cell "N1" [ref=e348]
+      - cell "Petrol" [ref=e349]
+      - cell "37.0" [ref=e350]
+      - cell "Rs. 272.50" [ref=e351]
+      - cell "Rs. 10,083" [ref=e352]
+      - cell "RFID" [ref=e353]
+      - cell "Zain Ahmed" [ref=e354]
+    - row
+      - cell "06:52" [ref=e355]
+      - cell "Pump 6" [ref=e356]
+      - cell "N2" [ref=e357]
+      - cell "Petrol" [ref=e358]
+      - cell "33.0" [ref=e359]
+      - cell "Rs. 272.50" [ref=e360]
+      - cell "Rs. 8,993" [ref=e361]
+      - cell "Mobile" [ref=e362]
+      - cell "Bilal Hussain" [ref=e363]
+    - row
+      - cell "06:48" [ref=e364]
+      - cell "Pump 2" [ref=e365]
+      - cell "N2" [ref=e366]
+      - cell "Premium" [ref=e367]
+      - cell "24.0" [ref=e368]
+      - cell "Rs. 302.50" [ref=e369]
+      - cell "Rs. 7,260" [ref=e370]
+      - cell "Mobile" [ref=e371]
+      - cell "Farhan Raza" [ref=e372]
+    - row
+      - cell "06:52" [ref=e373]
+      - cell "Pump 8" [ref=e374]
+      - cell "N1" [ref=e375]
+      - cell "Diesel" [ref=e376]
+      - cell "29.0" [ref=e377]
+      - cell "Rs. 268.00" [ref=e378]
+      - cell "Rs. 7,772" [ref=e379]
+      - cell "Card" [ref=e380]
+      - cell "Zain Ahmed" [ref=e381]
+    - row
+      - cell "06:48" [ref=e382]
+      - cell "Pump 8" [ref=e383]
+      - cell "N1" [ref=e384]
+      - cell "Petrol" [ref=e385]
+      - cell "5.0" [ref=e386]
+      - cell "Rs. 272.50" [ref=e387]
+      - cell "Rs. 1,363" [ref=e388]
+      - cell "RFID" [ref=e389]
+      - cell "Zain Ahmed" [ref=e390]
+    - row
+      - cell "06:51" [ref=e391]
+      - cell "Pump 8" [ref=e392]
+      - cell "N2" [ref=e393]
+      - cell "Hsd" [ref=e394]
+      - cell "57.0" [ref=e395]
+      - cell "Rs. 275.00" [ref=e396]
+      - cell "Rs. 15,675" [ref=e397]
+      - cell "Mobile" [ref=e398]
+      - cell "Usman Sheikh" [ref=e399]
+    - row
+      - cell "06:48" [ref=e400]
+      - cell "Pump 5" [ref=e401]
+      - cell "N1" [ref=e402]
+      - cell "Diesel" [ref=e403]
+      - cell "45.0" [ref=e404]
+      - cell "Rs. 268.00" [ref=e405]
+      - cell "Rs. 12,060" [ref=e406]
+      - cell "Fleet" [ref=e407]
+      - cell "Zain Ahmed" [ref=e408]
+    - row
+      - cell "06:51" [ref=e409]
+      - cell "Pump 1" [ref=e410]
+      - cell "N1" [ref=e411]
+      - cell "Petrol" [ref=e412]
+      - cell "44.0" [ref=e413]
+      - cell "Rs. 272.50" [ref=e414]
+      - cell "Rs. 11,990" [ref=e415]
+      - cell "Card" [ref=e416]
+      - cell "Bilal Hussain" [ref=e417]
+    - row
+      - cell "06:50" [ref=e418]
+      - cell "Pump 1" [ref=e419]
+      - cell "N2" [ref=e420]
+      - cell "Premium" [ref=e421]
+      - cell "53.0" [ref=e422]
+      - cell "Rs. 302.50" [ref=e423]
+      - cell "Rs. 16,033" [ref=e424]
+      - cell "Mobile" [ref=e425]
+      - cell "Zain Ahmed" [ref=e426]
+    - row
+      - cell "06:51" [ref=e427]
+      - cell "Pump 5" [ref=e428]
+      - cell "N2" [ref=e429]
+      - cell "Premium" [ref=e430]
+      - cell "5.0" [ref=e431]
+      - cell "Rs. 302.50" [ref=e432]
+      - cell "Rs. 1,513" [ref=e433]
+      - cell "Fleet" [ref=e434]
+      - cell "Farhan Raza" [ref=e435]
+- paragraph
+  - StaticText "Today's Revenue"
+- paragraph
+  - StaticText "Rs. 382,099"
+- paragraph
+  - StaticText "Today's Volume"
+- paragraph
+  - StaticText "1,352 L"
+- paragraph
+  - StaticText "Transactions"
+- paragraph
+  - StaticText "45"
+- StaticText "Payment Method Breakdown"
+- paragraph
+  - StaticText "RFID"
+- paragraph
+  - StaticText "5 txn · Rs. 35,205"
+- paragraph
+  - StaticText "Card"
+- paragraph
+  - StaticText "8 txn · Rs. 58,774"
+- paragraph
+  - StaticText "Fleet"
+- paragraph
+  - StaticText "9 txn · Rs. 92,571"
+- paragraph
+  - StaticText "Cash"
+- paragraph
+  - StaticText "14 txn · Rs. 91,282"
+- paragraph
+  - StaticText "Mobile"
+- paragraph
+  - StaticText "9 txn · Rs. 104,268"
+- StaticText "Recent Fuel Transactions"
+- table
+  - rowgroup
+    - row
+      - columnheader "Time" [ref=e436]
+      - columnheader "Pump" [ref=e437]
+      - columnheader "Nozzle" [ref=e438]
+      - columnheader "Fuel Type" [ref=e439]
+      - columnheader "Volume (L)" [ref=e440]
+      - columnheader "Rate" [ref=e441]
+      - columnheader "Amount" [ref=e442]
+      - columnheader "Payment" [ref=e443]
+      - columnheader "Attendant" [ref=e444]
+  - row
+    - cell "13:48" [ref=e31]
+    - cell "Pump 2" [ref=e32]
+    - cell "N2" [ref=e33]
+      - StaticText "N2"
+    - cell "Petrol" [ref=e34]
+    - cell "24.0" [ref=e35]
+    - cell "Rs. 272.50" [ref=e36]
+      - StaticText "Rs. 272.50"
+    - cell "Rs. 6,540" [ref=e37]
+      - StaticText "Rs. 6,540"
+    - cell "RFID" [ref=e38]
+      - StaticText "RFID"
+    - cell "Bilal Hussain" [ref=e39]
+  - row
+    - cell "13:47" [ref=e40]
+    - cell "Pump 3" [ref=e41]
+    - cell "N1" [ref=e42]
+      - StaticText "N1"
+    - cell "Diesel" [ref=e43]
+    - cell "18.0" [ref=e44]
+    - cell "Rs. 268.00" [ref=e45]
+      - StaticText "Rs. 268.00"
+    - cell "Rs. 4,824" [ref=e46]
+      - StaticText "Rs. 4,824"
+    - cell "Card" [ref=e47]
+      - StaticText "Card"
+    - cell "Zain Ahmed" [ref=e48]
+  - row
+    - cell "13:51" [ref=e49]
+    - cell "Pump 6" [ref=e50]
+    - cell "N2" [ref=e51]
+      - StaticText "N2"
+    - cell "Premium" [ref=e52]
+    - cell "35.0" [ref=e53]
+    - cell "Rs. 302.50" [ref=e54]
+      - StaticText "Rs. 302.50"
+    - cell "Rs. 10,588" [ref=e55]
+      - StaticText "Rs. 10,588"
+    - cell "Fleet" [ref=e56]
+      - StaticText "Fleet"
+    - cell "Zain Ahmed" [ref=e57]
+  - row
+    - cell "13:47" [ref=e58]
+    - cell "Pump 1" [ref=e59]
+    - cell "N2" [ref=e60]
+      - StaticText "N2"
+    - cell "Premium" [ref=e61]
+    - cell "57.0" [ref=e62]
+    - cell "Rs. 302.50" [ref=e63]
+      - StaticText "Rs. 302.50"
+    - cell "Rs. 17,243" [ref=e64]
+      - StaticText "Rs. 17,243"
+    - cell "Fleet" [ref=e65]
+      - StaticText "Fleet"
+    - cell "Usman Sheikh" [ref=e66]
+  - row
+    - cell "13:50" [ref=e67]
+    - cell "Pump 8" [ref=e68]
+    - cell "N1" [ref=e69]
+      - StaticText "N1"
+    - cell "Hsd" [ref=e70]
+    - cell "9.0" [ref=e71]
+    - cell "Rs. 275.00" [ref=e72]
+      - StaticText "Rs. 275.00"
+    - cell "Rs. 2,475" [ref=e73]
+      - StaticText "Rs. 2,475"
+    - cell "Cash" [ref=e74]
+      - StaticText "Cash"
+    - cell "Bilal Hussain" [ref=e75]
+  - row
+    - cell "13:50" [ref=e76]
+    - cell "Pump 8" [ref=e77]
+    - cell "N2" [ref=e78]
+      - StaticText "N2"
+    - cell "Petrol" [ref=e79]
+    - cell "30.0" [ref=e80]
+    - cell "Rs. 272.50" [ref=e81]
+      - StaticText "Rs. 272.50"
+    - cell "Rs. 8,175" [ref=e82]
+      - StaticText "Rs. 8,175"
+    - cell "Fleet" [ref=e83]
+      - StaticText "Fleet"
+    - cell "Zain Ahmed" [ref=e84]
+  - row
+    - cell "13:52" [ref=e85]
+    - cell "Pump 7" [ref=e86]
+    - cell "N1" [ref=e87]
+      - StaticText "N1"
+    - cell "Petrol" [ref=e88]
+    - cell "15.0" [ref=e89]
+    - cell "Rs. 272.50" [ref=e90]
+      - StaticText "Rs. 272.50"
+    - cell "Rs. 4,088" [ref=e91]
+      - StaticText "Rs. 4,088"
+    - cell "RFID" [ref=e92]
+      - StaticText "RFID"
+    - cell "Farhan Raza" [ref=e93]
+  - row
+    - cell "13:47" [ref=e94]
+    - cell "Pump 5" [ref=e95]
+    - cell "N1" [ref=e96]
+      - StaticText "N1"
+    - cell "Premium" [ref=e97]
+    - cell "57.0" [ref=e98]
+    - cell "Rs. 302.50" [ref=e99]
+      - StaticText "Rs. 302.50"
+    - cell "Rs. 17,243" [ref=e100]
+      - StaticText "Rs. 17,243"
+    - cell "Mobile" [ref=e101]
+      - StaticText "Mobile"
+    - cell "Usman Sheikh" [ref=e102]
+  - row
+    - cell "13:48" [ref=e103]
+    - cell "Pump 7" [ref=e104]
+    - cell "N2" [ref=e105]
+      - StaticText "N2"
+    - cell "Hsd" [ref=e106]
+    - cell "6.0" [ref=e107]
+    - cell "Rs. 275.00" [ref=e108]
+      - StaticText "Rs. 275.00"
+    - cell "Rs. 1,650" [ref=e109]
+      - StaticText "Rs. 1,650"
+    - cell "Cash" [ref=e110]
+      - StaticText "Cash"
+    - cell "Farhan Raza" [ref=e111]
+  - row
+    - cell "12:52" [ref=e112]
+    - cell "Pump 2" [ref=e113]
+    - cell "N1" [ref=e114]
+      - StaticText "N1"
+    - cell "Petrol" [ref=e115]
+    - cell "37.0" [ref=e116]
+    - cell "Rs. 272.50" [ref=e117]
+      - StaticText "Rs. 272.50"
+    - cell "Rs. 10,083" [ref=e118]
+      - StaticText "Rs. 10,083"
+    - cell "Fleet" [ref=e119]
+      - StaticText "Fleet"
+    - cell "Usman Sheikh" [ref=e120]
+  - row
+    - cell "12:49" [ref=e121]
+    - cell "Pump 4" [ref=e122]
+    - cell "N1" [ref=e123]
+      - StaticText "N1"
+    - cell "Petrol" [ref=e124]
+    - cell "11.0" [ref=e125]
+    - cell "Rs. 272.50" [ref=e126]
+      - StaticText "Rs. 272.50"
+    - cell "Rs. 2,998" [ref=e127]
+      - StaticText "Rs. 2,998"
+    - cell "Card" [ref=e128]
+      - StaticText "Card"
+    - cell "Zain Ahmed" [ref=e129]
+  - row
+    - cell "12:48" [ref=e130]
+    - cell "Pump 6" [ref=e131]
+    - cell "N2" [ref=e132]
+      - StaticText "N2"
+    - cell "Petrol" [ref=e133]
+    - cell "39.0" [ref=e134]
+    - cell "Rs. 272.50" [ref=e135]
+      - StaticText "Rs. 272.50"
+    - cell "Rs. 10,628" [ref=e136]
+      - StaticText "Rs. 10,628"
+    - cell "Mobile" [ref=e137]
+      - StaticText "Mobile"
+    - cell "Zain Ahmed" [ref=e138]
+  - row
+    - cell "11:49" [ref=e139]
+    - cell "Pump 7" [ref=e140]
+    - cell "N2" [ref=e141]
+      - StaticText "N2"
+    - cell "Premium" [ref=e142]
+    - cell "11.0" [ref=e143]
+    - cell "Rs. 302.50" [ref=e144]
+      - StaticText "Rs. 302.50"
+    - cell "Rs. 3,328" [ref=e145]
+      - StaticText "Rs. 3,328"
+    - cell "Cash" [ref=e146]
+      - StaticText "Cash"
+    - cell "Bilal Hussain" [ref=e147]
+  - row
+    - cell "11:50" [ref=e148]
+    - cell "Pump 4" [ref=e149]
+    - cell "N2" [ref=e150]
+      - StaticText "N2"
+    - cell "Premium" [ref=e151]
+    - cell "35.0" [ref=e152]
+    - cell "Rs. 302.50" [ref=e153]
+      - StaticText "Rs. 302.50"
+    - cell "Rs. 10,588" [ref=e154]
+      - StaticText "Rs. 10,588"
+    - cell "Cash" [ref=e155]
+      - StaticText "Cash"
+    - cell "Usman Sheikh" [ref=e156]
+  - row
+    - cell "11:50" [ref=e157]
+    - cell "Pump 4" [ref=e158]
+    - cell "N2" [ref=e159]
+      - StaticText "N2"
+    - cell "Premium" [ref=e160]
+    - cell "33.0" [ref=e161]
+    - cell "Rs. 302.50" [ref=e162]
+      - StaticText "Rs. 302.50"
+    - cell "Rs. 9,983" [ref=e163]
+      - StaticText "Rs. 9,983"
+    - cell "Cash" [ref=e164]
+      - StaticText "Cash"
+    - cell "Bilal Hussain" [ref=e165]
+  - row
+    - cell "11:52" [ref=e166]
+    - cell "Pump 5" [ref=e167]
+    - cell "N2" [ref=e168]
+      - StaticText "N2"
+    - cell "Hsd" [ref=e169]
+    - cell "29.0" [ref=e170]
+    - cell "Rs. 275.00" [ref=e171]
+      - StaticText "Rs. 275.00"
+    - cell "Rs. 7,975" [ref=e172]
+      - StaticText "Rs. 7,975"
+    - cell "Card" [ref=e173]
+      - StaticText "Card"
+    - cell "Farhan Raza" [ref=e174]
+  - row
+    - cell "11:49" [ref=e175]
+    - cell "Pump 8" [ref=e176]
+    - cell "N2" [ref=e177]
+      - StaticText "N2"
+    - cell "Petrol" [ref=e178]
+    - cell "21.0" [ref=e179]
+    - cell "Rs. 272.50" [ref=e180]
+      - StaticText "Rs. 272.50"
+    - cell "Rs. 5,723" [ref=e181]
+      - StaticText "Rs. 5,723"
+    - cell "Cash" [ref=e182]
+      - StaticText "Cash"
+    - cell "Bilal Hussain" [ref=e183]
+  - row
+    - cell "10:49" [ref=e184]
+    - cell "Pump 2" [ref=e185]
+    - cell "N2" [ref=e186]
+      - StaticText "N2"
+    - cell "Premium" [ref=e187]
+    - cell "53.0" [ref=e188]
+    - cell "Rs. 302.50" [ref=e189]
+      - StaticText "Rs. 302.50"
+    - cell "Rs. 16,033" [ref=e190]
+      - StaticText "Rs. 16,033"
+    - cell "Cash" [ref=e191]
+      - StaticText "Cash"
+    - cell "Usman Sheikh" [ref=e192]
+  - row
+    - cell "10:52" [ref=e193]
+    - cell "Pump 8" [ref=e194]
+    - cell "N2" [ref=e195]
+      - StaticText "N2"
+    - cell "Hsd" [ref=e196]
+    - cell "30.0" [ref=e197]
+    - cell "Rs. 275.00" [ref=e198]
+      - StaticText "Rs. 275.00"
+    - cell "Rs. 8,250" [ref=e199]
+      - StaticText "Rs. 8,250"
+    - cell "Cash" [ref=e200]
+      - StaticText "Cash"
+    - cell "Bilal Hussain" [ref=e201]
+  - row
+    - cell "10:47" [ref=e202]
+    - cell "Pump 1" [ref=e203]
+    - cell "N2" [ref=e204]
+      - StaticText "N2"
+    - cell "Premium" [ref=e205]
+    - cell "16.0" [ref=e206]
+    - cell "Rs. 302.50" [ref=e207]
+      - StaticText "Rs. 302.50"
+    - cell "Rs. 4,840" [ref=e208]
+      - StaticText "Rs. 4,840"
+    - cell "Cash" [ref=e209]
+      - StaticText "Cash"
+    - cell "Bilal Hussain" [ref=e210]
+  - row
+    - cell "10:47" [ref=e211]
+    - cell "Pump 7" [ref=e212]
+    - cell "N1" [ref=e213]
+      - StaticText "N1"
+    - cell "Hsd" [ref=e214]
+    - cell "48.0" [ref=e215]
+    - cell "Rs. 275.00" [ref=e216]
+      - StaticText "Rs. 275.00"
+    - cell "Rs. 13,200" [ref=e217]
+      - StaticText "Rs. 13,200"
+    - cell "Fleet" [ref=e218]
+      - StaticText "Fleet"
+    - cell "Zain Ahmed" [ref=e219]
+  - row
+    - cell "10:52" [ref=e220]
+    - cell "Pump 2" [ref=e221]
+    - cell "N1" [ref=e222]
+      - StaticText "N1"
+    - cell "Diesel" [ref=e223]
+    - cell "52.0" [ref=e224]
+    - cell "Rs. 268.00" [ref=e225]
+      - StaticText "Rs. 268.00"
+    - cell "Rs. 13,936" [ref=e226]
+      - StaticText "Rs. 13,936"
+    - cell "Fleet" [ref=e227]
+      - StaticText "Fleet"
+    - cell "Farhan Raza" [ref=e228]
+  - row
+    - cell "09:52" [ref=e229]
+    - cell "Pump 5" [ref=e230]
+    - cell "N1" [ref=e231]
+      - StaticText "N1"
+    - cell "Hsd" [ref=e232]
+    - cell "8.0" [ref=e233]
+    - cell "Rs. 275.00" [ref=e234]
+      - StaticText "Rs. 275.00"
+    - cell "Rs. 2,200" [ref=e235]
+      - StaticText "Rs. 2,200"
+    - cell "Cash" [ref=e236]
+      - StaticText "Cash"
+    - cell "Farhan Raza" [ref=e237]
+  - row
+    - cell "09:51" [ref=e238]
+    - cell "Pump 8" [ref=e239]
+    - cell "N1" [ref=e240]
+      - StaticText "N1"
+    - cell "Petrol" [ref=e241]
+    - cell "43.0" [ref=e242]
+    - cell "Rs. 272.50" [ref=e243]
+      - StaticText "Rs. 272.50"
+    - cell "Rs. 11,718" [ref=e244]
+      - StaticText "Rs. 11,718"
+    - cell "Card" [ref=e245]
+      - StaticText "Card"
+    - cell "Zain Ahmed" [ref=e246]
+  - row
+    - cell "09:52" [ref=e247]
+    - cell "Pump 7" [ref=e248]
+    - cell "N2" [ref=e249]
+      - StaticText "N2"
+    - cell "Hsd" [ref=e250]
+    - cell "35.0" [ref=e251]
+    - cell "Rs. 275.00" [ref=e252]
+      - StaticText "Rs. 275.00"
+    - cell "Rs. 9,625" [ref=e253]
+      - StaticText "Rs. 9,625"
+    - cell "Cash" [ref=e254]
+      - StaticText "Cash"
+    - cell "Bilal Hussain" [ref=e255]
+  - row
+    - cell "08:50" [ref=e256]
+    - cell "Pump 3" [ref=e257]
+    - cell "N2" [ref=e258]
+      - StaticText "N2"
+    - cell "Premium" [ref=e259]
+    - cell "45.0" [ref=e260]
+    - cell "Rs. 302.50" [ref=e261]
+      - StaticText "Rs. 302.50"
+    - cell "Rs. 13,613" [ref=e262]
+      - StaticText "Rs. 13,613"
+    - cell "Mobile" [ref=e263]
+      - StaticText "Mobile"
+    - cell "Zain Ahmed" [ref=e264]
+  - row
+    - cell "08:49" [ref=e265]
+    - cell "Pump 7" [ref=e266]
+    - cell "N1" [ref=e267]
+      - StaticText "N1"
+    - cell "Diesel" [ref=e268]
+    - cell "14.0" [ref=e269]
+    - cell "Rs. 268.00" [ref=e270]
+      - StaticText "Rs. 268.00"
+    - cell "Rs. 3,752" [ref=e271]
+      - StaticText "Rs. 3,752"
+    - cell "Cash" [ref=e272]
+      - StaticText "Cash"
+    - cell "Farhan Raza" [ref=e273]
+  - row
+    - cell "08:52" [ref=e274]
+    - cell "Pump 8" [ref=e275]
+    - cell "N2" [ref=e276]
+      - StaticText "N2"
+    - cell "Diesel" [ref=e277]
+    - cell "49.0" [ref=e278]
+    - cell "Rs. 268.00" [ref=e279]
+      - StaticText "Rs. 268.00"
+    - cell "Rs. 13,132" [ref=e280]
+      - StaticText "Rs. 13,132"
+    - cell "RFID" [ref=e281]
+      - StaticText "RFID"
+    - cell "Bilal Hussain" [ref=e282]
+  - row
+    - cell "08:51" [ref=e283]
+    - cell "Pump 7" [ref=e284]
+    - cell "N1" [ref=e285]
+      - StaticText "N1"
+    - cell "Premium" [ref=e286]
+    - cell "29.0" [ref=e287]
+    - cell "Rs. 302.50" [ref=e288]
+      - StaticText "Rs. 302.50"
+    - cell "Rs. 8,773" [ref=e289]
+      - StaticText "Rs. 8,773"
+    - cell "Card" [ref=e290]
+      - StaticText "Card"
+    - cell "Farhan Raza" [ref=e291]
+  - row
+    - cell "08:48" [ref=e292]
+    - cell "Pump 7" [ref=e293]
+    - cell "N2" [ref=e294]
+      - StaticText "N2"
+    - cell "Diesel" [ref=e295]
+    - cell "40.0" [ref=e296]
+    - cell "Rs. 268.00" [ref=e297]
+      - StaticText "Rs. 268.00"
+    - cell "Rs. 10,720" [ref=e298]
+      - StaticText "Rs. 10,720"
+    - cell "Cash" [ref=e299]
+      - StaticText "Cash"
+    - cell "Zain Ahmed" [ref=e300]
+  - row
+    - cell "08:47" [ref=e301]
+    - cell "Pump 8" [ref=e302]
+    - cell "N1" [ref=e303]
+      - StaticText "N1"
+    - cell "Premium" [ref=e304]
+    - cell "18.0" [ref=e305]
+    - cell "Rs. 302.50" [ref=e306]
+      - StaticText "Rs. 302.50"
+    - cell "Rs. 5,445" [ref=e307]
+      - StaticText "Rs. 5,445"
+    - cell "Mobile" [ref=e308]
+      - StaticText "Mobile"
+    - cell "Bilal Hussain" [ref=e309]
+  - row
+    - cell "08:51" [ref=e310]
+    - cell "Pump 3" [ref=e311]
+    - cell "N2" [ref=e312]
+      - StaticText "N2"
+    - cell "Premium" [ref=e313]
+    - cell "7.0" [ref=e314]
+    - cell "Rs. 302.50" [ref=e315]
+      - StaticText "Rs. 302.50"
+    - cell "Rs. 2,118" [ref=e316]
+      - StaticText "Rs. 2,118"
+    - cell "Cash" [ref=e317]
+      - StaticText "Cash"
+    - cell "Farhan Raza" [ref=e318]
+  - row
+    - cell "07:47" [ref=e319]
+    - cell "Pump 6" [ref=e320]
+    - cell "N1" [ref=e321]
+      - StaticText "N1"
+    - cell "Petrol" [ref=e322]
+    - cell "10.0" [ref=e323]
+    - cell "Rs. 272.50" [ref=e324]
+      - StaticText "Rs. 272.50"
+    - cell "Rs. 2,725" [ref=e325]
+      - StaticText "Rs. 2,725"
+    - cell "Card" [ref=e326]
+      - StaticText "Card"
+    - cell "Usman Sheikh" [ref=e327]
+  - row
+    - cell "07:50" [ref=e328]
+    - cell "Pump 6" [ref=e329]
+    - cell "N1" [ref=e330]
+      - StaticText "N1"
+    - cell "Diesel" [ref=e331]
+    - cell "35.0" [ref=e332]
+    - cell "Rs. 268.00" [ref=e333]
+      - StaticText "Rs. 268.00"
+    - cell "Rs. 9,380" [ref=e334]
+      - StaticText "Rs. 9,380"
+    - cell "Mobile" [ref=e335]
+      - StaticText "Mobile"
+    - cell "Usman Sheikh" [ref=e336]
+  - row
+    - cell "07:48" [ref=e337]
+    - cell "Pump 1" [ref=e338]
+    - cell "N2" [ref=e339]
+      - StaticText "N2"
+    - cell "Hsd" [ref=e340]
+    - cell "21.0" [ref=e341]
+    - cell "Rs. 275.00" [ref=e342]
+      - StaticText "Rs. 275.00"
+    - cell "Rs. 5,775" [ref=e343]
+      - StaticText "Rs. 5,775"
+    - cell "Fleet" [ref=e344]
+      - StaticText "Fleet"
+    - cell "Zain Ahmed" [ref=e345]
+  - row
+    - cell "07:52" [ref=e346]
+    - cell "Pump 4" [ref=e347]
+    - cell "N1" [ref=e348]
+      - StaticText "N1"
+    - cell "Petrol" [ref=e349]
+    - cell "37.0" [ref=e350]
+    - cell "Rs. 272.50" [ref=e351]
+      - StaticText "Rs. 272.50"
+    - cell "Rs. 10,083" [ref=e352]
+      - StaticText "Rs. 10,083"
+    - cell "RFID" [ref=e353]
+      - StaticText "RFID"
+    - cell "Zain Ahmed" [ref=e354]
+  - row
+    - cell "06:52" [ref=e355]
+    - cell "Pump 6" [ref=e356]
+    - cell "N2" [ref=e357]
+      - StaticText "N2"
+    - cell "Petrol" [ref=e358]
+    - cell "33.0" [ref=e359]
+    - cell "Rs. 272.50" [ref=e360]
+      - StaticText "Rs. 272.50"
+    - cell "Rs. 8,993" [ref=e361]
+      - StaticText "Rs. 8,993"
+    - cell "Mobile" [ref=e362]
+      - StaticText "Mobile"
+    - cell "Bilal Hussain" [ref=e363]
+  - row
+    - cell "06:48" [ref=e364]
+    - cell "Pump 2" [ref=e365]
+    - cell "N2" [ref=e366]
+      - StaticText "N2"
+    - cell "Premium" [ref=e367]
+    - cell "24.0" [ref=e368]
+    - cell "Rs. 302.50" [ref=e369]
+      - StaticText "Rs. 302.50"
+    - cell "Rs. 7,260" [ref=e370]
+      - StaticText "Rs. 7,260"
+    - cell "Mobile" [ref=e371]
+      - StaticText "Mobile"
+    - cell "Farhan Raza" [ref=e372]
+  - row
+    - cell "06:52" [ref=e373]
+    - cell "Pump 8" [ref=e374]
+    - cell "N1" [ref=e375]
+      - StaticText "N1"
+    - cell "Diesel" [ref=e376]
+    - cell "29.0" [ref=e377]
+    - cell "Rs. 268.00" [ref=e378]
+      - StaticText "Rs. 268.00"
+    - cell "Rs. 7,772" [ref=e379]
+      - StaticText "Rs. 7,772"
+    - cell "Card" [ref=e380]
+      - StaticText "Card"
+    - cell "Zain Ahmed" [ref=e381]
+  - row
+    - cell "06:48" [ref=e382]
+    - cell "Pump 8" [ref=e383]
+    - cell "N1" [ref=e384]
+      - StaticText "N1"
+    - cell "Petrol" [ref=e385]
+    - cell "5.0" [ref=e386]
+    - cell "Rs. 272.50" [ref=e387]
+      - StaticText "Rs. 272.50"
+    - cell "Rs. 1,363" [ref=e388]
+      - StaticText "Rs. 1,363"
+    - cell "RFID" [ref=e389]
+      - StaticText "RFID"
+    - cell "Zain Ahmed" [ref=e390]
+  - row
+    - cell "06:51" [ref=e391]
+    - cell "Pump 8" [ref=e392]
+    - cell "N2" [ref=e393]
+      - StaticText "N2"
+    - cell "Hsd" [ref=e394]
+    - cell "57.0" [ref=e395]
+    - cell "Rs. 275.00" [ref=e396]
+      - StaticText "Rs. 275.00"
+    - cell "Rs. 15,675" [ref=e397]
+      - StaticText "Rs. 15,675"
+    - cell "Mobile" [ref=e398]
+      - StaticText "Mobile"
+    - cell "Usman Sheikh" [ref=e399]
+  - row
+    - cell "06:48" [ref=e400]
+    - cell "Pump 5" [ref=e401]
+    - cell "N1" [ref=e402]
+      - StaticText "N1"
+    - cell "Diesel" [ref=e403]
+    - cell "45.0" [ref=e404]
+    - cell "Rs. 268.00" [ref=e405]
+      - StaticText "Rs. 268.00"
+    - cell "Rs. 12,060" [ref=e406]
+      - StaticText "Rs. 12,060"
+    - cell "Fleet" [ref=e407]
+      - StaticText "Fleet"
+    - cell "Zain Ahmed" [ref=e408]
+  - row
+    - cell "06:51" [ref=e409]
+    - cell "Pump 1" [ref=e410]
+    - cell "N1" [ref=e411]
+      - StaticText "N1"
+    - cell "Petrol" [ref=e412]
+    - cell "44.0" [ref=e413]
+    - cell "Rs. 272.50" [ref=e414]
+      - StaticText "Rs. 272.50"
+    - cell "Rs. 11,990" [ref=e415]
+      - StaticText "Rs. 11,990"
+    - cell "Card" [ref=e416]
+      - StaticText "Card"
+    - cell "Bilal Hussain" [ref=e417]
+  - row
+    - cell "06:50" [ref=e418]
+    - cell "Pump 1" [ref=e419]
+    - cell "N2" [ref=e420]
+      - StaticText "N2"
+    - cell "Premium" [ref=e421]
+    - cell "53.0" [ref=e422]
+    - cell "Rs. 302.50" [ref=e423]
+      - StaticText "Rs. 302.50"
+    - cell "Rs. 16,033" [ref=e424]
+      - StaticText "Rs. 16,033"
+    - cell "Mobile" [ref=e425]
+      - StaticText "Mobile"
+    - cell "Zain Ahmed" [ref=e426]
+  - row
+    - cell "06:51" [ref=e427]
+    - cell "Pump 5" [ref=e428]
+    - cell "N2" [ref=e429]
+      - StaticText "N2"
+    - cell "Premium" [ref=e430]
+    - cell "5.0" [ref=e431]
+    - cell "Rs. 302.50" [ref=e432]
+      - StaticText "Rs. 302.50"
+    - cell "Rs. 1,513" [ref=e433]
+      - StaticText "Rs. 1,513"
+    - cell "Fleet" [ref=e434]
+      - StaticText "Fleet"
+    - cell "Farhan Raza" [ref=e435]
+- row
+  - cell "13:48" [ref=e31]
+  - cell "Pump 2" [ref=e32]
+  - cell "N2" [ref=e33]
+    - StaticText "N2"
+  - cell "Petrol" [ref=e34]
+  - cell "24.0" [ref=e35]
+  - cell "Rs. 272.50" [ref=e36]
+    - StaticText "Rs. 272.50"
+  - cell "Rs. 6,540" [ref=e37]
+    - StaticText "Rs. 6,540"
+  - cell "RFID" [ref=e38]
+    - StaticText "RFID"
+  - cell "Bilal Hussain" [ref=e39]
+- row
+  - cell "13:47" [ref=e40]
+  - cell "Pump 3" [ref=e41]
+  - cell "N1" [ref=e42]
+    - StaticText "N1"
+  - cell "Diesel" [ref=e43]
+  - cell "18.0" [ref=e44]
+  - cell "Rs. 268.00" [ref=e45]
+    - StaticText "Rs. 268.00"
+  - cell "Rs. 4,824" [ref=e46]
+    - StaticText "Rs. 4,824"
+  - cell "Card" [ref=e47]
+    - StaticText "Card"
+  - cell "Zain Ahmed" [ref=e48]
+- row
+  - cell "13:51" [ref=e49]
+  - cell "Pump 6" [ref=e50]
+  - cell "N2" [ref=e51]
+    - StaticText "N2"
+  - cell "Premium" [ref=e52]
+  - cell "35.0" [ref=e53]
+  - cell "Rs. 302.50" [ref=e54]
+    - StaticText "Rs. 302.50"
+  - cell "Rs. 10,588" [ref=e55]
+    - StaticText "Rs. 10,588"
+  - cell "Fleet" [ref=e56]
+    - StaticText "Fleet"
+  - cell "Zain Ahmed" [ref=e57]
+- row
+  - cell "13:47" [ref=e58]
+  - cell "Pump 1" [ref=e59]
+  - cell "N2" [ref=e60]
+    - StaticText "N2"
+  - cell "Premium" [ref=e61]
+  - cell "57.0" [ref=e62]
+  - cell "Rs. 302.50" [ref=e63]
+    - StaticText "Rs. 302.50"
+  - cell "Rs. 17,243" [ref=e64]
+    - StaticText "Rs. 17,243"
+  - cell "Fleet" [ref=e65]
+    - StaticText "Fleet"
+  - cell "Usman Sheikh" [ref=e66]
+- row
+  - cell "13:50" [ref=e67]
+  - cell "Pump 8" [ref=e68]
+  - cell "N1" [ref=e69]
+    - StaticText "N1"
+  - cell "Hsd" [ref=e70]
+  - cell "9.0" [ref=e71]
+  - cell "Rs. 275.00" [ref=e72]
+    - StaticText "Rs. 275.00"
+  - cell "Rs. 2,475" [ref=e73]
+    - StaticText "Rs. 2,475"
+  - cell "Cash" [ref=e74]
+    - StaticText "Cash"
+  - cell "Bilal Hussain" [ref=e75]
+- row
+  - cell "13:50" [ref=e76]
+  - cell "Pump 8" [ref=e77]
+  - cell "N2" [ref=e78]
+    - StaticText "N2"
+  - cell "Petrol" [ref=e79]
+  - cell "30.0" [ref=e80]
+  - cell "Rs. 272.50" [ref=e81]
+    - StaticText "Rs. 272.50"
+  - cell "Rs. 8,175" [ref=e82]
+    - StaticText "Rs. 8,175"
+  - cell "Fleet" [ref=e83]
+    - StaticText "Fleet"
+  - cell "Zain Ahmed" [ref=e84]
+- row
+  - cell "13:52" [ref=e85]
+  - cell "Pump 7" [ref=e86]
+  - cell "N1" [ref=e87]
+    - StaticText "N1"
+  - cell "Petrol" [ref=e88]
+  - cell "15.0" [ref=e89]
+  - cell "Rs. 272.50" [ref=e90]
+    - StaticText "Rs. 272.50"
+  - cell "Rs. 4,088" [ref=e91]
+    - StaticText "Rs. 4,088"
+  - cell "RFID" [ref=e92]
+    - StaticText "RFID"
+  - cell "Farhan Raza" [ref=e93]
+- row
+  - cell "13:47" [ref=e94]
+  - cell "Pump 5" [ref=e95]
+  - cell "N1" [ref=e96]
+    - StaticText "N1"
+  - cell "Premium" [ref=e97]
+  - cell "57.0" [ref=e98]
+  - cell "Rs. 302.50" [ref=e99]
+    - StaticText "Rs. 302.50"
+  - cell "Rs. 17,243" [ref=e100]
+    - StaticText "Rs. 17,243"
+  - cell "Mobile" [ref=e101]
+    - StaticText "Mobile"
+  - cell "Usman Sheikh" [ref=e102]
+- row
+  - cell "13:48" [ref=e103]
+  - cell "Pump 7" [ref=e104]
+  - cell "N2" [ref=e105]
+    - StaticText "N2"
+  - cell "Hsd" [ref=e106]
+  - cell "6.0" [ref=e107]
+  - cell "Rs. 275.00" [ref=e108]
+    - StaticText "Rs. 275.00"
+  - cell "Rs. 1,650" [ref=e109]
+    - StaticText "Rs. 1,650"
+  - cell "Cash" [ref=e110]
+    - StaticText "Cash"
+  - cell "Farhan Raza" [ref=e111]
+- row
+  - cell "12:52" [ref=e112]
+  - cell "Pump 2" [ref=e113]
+  - cell "N1" [ref=e114]
+    - StaticText "N1"
+  - cell "Petrol" [ref=e115]
+  - cell "37.0" [ref=e116]
+  - cell "Rs. 272.50" [ref=e117]
+    - StaticText "Rs. 272.50"
+  - cell "Rs. 10,083" [ref=e118]
+    - StaticText "Rs. 10,083"
+  - cell "Fleet" [ref=e119]
+    - StaticText "Fleet"
+  - cell "Usman Sheikh" [ref=e120]
+- row
+  - cell "12:49" [ref=e121]
+  - cell "Pump 4" [ref=e122]
+  - cell "N1" [ref=e123]
+    - StaticText "N1"
+  - cell "Petrol" [ref=e124]
+  - cell "11.0" [ref=e125]
+  - cell "Rs. 272.50" [ref=e126]
+    - StaticText "Rs. 272.50"
+  - cell "Rs. 2,998" [ref=e127]
+    - StaticText "Rs. 2,998"
+  - cell "Card" [ref=e128]
+    - StaticText "Card"
+  - cell "Zain Ahmed" [ref=e129]
+- row
+  - cell "12:48" [ref=e130]
+  - cell "Pump 6" [ref=e131]
+  - cell "N2" [ref=e132]
+    - StaticText "N2"
+  - cell "Petrol" [ref=e133]
+  - cell "39.0" [ref=e134]
+  - cell "Rs. 272.50" [ref=e135]
+    - StaticText "Rs. 272.50"
+  - cell "Rs. 10,628" [ref=e136]
+    - StaticText "Rs. 10,628"
+  - cell "Mobile" [ref=e137]
+    - StaticText "Mobile"
+  - cell "Zain Ahmed" [ref=e138]
+- row
+  - cell "11:49" [ref=e139]
+  - cell "Pump 7" [ref=e140]
+  - cell "N2" [ref=e141]
+    - StaticText "N2"
+  - cell "Premium" [ref=e142]
+  - cell "11.0" [ref=e143]
+  - cell "Rs. 302.50" [ref=e144]
+    - StaticText "Rs. 302.50"
+  - cell "Rs. 3,328" [ref=e145]
+    - StaticText "Rs. 3,328"
+  - cell "Cash" [ref=e146]
+    - StaticText "Cash"
+  - cell "Bilal Hussain" [ref=e147]
+- row
+  - cell "11:50" [ref=e148]
+  - cell "Pump 4" [ref=e149]
+  - cell "N2" [ref=e150]
+    - StaticText "N2"
+  - cell "Premium" [ref=e151]
+  - cell "35.0" [ref=e152]
+  - cell "Rs. 302.50" [ref=e153]
+    - StaticText "Rs. 302.50"
+  - cell "Rs. 10,588" [ref=e154]
+    - StaticText "Rs. 10,588"
+  - cell "Cash" [ref=e155]
+    - StaticText "Cash"
+  - cell "Usman Sheikh" [ref=e156]
+- row
+  - cell "11:50" [ref=e157]
+  - cell "Pump 4" [ref=e158]
+  - cell "N2" [ref=e159]
+    - StaticText "N2"
+  - cell "Premium" [ref=e160]
+  - cell "33.0" [ref=e161]
+  - cell "Rs. 302.50" [ref=e162]
+    - StaticText "Rs. 302.50"
+  - cell "Rs. 9,983" [ref=e163]
+    - StaticText "Rs. 9,983"
+  - cell "Cash" [ref=e164]
+    - StaticText "Cash"
+  - cell "Bilal Hussain" [ref=e165]
+- row
+  - cell "11:52" [ref=e166]
+  - cell "Pump 5" [ref=e167]
+  - cell "N2" [ref=e168]
+    - StaticText "N2"
+  - cell "Hsd" [ref=e169]
+  - cell "29.0" [ref=e170]
+  - cell "Rs. 275.00" [ref=e171]
+    - StaticText "Rs. 275.00"
+  - cell "Rs. 7,975" [ref=e172]
+    - StaticText "Rs. 7,975"
+  - cell "Card" [ref=e173]
+    - StaticText "Card"
+  - cell "Farhan Raza" [ref=e174]
+- row
+  - cell "11:49" [ref=e175]
+  - cell "Pump 8" [ref=e176]
+  - cell "N2" [ref=e177]
+    - StaticText "N2"
+  - cell "Petrol" [ref=e178]
+  - cell "21.0" [ref=e179]
+  - cell "Rs. 272.50" [ref=e180]
+    - StaticText "Rs. 272.50"
+  - cell "Rs. 5,723" [ref=e181]
+    - StaticText "Rs. 5,723"
+  - cell "Cash" [ref=e182]
+    - StaticText "Cash"
+  - cell "Bilal Hussain" [ref=e183]
+- row
+  - cell "10:49" [ref=e184]
+  - cell "Pump 2" [ref=e185]
+  - cell "N2" [ref=e186]
+    - StaticText "N2"
+  - cell "Premium" [ref=e187]
+  - cell "53.0" [ref=e188]
+  - cell "Rs. 302.50" [ref=e189]
+    - StaticText "Rs. 302.50"
+  - cell "Rs. 16,033" [ref=e190]
+    - StaticText "Rs. 16,033"
+  - cell "Cash" [ref=e191]
+    - StaticText "Cash"
+  - cell "Usman Sheikh" [ref=e192]
+- row
+  - cell "10:52" [ref=e193]
+  - cell "Pump 8" [ref=e194]
+  - cell "N2" [ref=e195]
+    - StaticText "N2"
+  - cell "Hsd" [ref=e196]
+  - cell "30.0" [ref=e197]
+  - cell "Rs. 275.00" [ref=e198]
+    - StaticText "Rs. 275.00"
+  - cell "Rs. 8,250" [ref=e199]
+    - StaticText "Rs. 8,250"
+  - cell "Cash" [ref=e200]
+    - StaticText "Cash"
+  - cell "Bilal Hussain" [ref=e201]
+- row
+  - cell "10:47" [ref=e202]
+  - cell "Pump 1" [ref=e203]
+  - cell "N2" [ref=e204]
+    - StaticText "N2"
+  - cell "Premium" [ref=e205]
+  - cell "16.0" [ref=e206]
+  - cell "Rs. 302.50" [ref=e207]
+    - StaticText "Rs. 302.50"
+  - cell "Rs. 4,840" [ref=e208]
+    - StaticText "Rs. 4,840"
+  - cell "Cash" [ref=e209]
+    - StaticText "Cash"
+  - cell "Bilal Hussain" [ref=e210]
+- row
+  - cell "10:47" [ref=e211]
+  - cell "Pump 7" [ref=e212]
+  - cell "N1" [ref=e213]
+    - StaticText "N1"
+  - cell "Hsd" [ref=e214]
+  - cell "48.0" [ref=e215]
+  - cell "Rs. 275.00" [ref=e216]
+    - StaticText "Rs. 275.00"
+  - cell "Rs. 13,200" [ref=e217]
+    - StaticText "Rs. 13,200"
+  - cell "Fleet" [ref=e218]
+    - StaticText "Fleet"
+  - cell "Zain Ahmed" [ref=e219]
+- row
+  - cell "10:52" [ref=e220]
+  - cell "Pump 2" [ref=e221]
+  - cell "N1" [ref=e222]
+    - StaticText "N1"
+  - cell "Diesel" [ref=e223]
+  - cell "52.0" [ref=e224]
+  - cell "Rs. 268.00" [ref=e225]
+    - StaticText "Rs. 268.00"
+  - cell "Rs. 13,936" [ref=e226]
+    - StaticText "Rs. 13,936"
+  - cell "Fleet" [ref=e227]
+    - StaticText "Fleet"
+  - cell "Farhan Raza" [ref=e228]
+- row
+  - cell "09:52" [ref=e229]
+  - cell "Pump 5" [ref=e230]
+  - cell "N1" [ref=e231]
+    - StaticText "N1"
+  - cell "Hsd" [ref=e232]
+  - cell "8.0" [ref=e233]
+  - cell "Rs. 275.00" [ref=e234]
+    - StaticText "Rs. 275.00"
+  - cell "Rs. 2,200" [ref=e235]
+    - StaticText "Rs. 2,200"
+  - cell "Cash" [ref=e236]
+    - StaticText "Cash"
+  - cell "Farhan Raza" [ref=e237]
+- row
+  - cell "09:51" [ref=e238]
+  - cell "Pump 8" [ref=e239]
+  - cell "N1" [ref=e240]
+    - StaticText "N1"
+  - cell "Petrol" [ref=e241]
+  - cell "43.0" [ref=e242]
+  - cell "Rs. 272.50" [ref=e243]
+    - StaticText "Rs. 272.50"
+  - cell "Rs. 11,718" [ref=e244]
+    - StaticText "Rs. 11,718"
+  - cell "Card" [ref=e245]
+    - StaticText "Card"
+  - cell "Zain Ahmed" [ref=e246]
+- row
+  - cell "09:52" [ref=e247]
+  - cell "Pump 7" [ref=e248]
+  - cell "N2" [ref=e249]
+    - StaticText "N2"
+  - cell "Hsd" [ref=e250]
+  - cell "35.0" [ref=e251]
+  - cell "Rs. 275.00" [ref=e252]
+    - StaticText "Rs. 275.00"
+  - cell "Rs. 9,625" [ref=e253]
+    - StaticText "Rs. 9,625"
+  - cell "Cash" [ref=e254]
+    - StaticText "Cash"
+  - cell "Bilal Hussain" [ref=e255]
+- row
+  - cell "08:50" [ref=e256]
+  - cell "Pump 3" [ref=e257]
+  - cell "N2" [ref=e258]
+    - StaticText "N2"
+  - cell "Premium" [ref=e259]
+  - cell "45.0" [ref=e260]
+  - cell "Rs. 302.50" [ref=e261]
+    - StaticText "Rs. 302.50"
+  - cell "Rs. 13,613" [ref=e262]
+    - StaticText "Rs. 13,613"
+  - cell "Mobile" [ref=e263]
+    - StaticText "Mobile"
+  - cell "Zain Ahmed" [ref=e264]
+- row
+  - cell "08:49" [ref=e265]
+  - cell "Pump 7" [ref=e266]
+  - cell "N1" [ref=e267]
+    - StaticText "N1"
+  - cell "Diesel" [ref=e268]
+  - cell "14.0" [ref=e269]
+  - cell "Rs. 268.00" [ref=e270]
+    - StaticText "Rs. 268.00"
+  - cell "Rs. 3,752" [ref=e271]
+    - StaticText "Rs. 3,752"
+  - cell "Cash" [ref=e272]
+    - StaticText "Cash"
+  - cell "Farhan Raza" [ref=e273]
+- row
+  - cell "08:52" [ref=e274]
+  - cell "Pump 8" [ref=e275]
+  - cell "N2" [ref=e276]
+    - StaticText "N2"
+  - cell "Diesel" [ref=e277]
+  - cell "49.0" [ref=e278]
+  - cell "Rs. 268.00" [ref=e279]
+    - StaticText "Rs. 268.00"
+  - cell "Rs. 13,132" [ref=e280]
+    - StaticText "Rs. 13,132"
+  - cell "RFID" [ref=e281]
+    - StaticText "RFID"
+  - cell "Bilal Hussain" [ref=e282]
+- row
+  - cell "08:51" [ref=e283]
+  - cell "Pump 7" [ref=e284]
+  - cell "N1" [ref=e285]
+    - StaticText "N1"
+  - cell "Premium" [ref=e286]
+  - cell "29.0" [ref=e287]
+  - cell "Rs. 302.50" [ref=e288]
+    - StaticText "Rs. 302.50"
+  - cell "Rs. 8,773" [ref=e289]
+    - StaticText "Rs. 8,773"
+  - cell "Card" [ref=e290]
+    - StaticText "Card"
+  - cell "Farhan Raza" [ref=e291]
+- row
+  - cell "08:48" [ref=e292]
+  - cell "Pump 7" [ref=e293]
+  - cell "N2" [ref=e294]
+    - StaticText "N2"
+  - cell "Diesel" [ref=e295]
+  - cell "40.0" [ref=e296]
+  - cell "Rs. 268.00" [ref=e297]
+    - StaticText "Rs. 268.00"
+  - cell "Rs. 10,720" [ref=e298]
+    - StaticText "Rs. 10,720"
+  - cell "Cash" [ref=e299]
+    - StaticText "Cash"
+  - cell "Zain Ahmed" [ref=e300]
+- row
+  - cell "08:47" [ref=e301]
+  - cell "Pump 8" [ref=e302]
+  - cell "N1" [ref=e303]
+    - StaticText "N1"
+  - cell "Premium" [ref=e304]
+  - cell "18.0" [ref=e305]
+  - cell "Rs. 302.50" [ref=e306]
+    - StaticText "Rs. 302.50"
+  - cell "Rs. 5,445" [ref=e307]
+    - StaticText "Rs. 5,445"
+  - cell "Mobile" [ref=e308]
+    - StaticText "Mobile"
+  - cell "Bilal Hussain" [ref=e309]
+- row
+  - cell "08:51" [ref=e310]
+  - cell "Pump 3" [ref=e311]
+  - cell "N2" [ref=e312]
+    - StaticText "N2"
+  - cell "Premium" [ref=e313]
+  - cell "7.0" [ref=e314]
+  - cell "Rs. 302.50" [ref=e315]
+    - StaticText "Rs. 302.50"
+  - cell "Rs. 2,118" [ref=e316]
+    - StaticText "Rs. 2,118"
+  - cell "Cash" [ref=e317]
+    - StaticText "Cash"
+  - cell "Farhan Raza" [ref=e318]
+- row
+  - cell "07:47" [ref=e319]
+  - cell "Pump 6" [ref=e320]
+  - cell "N1" [ref=e321]
+    - StaticText "N1"
+  - cell "Petrol" [ref=e322]
+  - cell "10.0" [ref=e323]
+  - cell "Rs. 272.50" [ref=e324]
+    - StaticText "Rs. 272.50"
+  - cell "Rs. 2,725" [ref=e325]
+    - StaticText "Rs. 2,725"
+  - cell "Card" [ref=e326]
+    - StaticText "Card"
+  - cell "Usman Sheikh" [ref=e327]
+- row
+  - cell "07:50" [ref=e328]
+  - cell "Pump 6" [ref=e329]
+  - cell "N1" [ref=e330]
+    - StaticText "N1"
+  - cell "Diesel" [ref=e331]
+  - cell "35.0" [ref=e332]
+  - cell "Rs. 268.00" [ref=e333]
+    - StaticText "Rs. 268.00"
+  - cell "Rs. 9,380" [ref=e334]
+    - StaticText "Rs. 9,380"
+  - cell "Mobile" [ref=e335]
+    - StaticText "Mobile"
+  - cell "Usman Sheikh" [ref=e336]
+- row
+  - cell "07:48" [ref=e337]
+  - cell "Pump 1" [ref=e338]
+  - cell "N2" [ref=e339]
+    - StaticText "N2"
+  - cell "Hsd" [ref=e340]
+  - cell "21.0" [ref=e341]
+  - cell "Rs. 275.00" [ref=e342]
+    - StaticText "Rs. 275.00"
+  - cell "Rs. 5,775" [ref=e343]
+    - StaticText "Rs. 5,775"
+  - cell "Fleet" [ref=e344]
+    - StaticText "Fleet"
+  - cell "Zain Ahmed" [ref=e345]
+- row
+  - cell "07:52" [ref=e346]
+  - cell "Pump 4" [ref=e347]
+  - cell "N1" [ref=e348]
+    - StaticText "N1"
+  - cell "Petrol" [ref=e349]
+  - cell "37.0" [ref=e350]
+  - cell "Rs. 272.50" [ref=e351]
+    - StaticText "Rs. 272.50"
+  - cell "Rs. 10,083" [ref=e352]
+    - StaticText "Rs. 10,083"
+  - cell "RFID" [ref=e353]
+    - StaticText "RFID"
+  - cell "Zain Ahmed" [ref=e354]
+- row
+  - cell "06:52" [ref=e355]
+  - cell "Pump 6" [ref=e356]
+  - cell "N2" [ref=e357]
+    - StaticText "N2"
+  - cell "Petrol" [ref=e358]
+  - cell "33.0" [ref=e359]
+  - cell "Rs. 272.50" [ref=e360]
+    - StaticText "Rs. 272.50"
+  - cell "Rs. 8,993" [ref=e361]
+    - StaticText "Rs. 8,993"
+  - cell "Mobile" [ref=e362]
+    - StaticText "Mobile"
+  - cell "Bilal Hussain" [ref=e363]
+- row
+  - cell "06:48" [ref=e364]
+  - cell "Pump 2" [ref=e365]
+  - cell "N2" [ref=e366]
+    - StaticText "N2"
+  - cell "Premium" [ref=e367]
+  - cell "24.0" [ref=e368]
+  - cell "Rs. 302.50" [ref=e369]
+    - StaticText "Rs. 302.50"
+  - cell "Rs. 7,260" [ref=e370]
+    - StaticText "Rs. 7,260"
+  - cell "Mobile" [ref=e371]
+    - StaticText "Mobile"
+  - cell "Farhan Raza" [ref=e372]
+- row
+  - cell "06:52" [ref=e373]
+  - cell "Pump 8" [ref=e374]
+  - cell "N1" [ref=e375]
+    - StaticText "N1"
+  - cell "Diesel" [ref=e376]
+  - cell "29.0" [ref=e377]
+  - cell "Rs. 268.00" [ref=e378]
+    - StaticText "Rs. 268.00"
+  - cell "Rs. 7,772" [ref=e379]
+    - StaticText "Rs. 7,772"
+  - cell "Card" [ref=e380]
+    - StaticText "Card"
+  - cell "Zain Ahmed" [ref=e381]
+- row
+  - cell "06:48" [ref=e382]
+  - cell "Pump 8" [ref=e383]
+  - cell "N1" [ref=e384]
+    - StaticText "N1"
+  - cell "Petrol" [ref=e385]
+  - cell "5.0" [ref=e386]
+  - cell "Rs. 272.50" [ref=e387]
+    - StaticText "Rs. 272.50"
+  - cell "Rs. 1,363" [ref=e388]
+    - StaticText "Rs. 1,363"
+  - cell "RFID" [ref=e389]
+    - StaticText "RFID"
+  - cell "Zain Ahmed" [ref=e390]
+- row
+  - cell "06:51" [ref=e391]
+  - cell "Pump 8" [ref=e392]
+  - cell "N2" [ref=e393]
+    - StaticText "N2"
+  - cell "Hsd" [ref=e394]
+  - cell "57.0" [ref=e395]
+  - cell "Rs. 275.00" [ref=e396]
+    - StaticText "Rs. 275.00"
+  - cell "Rs. 15,675" [ref=e397]
+    - StaticText "Rs. 15,675"
+  - cell "Mobile" [ref=e398]
+    - StaticText "Mobile"
+  - cell "Usman Sheikh" [ref=e399]
+- row
+  - cell "06:48" [ref=e400]
+  - cell "Pump 5" [ref=e401]
+  - cell "N1" [ref=e402]
+    - StaticText "N1"
+  - cell "Diesel" [ref=e403]
+  - cell "45.0" [ref=e404]
+  - cell "Rs. 268.00" [ref=e405]
+    - StaticText "Rs. 268.00"
+  - cell "Rs. 12,060" [ref=e406]
+    - StaticText "Rs. 12,060"
+  - cell "Fleet" [ref=e407]
+    - StaticText "Fleet"
+  - cell "Zain Ahmed" [ref=e408]
+- row
+  - cell "06:51" [ref=e409]
+  - cell "Pump 1" [ref=e410]
+  - cell "N1" [ref=e411]
+    - StaticText "N1"
+  - cell "Petrol" [ref=e412]
+  - cell "44.0" [ref=e413]
+  - cell "Rs. 272.50" [ref=e414]
+    - StaticText "Rs. 272.50"
+  - cell "Rs. 11,990" [ref=e415]
+    - StaticText "Rs. 11,990"
+  - cell "Card" [ref=e416]
+    - StaticText "Card"
+  - cell "Bilal Hussain" [ref=e417]
+- row
+  - cell "06:50" [ref=e418]
+  - cell "Pump 1" [ref=e419]
+  - cell "N2" [ref=e420]
+    - StaticText "N2"
+  - cell "Premium" [ref=e421]
+  - cell "53.0" [ref=e422]
+  - cell "Rs. 302.50" [ref=e423]
+    - StaticText "Rs. 302.50"
+  - cell "Rs. 16,033" [ref=e424]
+    - StaticText "Rs. 16,033"
+  - cell "Mobile" [ref=e425]
+    - StaticText "Mobile"
+  - cell "Zain Ahmed" [ref=e426]
+- row
+  - cell "06:51" [ref=e427]
+  - cell "Pump 5" [ref=e428]
+  - cell "N2" [ref=e429]
+    - StaticText "N2"
+  - cell "Premium" [ref=e430]
+  - cell "5.0" [ref=e431]
+  - cell "Rs. 302.50" [ref=e432]
+    - StaticText "Rs. 302.50"
+  - cell "Rs. 1,513" [ref=e433]
+    - StaticText "Rs. 1,513"
+  - cell "Fleet" [ref=e434]
+    - StaticText "Fleet"
+  - cell "Farhan Raza" [ref=e435]
+- StaticText "RFID"
+- StaticText "Card"
+- StaticText "Fleet"
+- StaticText "Fleet"
+- StaticText "Cash"
+- StaticText "Fleet"
+- StaticText "RFID"
+- StaticText "Mobile"
+- StaticText "Cash"
+- StaticText "Fleet"
+- StaticText "Card"
+- StaticText "Mobile"
+- StaticText "Cash"
+- StaticText "Cash"
+- StaticText "Cash"
+- StaticText "Card"
+- StaticText "Cash"
+- StaticText "Cash"
+- StaticText "Cash"
+- StaticText "Cash"
+- StaticText "Fleet"
+- StaticText "Fleet"
+- StaticText "Cash"
+- StaticText "Card"
+- StaticText "Cash"
+- StaticText "Mobile"
+- StaticText "Cash"
+- StaticText "RFID"
+- StaticText "Card"
+- StaticText "Cash"
+- StaticText "Mobile"
+- StaticText "Cash"
+- StaticText "Card"
+- StaticText "Mobile"
+- StaticText "Fleet"
+- StaticText "RFID"
+- StaticText "Mobile"
+- StaticText "Mobile"
+- StaticText "Card"
+- StaticText "RFID"
+- StaticText "Mobile"
+- StaticText "Fleet"
+- StaticText "Card"
+- StaticText "Mobile"
+- StaticText "Fleet"
