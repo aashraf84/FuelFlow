@@ -38,8 +38,8 @@ export async function GET(request: Request) {
     }
     if (stationId) expenseWhere.stationId = stationId
 
-    // Fetch transactions and expenses in parallel
-    const [transactions, expenses, fuelingRevenue] = await Promise.all([
+    // Fetch transactions, expenses, fueling revenue, supplier invoices, purchase orders, payroll in parallel
+    const [transactions, expenses, fuelingRevenue, supplierInvoices, purchaseOrders, payrollRecords] = await Promise.all([
       db.transaction.findMany({
         where: transactionWhere,
         select: { type: true, category: true, amount: true, date: true },
@@ -56,6 +56,27 @@ export async function GET(request: Request) {
         },
         select: { totalAmount: true, fuelType: true },
       }),
+      db.supplierInvoice.findMany({
+        where: {
+          ...(stationId ? { stationId } : {}),
+          invoiceDate: { gte: startDate },
+        },
+        select: { totalAmount: true, netAmount: true, paidAmount: true, status: true },
+      }),
+      db.purchaseOrder.findMany({
+        where: {
+          ...(stationId ? { stationId } : {}),
+          orderDate: { gte: startDate },
+        },
+        select: { totalAmount: true, status: true },
+      }),
+      db.payrollRecord.findMany({
+        where: {
+          ...(stationId ? { stationId } : {}),
+          periodStart: { gte: startDate },
+        },
+        select: { netPay: true, status: true },
+      }),
     ])
 
     // Calculate totals
@@ -64,9 +85,21 @@ export async function GET(request: Request) {
       .reduce((sum, t) => sum + t.amount, 0)
 
     const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0)
-
     const totalFuelRevenue = fuelingRevenue.reduce((sum, f) => sum + f.totalAmount, 0)
-    const profit = totalIncome - totalExpenses
+    const totalPayrollCosts = payrollRecords.reduce((sum, p) => sum + p.netPay, 0)
+
+    // Supplier invoice summary
+    const invoicesPending = supplierInvoices.filter(i => i.status === 'pending' || i.status === 'approved')
+    const invoicesPaid = supplierInvoices.filter(i => i.status === 'paid')
+    const totalInvoicePending = invoicesPending.reduce((sum, i) => sum + i.netAmount - i.paidAmount, 0)
+    const totalInvoicePaid = invoicesPaid.reduce((sum, i) => sum + i.paidAmount, 0)
+
+    // Purchase order summary
+    const poOpen = purchaseOrders.filter(p => p.status !== 'received' && p.status !== 'cancelled')
+    const totalPOOpen = poOpen.reduce((sum, p) => sum + p.totalAmount, 0)
+
+    // Net profit calculation (income - expenses - payroll)
+    const profit = totalIncome - totalExpenses - totalPayrollCosts
 
     // Breakdown by category
     const incomeByCategory: Record<string, number> = {}
@@ -96,10 +129,28 @@ export async function GET(request: Request) {
         profitMargin: totalIncome > 0
           ? Math.round((profit / totalIncome) * 1000) / 10
           : 0,
+        payrollCosts: Math.round(totalPayrollCosts * 100) / 100,
+        netProfit: Math.round(profit * 100) / 100,
       },
       incomeByCategory,
       expenseByCategory,
       fuelRevenueByType,
+      supplierInvoices: {
+        totalPending: Math.round(totalInvoicePending * 100) / 100,
+        totalPaid: Math.round(totalInvoicePaid * 100) / 100,
+        pendingCount: invoicesPending.length,
+        paidCount: invoicesPaid.length,
+      },
+      purchaseOrders: {
+        totalOpen: Math.round(totalPOOpen * 100) / 100,
+        openCount: poOpen.length,
+      },
+      payroll: {
+        totalCost: Math.round(totalPayrollCosts * 100) / 100,
+        recordCount: payrollRecords.length,
+        paidCount: payrollRecords.filter(p => p.status === 'paid').length,
+        pendingCount: payrollRecords.filter(p => p.status === 'pending').length,
+      },
       transactionCount: transactions.length,
       expenseCount: expenses.length,
     })

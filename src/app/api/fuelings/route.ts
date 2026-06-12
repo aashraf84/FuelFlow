@@ -22,13 +22,25 @@ export async function GET(request: Request) {
           attendant: { select: { id: true, name: true } },
           shift: { select: { id: true, shiftNumber: true, status: true } },
           fleetAccount: { select: { id: true, companyName: true } },
+          customer: { select: { id: true, name: true, loyaltyPoints: true, membershipTier: true } },
         },
       }),
       db.fueling.count({ where }),
     ])
 
+    // Add loyalty points info to response
+    const fuelingsWithLoyalty = fuelings.map(f => ({
+      ...f,
+      loyaltyInfo: f.customer ? {
+        customerName: f.customer.name,
+        membershipTier: f.customer.membershipTier,
+        currentPoints: f.customer.loyaltyPoints,
+        pointsEarned: f.loyaltyPoints,
+      } : null,
+    }))
+
     return NextResponse.json({
-      fuelings,
+      fuelings: fuelingsWithLoyalty,
       pagination: {
         total,
         limit,
@@ -64,6 +76,7 @@ export async function POST(request: Request) {
       vehiclePlate,
       rfidTag,
       fleetAccountId,
+      customerId,
     } = body
 
     if (!stationId || !dispenserId || !nozzleId || !fuelType || !volume || !pricePerUnit) {
@@ -74,6 +87,9 @@ export async function POST(request: Request) {
     }
 
     const computedTotal = totalAmount || Math.round(volume * pricePerUnit * 100) / 100
+
+    // Calculate loyalty points (1 point per 100 PKR spent)
+    const loyaltyPoints = Math.floor(computedTotal / 100)
 
     const fueling = await db.fueling.create({
       data: {
@@ -92,6 +108,8 @@ export async function POST(request: Request) {
         vehiclePlate,
         rfidTag,
         fleetAccountId,
+        customerId,
+        loyaltyPoints,
         status: 'completed',
         startedAt: new Date(),
         completedAt: new Date(),
@@ -100,8 +118,22 @@ export async function POST(request: Request) {
         dispenser: { select: { name: true, code: true } },
         nozzle: { select: { nozzleNumber: true, fuelType: true } },
         attendant: { select: { name: true } },
+        customer: { select: { name: true, loyaltyPoints: true } },
       },
     })
+
+    // Update customer loyalty points if applicable
+    if (customerId && loyaltyPoints > 0) {
+      await db.customer.update({
+        where: { id: customerId },
+        data: {
+          loyaltyPoints: { increment: loyaltyPoints },
+          totalSpent: { increment: computedTotal },
+          totalVisits: { increment: 1 },
+          lastVisit: new Date(),
+        },
+      })
+    }
 
     return NextResponse.json({ fueling }, { status: 201 })
   } catch (error) {

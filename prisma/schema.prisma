@@ -23,71 +23,92 @@ model Tenant {
   phone         String?
   email         String?
   subscription  String   @default("starter")
+  taxId         String?
+  registrationNumber String?
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  stations     Station[]
-  users        User[]
-  fleetAccounts FleetAccount[]
-  customers    Customer[]
-  fuelCards    FuelCard[]
+  stations       Station[]
+  users          User[]
+  fleetAccounts  FleetAccount[]
+  customers      Customer[]
+  fuelCards      FuelCard[]
+  suppliers      Supplier[]
+  notifications  Notification[]
+  promotions     Promotion[]
+  loyaltyRules   LoyaltyRule[]
 }
 
 model Station {
-  id          String   @id @default(cuid())
-  tenantId    String
-  name        String
-  code        String
-  address     String?
-  city        String?
-  region      String?
-  country     String?
-  phone       String?
-  email       String?
-  latitude    Float?
-  longitude   Float?
-  isActive    Boolean  @default(true)
-  stationType String   @default("fuel") // fuel, cng, ev, hybrid
+  id            String   @id @default(cuid())
+  tenantId      String
+  name          String
+  code          String
+  address       String?
+  city          String?
+  region        String?
+  country       String?
+  phone         String?
+  email         String?
+  latitude      Float?
+  longitude     Float?
+  isActive      Boolean  @default(true)
+  stationType   String   @default("fuel") // fuel, cng, ev, hybrid
   operatingHours String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  timezone      String   @default("Asia/Karachi")
+  currency      String   @default("PKR")
+  taxRate       Float    @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  tenant       Tenant       @relation(fields: [tenantId], references: [id])
-  tanks        Tank[]
-  dispensers   Dispenser[]
-  shifts       Shift[]
-  employees    Employee[]
-  priceBoards  PriceBoard[]
-  deliveries   FuelDelivery[]
-  retailProducts RetailProduct[]
-  lubricantProducts LubricantProduct[]
-  evChargers   EVCharger[]
-  cngDispensers CNGDispenser[]
-  anprCameras ANPRCamera[]
-  rfidReaders  RFIDReader[]
+  tenant             Tenant             @relation(fields: [tenantId], references: [id])
+  tanks              Tank[]
+  dispensers         Dispenser[]
+  shifts             Shift[]
+  employees          Employee[]
+  priceBoards        PriceBoard[]
+  deliveries         FuelDelivery[]
+  retailProducts     RetailProduct[]
+  lubricantProducts  LubricantProduct[]
+  evChargers         EVCharger[]
+  cngDispensers      CNGDispenser[]
+  anprCameras        ANPRCamera[]
+  rfidReaders        RFIDReader[]
   retailTransactions RetailTransaction[]
-  transactions Transaction[]
-  expenses    Expense[]
+  transactions       Transaction[]
+  expenses           Expense[]
   maintenanceRecords MaintenanceRecord[]
-  aiAlerts    AIAlert[]
-  chargingSessions ChargingSession[]
+  aiAlerts           AIAlert[]
+  chargingSessions   ChargingSession[]
+  carWashSessions    CarWashSession[]
+  environmentalAlerts EnvironmentalAlert[]
+  dailyReports       DailyReport[]
+  meterRecords       MeterRecord[]
+  supplierInvoices   SupplierInvoice[]
+  purchaseOrders     PurchaseOrder[]
+  tankCalibrations   TankCalibration[]
+  lotterySales       LotterySale[]
+  promotions         PromotionUsage[]
+  payrollRecords     PayrollRecord[]
+  leaveRequests      LeaveRequest[]
+  vaporRecoveryReadings VaporRecoveryReading[]
 }
 
 model User {
-  id        String   @id @default(cuid())
-  tenantId  String
-  email     String   @unique
-  name      String
-  role      String   @default("viewer") // superadmin, admin, manager, operator, viewer
-  avatar    String?
-  isActive  Boolean  @default(true)
-  lastLogin DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  tenantId    String
+  email       String   @unique
+  name        String
+  role        String   @default("viewer") // superadmin, admin, manager, operator, cashier, attendant, viewer
+  avatar      String?
+  isActive    Boolean  @default(true)
+  lastLogin   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  tenant    Tenant    @relation(fields: [tenantId], references: [id])
-  auditLogs AuditLog[]
+  tenant     Tenant     @relation(fields: [tenantId], references: [id])
+  auditLogs  AuditLog[]
 }
 
 // =====================================================
@@ -106,6 +127,7 @@ model Dispenser {
   communicationType String?  // tcpip, rs232, rs485, serial, ethernet
   ipAddress         String?
   port              Int?
+  pumpLane          Int      @default(1)
   status            String   @default("idle") // idle, fueling, stopped, error, locked, maintenance
   isActive          Boolean  @default(true)
   lastCommunication DateTime?
@@ -121,22 +143,23 @@ model Nozzle {
   id              String   @id @default(cuid())
   dispenserId     String
   nozzleNumber    Int
-  fuelType        String   // petrol, diesel, premium, highSpeedDiesel, etc.
+  fuelType        String
   fuelGrade       String?
   meterReading    Float    @default(0)
   previousReading Float    @default(0)
   totalizer       Float    @default(0)
   calibrationDate DateTime?
   calibrationFactor Float  @default(1.0)
-  status          String   @default("idle") // idle, fueling, closed, error, locked, disabled
+  status          String   @default("idle")
   isActive        Boolean  @default(true)
   lastCalibration DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  dispenser  Dispenser @relation(fields: [dispenserId], references: [id])
-  fuelings   Fueling[]
+  dispenser        Dispenser         @relation(fields: [dispenserId], references: [id])
+  fuelings         Fueling[]
   maintenanceRecords MaintenanceRecord[]
+  meterRecords     MeterRecord[]
 }
 
 // =====================================================
@@ -148,24 +171,25 @@ model Tank {
   stationId       String
   name            String
   code            String
-  capacity        Float    // in liters
+  capacity        Float
   currentLevel    Float    @default(0)
   waterLevel      Float    @default(0)
   temperature     Float    @default(0)
   density         Float?
-  fuelType        String   // petrol, diesel, premium, etc.
-  atgType         String?  // veeder-root, opw, franklin, etc.
+  fuelType        String
+  atgType         String?
   atgIpAddress    String?
   atgPort         Int?
-  status          String   @default("normal") // normal, low, critical, leak_detected, maintenance
+  status          String   @default("normal")
   lastReading     DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  station     Station        @relation(fields: [stationId], references: [id])
-  deliveries  FuelDelivery[]
-  tankReadings TankReading[]
-  reconciliations Reconciliation[]
+  station          Station           @relation(fields: [stationId], references: [id])
+  deliveries       FuelDelivery[]
+  tankReadings     TankReading[]
+  reconciliations  Reconciliation[]
+  calibrations     TankCalibration[]
 }
 
 model TankReading {
@@ -176,7 +200,7 @@ model TankReading {
   waterLevel  Float
   temperature Float
   density     Float?
-  readingType String   @default("automatic") // automatic, manual
+  readingType String   @default("automatic")
   readingAt   DateTime @default(now())
   createdAt   DateTime @default(now())
 
@@ -187,6 +211,7 @@ model FuelDelivery {
   id              String   @id @default(cuid())
   stationId       String
   tankId          String
+  supplierId      String?
   supplierName    String
   tankerNumber    String?
   driverName      String?
@@ -200,11 +225,15 @@ model FuelDelivery {
   completedAt     DateTime?
   notes           String?
   variance        Float?
+  invoiceNumber   String?
+  costPerUnit     Float?
+  totalCost       Float?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  station     Station   @relation(fields: [stationId], references: [id])
-  tank        Tank      @relation(fields: [tankId], references: [id])
+  station     Station          @relation(fields: [stationId], references: [id])
+  tank        Tank             @relation(fields: [tankId], references: [id])
+  supplier    Supplier?        @relation(fields: [supplierId], references: [id])
 }
 
 model Reconciliation {
@@ -218,14 +247,45 @@ model Reconciliation {
   closingStock        Float
   bookStock           Float
   actualStock         Float
-  variance            Float    // actualStock - bookStock
+  variance            Float
   variancePercentage  Float
   status              String   @default("pending") // pending, reviewed, approved
+  reviewedBy          String?
   notes               String?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
   tank        Tank     @relation(fields: [tankId], references: [id])
+}
+
+model TankCalibration {
+  id              String   @id @default(cuid())
+  stationId       String
+  tankId          String
+  calibrationDate DateTime
+  calibratedBy    String?
+  certificateNumber String?
+  volumeTable     String   // JSON string of height->volume mapping
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  station        Station   @relation(fields: [stationId], references: [id])
+  tank           Tank      @relation(fields: [tankId], references: [id])
+}
+
+model MeterRecord {
+  id              String   @id @default(cuid())
+  stationId       String
+  nozzleId        String
+  shiftId         String?
+  readingStart    Float
+  readingEnd      Float?
+  volumeDispensed Float?
+  recordedAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  station         Station  @relation(fields: [stationId], references: [id])
+  nozzle          Nozzle   @relation(fields: [nozzleId], references: [id])
 }
 
 // =====================================================
@@ -242,23 +302,26 @@ model Fueling {
   volume          Float
   pricePerUnit    Float
   totalAmount     Float
-  paymentMethod   String   @default("cash") // cash, card, fleet, credit, rfid, mobile
+  paymentMethod   String   @default("cash")
   meterStart      Float
   meterEnd        Float
   attendantId     String?
   vehiclePlate    String?
   rfidTag         String?
   fleetAccountId  String?
-  status          String   @default("completed") // authorized, fueling, completed, cancelled, error
+  customerId      String?
+  loyaltyPoints   Int      @default(0)
+  status          String   @default("completed")
   startedAt       DateTime
   completedAt     DateTime?
   createdAt       DateTime @default(now())
 
-  dispenser     Dispenser    @relation(fields: [dispenserId], references: [id])
-  nozzle       Nozzle       @relation(fields: [nozzleId], references: [id])
-  shift        Shift?       @relation(fields: [shiftId], references: [id])
-  attendant    Employee?    @relation(fields: [attendantId], references: [id])
+  dispenser     Dispenser     @relation(fields: [dispenserId], references: [id])
+  nozzle       Nozzle        @relation(fields: [nozzleId], references: [id])
+  shift        Shift?        @relation(fields: [shiftId], references: [id])
+  attendant    Employee?     @relation(fields: [attendantId], references: [id])
   fleetAccount FleetAccount? @relation(fields: [fleetAccountId], references: [id])
+  customer     Customer?     @relation(fields: [customerId], references: [id])
 }
 
 model Shift {
@@ -266,6 +329,7 @@ model Shift {
   stationId       String
   shiftNumber     Int
   attendantId     String?
+  supervisorId    String?
   openedAt        DateTime
   closedAt        DateTime?
   openingCash     Float    @default(0)
@@ -276,14 +340,20 @@ model Shift {
   totalVolume     Float    @default(0)
   fuelSales       Float    @default(0)
   retailSales     Float    @default(0)
+  cardSales       Float    @default(0)
+  fleetSales      Float    @default(0)
+  creditSales     Float    @default(0)
+  cashSales       Float    @default(0)
+  transactionCount Int     @default(0)
   status          String   @default("open") // open, closed, reconciled
   notes           String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  station     Station    @relation(fields: [stationId], references: [id])
-  fuelings    Fueling[]
-  attendant   Employee?  @relation(fields: [attendantId], references: [id])
+  station            Station            @relation(fields: [stationId], references: [id])
+  fuelings           Fueling[]
+  attendant          Employee?          @relation("ShiftAttendant", fields: [attendantId], references: [id])
+  supervisor         Employee?          @relation("ShiftSupervisor", fields: [supervisorId], references: [id])
   retailTransactions RetailTransaction[]
 }
 
@@ -303,8 +373,10 @@ model FleetAccount {
   currentBalance  Float    @default(0)
   dailyLimit      Float?
   monthlyLimit    Float?
-  fuelTypes       String?  // comma-separated allowed fuel types
-  status          String   @default("active") // active, suspended, closed
+  fuelTypes       String?
+  status          String   @default("active")
+  paymentTerms    String?  // net15, net30, cod, prepaid
+  taxExempt       Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -322,11 +394,12 @@ model Vehicle {
   make            String?
   model           String?
   year            Int?
-  vehicleType     String?  // truck, bus, car, van, tanker
+  vehicleType     String?
   rfidTag         String?
   fuelType        String?
   tankCapacity    Float?
   dailyLimit      Float?
+  odometer        Float?
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -353,7 +426,7 @@ model FuelCard {
   tenantId        String
   cardNumber      String   @unique
   fleetAccountId  String?
-  cardType        String   @default("fleet") // fleet, loyalty, prepaid
+  cardType        String   @default("fleet")
   rfidTag         String?
   pin             String?
   dailyLimit      Float?
@@ -373,10 +446,10 @@ model RFIDReader {
   stationId   String
   name        String
   code        String
-  readerType  String   @default("vehicle") // vehicle, driver, card
+  readerType  String   @default("vehicle")
   ipAddress   String?
   port        Int?
-  status      String   @default("online") // online, offline, error
+  status      String   @default("online")
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -392,7 +465,7 @@ model ANPRCamera {
   ipAddress   String?
   port        Int?
   location    String?
-  status      String   @default("online") // online, offline, error
+  status      String   @default("online")
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -405,30 +478,32 @@ model ANPRCamera {
 // =====================================================
 
 model FuelPrice {
-  id          String   @id @default(cuid())
-  tenantId    String
-  stationId   String?
-  fuelType    String
-  fuelGrade   String?
-  pricePerUnit Float
+  id            String   @id @default(cuid())
+  tenantId      String
+  stationId     String?
+  fuelType      String
+  fuelGrade     String?
+  pricePerUnit  Float
   previousPrice Float?
-  currency    String   @default("PKR")
+  currency      String   @default("PKR")
   effectiveFrom DateTime
   effectiveTo   DateTime?
-  status      String   @default("active") // active, scheduled, expired
-  updatedBy   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  status        String   @default("active")
+  updatedBy     String?
+  isGovernment  Boolean  @default(false)
+  scheduledAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model PriceBoard {
   id          String   @id @default(cuid())
   stationId   String
   name        String
-  boardType   String   @default("led") // led, digital, outdoor_signage
+  boardType   String   @default("led")
   ipAddress   String?
   port        Int?
-  status      String   @default("online") // online, offline, error
+  status      String   @default("online")
   isActive    Boolean  @default(true)
   lastUpdate  DateTime?
   createdAt   DateTime @default(now())
@@ -438,7 +513,7 @@ model PriceBoard {
 }
 
 // =====================================================
-// RETAIL STORE
+// RETAIL STORE & SERVICES
 // =====================================================
 
 model RetailProduct {
@@ -446,13 +521,16 @@ model RetailProduct {
   stationId   String
   name        String
   sku         String?
-  category    String?  // snacks, beverages, automotive, general
+  category    String?
   barcode     String?
   price       Float
   costPrice   Float?
   stockQty    Int      @default(0)
   minStock    Int      @default(5)
+  maxStock    Int      @default(100)
   unit        String   @default("piece")
+  supplierId  String?
+  reorderPoint Int     @default(10)
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -461,18 +539,20 @@ model RetailProduct {
 }
 
 model RetailTransaction {
-  id          String   @id @default(cuid())
-  stationId   String
-  shiftId     String?
-  totalAmount Float
-  paymentMethod String @default("cash")
-  items       String   // JSON string of items
-  posTerminal String?
-  status      String   @default("completed")
-  createdAt   DateTime @default(now())
+  id             String   @id @default(cuid())
+  stationId      String
+  shiftId        String?
+  totalAmount    Float
+  paymentMethod  String   @default("cash")
+  items          String   // JSON string of items
+  posTerminal    String?
+  discountAmount Float    @default(0)
+  loyaltyPointsUsed Int   @default(0)
+  status         String   @default("completed")
+  createdAt      DateTime @default(now())
 
-  station     Station   @relation(fields: [stationId], references: [id])
-  shift       Shift?    @relation(fields: [shiftId], references: [id])
+  station        Station  @relation(fields: [stationId], references: [id])
+  shift          Shift?   @relation(fields: [shiftId], references: [id])
 }
 
 model LubricantProduct {
@@ -481,7 +561,7 @@ model LubricantProduct {
   name        String
   brand       String?
   viscosity   String?
-  category    String?  // engine_oil, transmission, hydraulic, grease, coolant
+  category    String?
   price       Float
   costPrice   Float?
   stockQty    Int      @default(0)
@@ -491,6 +571,103 @@ model LubricantProduct {
   updatedAt   DateTime @updatedAt
 
   station     Station   @relation(fields: [stationId], references: [id])
+}
+
+model CarWashSession {
+  id          String   @id @default(cuid())
+  stationId   String
+  shiftId     String?
+  vehiclePlate String?
+  washType    String   // basic, premium, deluxe
+  amount      Float
+  paymentMethod String @default("cash")
+  status      String   @default("completed")
+  startedAt   DateTime @default(now())
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  station     Station   @relation(fields: [stationId], references: [id])
+}
+
+model LotterySale {
+  id          String   @id @default(cuid())
+  stationId   String
+  shiftId     String?
+  gameType    String   // scratch, draw, online
+  ticketCount Int      @default(1)
+  saleAmount  Float
+  commission  Float    @default(0)
+  status      String   @default("completed")
+  createdAt   DateTime @default(now())
+
+  station     Station   @relation(fields: [stationId], references: [id])
+}
+
+// =====================================================
+// SUPPLIER & PROCUREMENT
+// =====================================================
+
+model Supplier {
+  id              String   @id @default(cuid())
+  tenantId        String
+  name            String
+  code            String?
+  contactPerson   String?
+  phone           String?
+  email           String?
+  address         String?
+  city            String?
+  category        String   // fuel, lubricant, retail, maintenance, other
+  paymentTerms    String?
+  taxId           String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant          @relation(fields: [tenantId], references: [id])
+  deliveries      FuelDelivery[]
+  invoices        SupplierInvoice[]
+  purchaseOrders  PurchaseOrder[]
+}
+
+model SupplierInvoice {
+  id              String   @id @default(cuid())
+  stationId       String
+  supplierId      String
+  invoiceNumber   String
+  invoiceDate     DateTime
+  dueDate         DateTime?
+  totalAmount     Float
+  taxAmount       Float    @default(0)
+  netAmount       Float
+  status          String   @default("pending") // pending, approved, paid, overdue, cancelled
+  paidAmount      Float    @default(0)
+  paidDate        DateTime?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  station         Station   @relation(fields: [stationId], references: [id])
+  supplier        Supplier  @relation(fields: [supplierId], references: [id])
+}
+
+model PurchaseOrder {
+  id              String   @id @default(cuid())
+  stationId       String
+  supplierId      String
+  poNumber        String
+  orderDate       DateTime
+  expectedDate    DateTime?
+  items           String   // JSON string of line items
+  totalAmount     Float
+  status          String   @default("draft") // draft, submitted, approved, received, cancelled
+  approvedBy      String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  station         Station   @relation(fields: [stationId], references: [id])
+  supplier        Supplier  @relation(fields: [supplierId], references: [id])
 }
 
 // =====================================================
@@ -502,9 +679,9 @@ model EVCharger {
   stationId       String
   name            String
   code            String
-  connectorType   String   @default("type2") // type2, ccs, chademo, tesla
+  connectorType   String   @default("type2")
   maxPowerKw      Float    @default(50)
-  status          String   @default("available") // available, charging, occupied, offline, error
+  status          String   @default("available")
   currentSession  String?
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
@@ -526,7 +703,7 @@ model ChargingSession {
   pricePerKwh     Float
   totalAmount     Float    @default(0)
   paymentMethod   String   @default("cash")
-  status          String   @default("active") // active, completed, cancelled
+  status          String   @default("active")
   startedAt       DateTime
   completedAt     DateTime?
   createdAt       DateTime @default(now())
@@ -540,7 +717,7 @@ model CNGDispenser {
   name            String
   code            String
   pressure        Float?
-  status          String   @default("idle") // idle, dispensing, stopped, error, maintenance
+  status          String   @default("idle")
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -557,21 +734,24 @@ model Employee {
   stationId       String
   name            String
   employeeId      String?
-  role            String   @default("attendant") // attendant, manager, supervisor, cashier, maintenance
+  role            String   @default("attendant")
   phone           String?
   email           String?
   hireDate        DateTime?
   salary          Float?
   commissionRate  Float    @default(0)
-  status          String   @default("active") // active, on_leave, terminated
+  status          String   @default("active")
   avatar          String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  station     Station    @relation(fields: [stationId], references: [id])
-  shifts      Shift[]
-  fuelings    Fueling[]
-  attendance  Attendance[]
+  station        Station         @relation(fields: [stationId], references: [id])
+  shifts         Shift[]              @relation("ShiftAttendant")
+  supervisedShifts Shift[]              @relation("ShiftSupervisor")
+  fuelings       Fueling[]
+  attendance     Attendance[]
+  payrollRecords PayrollRecord[]
+  leaveRequests  LeaveRequest[]
 }
 
 model Attendance {
@@ -581,10 +761,50 @@ model Attendance {
   checkIn     DateTime
   checkOut    DateTime?
   status      String   @default("present") // present, absent, late, half_day
+  hoursWorked Float?
   notes       String?
   createdAt   DateTime @default(now())
 
   employee    Employee  @relation(fields: [employeeId], references: [id])
+}
+
+model PayrollRecord {
+  id              String   @id @default(cuid())
+  stationId       String
+  employeeId      String
+  periodStart     DateTime
+  periodEnd       DateTime
+  baseSalary      Float
+  overtimeHours   Float    @default(0)
+  overtimePay     Float    @default(0)
+  commissions     Float    @default(0)
+  deductions      Float    @default(0)
+  taxDeductions   Float    @default(0)
+  netPay          Float
+  status          String   @default("pending") // pending, approved, paid
+  paidDate        DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  station         Station   @relation(fields: [stationId], references: [id])
+  employee        Employee  @relation(fields: [employeeId], references: [id])
+}
+
+model LeaveRequest {
+  id              String   @id @default(cuid())
+  stationId       String
+  employeeId      String
+  leaveType       String   // annual, sick, personal, unpaid
+  startDate       DateTime
+  endDate         DateTime
+  reason          String?
+  status          String   @default("pending") // pending, approved, rejected
+  approvedBy      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  station         Station   @relation(fields: [stationId], references: [id])
+  employee        Employee  @relation(fields: [employeeId], references: [id])
 }
 
 // =====================================================
@@ -598,7 +818,7 @@ model Customer {
   phone           String?
   email           String?
   loyaltyPoints   Int      @default(0)
-  membershipTier  String   @default("basic") // basic, silver, gold, platinum
+  membershipTier  String   @default("basic")
   totalSpent      Float    @default(0)
   totalVisits     Int      @default(0)
   lastVisit       DateTime?
@@ -607,6 +827,56 @@ model Customer {
   updatedAt       DateTime @updatedAt
 
   tenant       Tenant     @relation(fields: [tenantId], references: [id])
+  fuelings     Fueling[]
+}
+
+model LoyaltyRule {
+  id              String   @id @default(cuid())
+  tenantId        String
+  name            String
+  pointsPerUnit   Float    @default(1)
+  fuelType        String?  // null = all fuel types
+  minimumPurchase Float?
+  bonusMultiplier Float    @default(1)
+  isActive        Boolean  @default(true)
+  validFrom       DateTime?
+  validTo         DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant       Tenant     @relation(fields: [tenantId], references: [id])
+}
+
+model Promotion {
+  id              String   @id @default(cuid())
+  tenantId        String
+  name            String
+  description     String?
+  discountType    String   // percentage, fixed, bogo
+  discountValue   Float
+  applicableTo    String   // fuel, retail, car_wash, all
+  fuelType        String?
+  minimumPurchase Float?
+  validFrom       DateTime
+  validTo         DateTime
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant         Tenant           @relation(fields: [tenantId], references: [id])
+  usage          PromotionUsage[]
+}
+
+model PromotionUsage {
+  id              String   @id @default(cuid())
+  stationId       String
+  promotionId     String
+  customerName    String?
+  discountAmount  Float
+  createdAt       DateTime @default(now())
+
+  station         Station    @relation(fields: [stationId], references: [id])
+  promotion       Promotion  @relation(fields: [promotionId], references: [id])
 }
 
 // =====================================================
@@ -619,13 +889,13 @@ model Transaction {
   tenantId        String
 
   station         Station  @relation(fields: [stationId], references: [id])
-  type            String   // income, expense, transfer
-  category        String   // fuel_sale, retail_sale, expense, salary, utility, delivery, other
+  type            String
+  category        String
   amount          Float
   description     String?
   referenceNumber String?
-  paymentMethod   String   @default("cash") // cash, card, bank_transfer, credit
-  status          String   @default("completed") // pending, completed, cancelled
+  paymentMethod   String   @default("cash")
+  status          String   @default("completed")
   date            DateTime
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -636,14 +906,14 @@ model Expense {
   stationId       String
 
   station         Station  @relation(fields: [stationId], references: [id])
-  category        String   // utilities, maintenance, salary, rent, supplies, other
+  category        String
   amount          Float
   description     String?
   vendor          String?
   receiptNumber   String?
   date            DateTime
   approvedBy      String?
-  status          String   @default("pending") // pending, approved, paid, rejected
+  status          String   @default("pending")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
@@ -655,16 +925,16 @@ model Expense {
 model MaintenanceRecord {
   id              String   @id @default(cuid())
   stationId       String
-  equipmentType   String   // dispenser, nozzle, tank, atg, price_board, ev_charger, cng
+  equipmentType   String
   equipmentId     String
   nozzleId        String?
 
   station         Station  @relation(fields: [stationId], references: [id])
-  type            String   // preventive, corrective, emergency, calibration
+  type            String
   description     String
   technician      String?
   cost            Float    @default(0)
-  status          String   @default("scheduled") // scheduled, in_progress, completed, cancelled
+  status          String   @default("scheduled")
   scheduledDate   DateTime
   completedDate   DateTime?
   notes           String?
@@ -672,6 +942,84 @@ model MaintenanceRecord {
   updatedAt       DateTime @updatedAt
 
   nozzle       Nozzle?   @relation(fields: [nozzleId], references: [id])
+}
+
+// =====================================================
+// ENVIRONMENTAL COMPLIANCE
+// =====================================================
+
+model EnvironmentalAlert {
+  id              String   @id @default(cuid())
+  stationId       String
+  alertType       String   // leak, spill, vapor, water_intrusion, overfill, epa_violation
+  severity        String   @default("warning")
+  tankId          String?
+  description     String
+  epaCode         String?
+  isReportable    Boolean  @default(false)
+  isResolved      Boolean  @default(false)
+  resolvedAt      DateTime?
+  reportedToAgency Boolean @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  station         Station  @relation(fields: [stationId], references: [id])
+}
+
+model VaporRecoveryReading {
+  id              String   @id @default(cuid())
+  stationId       String
+  tankId          String?
+  vaporPressure   Float
+  recoveryRate    Float?
+  status          String   @default("normal") // normal, warning, violation
+  readingAt       DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  station         Station  @relation(fields: [stationId], references: [id])
+}
+
+// =====================================================
+// NOTIFICATIONS
+// =====================================================
+
+model Notification {
+  id          String   @id @default(cuid())
+  tenantId    String
+  stationId   String?
+  title       String
+  message     String
+  type        String   // alert, info, warning, system, shift, delivery
+  priority    String   @default("normal") // low, normal, high, urgent
+  isRead      Boolean  @default(false)
+  readAt      DateTime?
+  actionUrl   String?
+  createdAt   DateTime @default(now())
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+// =====================================================
+// DAILY REPORTS
+// =====================================================
+
+model DailyReport {
+  id              String   @id @default(cuid())
+  stationId       String
+  reportDate      DateTime
+  totalRevenue    Float    @default(0)
+  fuelRevenue     Float    @default(0)
+  retailRevenue   Float    @default(0)
+  totalVolume     Float    @default(0)
+  transactionCount Int     @default(0)
+  averageTicket   Float    @default(0)
+  cashVariance    Float    @default(0)
+  fuelVariance    Float    @default(0)
+  expenses        Float    @default(0)
+  netProfit       Float    @default(0)
+  createdAt       DateTime @default(now())
+
+  station         Station  @relation(fields: [stationId], references: [id])
 }
 
 // =====================================================
@@ -703,8 +1051,8 @@ model AIAlert {
   stationId   String?
 
   station      Station?  @relation(fields: [stationId], references: [id])
-  alertType   String   // fuel_loss, theft, leakage, meter_manipulation, variance, maintenance, demand
-  severity    String   @default("warning") // info, warning, critical
+  alertType   String
+  severity    String   @default("warning")
   title       String
   description String?
   confidence  Float?
@@ -719,7 +1067,7 @@ model AIForecast {
   id          String   @id @default(cuid())
   tenantId    String
   stationId   String
-  forecastType String  // demand, delivery, stock, revenue
+  forecastType String
   fuelType    String?
   predictedValue Float
   confidence  Float

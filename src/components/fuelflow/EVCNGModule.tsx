@@ -3,28 +3,30 @@
 import { useState, useEffect } from 'react'
 import {
   Zap,
-  AlertTriangle,
+  Fuel,
   Battery,
   Gauge,
-  Activity,
   Clock,
+  Activity,
+  AlertTriangle,
+  CheckCircle2,
   Plug,
+  Cpu,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-
-interface ChargingSession {
-  id: string
-  vehiclePlate: string | null
-  energyKwh: number
-  durationMinutes: number
-  pricePerKwh: number
-  totalAmount: number
-  paymentMethod: string
-  startedAt: string
-  status: string
-}
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 interface EVCharger {
   id: string
@@ -33,9 +35,18 @@ interface EVCharger {
   connectorType: string
   maxPowerKw: number
   status: string
+  currentSession: string | null
   isActive: boolean
   station: { id: string; name: string; code: string; city: string }
-  activeSession: ChargingSession | null
+  activeSession: {
+    id: string
+    vehiclePlate: string | null
+    energyKwh: number
+    durationMinutes: number
+    pricePerKwh: number
+    totalAmount: number
+    startedAt: string
+  } | null
 }
 
 interface CNGDispenser {
@@ -48,7 +59,7 @@ interface CNGDispenser {
   station: { id: string; name: string; code: string; city: string }
 }
 
-interface EVSummary {
+interface EVCSummary {
   total: number
   available: number
   charging: number
@@ -65,293 +76,338 @@ interface CNGSummary {
   error: number
 }
 
-function EVStatusBadge({ status }: { status: string }) {
-  const configs: Record<string, { className: string; label: string }> = {
-    available: { className: 'bg-emerald-500/10 text-emerald-600 border-emerald-200 dark:text-emerald-400 dark:border-emerald-800', label: 'Available' },
-    charging: { className: 'bg-amber-500/10 text-amber-600 border-amber-200 dark:text-amber-400 dark:border-amber-800', label: 'Charging' },
-    occupied: { className: 'bg-blue-500/10 text-blue-600 border-blue-200 dark:text-blue-400 dark:border-blue-800', label: 'Occupied' },
-    offline: { className: 'bg-gray-500/10 text-gray-600 border-gray-200 dark:text-gray-400 dark:border-gray-800', label: 'Offline' },
-    error: { className: 'bg-red-500/10 text-red-600 border-red-200 dark:text-red-400 dark:border-red-800', label: 'Error' },
-  }
-  const config = configs[status] || configs.offline
-  return (
-    <Badge variant="outline" className={`text-[10px] ${config.className}`}>
-      <div className={`size-1.5 rounded-full mr-1 ${status === 'charging' ? 'bg-amber-500 animate-pulse' : status === 'available' ? 'bg-emerald-500' : status === 'error' ? 'bg-red-500' : 'bg-gray-400'}`} />
-      {config.label}
-    </Badge>
-  )
+const CONNECTOR_LABELS: Record<string, string> = {
+  type2: 'Type 2',
+  ccs: 'CCS2',
+  chademo: 'CHAdeMO',
 }
 
-function CNGStatusBadge({ status }: { status: string }) {
-  const configs: Record<string, { className: string; label: string }> = {
-    idle: { className: 'bg-emerald-500/10 text-emerald-600 border-emerald-200 dark:text-emerald-400 dark:border-emerald-800', label: 'Idle' },
-    dispensing: { className: 'bg-amber-500/10 text-amber-600 border-amber-200 dark:text-amber-400 dark:border-amber-800', label: 'Dispensing' },
-    stopped: { className: 'bg-gray-500/10 text-gray-600 border-gray-200 dark:text-gray-400 dark:border-gray-800', label: 'Stopped' },
-    error: { className: 'bg-red-500/10 text-red-600 border-red-200 dark:text-red-400 dark:border-red-800', label: 'Error' },
-    maintenance: { className: 'bg-yellow-500/10 text-yellow-600 border-yellow-200 dark:text-yellow-400 dark:border-yellow-800', label: 'Maintenance' },
-  }
-  const config = configs[status] || configs.idle
-  return (
-    <Badge variant="outline" className={`text-[10px] ${config.className}`}>
-      {config.label}
-    </Badge>
-  )
+const CHARGER_STATUS: Record<string, { color: string; bg: string; label: string; animate?: boolean }> = {
+  available: { color: 'text-emerald-500', bg: 'bg-emerald-500/10 border-emerald-500/20', label: 'Available' },
+  charging: { color: 'text-amber-500', bg: 'bg-amber-500/10 border-amber-500/20', label: 'Charging', animate: true },
+  occupied: { color: 'text-blue-500', bg: 'bg-blue-500/10 border-blue-500/20', label: 'Occupied' },
+  offline: { color: 'text-slate-400', bg: 'bg-slate-500/10 border-slate-500/20', label: 'Offline' },
+  error: { color: 'text-red-500', bg: 'bg-red-500/10 border-red-500/20', label: 'Error' },
 }
 
-function ConnectorBadge({ type }: { type: string }) {
-  const configs: Record<string, { className: string }> = {
-    type2: { className: 'bg-blue-500/10 text-blue-600 border-blue-200' },
-    ccs: { className: 'bg-emerald-500/10 text-emerald-600 border-emerald-200' },
-    chademo: { className: 'bg-amber-500/10 text-amber-600 border-amber-200' },
-    tesla: { className: 'bg-red-500/10 text-red-600 border-red-200' },
-  }
-  const config = configs[type] || { className: 'bg-gray-500/10 text-gray-600 border-gray-200' }
+const CNG_STATUS: Record<string, { color: string; bg: string; label: string }> = {
+  idle: { color: 'text-emerald-500', bg: 'bg-emerald-500/10 border-emerald-500/20', label: 'Idle' },
+  dispensing: { color: 'text-amber-500', bg: 'bg-amber-500/10 border-amber-500/20', label: 'Dispensing' },
+  stopped: { color: 'text-slate-400', bg: 'bg-slate-500/10 border-slate-500/20', label: 'Stopped' },
+  error: { color: 'text-red-500', bg: 'bg-red-500/10 border-red-500/20', label: 'Error' },
+}
+
+function LoadingSkeleton() {
   return (
-    <Badge variant="outline" className={`text-[10px] ${config.className}`}>
-      <Plug className="size-2.5 mr-1" />
-      {type.toUpperCase()}
-    </Badge>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Card key={i}><CardContent className="p-4"><Skeleton className="h-40 w-full" /></CardContent></Card>
+      ))}
+    </div>
   )
 }
 
 export default function EVCNGModule() {
   const [evChargers, setEvChargers] = useState<EVCharger[]>([])
   const [cngDispensers, setCngDispensers] = useState<CNGDispenser[]>([])
-  const [summary, setSummary] = useState<{ ev: EVSummary; cng: CNGSummary } | null>(null)
+  const [evSummary, setEvSummary] = useState<EVCSummary | null>(null)
+  const [cngSummary, setCngSummary] = useState<CNGSummary | null>(null)
+  const [sessions, setSessions] = useState<Array<{
+    id: string; vehiclePlate: string | null; energyKwh: number; durationMinutes: number;
+    pricePerKwh: number; totalAmount: number; status: string; startedAt: string; completedAt: string | null;
+    evCharger: { name: string; code: string }
+  }>>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState('ev-chargers')
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const res = await fetch('/api/ev-cng')
-        if (!res.ok) throw new Error('Failed to fetch')
-        const json = await res.json()
-        setEvChargers(json.evChargers || [])
-        setCngDispensers(json.cngDispensers || [])
-        setSummary(json.summary || null)
+        setLoading(true)
+        const [evCngRes] = await Promise.all([
+          fetch('/api/ev-cng'),
+        ])
+        if (evCngRes.ok) {
+          const data = await evCngRes.json()
+          setEvChargers(data.evChargers || [])
+          setCngDispensers(data.cngDispensers || [])
+          setEvSummary(data.summary?.ev || null)
+          setCngSummary(data.summary?.cng || null)
+        }
+
+        // Fetch charging sessions
+        try {
+          const sessionsRes = await fetch('/api/charging-sessions')
+          if (sessionsRes.ok) {
+            const data = await sessionsRes.json()
+            setSessions(data.sessions || [])
+          }
+        } catch {}
       } catch (err) {
-        console.error('Failed to fetch EV/CNG data:', err)
-        setError('Failed to load EV/CNG data')
+        setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {
         setLoading(false)
       }
     }
     fetchData()
+    const interval = setInterval(fetchData, 15000)
+    return () => clearInterval(interval)
   }, [])
 
+  if (loading) return <LoadingSkeleton />
   if (error) {
     return (
-      <div className="module-enter space-y-6">
-        <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
-          <CardContent className="p-6 text-center">
-            <AlertTriangle className="size-10 mx-auto text-red-500 mb-2" />
-            <p className="text-sm font-medium text-red-700 dark:text-red-400">{error}</p>
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardContent className="p-6 text-center">
+          <AlertTriangle className="size-8 text-red-500 mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground">{error}</p>
+          <Button variant="outline" size="sm" className="mt-2" onClick={() => window.location.reload()}>Retry</Button>
+        </CardContent>
+      </Card>
     )
   }
 
   return (
-    <div className="module-enter space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="flex size-10 items-center justify-center rounded-lg bg-amber-500/10">
-          <Zap className="size-5 text-amber-500" />
-        </div>
-        <div>
-          <h2 className="text-xl font-bold">EV & CNG</h2>
-          <p className="text-sm text-muted-foreground">
-            Electric vehicle charging, CNG dispensing, and alternative energy
-          </p>
-        </div>
-      </div>
+    <div className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="ev-chargers">EV Chargers</TabsTrigger>
+          <TabsTrigger value="cng-dispensers">CNG Dispensers</TabsTrigger>
+          <TabsTrigger value="sessions">Sessions</TabsTrigger>
+        </TabsList>
 
-      {/* Summary stats */}
-      {summary && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Zap className="size-4 text-amber-500" />
-                <span className="text-sm font-semibold">EV Chargers</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="outline" className="text-[10px]">Total: {summary.ev.total}</Badge>
-                <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-200">Available: {summary.ev.available}</Badge>
-                <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-200">Charging: {summary.ev.charging}</Badge>
-                <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-600 border-blue-200">Occupied: {summary.ev.occupied}</Badge>
-                <Badge variant="outline" className="text-[10px] bg-gray-500/10 text-gray-600 border-gray-200">Offline: {summary.ev.offline}</Badge>
-                {summary.ev.error > 0 && (
-                  <Badge variant="outline" className="text-[10px] bg-red-500/10 text-red-600 border-red-200">Error: {summary.ev.error}</Badge>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Gauge className="size-4 text-blue-500" />
-                <span className="text-sm font-semibold">CNG Dispensers</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="outline" className="text-[10px]">Total: {summary.cng.total}</Badge>
-                <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-200">Idle: {summary.cng.idle}</Badge>
-                <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-200">Dispensing: {summary.cng.dispensing}</Badge>
-                <Badge variant="outline" className="text-[10px] bg-gray-500/10 text-gray-600 border-gray-200">Stopped: {summary.cng.stopped}</Badge>
-                {summary.cng.error > 0 && (
-                  <Badge variant="outline" className="text-[10px] bg-red-500/10 text-red-600 border-red-200">Error: {summary.cng.error}</Badge>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* EV Chargers */}
-      <div>
-        <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-          <Battery className="size-4 text-amber-500" />
-          EV Chargers
-        </h3>
-        {loading ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i}>
-                <CardContent className="p-4 space-y-3">
-                  <Skeleton className="h-5 w-24" />
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-10 w-full" />
+        {/* EV Chargers */}
+        <TabsContent value="ev-chargers" className="mt-4 space-y-4">
+          {/* EV Summary */}
+          {evSummary && (
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              <Card>
+                <CardContent className="p-3 text-center">
+                  <p className="text-lg font-bold">{evSummary.total}</p>
+                  <p className="text-[10px] text-muted-foreground">Total</p>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        ) : evChargers.length === 0 ? (
-          <Card>
-            <CardContent className="flex h-32 items-center justify-center">
-              <div className="text-center space-y-1">
-                <Zap className="size-8 mx-auto text-muted-foreground/30" />
-                <p className="text-sm text-muted-foreground">No EV chargers configured</p>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {evChargers.map((charger) => (
-              <Card key={charger.id} className="relative overflow-hidden">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <Zap className="size-4 text-amber-500" />
-                      {charger.name}
-                    </CardTitle>
-                    <EVStatusBadge status={charger.status} />
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <ConnectorBadge type={charger.connectorType} />
-                    <span className="text-xs text-muted-foreground">{charger.maxPowerKw} kW</span>
-                  </div>
+              <Card>
+                <CardContent className="p-3 text-center">
+                  <p className="text-lg font-bold text-emerald-500">{evSummary.available}</p>
+                  <p className="text-[10px] text-muted-foreground">Available</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-3 text-center">
+                  <p className="text-lg font-bold text-amber-500">{evSummary.charging}</p>
+                  <p className="text-[10px] text-muted-foreground">Charging</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-3 text-center">
+                  <p className="text-lg font-bold text-slate-400">{evSummary.offline}</p>
+                  <p className="text-[10px] text-muted-foreground">Offline</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-3 text-center">
+                  <p className="text-lg font-bold text-red-500">{evSummary.error}</p>
+                  <p className="text-[10px] text-muted-foreground">Error</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
-                  {charger.activeSession && (
-                    <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-2.5 space-y-1.5">
-                      <p className="text-[10px] font-medium text-amber-600 dark:text-amber-400 uppercase">Active Session</p>
-                      <div className="grid grid-cols-2 gap-1.5 text-xs">
-                        {charger.activeSession.vehiclePlate && (
-                          <div>
-                            <span className="text-muted-foreground text-[10px]">Vehicle</span>
-                            <p className="font-medium">{charger.activeSession.vehiclePlate}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {evChargers.map((charger) => {
+              const statusCfg = CHARGER_STATUS[charger.status] || CHARGER_STATUS.available
+              return (
+                <Card key={charger.id} className={`border ${statusCfg.bg}`}>
+                  <CardHeader className="pb-2 p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Zap className={`size-4 ${statusCfg.color} ${statusCfg.animate ? 'animate-pulse' : ''}`} />
+                        <CardTitle className="text-sm font-semibold">{charger.name}</CardTitle>
+                      </div>
+                      <Badge
+                        variant={charger.status === 'error' ? 'destructive' : charger.status === 'charging' ? 'secondary' : 'outline'}
+                        className="text-[10px] px-1.5 py-0"
+                      >
+                        {statusCfg.label}
+                      </Badge>
+                    </div>
+                    <CardDescription className="text-[10px]">
+                      {charger.code} • {CONNECTOR_LABELS[charger.connectorType] || charger.connectorType}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0 space-y-3">
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <Plug className="size-3 text-blue-500" />
+                        <span>{CONNECTOR_LABELS[charger.connectorType] || charger.connectorType}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Battery className="size-3 text-emerald-500" />
+                        <span>{charger.maxPowerKw} kW</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Cpu className="size-3 text-slate-400" />
+                        <span>Station: {charger.station?.name || 'N/A'}</span>
+                      </div>
+                    </div>
+
+                    {/* Active Session */}
+                    {charger.activeSession && (
+                      <div className="rounded-lg bg-background/50 p-2 space-y-1">
+                        <p className="text-[10px] font-semibold text-amber-600">Active Session</p>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Vehicle:</span>
+                            <span className="font-mono">{charger.activeSession.vehiclePlate || 'N/A'}</span>
                           </div>
-                        )}
-                        <div>
-                          <span className="text-muted-foreground text-[10px]">Energy</span>
-                          <p className="font-medium">{charger.activeSession.energyKwh} kWh</p>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground text-[10px]">Duration</span>
-                          <p className="font-medium">{charger.activeSession.durationMinutes} min</p>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground text-[10px]">Amount</span>
-                          <p className="font-medium">Rs. {Math.round(charger.activeSession.totalAmount).toLocaleString()}</p>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Energy:</span>
+                            <span>{charger.activeSession.energyKwh.toFixed(1)} kWh</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Duration:</span>
+                            <span>{charger.activeSession.durationMinutes} min</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Amount:</span>
+                            <span className="font-medium">Rs. {Math.round(charger.activeSession.totalAmount).toLocaleString()}</span>
+                          </div>
                         </div>
                       </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </TabsContent>
+
+        {/* CNG Dispensers */}
+        <TabsContent value="cng-dispensers" className="mt-4 space-y-4">
+          {cngSummary && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <Card>
+                <CardContent className="p-3 text-center">
+                  <p className="text-lg font-bold">{cngSummary.total}</p>
+                  <p className="text-[10px] text-muted-foreground">Total</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-3 text-center">
+                  <p className="text-lg font-bold text-emerald-500">{cngSummary.idle}</p>
+                  <p className="text-[10px] text-muted-foreground">Idle</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-3 text-center">
+                  <p className="text-lg font-bold text-amber-500">{cngSummary.dispensing}</p>
+                  <p className="text-[10px] text-muted-foreground">Dispensing</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-3 text-center">
+                  <p className="text-lg font-bold text-red-500">{cngSummary.error}</p>
+                  <p className="text-[10px] text-muted-foreground">Error</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {cngDispensers.map((dispenser) => {
+              const statusCfg = CNG_STATUS[dispenser.status] || CNG_STATUS.idle
+              return (
+                <Card key={dispenser.id} className={`border ${statusCfg.bg}`}>
+                  <CardHeader className="pb-2 p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Fuel className={`size-4 ${statusCfg.color}`} />
+                        <CardTitle className="text-sm font-semibold">{dispenser.name}</CardTitle>
+                      </div>
+                      <Badge
+                        variant={dispenser.status === 'error' ? 'destructive' : 'outline'}
+                        className="text-[10px] px-1.5 py-0"
+                      >
+                        {statusCfg.label}
+                      </Badge>
                     </div>
-                  )}
-
-                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                    <Activity className="size-2.5" />
-                    <span>Code: {charger.code}</span>
-                  </div>
-                </CardContent>
-                <div className={`absolute bottom-0 left-0 right-0 h-1 ${charger.status === 'available' ? 'bg-emerald-500' : charger.status === 'charging' ? 'bg-amber-500' : charger.status === 'error' ? 'bg-red-500' : 'bg-gray-400'}`} />
-              </Card>
-            ))}
+                    <CardDescription className="text-[10px]">{dispenser.code}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0">
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <Gauge className="size-3 text-blue-500" />
+                        <span>Pressure: {dispenser.pressure || 'N/A'} bar</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Activity className="size-3 text-slate-400" />
+                        <span>{dispenser.station?.name || 'N/A'}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
-        )}
-      </div>
+        </TabsContent>
 
-      {/* CNG Dispensers */}
-      <div>
-        <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-          <Gauge className="size-4 text-blue-500" />
-          CNG Dispensers
-        </h3>
-        {loading ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Card key={i}>
-                <CardContent className="p-4 space-y-2">
-                  <Skeleton className="h-5 w-24" />
-                  <Skeleton className="h-4 w-20" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : cngDispensers.length === 0 ? (
+        {/* Sessions */}
+        <TabsContent value="sessions" className="mt-4">
           <Card>
-            <CardContent className="flex h-32 items-center justify-center">
-              <div className="text-center space-y-1">
-                <Gauge className="size-8 mx-auto text-muted-foreground/30" />
-                <p className="text-sm text-muted-foreground">No CNG dispensers configured</p>
-              </div>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Charging Session History</CardTitle>
+              <CardDescription className="text-xs">{sessions.length} sessions</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              <ScrollArea className="max-h-96">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs">Charger</TableHead>
+                      <TableHead className="text-xs">Vehicle</TableHead>
+                      <TableHead className="text-xs text-right">Energy (kWh)</TableHead>
+                      <TableHead className="text-xs text-right">Duration</TableHead>
+                      <TableHead className="text-xs text-right">Amount</TableHead>
+                      <TableHead className="text-xs">Status</TableHead>
+                      <TableHead className="text-xs">Started</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sessions.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center text-xs text-muted-foreground py-8">
+                          No charging sessions recorded
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      sessions.map((s) => (
+                        <TableRow key={s.id}>
+                          <TableCell className="text-xs font-medium">{s.evCharger?.name || 'N/A'}</TableCell>
+                          <TableCell className="text-xs font-mono">{s.vehiclePlate || 'N/A'}</TableCell>
+                          <TableCell className="text-xs text-right">{s.energyKwh.toFixed(1)}</TableCell>
+                          <TableCell className="text-xs text-right">{s.durationMinutes} min</TableCell>
+                          <TableCell className="text-xs text-right font-medium">Rs. {Math.round(s.totalAmount).toLocaleString()}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={s.status === 'completed' ? 'outline' : s.status === 'active' ? 'secondary' : 'destructive'}
+                              className="text-[10px] px-1.5 py-0 capitalize"
+                            >
+                              {s.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-xs font-mono">{new Date(s.startedAt).toLocaleString()}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
             </CardContent>
           </Card>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {cngDispensers.map((dispenser) => (
-              <Card key={dispenser.id} className="relative overflow-hidden">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <Gauge className="size-4 text-blue-500" />
-                      {dispenser.name}
-                    </CardTitle>
-                    <CNGStatusBadge status={dispenser.status} />
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {dispenser.pressure !== null && dispenser.pressure !== undefined && (
-                    <div className="bg-muted/50 rounded-lg p-2 flex items-center gap-2">
-                      <Gauge className="size-4 text-blue-500" />
-                      <div>
-                        <p className="text-[10px] text-muted-foreground">Pressure</p>
-                        <p className="text-sm font-semibold">{dispenser.pressure} bar</p>
-                      </div>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                    <Activity className="size-2.5" />
-                    <span>Code: {dispenser.code}</span>
-                  </div>
-                </CardContent>
-                <div className={`absolute bottom-0 left-0 right-0 h-1 ${dispenser.status === 'idle' ? 'bg-emerald-500' : dispenser.status === 'dispensing' ? 'bg-amber-500' : dispenser.status === 'error' ? 'bg-red-500' : 'bg-gray-400'}`} />
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

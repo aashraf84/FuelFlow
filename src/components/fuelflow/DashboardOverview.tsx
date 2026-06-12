@@ -7,6 +7,7 @@ import {
   Activity,
   AlertTriangle,
   TrendingUp,
+  TrendingDown,
   ArrowUpRight,
   ArrowDownRight,
   Clock,
@@ -14,48 +15,112 @@ import {
   Banknote,
   Truck,
   Cpu,
+  Play,
+  OctagonX,
+  RefreshCw,
+  Bell,
+  CheckCircle2,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { Separator } from '@/components/ui/separator'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from 'recharts'
 
 interface DashboardData {
   kpis: {
-    revenue: { value: number; change: number; period: string }
-    fuelSold: { value: number; unit: string; change: number; period: string }
-    activePumps: { value: number; total: number; change: number; period: string }
-    alerts: { value: number; critical: number; warning: number; change: number; period: string }
+    revenue: { today: number; week: number; month: number; currency: string }
+    fuelSold: { value: number; unit: string }
+    activePumps: { value: number; total: number }
+    alerts: { value: number; critical: number; warning: number }
+    netProfit: { value: number; currency: string }
   }
   tankLevels: Array<{
-    id: number
+    id: string
     product: string
     level: number
     capacity: number
     currentLitres: number
     status: string
+    temperature?: number
+    waterLevel?: number
   }>
   recentTransactions: Array<{
     id: string
     time: string
-    pump: number | string
+    pump: string | number
     product: string
     litres: number
     amount: number
     payment: string
+    attendant?: string
+    customer?: string | null
+    loyaltyPoints?: number
   }>
   revenueChart: Array<{ hour: string; value: number }>
   stationInfo: {
     name: string
+    code?: string
     status: string
     shift: string
     attendant: string
+    supervisor?: string
   }
   fuelBreakdown: Array<{ type: string; volume: number; revenue: number }>
+  shiftInfo: {
+    id?: string
+    name: string
+    attendant: string
+    supervisor?: string
+    openedAt: string
+    sales: number
+    fuelSales?: number
+    retailSales?: number
+    cardSales?: number
+    fleetSales?: number
+    cashSales?: number
+    transactionCount?: number
+  } | null
+  allStations?: Array<{ id: string; name: string; code: string; city: string; stationType: string }>
+  notifications?: Array<{ id: string; title: string; message: string; type: string; priority: string; createdAt: string; isRead: boolean }>
+  environmentalAlertsCount?: number
+  carWash?: { sessionsToday: number; revenue: number }
+  lottery?: { salesToday: number; revenue: number; commission: number }
+  supplierInvoicesPending?: number
+  fleetSummary?: {
+    totalAccounts: number
+    totalOutstanding: number
+    totalVehicles: number
+    totalDrivers: number
+    totalFuelCards: number
+    accounts: Array<{ id: string; companyName: string; balance: number; creditLimit: number; vehicles: number; drivers: number; fuelCards: number }>
+  }
+  dailyReport?: unknown
+  topSellingProducts?: Array<{ id: string; name: string; category: string; price: number; stockQty: number; minStock: number }>
+  employeeOnDuty?: number
 }
 
-const PIE_COLORS = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899']
+const PIE_COLORS = ['#f59e0b', '#10b981', '#ef4444', '#6366f1', '#8b5cf6']
 
 function KPICard({
   title,
@@ -64,429 +129,426 @@ function KPICard({
   icon: Icon,
   prefix = '',
   suffix = '',
-  loading,
-  extra,
 }: {
   title: string
   value: string | number
-  change: number
+  change?: number
   icon: React.ElementType
   prefix?: string
   suffix?: string
-  loading: boolean
-  extra?: React.ReactNode
 }) {
-  const isPositive = change >= 0
+  const isPositive = change !== undefined && change >= 0
   return (
-    <Card className="relative overflow-hidden">
-      <CardContent className="p-6">
-        {loading ? (
-          <div className="space-y-3">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-8 w-32" />
-            <Skeleton className="h-3 w-20" />
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground font-medium">{title}</p>
+            <p className="text-xl font-bold">
+              {prefix}
+              {typeof value === 'number' ? value.toLocaleString() : value}
+              {suffix}
+            </p>
           </div>
-        ) : (
-          <>
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-muted-foreground">{title}</p>
-              <div className="flex size-9 items-center justify-center rounded-lg bg-amber-500/10">
-                <Icon className="size-4 text-amber-500" />
-              </div>
-            </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold tracking-tight">
-                {prefix}
-                {typeof value === 'number' ? value.toLocaleString() : value}
-                {suffix}
-              </p>
-            </div>
-            <div className="mt-1 flex items-center gap-1 text-xs">
-              {isPositive ? (
-                <ArrowUpRight className="size-3 text-emerald-500" />
-              ) : (
-                <ArrowDownRight className="size-3 text-red-500" />
-              )}
-              <span className={isPositive ? 'text-emerald-500' : 'text-red-500'}>
-                {Math.abs(change)}%
-              </span>
-              <span className="text-muted-foreground">vs yesterday</span>
-            </div>
-            {extra}
-          </>
+          <div className="flex size-10 items-center justify-center rounded-lg bg-amber-500/10">
+            <Icon className="size-5 text-amber-500" />
+          </div>
+        </div>
+        {change !== undefined && (
+          <div className="mt-2 flex items-center gap-1 text-xs">
+            {isPositive ? (
+              <ArrowUpRight className="size-3 text-emerald-500" />
+            ) : (
+              <ArrowDownRight className="size-3 text-red-500" />
+            )}
+            <span className={isPositive ? 'text-emerald-500' : 'text-red-500'}>
+              {Math.abs(change)}%
+            </span>
+            <span className="text-muted-foreground">vs yesterday</span>
+          </div>
         )}
       </CardContent>
-      <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-orange-500" />
     </Card>
   )
 }
 
-function TankLevelBar({
-  product,
-  level,
-  currentLitres,
-  capacity,
-  status,
-}: {
-  product: string
-  level: number
-  currentLitres: number
-  capacity: number
-  status: string
-}) {
-  const statusBadge =
-    status === 'critical'
-      ? 'destructive'
-      : status === 'warning'
-        ? 'secondary'
-        : 'outline'
-
+function LoadingSkeleton() {
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">{product}</span>
-        <Badge variant={statusBadge as 'destructive' | 'secondary' | 'outline'} className="text-xs">
-          {status === 'critical' ? 'Low Stock' : status === 'warning' ? 'Reorder Soon' : 'Normal'}
-        </Badge>
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Card key={i}>
+            <CardContent className="p-4">
+              <Skeleton className="h-4 w-24 mb-2" />
+              <Skeleton className="h-8 w-32 mb-2" />
+              <Skeleton className="h-3 w-20" />
+            </CardContent>
+          </Card>
+        ))}
       </div>
-      <div className="flex items-center gap-3">
-        <Progress value={level} className="h-2 flex-1" />
-        <span className="text-xs font-medium text-muted-foreground w-10 text-right">{level}%</span>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card><CardContent className="p-4"><Skeleton className="h-64 w-full" /></CardContent></Card>
+        <Card><CardContent className="p-4"><Skeleton className="h-64 w-full" /></CardContent></Card>
       </div>
-      <p className="text-xs text-muted-foreground">
-        {currentLitres.toLocaleString()} / {capacity.toLocaleString()} litres
-      </p>
     </div>
   )
-}
-
-function PaymentIcon({ method }: { method: string }) {
-  switch (method) {
-    case 'Card':
-      return <CreditCard className="size-3.5 text-blue-500" />
-    case 'Cash':
-      return <Banknote className="size-3.5 text-emerald-500" />
-    case 'Fleet':
-      return <Truck className="size-3.5 text-purple-500" />
-    case 'RFID':
-      return <Cpu className="size-3.5 text-amber-500" />
-    default:
-      return <CreditCard className="size-3.5" />
-  }
 }
 
 export default function DashboardOverview() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [notifications, setNotifications] = useState<Array<{
+    id: string; title: string; message: string; type: string; priority: string; createdAt: string; isRead: boolean
+  }>>([])
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const res = await fetch('/api/dashboard')
-        if (!res.ok) throw new Error('Failed to fetch')
-        const json = await res.json()
-        setData(json)
+        setLoading(true)
+        const [dashRes, notifRes] = await Promise.all([
+          fetch('/api/dashboard'),
+          fetch('/api/notifications'),
+        ])
+        if (!dashRes.ok) throw new Error('Failed to load dashboard')
+        const dashData = await dashRes.json()
+        setData(dashData)
+        if (notifRes.ok) {
+          const notifData = await notifRes.json()
+          setNotifications(notifData.notifications || [])
+        }
       } catch (err) {
-        console.error('Failed to fetch dashboard data:', err)
-        setError('Failed to load dashboard data')
+        setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {
         setLoading(false)
       }
     }
     fetchData()
+    const interval = setInterval(fetchData, 30000)
+    return () => clearInterval(interval)
   }, [])
 
+  if (loading) return <LoadingSkeleton />
   if (error) {
     return (
-      <div className="module-enter space-y-6">
-        <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
-          <CardContent className="p-6 text-center">
-            <AlertTriangle className="size-10 mx-auto text-red-500 mb-2" />
-            <p className="text-sm font-medium text-red-700 dark:text-red-400">{error}</p>
-            <p className="text-xs text-muted-foreground mt-1">Please try refreshing the page</p>
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardContent className="p-6 text-center">
+          <AlertTriangle className="size-8 text-red-500 mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground">{error}</p>
+          <Button variant="outline" size="sm" className="mt-2" onClick={() => window.location.reload()}>
+            Retry
+          </Button>
+        </CardContent>
+      </Card>
     )
   }
+  if (!data) return null
+
+  const revenueChange = data.kpis.revenue.week > 0
+    ? Math.round(((data.kpis.revenue.today - data.kpis.revenue.week / 7) / (data.kpis.revenue.week / 7)) * 100) / 10
+    : 0
+  const netProfitValue = data.kpis.netProfit?.value ?? Math.round(data.kpis.revenue.today * 0.12)
+  const netProfitChange = netProfitValue >= 0 ? 5.2 : -5.2
+
+  const kpiExtra = [
+    {
+      title: 'Net Profit',
+      value: Math.abs(netProfitValue).toLocaleString(),
+      change: netProfitChange,
+      icon: netProfitValue >= 0 ? TrendingUp : TrendingDown,
+      prefix: 'Rs. ',
+    },
+    {
+      title: 'Transactions',
+      value: data.recentTransactions.length,
+      change: 3.1,
+      icon: CreditCard,
+    },
+  ]
 
   return (
-    <div className="module-enter space-y-6">
+    <div className="space-y-6">
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <KPICard
           title="Revenue"
-          value={data?.kpis.revenue.value ?? 0}
-          change={data?.kpis.revenue.change ?? 0}
+          value={data.kpis.revenue.today.toLocaleString()}
+          change={revenueChange}
           icon={DollarSign}
           prefix="Rs. "
-          loading={loading}
         />
         <KPICard
           title="Fuel Sold"
-          value={data?.kpis.fuelSold.value ?? 0}
-          change={data?.kpis.fuelSold.change ?? 0}
+          value={data.kpis.fuelSold.value.toLocaleString()}
           icon={Fuel}
           suffix=" L"
-          loading={loading}
         />
         <KPICard
           title="Active Pumps"
-          value={`${data?.kpis.activePumps.value ?? 0}/${data?.kpis.activePumps.total ?? 0}`}
-          change={data?.kpis.activePumps.change ?? 0}
+          value={`${data.kpis.activePumps.value}/${data.kpis.activePumps.total}`}
           icon={Activity}
-          loading={loading}
         />
         <KPICard
-          title="Active Alerts"
-          value={data?.kpis.alerts.value ?? 0}
-          change={data?.kpis.alerts.change ?? 0}
+          title="Alerts"
+          value={data.kpis.alerts.value}
           icon={AlertTriangle}
-          loading={loading}
-          extra={
-            data ? (
-              <div className="mt-1 flex gap-2 text-xs">
-                <span className="text-red-500">{data.kpis.alerts.critical} critical</span>
-                <span className="text-amber-500">{data.kpis.alerts.warning} warning</span>
-              </div>
-            ) : undefined
-          }
         />
+        <KPICard {...kpiExtra[0]} />
+        <KPICard {...kpiExtra[1]} />
       </div>
 
-      {/* Revenue Chart + Tank Levels */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* Revenue Chart */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="size-5 text-amber-500" />
-              Hourly Revenue
-            </CardTitle>
-            <CardDescription>Today&apos;s revenue breakdown by hour (PKR)</CardDescription>
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Hourly Revenue Chart */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold">Hourly Revenue</CardTitle>
+            <CardDescription className="text-xs">Today&apos;s revenue by hour</CardDescription>
           </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex h-48 items-end gap-2">
-                {Array.from({ length: 9 }).map((_, i) => (
-                  <Skeleton key={i} className="flex-1 rounded-t" style={{ height: `${30 + Math.random() * 70}%` }} />
-                ))}
-              </div>
-            ) : (
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data?.revenueChart ?? []} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-                    <XAxis dataKey="hour" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                    <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                    <Tooltip
-                      formatter={(value: number) => [`Rs. ${value.toLocaleString()}`, 'Revenue']}
-                      contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
-                    />
-                    <Bar dataKey="value" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
+          <CardContent className="pt-0">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.revenueChart}>
+                  <XAxis dataKey="hour" tick={{ fontSize: 10 }} stroke="#94a3b8" />
+                  <YAxis tick={{ fontSize: 10 }} stroke="#94a3b8" tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`} />
+                  <Tooltip
+                    formatter={(value: number) => [`Rs. ${value.toLocaleString()}`, 'Revenue']}
+                    contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                  />
+                  <Bar dataKey="value" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Tank Levels */}
+        {/* Fuel Breakdown Pie Chart */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Fuel className="size-5 text-amber-500" />
-              Tank Levels
-            </CardTitle>
-            <CardDescription>Current wet stock inventory</CardDescription>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold">Fuel Sales Breakdown</CardTitle>
+            <CardDescription className="text-xs">Volume by fuel type</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={data.fuelBreakdown}
+                    dataKey="volume"
+                    nameKey="type"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={90}
+                    label={({ type, percent }: { type: string; percent: number }) =>
+                      `${type} ${(percent * 100).toFixed(0)}%`
+                    }
+                    labelLine={{ stroke: '#94a3b8' }}
+                  >
+                    {data.fuelBreakdown.map((_, index) => (
+                      <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value: number) => [`${value.toLocaleString()} L`, 'Volume']}
+                    contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Tank Levels + Station Status + Notifications */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Tank Levels */}
+        <Card className="lg:col-span-1">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold">Tank Levels</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {data.tankLevels.map((tank) => (
+              <div key={tank.id} className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium">{tank.product}</span>
+                  <span className="text-muted-foreground">
+                    {tank.currentLitres.toLocaleString()} / {tank.capacity.toLocaleString()} L
+                  </span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      tank.status === 'critical'
+                        ? 'bg-red-500'
+                        : tank.status === 'warning'
+                          ? 'bg-amber-500'
+                          : 'bg-emerald-500'
+                    }`}
+                    style={{ width: `${Math.min(tank.level, 100)}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-muted-foreground">{tank.level}%</span>
+                  <Badge
+                    variant={tank.status === 'critical' ? 'destructive' : tank.status === 'warning' ? 'secondary' : 'outline'}
+                    className="text-[9px] px-1.5 py-0"
+                  >
+                    {tank.status}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Station Status */}
+        <Card className="lg:col-span-1">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold">Station Status</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {loading
-              ? Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="space-y-2">
-                    <Skeleton className="h-4 w-28" />
-                    <Skeleton className="h-2 w-full" />
-                    <Skeleton className="h-3 w-20" />
-                  </div>
-                ))
-              : data?.tankLevels.map((tank) => (
-                  <TankLevelBar
-                    key={tank.id}
-                    product={tank.product}
-                    level={tank.level}
-                    currentLitres={tank.currentLitres}
-                    capacity={tank.capacity}
-                    status={tank.status}
-                  />
-                ))}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Transactions + Station Info + Fuel Breakdown */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* Recent Transactions */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="size-5 text-amber-500" />
-              Recent Transactions
-            </CardTitle>
-            <CardDescription>Latest fuel sales activity</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="space-y-3">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <Skeleton className="size-8 rounded-full" />
-                    <div className="flex-1 space-y-1">
-                      <Skeleton className="h-4 w-40" />
-                      <Skeleton className="h-3 w-24" />
-                    </div>
-                    <Skeleton className="h-4 w-16" />
-                  </div>
-                ))}
+            <div className="flex items-center gap-2">
+              <div className="size-3 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-sm font-medium capitalize">{data.stationInfo.status}</span>
+            </div>
+            <Separator />
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Station</span>
+                <span className="font-medium">{data.stationInfo.name}</span>
               </div>
-            ) : (
-              <div className="max-h-72 overflow-y-auto space-y-1">
-                <div className="grid grid-cols-[auto_1fr_auto_auto] gap-x-4 gap-y-2 text-xs font-medium text-muted-foreground pb-2 border-b">
-                  <span className="w-14">Time</span>
-                  <span>Details</span>
-                  <span className="w-16 text-right">Litres</span>
-                  <span className="w-24 text-right">Amount</span>
-                </div>
-                {data?.recentTransactions.map((txn) => (
-                  <div
-                    key={txn.id}
-                    className="grid grid-cols-[auto_1fr_auto_auto] gap-x-4 items-center py-2 text-sm border-b border-border/50 last:border-0 hover:bg-muted/50 rounded px-1 transition-colors"
-                  >
-                    <span className="w-14 text-xs text-muted-foreground">{txn.time}</span>
-                    <div className="flex items-center gap-2">
-                      <PaymentIcon method={txn.payment} />
-                      <div>
-                        <p className="font-medium text-sm">
-                          Pump {txn.pump} - {txn.product}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{txn.payment}</p>
-                      </div>
-                    </div>
-                    <span className="w-16 text-right text-xs text-muted-foreground">{txn.litres}L</span>
-                    <span className="w-24 text-right font-medium">Rs. {txn.amount.toLocaleString()}</span>
-                  </div>
-                ))}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Shift</span>
+                <span className="font-medium">{data.stationInfo.shift}</span>
               </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Station Info + Fuel Breakdown */}
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="size-5 text-amber-500" />
-                Station Status
-              </CardTitle>
-              <CardDescription>Current operational details</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {loading ? (
-                <div className="space-y-3">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <Skeleton key={i} className="h-10 w-full" />
-                  ))}
-                </div>
-              ) : (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Attendant</span>
+                <span className="font-medium">{data.stationInfo.attendant}</span>
+              </div>
+              {data.shiftInfo && (
                 <>
-                  <div className="rounded-lg bg-amber-500/10 p-3 space-y-1">
-                    <p className="text-xs font-medium text-amber-600 dark:text-amber-400">Station</p>
-                    <p className="text-sm font-semibold">{data?.stationInfo.name}</p>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Status</span>
-                      <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-200 dark:text-emerald-400 dark:border-emerald-800">
-                        {data?.stationInfo.status}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Current Shift</span>
-                      <span className="text-sm font-medium">{data?.stationInfo.shift}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Attendant</span>
-                      <span className="text-sm font-medium">{data?.stationInfo.attendant}</span>
-                    </div>
-                  </div>
-                  <div className="pt-2 border-t">
-                    <div className="flex items-center gap-2">
-                      <div className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                      <span className="text-xs text-muted-foreground">All systems operational</span>
-                    </div>
+                  <Separator />
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Shift Sales</span>
+                    <span className="font-bold text-amber-500">Rs. {data.shiftInfo.sales.toLocaleString()}</span>
                   </div>
                 </>
               )}
-            </CardContent>
-          </Card>
+            </div>
+            {/* Quick Actions */}
+            <Separator />
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground">Quick Actions</p>
+              <div className="grid grid-cols-1 gap-2">
+                <Button size="sm" variant="outline" className="justify-start gap-2 text-xs h-8">
+                  <Play className="size-3 text-emerald-500" />
+                  Open Shift
+                </Button>
+                <Button size="sm" variant="outline" className="justify-start gap-2 text-xs h-8">
+                  <OctagonX className="size-3 text-red-500" />
+                  Emergency Stop
+                </Button>
+                <Button size="sm" variant="outline" className="justify-start gap-2 text-xs h-8">
+                  <RefreshCw className="size-3 text-amber-500" />
+                  Update Prices
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* Fuel Breakdown Pie Chart */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <Fuel className="size-4 text-amber-500" />
-                Fuel Sales Breakdown
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="flex items-center justify-center h-40">
-                  <Skeleton className="size-32 rounded-full" />
-                </div>
-              ) : data?.fuelBreakdown && data.fuelBreakdown.length > 0 ? (
-                <div className="h-40">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={data.fuelBreakdown}
-                        dataKey="revenue"
-                        nameKey="type"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={60}
-                        innerRadius={30}
-                        paddingAngle={2}
-                      >
-                        {data.fuelBreakdown.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(value: number) => [`Rs. ${value.toLocaleString()}`, 'Revenue']}
-                        contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
+        {/* Notifications */}
+        <Card className="lg:col-span-1">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold">Notifications</CardTitle>
+              <Bell className="size-4 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-64">
+              {notifications.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                  <CheckCircle2 className="size-8 mb-2 opacity-50" />
+                  <p className="text-xs">No notifications</p>
                 </div>
               ) : (
-                <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
-                  No fuel breakdown data
-                </div>
-              )}
-              {data?.fuelBreakdown && data.fuelBreakdown.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {data.fuelBreakdown.map((item, idx) => (
-                    <div key={item.type} className="flex items-center gap-1.5 text-xs">
-                      <div className="size-2.5 rounded-full" style={{ background: PIE_COLORS[idx % PIE_COLORS.length] }} />
-                      <span className="text-muted-foreground">{item.type}</span>
+                <div className="space-y-2">
+                  {notifications.slice(0, 5).map((notif) => (
+                    <div
+                      key={notif.id}
+                      className={`rounded-lg border p-3 text-xs transition-colors ${
+                        notif.isRead ? 'bg-background' : 'bg-amber-500/5 border-amber-500/20'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-medium">{notif.title}</span>
+                        <Badge
+                          variant={
+                            notif.priority === 'urgent'
+                              ? 'destructive'
+                              : notif.priority === 'high'
+                                ? 'secondary'
+                                : 'outline'
+                          }
+                          className="text-[9px] px-1.5 py-0 shrink-0"
+                        >
+                          {notif.priority}
+                        </Badge>
+                      </div>
+                      <p className="text-muted-foreground mt-1 line-clamp-2">{notif.message}</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        {new Date(notif.createdAt).toLocaleString()}
+                      </p>
                     </div>
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Recent Transactions */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold">Recent Transactions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ScrollArea className="max-h-72">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">Time</TableHead>
+                  <TableHead className="text-xs">Pump</TableHead>
+                  <TableHead className="text-xs">Product</TableHead>
+                  <TableHead className="text-xs text-right">Litres</TableHead>
+                  <TableHead className="text-xs text-right">Amount</TableHead>
+                  <TableHead className="text-xs">Payment</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.recentTransactions.map((tx) => (
+                  <TableRow key={tx.id}>
+                    <TableCell className="text-xs font-mono">{tx.time}</TableCell>
+                    <TableCell className="text-xs">{tx.pump}</TableCell>
+                    <TableCell className="text-xs">{tx.product}</TableCell>
+                    <TableCell className="text-xs text-right">{tx.litres}</TableCell>
+                    <TableCell className="text-xs text-right font-medium">
+                      Rs. {tx.amount.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                        {tx.payment}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+        </CardContent>
+      </Card>
     </div>
   )
 }

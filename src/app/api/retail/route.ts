@@ -11,15 +11,36 @@ export async function GET(request: Request) {
     if (stationId) where.stationId = stationId
     if (category) where.category = category
 
-    const products = await db.retailProduct.findMany({
-      where,
-      include: {
-        station: {
-          select: { id: true, name: true, code: true },
+    const [products, carWashSessions, lotterySales, lubricantProducts] = await Promise.all([
+      db.retailProduct.findMany({
+        where,
+        include: {
+          station: {
+            select: { id: true, name: true, code: true },
+          },
         },
-      },
-      orderBy: [{ category: 'asc' }, { name: 'asc' }],
-    })
+        orderBy: [{ category: 'asc' }, { name: 'asc' }],
+      }),
+      db.carWashSession.findMany({
+        where: stationId ? { stationId } : {},
+        select: { id: true, washType: true, amount: true, paymentMethod: true, status: true, startedAt: true, vehiclePlate: true },
+        orderBy: { startedAt: 'desc' },
+        take: 20,
+      }),
+      db.lotterySale.findMany({
+        where: stationId ? { stationId } : {},
+        select: { id: true, gameType: true, ticketCount: true, saleAmount: true, commission: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      }),
+      db.lubricantProduct.findMany({
+        where: stationId ? { stationId, isActive: true } : { isActive: true },
+        include: {
+          station: { select: { id: true, name: true, code: true } },
+        },
+        orderBy: [{ category: 'asc' }, { name: 'asc' }],
+      }),
+    ])
 
     const productsWithStatus = products.map((product) => ({
       ...product,
@@ -31,11 +52,41 @@ export async function GET(request: Request) {
             : 'in_stock',
     }))
 
-    return NextResponse.json({ products: productsWithStatus })
+    // Car wash summary
+    const carWashSummary = {
+      totalSessions: carWashSessions.length,
+      totalRevenue: carWashSessions.reduce((sum, s) => sum + s.amount, 0),
+      byType: {
+        basic: carWashSessions.filter(s => s.washType === 'basic').length,
+        premium: carWashSessions.filter(s => s.washType === 'premium').length,
+        deluxe: carWashSessions.filter(s => s.washType === 'deluxe').length,
+      },
+    }
+
+    // Lottery summary
+    const lotterySummary = {
+      totalSales: lotterySales.length,
+      totalRevenue: lotterySales.reduce((sum, s) => sum + s.saleAmount, 0),
+      totalCommission: lotterySales.reduce((sum, s) => sum + s.commission, 0),
+      totalTickets: lotterySales.reduce((sum, s) => sum + s.ticketCount, 0),
+    }
+
+    return NextResponse.json({
+      products: productsWithStatus,
+      lubricantProducts,
+      carWash: {
+        sessions: carWashSessions,
+        summary: carWashSummary,
+      },
+      lottery: {
+        sales: lotterySales,
+        summary: lotterySummary,
+      },
+    })
   } catch (error) {
     console.error('Retail GET error:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch retail products' },
+      { error: 'Failed to fetch retail data' },
       { status: 500 }
     )
   }

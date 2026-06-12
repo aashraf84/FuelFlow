@@ -6,23 +6,42 @@ import {
   Play,
   Square,
   Lock,
+  Unlock,
+  AlertTriangle,
+  OctagonX,
+  Cpu,
   Wifi,
   WifiOff,
-  Settings,
-  AlertTriangle,
+  Wrench,
+  Clock,
+  Activity,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Separator } from '@/components/ui/separator'
 
 interface Nozzle {
   id: string
   nozzleNumber: number
   fuelType: string
-  fuelGrade?: string
+  fuelGrade: string | null
   meterReading: number
   previousReading: number
+  totalizer: number
+  calibrationDate: string | null
+  calibrationFactor: number
   status: string
   isActive: boolean
 }
@@ -31,58 +50,143 @@ interface Dispenser {
   id: string
   name: string
   code: string
-  manufacturer?: string
-  model?: string
-  controllerType?: string
-  communicationType?: string
+  manufacturer: string | null
+  model: string | null
+  serialNumber: string | null
+  controllerType: string | null
+  communicationType: string | null
+  ipAddress: string | null
+  port: number | null
+  pumpLane: number
   status: string
   isActive: boolean
+  lastCommunication: string | null
   nozzles: Nozzle[]
-  station: { id: string; name: string; code: string }
+  station: { id: string; name: string; code: string; city: string }
 }
 
-function StatusDot({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    idle: 'bg-emerald-500',
-    fueling: 'bg-amber-500 animate-pulse',
-    maintenance: 'bg-red-500',
-    error: 'bg-red-500',
-    stopped: 'bg-yellow-500',
-    locked: 'bg-gray-500',
-  }
-  return <div className={`size-2.5 rounded-full ${colors[status] || 'bg-gray-400'}`} />
+const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string; animate?: boolean }> = {
+  idle: { color: 'text-emerald-500', bg: 'bg-emerald-500/10 border-emerald-500/20', label: 'Idle' },
+  fueling: { color: 'text-amber-500', bg: 'bg-amber-500/10 border-amber-500/20', label: 'Fueling', animate: true },
+  maintenance: { color: 'text-red-500', bg: 'bg-red-500/10 border-red-500/20', label: 'Maintenance' },
+  locked: { color: 'text-slate-400', bg: 'bg-slate-500/10 border-slate-500/20', label: 'Locked' },
+  stopped: { color: 'text-red-500', bg: 'bg-red-500/10 border-red-500/20', label: 'Stopped' },
+  error: { color: 'text-red-600', bg: 'bg-red-600/10 border-red-600/20', label: 'Error' },
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const variants: Record<string, { variant: 'outline' | 'secondary' | 'destructive'; label: string }> = {
-    idle: { variant: 'outline', label: 'Idle' },
-    fueling: { variant: 'secondary', label: 'Fueling' },
-    maintenance: { variant: 'destructive', label: 'Maintenance' },
-    error: { variant: 'destructive', label: 'Error' },
-    stopped: { variant: 'secondary', label: 'Stopped' },
-    locked: { variant: 'secondary', label: 'Locked' },
-  }
-  const config = variants[status] || { variant: 'secondary' as const, label: status }
+function DispenserCard({ dispenser }: { dispenser: Dispenser }) {
+  const cfg = STATUS_CONFIG[dispenser.status] || STATUS_CONFIG.idle
+
   return (
-    <Badge variant={config.variant} className="text-xs gap-1">
-      <StatusDot status={status} />
-      {config.label}
-    </Badge>
+    <Card className={`border ${cfg.bg}`}>
+      <CardHeader className="pb-2 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Fuel className={`size-4 ${cfg.color} ${cfg.animate ? 'animate-pulse' : ''}`} />
+            <CardTitle className="text-sm font-semibold">{dispenser.name}</CardTitle>
+          </div>
+          <Badge
+            variant={
+              dispenser.status === 'error' || dispenser.status === 'maintenance'
+                ? 'destructive'
+                : dispenser.status === 'fueling'
+                  ? 'secondary'
+                  : 'outline'
+            }
+            className="text-[10px] px-1.5 py-0"
+          >
+            {cfg.label}
+          </Badge>
+        </div>
+        <CardDescription className="text-[10px]">
+          {dispenser.code} • {dispenser.manufacturer || 'N/A'} • Lane {dispenser.pumpLane}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="p-4 pt-0 space-y-3">
+        {/* Nozzle List */}
+        <div className="space-y-1.5">
+          {dispenser.nozzles.map((nozzle) => (
+            <div
+              key={nozzle.id}
+              className="flex items-center justify-between rounded-md bg-background/50 px-2 py-1.5 text-xs"
+            >
+              <div className="flex items-center gap-2">
+                <div
+                  className={`size-2 rounded-full ${
+                    nozzle.status === 'fueling' ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'
+                  }`}
+                />
+                <span className="font-medium">
+                  N{nozzle.nozzleNumber} - {nozzle.fuelType}
+                </span>
+              </div>
+              <span className="text-muted-foreground font-mono">
+                {nozzle.meterReading.toLocaleString()} L
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Controller Info */}
+        <Separator />
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
+          <div className="flex justify-between">
+            <span>Controller:</span>
+            <span className="font-medium text-foreground">{dispenser.controllerType?.toUpperCase() || 'N/A'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Comm:</span>
+            <span className="font-medium text-foreground">{dispenser.communicationType?.toUpperCase() || 'N/A'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>IP:</span>
+            <span className="font-medium text-foreground font-mono">{dispenser.ipAddress || 'N/A'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Last Comm:</span>
+            <span className="font-medium text-foreground">
+              {dispenser.lastCommunication
+                ? new Date(dispenser.lastCommunication).toLocaleTimeString()
+                : 'N/A'}
+            </span>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="grid grid-cols-2 gap-2 pt-1">
+          <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1">
+            <Play className="size-3" /> Authorize
+          </Button>
+          <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1">
+            <Square className="size-3" /> Stop
+          </Button>
+          <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1">
+            <Lock className="size-3" /> Lock
+          </Button>
+          <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1">
+            <Unlock className="size-3" /> Unlock
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
-function NozzleStatusBadge({ status }: { status: string }) {
-  const colorMap: Record<string, string> = {
-    idle: 'text-emerald-600 bg-emerald-50 border-emerald-200 dark:text-emerald-400 dark:bg-emerald-950 dark:border-emerald-800',
-    fueling: 'text-amber-600 bg-amber-50 border-amber-200 dark:text-amber-400 dark:bg-amber-950 dark:border-amber-800',
-    closed: 'text-gray-600 bg-gray-50 border-gray-200 dark:text-gray-400 dark:bg-gray-900 dark:border-gray-700',
-    error: 'text-red-600 bg-red-50 border-red-200 dark:text-red-400 dark:bg-red-950 dark:border-red-800',
-    locked: 'text-gray-600 bg-gray-50 border-gray-200 dark:text-gray-400 dark:bg-gray-900 dark:border-gray-700',
-  }
+function LoadingSkeleton() {
   return (
-    <span className={`text-[10px] px-1.5 py-0.5 rounded border ${colorMap[status] || 'text-gray-500 bg-gray-50 border-gray-200'}`}>
-      {status.charAt(0).toUpperCase() + status.slice(1)}
-    </span>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <Card key={i}>
+          <CardContent className="p-4">
+            <Skeleton className="h-5 w-24 mb-2" />
+            <Skeleton className="h-3 w-32 mb-3" />
+            <Skeleton className="h-4 w-full mb-1" />
+            <Skeleton className="h-4 w-full mb-1" />
+            <Skeleton className="h-8 w-full mt-2" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
   )
 }
 
@@ -90,157 +194,234 @@ export default function ForecourtModule() {
   const [dispensers, setDispensers] = useState<Dispenser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState('pumps')
 
   useEffect(() => {
     async function fetchData() {
       try {
+        setLoading(true)
         const res = await fetch('/api/dispensers')
-        if (!res.ok) throw new Error('Failed to fetch')
-        const json = await res.json()
-        setDispensers(json.dispensers || [])
+        if (!res.ok) throw new Error('Failed to load dispensers')
+        const data = await res.json()
+        setDispensers(data.dispensers || [])
       } catch (err) {
-        console.error('Failed to fetch dispensers:', err)
-        setError('Failed to load dispenser data')
+        setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {
         setLoading(false)
       }
     }
     fetchData()
+    const interval = setInterval(fetchData, 10000)
+    return () => clearInterval(interval)
   }, [])
 
+  const allNozzles = dispensers.flatMap((d) =>
+    d.nozzles.map((n) => ({ ...n, dispenserName: d.name, dispenserCode: d.code }))
+  )
+
+  const statusSummary = {
+    idle: dispensers.filter((d) => d.status === 'idle').length,
+    fueling: dispensers.filter((d) => d.status === 'fueling').length,
+    maintenance: dispensers.filter((d) => d.status === 'maintenance').length,
+    locked: dispensers.filter((d) => d.status === 'locked').length,
+    error: dispensers.filter((d) => d.status === 'error').length,
+  }
+
+  if (loading) return <LoadingSkeleton />
   if (error) {
     return (
-      <div className="module-enter space-y-6">
-        <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
-          <CardContent className="p-6 text-center">
-            <AlertTriangle className="size-10 mx-auto text-red-500 mb-2" />
-            <p className="text-sm font-medium text-red-700 dark:text-red-400">{error}</p>
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardContent className="p-6 text-center">
+          <AlertTriangle className="size-8 text-red-500 mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground">{error}</p>
+          <Button variant="outline" size="sm" className="mt-2" onClick={() => window.location.reload()}>
+            Retry
+          </Button>
+        </CardContent>
+      </Card>
     )
   }
 
   return (
-    <div className="module-enter space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="flex size-10 items-center justify-center rounded-lg bg-amber-500/10">
-          <Fuel className="size-5 text-amber-500" />
-        </div>
-        <div>
-          <h2 className="text-xl font-bold">Forecourt Automation</h2>
-          <p className="text-sm text-muted-foreground">
-            Real-time pump monitoring, nozzle tracking, and forecourt operations
-          </p>
-        </div>
+    <div className="space-y-4">
+      {/* Status Summary */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {Object.entries(statusSummary).map(([status, count]) => {
+          const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.idle
+          return (
+            <Card key={status}>
+              <CardContent className="p-3 flex items-center gap-3">
+                <div className={`flex size-8 items-center justify-center rounded-lg ${cfg.bg}`}>
+                  <Fuel className={`size-4 ${cfg.color}`} />
+                </div>
+                <div>
+                  <p className="text-lg font-bold">{count}</p>
+                  <p className="text-[10px] text-muted-foreground">{cfg.label}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
 
-      {loading ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <Skeleton className="h-5 w-24" />
-                  <Skeleton className="h-5 w-16" />
-                </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="pumps">Pumps</TabsTrigger>
+          <TabsTrigger value="nozzle-control">Nozzle Control</TabsTrigger>
+          <TabsTrigger value="emergency">Emergency</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="pumps" className="mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {dispensers.map((dispenser) => (
+              <DispenserCard key={dispenser.id} dispenser={dispenser} />
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="nozzle-control" className="mt-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">All Nozzles</CardTitle>
+              <CardDescription className="text-xs">
+                {allNozzles.length} nozzles across {dispensers.length} dispensers
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="max-h-96">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs">Dispenser</TableHead>
+                      <TableHead className="text-xs">Nozzle</TableHead>
+                      <TableHead className="text-xs">Fuel Type</TableHead>
+                      <TableHead className="text-xs text-right">Meter Reading</TableHead>
+                      <TableHead className="text-xs">Calibration</TableHead>
+                      <TableHead className="text-xs">Status</TableHead>
+                      <TableHead className="text-xs">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {allNozzles.map((nozzle) => (
+                      <TableRow key={nozzle.id}>
+                        <TableCell className="text-xs font-medium">{nozzle.dispenserName}</TableCell>
+                        <TableCell className="text-xs">N{nozzle.nozzleNumber}</TableCell>
+                        <TableCell className="text-xs capitalize">{nozzle.fuelType}</TableCell>
+                        <TableCell className="text-xs text-right font-mono">
+                          {nozzle.meterReading.toLocaleString()} L
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {nozzle.calibrationDate
+                            ? new Date(nozzle.calibrationDate).toLocaleDateString()
+                            : 'N/A'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={nozzle.status === 'fueling' ? 'secondary' : 'outline'}
+                            className="text-[10px] px-1.5 py-0"
+                          >
+                            {nozzle.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button size="sm" variant="ghost" className="h-6 text-[10px]">
+                            Calibrate
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="emergency" className="mt-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Emergency Stop */}
+            <Card className="border-red-200 dark:border-red-900/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold text-red-600">Emergency Controls</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-full" />
-                <div className="flex gap-2 pt-2">
-                  <Skeleton className="h-8 w-20" />
-                  <Skeleton className="h-8 w-20" />
-                  <Skeleton className="h-8 w-20" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : dispensers.length === 0 ? (
-        <Card>
-          <CardContent className="flex h-48 items-center justify-center">
-            <div className="text-center space-y-2">
-              <Fuel className="size-10 mx-auto text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">No dispensers configured</p>
-              <p className="text-xs text-muted-foreground">Add dispensers through the settings page</p>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {dispensers.map((dispenser) => (
-            <Card key={dispenser.id} className="relative overflow-hidden">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <CardTitle className="text-sm">{dispenser.name}</CardTitle>
-                    {dispenser.manufacturer && (
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5">
-                        {dispenser.manufacturer}
-                      </Badge>
-                    )}
-                  </div>
-                  <StatusBadge status={dispenser.status} />
-                </div>
-                {dispenser.model && (
-                  <CardDescription className="text-xs">{dispenser.model}</CardDescription>
-                )}
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {/* Nozzles */}
+              <CardContent className="space-y-4">
+                <Button
+                  variant="destructive"
+                  size="lg"
+                  className="w-full h-20 text-lg font-bold gap-3"
+                >
+                  <OctagonX className="size-8" />
+                  EMERGENCY STOP ALL PUMPS
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  This will immediately halt all dispensers and lock the forecourt.
+                  Use only in case of emergency.
+                </p>
+                <Separator />
                 <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground">Nozzles</p>
-                  {dispenser.nozzles.map((nozzle) => (
-                    <div key={nozzle.id} className="flex items-center justify-between text-xs bg-muted/50 rounded px-2 py-1.5">
-                      <div className="flex items-center gap-2">
-                        <div className={`size-1.5 rounded-full ${nozzle.status === 'fueling' ? 'bg-amber-500 animate-pulse' : nozzle.status === 'error' ? 'bg-red-500' : 'bg-emerald-500'}`} />
-                        <span className="font-medium">N{nozzle.nozzleNumber}</span>
-                        <span className="text-muted-foreground capitalize">{nozzle.fuelType}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">{nozzle.meterReading.toLocaleString()}L</span>
-                        <NozzleStatusBadge status={nozzle.status} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Controller info */}
-                {(dispenser.controllerType || dispenser.communicationType) && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    {dispenser.communicationType === 'tcpip' || dispenser.communicationType === 'ethernet' ? (
-                      <Wifi className="size-3 text-emerald-500" />
-                    ) : (
-                      <WifiOff className="size-3 text-muted-foreground" />
-                    )}
-                    <span>{dispenser.controllerType || 'Unknown'} / {dispenser.communicationType || 'N/A'}</span>
+                  <p className="text-xs font-semibold text-muted-foreground">Individual Pump Lockdown</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {dispensers.map((d) => (
+                      <Button
+                        key={d.id}
+                        size="sm"
+                        variant={d.status === 'locked' ? 'destructive' : 'outline'}
+                        className="h-8 text-[10px] gap-1"
+                      >
+                        <Lock className="size-3" />
+                        {d.name} {d.status === 'locked' ? '(Locked)' : ''}
+                      </Button>
+                    ))}
                   </div>
-                )}
-
-                {/* Action buttons */}
-                <div className="flex gap-2 pt-2 border-t">
-                  <Button variant="outline" size="sm" className="h-7 text-xs flex-1 gap-1" disabled={dispenser.status === 'fueling'}>
-                    <Play className="size-3" />
-                    Authorize
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-7 text-xs flex-1 gap-1" disabled={dispenser.status !== 'fueling'}>
-                    <Square className="size-3" />
-                    Stop
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-7 text-xs gap-1" disabled={dispenser.status === 'locked'}>
-                    <Lock className="size-3" />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
-                    <Settings className="size-3" />
-                  </Button>
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      )}
+
+            {/* Emergency Events */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Recent Emergency Events</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-64">
+                  <div className="space-y-2">
+                    {dispensers
+                      .filter((d) => d.status === 'maintenance' || d.status === 'error')
+                      .map((d) => (
+                        <div
+                          key={d.id}
+                          className="flex items-start gap-3 rounded-lg border p-3"
+                        >
+                          <AlertTriangle className="size-4 text-red-500 mt-0.5 shrink-0" />
+                          <div className="text-xs">
+                            <p className="font-medium">
+                              {d.name} - {d.status === 'error' ? 'Error' : 'Maintenance Required'}
+                            </p>
+                            <p className="text-muted-foreground">
+                              {d.manufacturer?.toUpperCase()} • Controller: {d.controllerType?.toUpperCase() || 'N/A'}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground mt-1">
+                              <Clock className="size-3 inline mr-1" />
+                              Last communication: {d.lastCommunication
+                                ? new Date(d.lastCommunication).toLocaleString()
+                                : 'Unknown'}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    {dispensers.filter((d) => d.status === 'maintenance' || d.status === 'error').length === 0 && (
+                      <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                        <Activity className="size-8 mb-2 opacity-50" />
+                        <p className="text-xs">No active emergency events</p>
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

@@ -16,12 +16,51 @@ export async function GET(request: Request) {
       include: {
         station: { select: { id: true, name: true, code: true } },
         attendant: { select: { id: true, name: true, role: true } },
+        supervisor: { select: { id: true, name: true, role: true } },
         _count: { select: { fuelings: true, retailTransactions: true } },
       },
       orderBy: { openedAt: 'desc' },
     })
 
-    return NextResponse.json({ shifts })
+    const shiftsEnhanced = shifts.map(s => ({
+      id: s.id,
+      stationId: s.stationId,
+      shiftNumber: s.shiftNumber,
+      attendantId: s.attendantId,
+      supervisorId: s.supervisorId,
+      attendant: s.attendant,
+      supervisor: s.supervisor,
+      openedAt: s.openedAt,
+      closedAt: s.closedAt,
+      openingCash: s.openingCash,
+      closingCash: s.closingCash,
+      expectedCash: s.expectedCash,
+      cashVariance: s.cashVariance,
+      totalSales: s.totalSales,
+      totalVolume: s.totalVolume,
+      fuelSales: s.fuelSales,
+      retailSales: s.retailSales,
+      cardSales: s.cardSales,
+      fleetSales: s.fleetSales,
+      creditSales: s.creditSales,
+      cashSales: s.cashSales,
+      transactionCount: s.transactionCount,
+      status: s.status,
+      notes: s.notes,
+      station: s.station,
+      fuelingCount: s._count.fuelings,
+      retailTransactionCount: s._count.retailTransactions,
+      // Sales breakdown
+      salesBreakdown: {
+        cash: s.cashSales,
+        card: s.cardSales,
+        fleet: s.fleetSales,
+        credit: s.creditSales,
+        total: s.totalSales,
+      },
+    }))
+
+    return NextResponse.json({ shifts: shiftsEnhanced })
   } catch (error) {
     console.error('Shifts GET error:', error)
     return NextResponse.json(
@@ -34,7 +73,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { stationId, attendantId, openingCash, notes } = body
+    const { stationId, attendantId, supervisorId, openingCash, notes } = body
 
     if (!stationId) {
       return NextResponse.json(
@@ -43,7 +82,6 @@ export async function POST(request: Request) {
       )
     }
 
-    // Find the latest shift number for the station
     const latestShift = await db.shift.findFirst({
       where: { stationId },
       orderBy: { shiftNumber: 'desc' },
@@ -57,6 +95,7 @@ export async function POST(request: Request) {
         stationId,
         shiftNumber,
         attendantId,
+        supervisorId,
         openedAt: new Date(),
         openingCash: openingCash ? parseFloat(String(openingCash)) : 0,
         status: 'open',
@@ -65,6 +104,7 @@ export async function POST(request: Request) {
       include: {
         station: { select: { id: true, name: true, code: true } },
         attendant: { select: { id: true, name: true, role: true } },
+        supervisor: { select: { id: true, name: true, role: true } },
       },
     })
 
@@ -112,11 +152,17 @@ export async function PUT(request: Request) {
     // Aggregate shift totals from fuelings
     const shiftFuelings = await db.fueling.findMany({
       where: { shiftId: id, status: 'completed' },
-      select: { totalAmount: true, volume: true, fuelType: true },
+      select: { totalAmount: true, volume: true, fuelType: true, paymentMethod: true },
     })
 
     const totalSales = shiftFuelings.reduce((sum, f) => sum + f.totalAmount, 0)
     const totalVolume = shiftFuelings.reduce((sum, f) => sum + f.volume, 0)
+
+    // Calculate breakdown by payment method
+    const cashSales = shiftFuelings.filter(f => f.paymentMethod === 'cash').reduce((sum, f) => sum + f.totalAmount, 0)
+    const cardSales = shiftFuelings.filter(f => f.paymentMethod === 'card').reduce((sum, f) => sum + f.totalAmount, 0)
+    const fleetSales = shiftFuelings.filter(f => f.paymentMethod === 'fleet').reduce((sum, f) => sum + f.totalAmount, 0)
+    const creditSales = shiftFuelings.filter(f => f.paymentMethod === 'credit' || f.paymentMethod === 'mobile' || f.paymentMethod === 'rfid').reduce((sum, f) => sum + f.totalAmount, 0)
 
     const shift = await db.shift.update({
       where: { id },
@@ -128,12 +174,18 @@ export async function PUT(request: Request) {
         totalSales: Math.round(totalSales * 100) / 100,
         totalVolume: Math.round(totalVolume * 10) / 10,
         fuelSales: Math.round(totalSales * 100) / 100,
+        cashSales: Math.round(cashSales * 100) / 100,
+        cardSales: Math.round(cardSales * 100) / 100,
+        fleetSales: Math.round(fleetSales * 100) / 100,
+        creditSales: Math.round(creditSales * 100) / 100,
+        transactionCount: shiftFuelings.length,
         status: 'closed',
         notes,
       },
       include: {
         station: { select: { id: true, name: true, code: true } },
         attendant: { select: { id: true, name: true, role: true } },
+        supervisor: { select: { id: true, name: true, role: true } },
       },
     })
 

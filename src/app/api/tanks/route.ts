@@ -18,9 +18,25 @@ export async function GET(request: Request) {
           take: 5,
           orderBy: { readingAt: 'desc' },
         },
+        calibrations: {
+          take: 1,
+          orderBy: { calibrationDate: 'desc' },
+        },
+        deliveries: {
+          where: { status: { in: ['pending', 'arriving', 'unloading'] } },
+          take: 3,
+          orderBy: { deliveryDate: 'desc' },
+        },
+        reconciliations: {
+          take: 1,
+          orderBy: { date: 'desc' },
+        },
       },
       orderBy: { code: 'asc' },
     })
+
+    // Get meter records for nozzles connected to these tanks via dispensers
+    const tankIds = tanks.map(t => t.id)
 
     const tanksWithLevel = tanks.map((tank) => {
       const levelPercentage =
@@ -52,12 +68,34 @@ export async function GET(request: Request) {
         lastReading: tank.lastReading,
         station: tank.station,
         recentReadings: tank.tankReadings,
+        latestCalibration: tank.calibrations[0] || null,
+        pendingDeliveries: tank.deliveries,
+        latestReconciliation: tank.reconciliations[0] || null,
         createdAt: tank.createdAt,
         updatedAt: tank.updatedAt,
       }
     })
 
-    return NextResponse.json({ tanks: tanksWithLevel })
+    // Get meter records for nozzles at this station
+    const meterRecords = stationId
+      ? await db.meterRecord.findMany({
+          where: { stationId },
+          include: {
+            nozzle: {
+              select: {
+                id: true,
+                nozzleNumber: true,
+                fuelType: true,
+                dispenser: { select: { name: true, code: true } },
+              },
+            },
+          },
+          take: 20,
+          orderBy: { recordedAt: 'desc' },
+        })
+      : []
+
+    return NextResponse.json({ tanks: tanksWithLevel, meterRecords })
   } catch (error) {
     console.error('Tanks GET error:', error)
     return NextResponse.json(

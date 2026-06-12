@@ -13,7 +13,7 @@ export async function GET(request: Request) {
       cngWhere.stationId = stationId
     }
 
-    const [evChargers, cngDispensers] = await Promise.all([
+    const [evChargers, cngDispensers, chargingSessions] = await Promise.all([
       db.eVCharger.findMany({
         where: evWhere,
         include: {
@@ -21,9 +21,8 @@ export async function GET(request: Request) {
             select: { id: true, name: true, code: true, city: true },
           },
           sessions: {
-            where: { status: 'active' },
-            take: 1,
             orderBy: { startedAt: 'desc' },
+            take: 5,
           },
         },
         orderBy: { code: 'asc' },
@@ -37,6 +36,14 @@ export async function GET(request: Request) {
         },
         orderBy: { code: 'asc' },
       }),
+      db.chargingSession.findMany({
+        where: stationId ? { stationId } : {},
+        include: {
+          evCharger: { select: { name: true, code: true, connectorType: true } },
+        },
+        orderBy: { startedAt: 'desc' },
+        take: 20,
+      }),
     ])
 
     const evChargersWithStatus = evChargers.map((charger) => ({
@@ -49,7 +56,10 @@ export async function GET(request: Request) {
       currentSession: charger.currentSession,
       isActive: charger.isActive,
       station: charger.station,
-      activeSession: charger.sessions[0] || null,
+      recentSessions: charger.sessions,
+      totalSessions: charger.sessions.length,
+      totalRevenue: charger.sessions.reduce((sum, s) => sum + s.totalAmount, 0),
+      totalEnergy: charger.sessions.reduce((sum, s) => sum + s.energyKwh, 0),
       createdAt: charger.createdAt,
       updatedAt: charger.updatedAt,
     }))
@@ -74,6 +84,8 @@ export async function GET(request: Request) {
       occupied: evChargersWithStatus.filter((c) => c.status === 'occupied').length,
       offline: evChargersWithStatus.filter((c) => c.status === 'offline').length,
       error: evChargersWithStatus.filter((c) => c.status === 'error').length,
+      totalRevenue: evChargersWithStatus.reduce((sum, c) => sum + c.totalRevenue, 0),
+      totalEnergyDispensed: evChargersWithStatus.reduce((sum, c) => sum + c.totalEnergy, 0),
     }
 
     const cngSummary = {
@@ -84,10 +96,19 @@ export async function GET(request: Request) {
       error: cngDispensersWithStatus.filter((d) => d.status === 'error').length,
     }
 
+    const chargingSummary = {
+      totalSessions: chargingSessions.length,
+      activeSessions: chargingSessions.filter(s => s.status === 'active').length,
+      completedSessions: chargingSessions.filter(s => s.status === 'completed').length,
+      totalRevenue: chargingSessions.reduce((sum, s) => sum + s.totalAmount, 0),
+      totalEnergyKwh: chargingSessions.reduce((sum, s) => sum + s.energyKwh, 0),
+    }
+
     return NextResponse.json({
       evChargers: evChargersWithStatus,
       cngDispensers: cngDispensersWithStatus,
-      summary: { ev: evSummary, cng: cngSummary },
+      chargingSessions,
+      summary: { ev: evSummary, cng: cngSummary, charging: chargingSummary },
     })
   } catch (error) {
     console.error('EV-CNG GET error:', error)
