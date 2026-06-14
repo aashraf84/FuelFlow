@@ -107,6 +107,25 @@ async function handleReport(reportType: string, stationId: string | null, tenant
       case 'environmental_report': return await environmentalReport(stationId, dateFrom, dateTo)
       case 'security_audit': return await securityAuditReport(tenantId, dateFrom, dateTo)
       case 'station_performance': return await stationPerformanceReport(tenantId, dateFrom, dateTo)
+      case 'nozzle_sales': return await nozzleSalesReport(stationId, dateFrom, dateTo)
+      case 'product_sales': return await productSalesReport(stationId, dateFrom, dateTo)
+      case 'payment_mode': return await paymentModeReport(stationId, dateFrom, dateTo)
+      case 'hourly_sales': return await hourlySalesReport(stationId, dateFrom, dateTo)
+      case 'meter_reading': return await meterReadingReport(stationId, dateFrom, dateTo)
+      case 'dip_reading': return await dipReadingReport(stationId, dateFrom, dateTo)
+      case 'stock_gain_loss': return await stockGainLossReport(stationId, dateFrom, dateTo)
+      case 'lubricant_inventory': return await lubricantInventoryReport(stationId, dateFrom, dateTo)
+      case 'profit_loss': return await profitLossReport(stationId, tenantId, dateFrom, dateTo)
+      case 'credit_billing': return await creditBillingReport(tenantId, dateFrom, dateTo)
+      case 'tax_report': return await taxReport(stationId, tenantId, dateFrom, dateTo)
+      case 'ap_aging': return await apAgingReport(tenantId, dateFrom, dateTo)
+      case 'ar_aging': return await arAgingReport(tenantId, dateFrom, dateTo)
+      case 'shift_handover': return await shiftHandoverReport(stationId, dateFrom, dateTo)
+      case 'dispenser_uptime': return await dispenserUptimeReport(stationId, dateFrom, dateTo)
+      case 'credit_ledger': return await creditLedgerReport(tenantId, dateFrom, dateTo)
+      case 'redemption': return await redemptionReport(tenantId, dateFrom, dateTo)
+      case 'ogra_compliance': return await ograComplianceReport(stationId, dateFrom, dateTo)
+      case 'calibration': return await calibrationReport(stationId, dateFrom, dateTo)
       default: return NextResponse.json({ error: `Unknown reportType: ${reportType}` }, { status: 400 })
     }
   } catch (error) {
@@ -609,6 +628,300 @@ async function stationPerformanceReport(tenantId: string | null, dateFrom?: Date
       evStations: stations.filter((s) => s.stationType === 'ev' || s.stationType === 'hybrid').length,
     }, dateFrom, dateTo)
   } catch { return reportResponse('station_performance', [], [], { totalStations: 0, activeStations: 0 }, dateFrom, dateTo) }
+}
+
+// =====================================================
+// 21-40. NEW REPORT TYPES
+// =====================================================
+
+async function nozzleSalesReport(stationId: string | null, dateFrom?: Date, dateTo?: Date) {
+  try {
+    const where = buildWhere(stationId, dateFrom, dateTo, 'startedAt') as Record<string, unknown>
+    where.status = 'completed'
+    const fuelings = await db.fueling.findMany({ where, orderBy: { startedAt: 'desc' }, take: 5000, include: { nozzle: { select: { name: true, code: true, dispenser: { select: { name: true } } } } } })
+    const byNozzle: Record<string, { nozzleName: string; dispenserName: string; transactionCount: number; totalVolume: number; totalRevenue: number }> = {}
+    for (const f of fuelings) {
+      const nk = f.nozzleId || 'unknown'
+      if (!byNozzle[nk]) byNozzle[nk] = { nozzleName: (f.nozzle as { name: string } | null)?.name || 'Unknown', dispenserName: ((f.nozzle as { dispenser: { name: string } } | null)?.dispenser?.name) || 'Unknown', transactionCount: 0, totalVolume: 0, totalRevenue: 0 }
+      byNozzle[nk].transactionCount += 1
+      byNozzle[nk].totalVolume += f.volume
+      byNozzle[nk].totalRevenue += f.totalAmount
+    }
+    const columns = ['nozzleName', 'dispenserName', 'transactionCount', 'totalVolume', 'totalRevenue']
+    const rows = Object.values(byNozzle).map((d) => ({ ...d, totalVolume: Math.round(d.totalVolume * 100) / 100, totalRevenue: Math.round(d.totalRevenue * 100) / 100 }))
+    const totalVolume = fuelings.reduce((s, f) => s + f.volume, 0)
+    const totalRevenue = fuelings.reduce((s, f) => s + f.totalAmount, 0)
+    return reportResponse('nozzle_sales', columns, rows, { totalNozzles: Object.keys(byNozzle).length, totalTransactions: fuelings.length, totalVolume: Math.round(totalVolume * 100) / 100, totalRevenue: Math.round(totalRevenue * 100) / 100 }, dateFrom, dateTo)
+  } catch { return reportResponse('nozzle_sales', [], [], { totalNozzles: 0, totalTransactions: 0, totalVolume: 0, totalRevenue: 0 }, dateFrom, dateTo) }
+}
+
+async function productSalesReport(stationId: string | null, dateFrom?: Date, dateTo?: Date) {
+  try {
+    const where = buildWhere(stationId, dateFrom, dateTo, 'startedAt') as Record<string, unknown>
+    where.status = 'completed'
+    const fuelings = await db.fueling.findMany({ where, take: 5000 })
+    const byProduct: Record<string, { fuelType: string; transactionCount: number; totalVolume: number; totalRevenue: number; avgPrice: number }> = {}
+    for (const f of fuelings) {
+      const pk = f.fuelType || 'unknown'
+      if (!byProduct[pk]) byProduct[pk] = { fuelType: pk, transactionCount: 0, totalVolume: 0, totalRevenue: 0, avgPrice: 0 }
+      byProduct[pk].transactionCount += 1
+      byProduct[pk].totalVolume += f.volume
+      byProduct[pk].totalRevenue += f.totalAmount
+    }
+    for (const k of Object.keys(byProduct)) {
+      const p = byProduct[k]
+      p.avgPrice = p.totalVolume > 0 ? Math.round((p.totalRevenue / p.totalVolume) * 100) / 100 : 0
+      p.totalVolume = Math.round(p.totalVolume * 100) / 100
+      p.totalRevenue = Math.round(p.totalRevenue * 100) / 100
+    }
+    const columns = ['fuelType', 'transactionCount', 'totalVolume', 'totalRevenue', 'avgPrice']
+    const rows = Object.values(byProduct)
+    const totalRevenue = fuelings.reduce((s, f) => s + f.totalAmount, 0)
+    return reportResponse('product_sales', columns, rows, { totalProducts: rows.length, totalTransactions: fuelings.length, totalRevenue: Math.round(totalRevenue * 100) / 100 }, dateFrom, dateTo)
+  } catch { return reportResponse('product_sales', [], [], { totalProducts: 0, totalTransactions: 0, totalRevenue: 0 }, dateFrom, dateTo) }
+}
+
+async function paymentModeReport(stationId: string | null, dateFrom?: Date, dateTo?: Date) {
+  try {
+    const where = buildWhere(stationId, dateFrom, dateTo, 'startedAt') as Record<string, unknown>
+    where.status = 'completed'
+    const fuelings = await db.fueling.findMany({ where, take: 5000 })
+    const byPayment: Record<string, { paymentMethod: string; transactionCount: number; totalRevenue: number; percentage: number }> = {}
+    const totalRev = fuelings.reduce((s, f) => s + f.totalAmount, 0)
+    for (const f of fuelings) {
+      const pm = f.paymentMethod || 'cash'
+      if (!byPayment[pm]) byPayment[pm] = { paymentMethod: pm, transactionCount: 0, totalRevenue: 0, percentage: 0 }
+      byPayment[pm].transactionCount += 1
+      byPayment[pm].totalRevenue += f.totalAmount
+    }
+    for (const k of Object.keys(byPayment)) {
+      byPayment[k].totalRevenue = Math.round(byPayment[k].totalRevenue * 100) / 100
+      byPayment[k].percentage = totalRev > 0 ? Math.round((byPayment[k].totalRevenue / totalRev) * 10000) / 100 : 0
+    }
+    const columns = ['paymentMethod', 'transactionCount', 'totalRevenue', 'percentage']
+    const rows = Object.values(byPayment)
+    return reportResponse('payment_mode', columns, rows, { totalPaymentModes: rows.length, totalTransactions: fuelings.length, totalRevenue: Math.round(totalRev * 100) / 100 }, dateFrom, dateTo)
+  } catch { return reportResponse('payment_mode', [], [], { totalPaymentModes: 0, totalTransactions: 0, totalRevenue: 0 }, dateFrom, dateTo) }
+}
+
+async function hourlySalesReport(stationId: string | null, dateFrom?: Date, dateTo?: Date) {
+  try {
+    const where = buildWhere(stationId, dateFrom, dateTo, 'startedAt') as Record<string, unknown>
+    where.status = 'completed'
+    const fuelings = await db.fueling.findMany({ where, take: 5000 })
+    const byHour: Record<number, { hour: number; transactionCount: number; totalVolume: number; totalRevenue: number }> = {}
+    for (let h = 0; h < 24; h++) byHour[h] = { hour: h, transactionCount: 0, totalVolume: 0, totalRevenue: 0 }
+    for (const f of fuelings) {
+      const h = new Date(f.startedAt).getHours()
+      byHour[h].transactionCount += 1
+      byHour[h].totalVolume += f.volume
+      byHour[h].totalRevenue += f.totalAmount
+    }
+    const columns = ['hour', 'transactionCount', 'totalVolume', 'totalRevenue']
+    const rows = Object.values(byHour).map((d) => ({ hour: `${String(d.hour).padStart(2, '0')}:00`, transactionCount: d.transactionCount, totalVolume: Math.round(d.totalVolume * 100) / 100, totalRevenue: Math.round(d.totalRevenue * 100) / 100 }))
+    const peakHour = Object.values(byHour).reduce((max, d) => d.totalRevenue > max.totalRevenue ? d : max, byHour[0])
+    return reportResponse('hourly_sales', columns, rows, { totalTransactions: fuelings.length, peakHour: `${String(peakHour.hour).padStart(2, '0')}:00`, totalRevenue: Math.round(fuelings.reduce((s, f) => s + f.totalAmount, 0) * 100) / 100 }, dateFrom, dateTo)
+  } catch { return reportResponse('hourly_sales', [], [], { totalTransactions: 0, peakHour: '-', totalRevenue: 0 }, dateFrom, dateTo) }
+}
+
+async function meterReadingReport(stationId: string | null, dateFrom?: Date, dateTo?: Date) {
+  try {
+    const where = buildWhere(stationId, dateFrom, dateTo) as Record<string, unknown>
+    const records = await db.meterRecord.findMany({ where, orderBy: { createdAt: 'desc' }, take: 500, include: { nozzle: { select: { name: true, code: true } } } })
+    const columns = ['nozzleName', 'nozzleCode', 'openingReading', 'closingReading', 'volumeDispensed', 'shiftNumber', 'date', 'status']
+    const rows = records.map((r) => ({
+      nozzleName: (r.nozzle as { name: string } | null)?.name || 'Unknown',
+      nozzleCode: (r.nozzle as { code: string } | null)?.code || 'N/A',
+      openingReading: r.openingReading,
+      closingReading: r.closingReading,
+      volumeDispensed: Math.round((r.closingReading - r.openingReading) * 100) / 100,
+      shiftNumber: (r as Record<string, unknown>).shiftNumber || 'N/A',
+      date: r.createdAt.toISOString(),
+      status: 'completed',
+    }))
+    return reportResponse('meter_reading', columns, rows, { totalReadings: records.length, totalVolume: Math.round(rows.reduce((s, r) => s + (r.volumeDispensed as number), 0) * 100) / 100 }, dateFrom, dateTo)
+  } catch { return reportResponse('meter_reading', [], [], { totalReadings: 0, totalVolume: 0 }, dateFrom, dateTo) }
+}
+
+async function dipReadingReport(stationId: string | null, dateFrom?: Date, dateTo?: Date) {
+  try {
+    const where = buildWhere(stationId, dateFrom, dateTo) as Record<string, unknown>
+    const recons = await db.reconciliation.findMany({ where, orderBy: { date: 'desc' }, take: 500, include: { tank: { select: { name: true, fuelType: true } } } })
+    const columns = ['tankName', 'fuelType', 'date', 'bookStock', 'actualStock', 'variance', 'variancePercentage']
+    const rows = recons.map((r) => ({ tankName: r.tank?.name || 'Unknown', fuelType: r.tank?.fuelType || 'N/A', date: r.date.toISOString(), bookStock: r.bookStock, actualStock: r.actualStock, variance: Math.round(r.variance * 100) / 100, variancePercentage: Math.round(r.variancePercentage * 100) / 100 }))
+    return reportResponse('dip_reading', columns, rows, { totalReadings: recons.length, avgVariance: recons.length ? Math.round((recons.reduce((s, r) => s + r.variancePercentage, 0) / recons.length) * 100) / 100 : 0 }, dateFrom, dateTo)
+  } catch { return reportResponse('dip_reading', [], [], { totalReadings: 0, avgVariance: 0 }, dateFrom, dateTo) }
+}
+
+async function stockGainLossReport(stationId: string | null, dateFrom?: Date, dateTo?: Date) {
+  try {
+    const where = buildWhere(stationId, dateFrom, dateTo) as Record<string, unknown>
+    const recons = await db.reconciliation.findMany({ where, orderBy: { date: 'desc' }, take: 500, include: { tank: { select: { name: true, fuelType: true } } } })
+    const columns = ['tankName', 'fuelType', 'date', 'variance', 'variancePercentage', 'status']
+    const rows = recons.map((r) => ({ tankName: r.tank?.name || 'Unknown', fuelType: r.tank?.fuelType || 'N/A', date: r.date.toISOString(), variance: Math.round(r.variance * 100) / 100, variancePercentage: Math.round(r.variancePercentage * 100) / 100, status: r.variance > 0 ? 'gain' : r.variance < 0 ? 'loss' : 'balanced' }))
+    const totalGain = rows.filter((r) => r.variance > 0).reduce((s, r) => s + r.variance, 0)
+    const totalLoss = rows.filter((r) => r.variance < 0).reduce((s, r) => s + r.variance, 0)
+    return reportResponse('stock_gain_loss', columns, rows, { totalRecords: recons.length, totalGain: Math.round(totalGain * 100) / 100, totalLoss: Math.round(totalLoss * 100) / 100 }, dateFrom, dateTo)
+  } catch { return reportResponse('stock_gain_loss', [], [], { totalRecords: 0, totalGain: 0, totalLoss: 0 }, dateFrom, dateTo) }
+}
+
+async function lubricantInventoryReport(stationId: string | null, _dateFrom?: Date, _dateTo?: Date) {
+  try {
+    const where = stationId ? { stationId } : {}
+    const products = await db.retailProduct.findMany({ where: { category: 'lubricant' }, orderBy: { name: 'asc' } })
+    const columns = ['name', 'sku', 'category', 'price', 'stock', 'reorderLevel', 'status']
+    const rows = products.map((p) => ({ name: p.name, sku: p.sku || 'N/A', category: p.category, price: p.price, stock: p.stock, reorderLevel: (p as Record<string, unknown>).reorderLevel || 0, status: p.stock > 0 ? 'in_stock' : 'out_of_stock' }))
+    return reportResponse('lubricant_inventory', columns, rows, { totalProducts: products.length, totalValue: Math.round(products.reduce((s, p) => s + p.price * p.stock, 0) * 100) / 100, lowStock: products.filter((p) => p.stock < 10).length }, _dateFrom, _dateTo)
+  } catch { return reportResponse('lubricant_inventory', [], [], { totalProducts: 0, totalValue: 0, lowStock: 0 }, _dateFrom, _dateTo) }
+}
+
+async function profitLossReport(stationId: string | null, tenantId: string | null, dateFrom?: Date, dateTo?: Date) {
+  try {
+    const tWhere = buildWhere(stationId, dateFrom, dateTo, 'date') as Record<string, unknown>
+    tWhere.status = 'completed'
+    if (tenantId) tWhere.tenantId = tenantId
+    const transactions = await db.transaction.findMany({ where: tWhere, take: 5000 })
+    const eWhere = buildWhere(stationId, dateFrom, dateTo, 'date') as Record<string, unknown>
+    eWhere.status = { in: ['approved', 'paid'] }
+    const expenses = await db.expense.findMany({ where: eWhere, take: 5000 })
+    const totalRevenue = transactions.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+    const cogs = expenses.filter((e) => (e.category || '').toLowerCase().includes('fuel') || (e.category || '').toLowerCase().includes('purchase')).reduce((s, e) => s + e.amount, 0)
+    const operatingExpenses = totalRevenue > 0 ? expenses.reduce((s, e) => s + e.amount, 0) - cogs : 0
+    const grossProfit = totalRevenue - cogs
+    const netProfit = grossProfit - operatingExpenses
+    const columns = ['category', 'amount', 'percentage']
+    const rows = [
+      { category: 'Revenue', amount: Math.round(totalRevenue * 100) / 100, percentage: 100 },
+      { category: 'Cost of Goods Sold', amount: Math.round(cogs * 100) / 100, percentage: totalRevenue > 0 ? Math.round((cogs / totalRevenue) * 10000) / 100 : 0 },
+      { category: 'Gross Profit', amount: Math.round(grossProfit * 100) / 100, percentage: totalRevenue > 0 ? Math.round((grossProfit / totalRevenue) * 10000) / 100 : 0 },
+      { category: 'Operating Expenses', amount: Math.round(operatingExpenses * 100) / 100, percentage: totalRevenue > 0 ? Math.round((operatingExpenses / totalRevenue) * 10000) / 100 : 0 },
+      { category: 'Net Profit', amount: Math.round(netProfit * 100) / 100, percentage: totalRevenue > 0 ? Math.round((netProfit / totalRevenue) * 10000) / 100 : 0 },
+    ]
+    return reportResponse('profit_loss', columns, rows, { totalRevenue: Math.round(totalRevenue * 100) / 100, grossProfit: Math.round(grossProfit * 100) / 100, netProfit: Math.round(netProfit * 100) / 100, profitMargin: totalRevenue > 0 ? Math.round((netProfit / totalRevenue) * 10000) / 100 : 0 }, dateFrom, dateTo)
+  } catch { return reportResponse('profit_loss', [], [], { totalRevenue: 0, grossProfit: 0, netProfit: 0, profitMargin: 0 }, dateFrom, dateTo) }
+}
+
+async function creditBillingReport(tenantId: string | null, dateFrom?: Date, dateTo?: Date) {
+  try {
+    const where: Record<string, unknown> = {}
+    if (tenantId) where.tenantId = tenantId
+    const fleets = await db.fleetAccount.findMany({ where, orderBy: { companyName: 'asc' }, take: 200 })
+    const columns = ['companyName', 'creditLimit', 'currentBalance', 'availableCredit', 'paymentTerms', 'status']
+    const rows = fleets.map((f) => ({ companyName: f.companyName, creditLimit: f.creditLimit, currentBalance: f.currentBalance, availableCredit: Math.round((f.creditLimit - f.currentBalance) * 100) / 100, paymentTerms: f.paymentTerms || 'N/A', status: f.status }))
+    const totalCredit = fleets.reduce((s, f) => s + f.creditLimit, 0)
+    const totalOutstanding = fleets.reduce((s, f) => s + f.currentBalance, 0)
+    return reportResponse('credit_billing', columns, rows, { totalAccounts: fleets.length, totalCreditLimit: totalCredit, totalOutstanding: Math.round(totalOutstanding * 100) / 100 }, dateFrom, dateTo)
+  } catch { return reportResponse('credit_billing', [], [], { totalAccounts: 0, totalCreditLimit: 0, totalOutstanding: 0 }, dateFrom, dateTo) }
+}
+
+async function taxReport(stationId: string | null, tenantId: string | null, dateFrom?: Date, dateTo?: Date) {
+  try {
+    const tWhere = buildWhere(stationId, dateFrom, dateTo, 'date') as Record<string, unknown>
+    tWhere.status = 'completed'
+    if (tenantId) tWhere.tenantId = tenantId
+    const transactions = await db.transaction.findMany({ where: tWhere, take: 5000 })
+    const totalRevenue = transactions.reduce((s, t) => s + t.amount, 0)
+    const gstRate = 17
+    const gstAmount = Math.round(totalRevenue * gstRate / (100 + gstRate) * 100) / 100
+    const columns = ['category', 'totalAmount', 'taxRate', 'taxAmount']
+    const rows = [
+      { category: 'Fuel Sales GST', totalAmount: Math.round(totalRevenue * 100) / 100, taxRate: gstRate, taxAmount: gstAmount },
+    ]
+    return reportResponse('tax_report', columns, rows, { totalRevenue: Math.round(totalRevenue * 100) / 100, totalGST: gstAmount, transactionCount: transactions.length }, dateFrom, dateTo)
+  } catch { return reportResponse('tax_report', [], [], { totalRevenue: 0, totalGST: 0, transactionCount: 0 }, dateFrom, dateTo) }
+}
+
+async function apAgingReport(tenantId: string | null, _dateFrom?: Date, _dateTo?: Date) {
+  try {
+    const where: Record<string, unknown> = {}
+    if (tenantId) where.tenantId = tenantId
+    where.status = { in: ['pending', 'approved'] }
+    const expenses = await db.expense.findMany({ where, take: 500, include: { supplier: { select: { name: true } } } })
+    const columns = ['supplierName', 'category', 'amount', 'status', 'date']
+    const rows = expenses.map((e) => ({ supplierName: (e.supplier as { name: string } | null)?.name || 'N/A', category: e.category, amount: e.amount, status: e.status, date: e.date.toISOString() }))
+    const totalPayable = expenses.reduce((s, e) => s + e.amount, 0)
+    return reportResponse('ap_aging', columns, rows, { totalPayable: Math.round(totalPayable * 100) / 100, currentBuckets: expenses.filter((e) => e.status === 'pending').length, overdueBuckets: 0 }, _dateFrom, _dateTo)
+  } catch { return reportResponse('ap_aging', [], [], { totalPayable: 0, currentBuckets: 0, overdueBuckets: 0 }, _dateFrom, _dateTo) }
+}
+
+async function arAgingReport(tenantId: string | null, _dateFrom?: Date, _dateTo?: Date) {
+  try {
+    const where: Record<string, unknown> = {}
+    if (tenantId) where.tenantId = tenantId
+    const fleets = await db.fleetAccount.findMany({ where, orderBy: { companyName: 'asc' }, take: 200 })
+    const columns = ['companyName', 'currentBalance', 'creditLimit', 'paymentTerms', 'status']
+    const rows = fleets.filter((f) => f.currentBalance > 0).map((f) => ({ companyName: f.companyName, currentBalance: f.currentBalance, creditLimit: f.creditLimit, paymentTerms: f.paymentTerms || 'N/A', status: f.status }))
+    const totalReceivable = rows.reduce((s, r) => s + r.currentBalance, 0)
+    return reportResponse('ar_aging', columns, rows, { totalReceivable: Math.round(totalReceivable * 100) / 100, totalAccounts: rows.length }, _dateFrom, _dateTo)
+  } catch { return reportResponse('ar_aging', [], [], { totalReceivable: 0, totalAccounts: 0 }, _dateFrom, _dateTo) }
+}
+
+async function shiftHandoverReport(stationId: string | null, dateFrom?: Date, dateTo?: Date) {
+  try {
+    const where = buildWhere(stationId, dateFrom, dateTo, 'openedAt') as Record<string, unknown>
+    const shifts = await db.shift.findMany({ where, orderBy: { openedAt: 'desc' }, take: 200 })
+    const columns = ['shiftNumber', 'openedAt', 'closedAt', 'openingCash', 'closingCash', 'cashVariance', 'totalSales', 'status']
+    const rows = shifts.map((s) => ({
+      shiftNumber: s.shiftNumber, openedAt: s.openedAt.toISOString(), closedAt: s.closedAt?.toISOString() || 'Open',
+      openingCash: (s as Record<string, unknown>).openingCash || 0, closingCash: (s as Record<string, unknown>).closingCash || 0,
+      cashVariance: Math.round(((s as Record<string, unknown>).closingCash as number || 0) - ((s as Record<string, unknown>).openingCash as number || 0) - s.cashSales) * 100 / 100,
+      totalSales: s.totalSales, status: s.status,
+    }))
+    return reportResponse('shift_handover', columns, rows, { totalShifts: shifts.length, totalSales: Math.round(shifts.reduce((s, sh) => s + sh.totalSales, 0) * 100) / 100 }, dateFrom, dateTo)
+  } catch { return reportResponse('shift_handover', [], [], { totalShifts: 0, totalSales: 0 }, dateFrom, dateTo) }
+}
+
+async function dispenserUptimeReport(stationId: string | null, _dateFrom?: Date, _dateTo?: Date) {
+  try {
+    const where = stationId ? { stationId } : {}
+    const dispensers = await db.dispenser.findMany({ where, orderBy: { name: 'asc' } })
+    const columns = ['name', 'code', 'fuelType', 'status', 'nozzleCount', 'location']
+    const rows = dispensers.map((d) => ({ name: d.name, code: d.code || 'N/A', fuelType: d.fuelType || 'N/A', status: d.status, nozzleCount: d.nozzleCount || 0, location: d.location || 'N/A' }))
+    return reportResponse('dispenser_uptime', columns, rows, { totalDispensers: dispensers.length, activeDispensers: dispensers.filter((d) => d.status === 'active').length, inactiveDispensers: dispensers.filter((d) => d.status !== 'active').length }, _dateFrom, _dateTo)
+  } catch { return reportResponse('dispenser_uptime', [], [], { totalDispensers: 0, activeDispensers: 0, inactiveDispensers: 0 }, _dateFrom, _dateTo) }
+}
+
+async function creditLedgerReport(tenantId: string | null, _dateFrom?: Date, _dateTo?: Date) {
+  try {
+    const where: Record<string, unknown> = {}
+    if (tenantId) where.tenantId = tenantId
+    const fleets = await db.fleetAccount.findMany({ where, orderBy: { companyName: 'asc' }, take: 200 })
+    const columns = ['companyName', 'creditLimit', 'currentBalance', 'availableCredit', 'paymentTerms', 'status']
+    const rows = fleets.map((f) => ({ companyName: f.companyName, creditLimit: f.creditLimit, currentBalance: f.currentBalance, availableCredit: Math.round((f.creditLimit - f.currentBalance) * 100) / 100, paymentTerms: f.paymentTerms || 'N/A', status: f.status }))
+    return reportResponse('credit_ledger', columns, rows, { totalAccounts: fleets.length, totalOutstanding: Math.round(fleets.reduce((s, f) => s + f.currentBalance, 0) * 100) / 100 }, _dateFrom, _dateTo)
+  } catch { return reportResponse('credit_ledger', [], [], { totalAccounts: 0, totalOutstanding: 0 }, _dateFrom, _dateTo) }
+}
+
+async function redemptionReport(tenantId: string | null, _dateFrom?: Date, _dateTo?: Date) {
+  try {
+    const where: Record<string, unknown> = {}
+    if (tenantId) where.tenantId = tenantId
+    const promotions = await db.promotion.findMany({ where, orderBy: { createdAt: 'desc' }, take: 200 })
+    const columns = ['name', 'type', 'discountValue', 'startDate', 'endDate', 'status']
+    const rows = promotions.map((p) => ({ name: p.name, type: p.type || 'N/A', discountValue: p.discountValue, startDate: p.startDate?.toISOString() || 'N/A', endDate: p.endDate?.toISOString() || 'N/A', status: p.status }))
+    return reportResponse('redemption', columns, rows, { totalPromotions: promotions.length, activePromotions: promotions.filter((p) => p.status === 'active').length }, _dateFrom, _dateTo)
+  } catch { return reportResponse('redemption', [], [], { totalPromotions: 0, activePromotions: 0 }, _dateFrom, _dateTo) }
+}
+
+async function ograComplianceReport(stationId: string | null, _dateFrom?: Date, _dateTo?: Date) {
+  try {
+    const where = stationId ? { stationId } : {}
+    const tanks = await db.tank.findMany({ where, orderBy: { name: 'asc' } })
+    const recons = await db.reconciliation.findMany({ where, orderBy: { date: 'desc' }, take: 100, include: { tank: { select: { name: true, fuelType: true } } } })
+    const columns = ['tankName', 'fuelType', 'date', 'variance', 'variancePercentage', 'status']
+    const rows = recons.map((r) => ({ tankName: r.tank?.name || 'Unknown', fuelType: r.tank?.fuelType || 'N/A', date: r.date.toISOString(), variance: Math.round(r.variance * 100) / 100, variancePercentage: Math.round(r.variancePercentage * 100) / 100, status: r.status }))
+    return reportResponse('ogra_compliance', columns, rows, { totalTanks: tanks.length, totalReconciliationRecords: recons.length, complianceRate: recons.length > 0 ? Math.round((recons.filter((r) => Math.abs(r.variancePercentage) < 0.5).length / recons.length) * 10000) / 100 : 100 }, _dateFrom, _dateTo)
+  } catch { return reportResponse('ogra_compliance', [], [], { totalTanks: 0, totalReconciliationRecords: 0, complianceRate: 0 }, _dateFrom, _dateTo) }
+}
+
+async function calibrationReport(stationId: string | null, _dateFrom?: Date, _dateTo?: Date) {
+  try {
+    const where = stationId ? { stationId } : {}
+    const calibrations = await db.calibration.findMany({ where, orderBy: { createdAt: 'desc' }, take: 200 })
+    const columns = ['deviceName', 'deviceType', 'calibrationDate', 'nextDueDate', 'result', 'performedBy', 'status']
+    const rows = calibrations.map((c) => ({ deviceName: c.deviceName || 'N/A', deviceType: c.deviceType || 'N/A', calibrationDate: c.calibrationDate?.toISOString() || c.createdAt.toISOString(), nextDueDate: c.nextDueDate?.toISOString() || 'N/A', result: c.result || 'N/A', performedBy: c.performedBy || 'N/A', status: c.status }))
+    return reportResponse('calibration', columns, rows, { totalCalibrations: calibrations.length, compliant: calibrations.filter((c) => c.status === 'passed' || c.status === 'compliant').length, pending: calibrations.filter((c) => c.status === 'pending').length }, _dateFrom, _dateTo)
+  } catch { return reportResponse('calibration', [], [], { totalCalibrations: 0, compliant: 0, pending: 0 }, _dateFrom, _dateTo) }
 }
 
 // Keep existing POST handler for templates and scheduled reports

@@ -1,28 +1,20 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  BarChart3, FileText, Calendar, RefreshCw, Download, Printer, Search,
-  TrendingUp, Table, Eye, Filter, Loader2, ChevronRight, ChevronDown,
-  Fuel, Droplets, Receipt, Truck, DollarSign, ShoppingCart, Users, Wallet,
-  Building2, Brain, Zap, Shield, Activity, Clock, Hash, ArrowUpDown,
-  FileSpreadsheet, FileDown, X, Crown,
+  Receipt, Droplets, Wallet, Users, Shield, Search, ChevronRight, ChevronDown,
+  Fuel, Clock, DollarSign, ShoppingCart, Truck, Activity, TrendingUp, Zap,
+  FileText, Printer, FileDown, FileSpreadsheet, RefreshCw, Loader2, ArrowLeft,
+  Crown, CalendarDays, BarChart3, Hash, AlertCircle,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { useAppStore } from '@/stores/app-store'
 
 // ── Types ──────────────────────────────────────
-
-interface ReportCategory {
-  id: string
-  label: string
-  icon: React.ComponentType<{ className?: string }>
-  color: string
-  reports: ReportDefinition[]
-}
 
 interface ReportDefinition {
   id: string
@@ -31,6 +23,14 @@ interface ReportDefinition {
   reportType: string
   category: string
   icon: React.ComponentType<{ className?: string }>
+}
+
+interface ReportCategory {
+  id: string
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  color: string
+  reports: ReportDefinition[]
 }
 
 interface ReportData {
@@ -43,6 +43,7 @@ interface ReportData {
   columns: string[]
   rows: Record<string, unknown>[]
   summary: Record<string, unknown>
+  error?: string
 }
 
 // ── Report Definitions ──────────────────────────────
@@ -56,8 +57,13 @@ const reportCategories: ReportCategory[] = [
     reports: [
       { id: 'daily-sales', name: 'Daily Sales Report', description: 'Daily fuel sales summary with volume, revenue, and payment breakdown', reportType: 'daily_sales', category: 'sales', icon: Receipt },
       { id: 'shift-summary', name: 'Shift Summary Report', description: 'Shift-wise sales, cash/card/fleet breakdown, and attendant performance', reportType: 'shift_summary', category: 'sales', icon: Clock },
-      { id: 'retail-sales', name: 'Retail Store Sales', description: 'Retail product sales, category performance, and payment analysis', reportType: 'retail_sales', category: 'sales', icon: ShoppingCart },
+      { id: 'nozzle-sales', name: 'Nozzle-wise Sales Report', description: 'Individual nozzle transaction volume and revenue analysis', reportType: 'nozzle_sales', category: 'sales', icon: Hash },
+      { id: 'product-sales', name: 'Product-wise Sales Report', description: 'Sales broken down by fuel product type (Petrol, Diesel, Premium, HOBC)', reportType: 'product_sales', category: 'sales', icon: Fuel },
+      { id: 'payment-mode', name: 'Payment Mode Summary', description: 'Revenue grouped by Cash, Card, Fleet, Digital Wallet, Loyalty', reportType: 'payment_mode', category: 'sales', icon: DollarSign },
       { id: 'cash-recon', name: 'Cash Reconciliation', description: 'Shift cash reconciliation with opening/closing cash and variance', reportType: 'cash_reconciliation', category: 'sales', icon: DollarSign },
+      { id: 'retail-sales', name: 'Retail Store Sales', description: 'Retail product sales, category performance, and payment analysis', reportType: 'retail_sales', category: 'sales', icon: ShoppingCart },
+      { id: 'hourly-sales', name: 'Hourly Sales Analysis', description: 'Sales volume and revenue by hour of the day', reportType: 'hourly_sales', category: 'sales', icon: Clock },
+      { id: 'meter-reading', name: 'Meter Reading Report', description: 'Dispenser meter opening/closing readings per shift', reportType: 'meter_reading', category: 'sales', icon: BarChart3 },
     ],
   },
   {
@@ -70,6 +76,9 @@ const reportCategories: ReportCategory[] = [
       { id: 'tank-recon', name: 'Tank Reconciliation', description: 'Opening stock + deliveries - sales vs closing stock with variance analysis', reportType: 'tank_reconciliation', category: 'inventory', icon: Droplets },
       { id: 'reconciliation', name: 'Full Reconciliation Report', description: 'Comprehensive wet stock reconciliation with variance % and book vs actual', reportType: 'reconciliation_report', category: 'inventory', icon: Activity },
       { id: 'delivery-log', name: 'Delivery Log Report', description: 'Fuel delivery history with supplier, volumes, variances, and costs', reportType: 'delivery_log', category: 'inventory', icon: Truck },
+      { id: 'dip-reading', name: 'Dip Reading Report', description: 'Manual dip chart readings with calculated vs actual stock comparison', reportType: 'dip_reading', category: 'inventory', icon: BarChart3 },
+      { id: 'stock-gain-loss', name: 'Stock Gain/Loss Report', description: 'Tank-wise, fuel-wise, date-wise stock gain and loss analysis', reportType: 'stock_gain_loss', category: 'inventory', icon: TrendingUp },
+      { id: 'lubricant-inventory', name: 'Lubricant Inventory Report', description: 'Lubricant stock levels, movements, and reorder points', reportType: 'lubricant_inventory', category: 'inventory', icon: Droplets },
     ],
   },
   {
@@ -82,6 +91,11 @@ const reportCategories: ReportCategory[] = [
       { id: 'expense-report', name: 'Expense Report', description: 'Detailed expense categories, approval status, and vendor breakdown', reportType: 'expense_report', category: 'finance', icon: DollarSign },
       { id: 'supplier-statement', name: 'Supplier Statement', description: 'Supplier invoices, payment status, and outstanding amounts', reportType: 'supplier_statement', category: 'finance', icon: Truck },
       { id: 'price-history', name: 'Price History Report', description: 'Fuel price changes over time with effective dates', reportType: 'price_history', category: 'finance', icon: TrendingUp },
+      { id: 'profit-loss', name: 'Profit & Loss Statement', description: 'Revenue, COGS, operating expenses, and net profit analysis', reportType: 'profit_loss', category: 'finance', icon: BarChart3 },
+      { id: 'credit-billing', name: 'Credit Billing Report', description: 'Customer credit accounts, billing periods, and outstanding balances', reportType: 'credit_billing', category: 'finance', icon: DollarSign },
+      { id: 'tax-report', name: 'Tax Report (GST/FBR)', description: 'Tax collection summary with FBR/GST compliance data', reportType: 'tax_report', category: 'finance', icon: FileText },
+      { id: 'ap-aging', name: 'Accounts Payable Aging', description: 'Outstanding payables by aging bucket (Current, 30, 60, 90+ days)', reportType: 'ap_aging', category: 'finance', icon: Wallet },
+      { id: 'ar-aging', name: 'Accounts Receivable Aging', description: 'Outstanding receivables by aging bucket', reportType: 'ar_aging', category: 'finance', icon: Wallet },
     ],
   },
   {
@@ -92,8 +106,10 @@ const reportCategories: ReportCategory[] = [
     reports: [
       { id: 'employee-perf', name: 'Employee Performance', description: 'Employee shifts, sales volume, transaction counts, and commissions', reportType: 'employee_performance', category: 'operations', icon: Users },
       { id: 'attendance', name: 'Attendance Report', description: 'Employee attendance, hours worked, late/absent counts', reportType: 'attendance_report', category: 'operations', icon: Clock },
+      { id: 'shift-handover', name: 'Shift Handover Report', description: 'Shift handover details, cash counts, and pending items', reportType: 'shift_handover', category: 'operations', icon: Clock },
       { id: 'fleet-summary', name: 'Fleet Account Summary', description: 'Fleet usage by company, transactions, volumes, and outstanding balances', reportType: 'fleet_summary', category: 'operations', icon: Truck },
-      { id: 'station-perf', name: 'Station Performance', description: 'Multi-station comparison: revenue, volume, and efficiency metrics', reportType: 'station_performance', category: 'operations', icon: Building2 },
+      { id: 'station-perf', name: 'Station Performance', description: 'Multi-station comparison: revenue, volume, and efficiency metrics', reportType: 'station_performance', category: 'operations', icon: BarChart3 },
+      { id: 'dispenser-uptime', name: 'Dispenser Uptime Report', description: 'Dispenser availability, downtime, and maintenance schedule', reportType: 'dispenser_uptime', category: 'operations', icon: Activity },
     ],
   },
   {
@@ -103,17 +119,21 @@ const reportCategories: ReportCategory[] = [
     color: 'text-violet-600 dark:text-violet-400',
     reports: [
       { id: 'loyalty-summary', name: 'Loyalty Summary Report', description: 'Customer loyalty points, tier distribution, and redemption statistics', reportType: 'loyalty_summary', category: 'customer', icon: Users },
+      { id: 'credit-ledger', name: 'Customer Credit Ledger', description: 'Detailed credit account transactions and balance history', reportType: 'credit_ledger', category: 'customer', icon: DollarSign },
+      { id: 'redemption', name: 'Redemption Report', description: 'Loyalty points and reward redemption details and trends', reportType: 'redemption', category: 'customer', icon: ShoppingCart },
     ],
   },
   {
     id: 'compliance',
-    label: 'Compliance & Security',
+    label: 'Compliance & Regulatory',
     icon: Shield,
     color: 'text-slate-600 dark:text-slate-400',
     reports: [
       { id: 'ev-cng', name: 'EV & CNG Session Report', description: 'EV charging and CNG dispensing session details and revenue', reportType: 'ev_cng_sessions', category: 'compliance', icon: Zap },
       { id: 'environmental', name: 'Environmental Report', description: 'Environmental alerts, vapor recovery readings, and compliance data', reportType: 'environmental_report', category: 'compliance', icon: Activity },
       { id: 'security-audit', name: 'Security Audit Report', description: 'Security alerts, login sessions, and audit trail', reportType: 'security_audit', category: 'compliance', icon: Shield },
+      { id: 'ogra', name: 'OGRA Compliance Report', description: 'Oil & Gas Regulatory Authority compliance data and filings', reportType: 'ogra_compliance', category: 'compliance', icon: FileText },
+      { id: 'calibration', name: 'Calibration Report', description: 'Dispenser and tank gauge calibration history and results', reportType: 'calibration', category: 'compliance', icon: Hash },
     ],
   },
 ]
@@ -138,6 +158,142 @@ function formatDateTime(d: string | Date): string {
   return new Date(d).toLocaleString('en-PK', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+function prettyColumnName(col: string): string {
+  return col
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/_/g, ' ')
+    .replace(/^\w/, (c) => c.toUpperCase())
+    .trim()
+}
+
+// Money column keywords
+const MONEY_KEYWORDS = ['revenue', 'amount', 'sales', 'cost', 'price', 'income', 'expense', 'profit', 'balance', 'credit', 'debit', 'payable', 'receivable', 'payment', 'total', 'cash', 'limit', 'outstanding', 'bill', 'ticket', 'salary', 'wage', 'rental', 'fee']
+// Volume column keywords
+const VOLUME_KEYWORDS = ['volume', 'capacity', 'level', 'stock', 'delivery', 'deliveries', 'liters', 'quantity']
+// Percentage column keywords
+const PERCENT_KEYWORDS = ['percentage', 'percent', 'rate', 'margin', 'utilization', 'variancepercentage']
+// Status column keywords
+const STATUS_KEYWORDS = ['status', 'state']
+
+function isMoneyColumn(col: string): boolean {
+  const lower = col.toLowerCase()
+  return MONEY_KEYWORDS.some((k) => lower.includes(k)) && !PERCENT_KEYWORDS.some((k) => lower.includes(k)) && !VOLUME_KEYWORDS.some((k) => lower.includes(k))
+}
+
+function isVolumeColumn(col: string): boolean {
+  const lower = col.toLowerCase()
+  return VOLUME_KEYWORDS.some((k) => lower.includes(k)) && !PERCENT_KEYWORDS.some((k) => lower.includes(k))
+}
+
+function isPercentColumn(col: string): boolean {
+  const lower = col.toLowerCase()
+  return PERCENT_KEYWORDS.some((k) => lower.includes(k)) || lower === 'utilization'
+}
+
+function isStatusColumn(col: string): boolean {
+  const lower = col.toLowerCase()
+  return STATUS_KEYWORDS.some((k) => lower.includes(k))
+}
+
+function isDateColumn(col: string): boolean {
+  const lower = col.toLowerCase()
+  return ['date', 'at', 'time', 'from', 'to', 'opened', 'closed', 'effective', 'lastreading'].some((k) => lower.includes(k))
+}
+
+function renderCell(col: string, value: unknown): React.ReactNode {
+  if (value === null || value === undefined || value === '') return <span className="text-muted-foreground">—</span>
+
+  const numVal = typeof value === 'number' ? value : parseFloat(String(value))
+
+  if (isMoneyColumn(col) && !isNaN(numVal)) {
+    return <span className="font-medium tabular-nums">{formatPKR(numVal)}</span>
+  }
+  if (isVolumeColumn(col) && !isNaN(numVal)) {
+    return <span className="tabular-nums">{formatNumber(numVal, 1)} L</span>
+  }
+  if (isPercentColumn(col) && !isNaN(numVal)) {
+    return <span className="tabular-nums">{formatNumber(numVal, 2)}%</span>
+  }
+  if (isStatusColumn(col)) {
+    const statusStr = String(value).toLowerCase()
+    const statusColors: Record<string, string> = {
+      active: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+      completed: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
+      approved: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
+      paid: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+      pending: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+      open: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+      inactive: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+      closed: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+      cancelled: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+      overdue: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    }
+    const colorClass = statusColors[statusStr] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+    return (
+      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${colorClass}`}>
+        {String(value)}
+      </span>
+    )
+  }
+  if (isDateColumn(col)) {
+    const dateStr = String(value)
+    if (dateStr.includes('T')) {
+      return <span className="text-muted-foreground text-xs">{formatDateTime(dateStr)}</span>
+    }
+    return <span className="text-muted-foreground text-xs">{formatDate(dateStr)}</span>
+  }
+  if (typeof value === 'boolean') {
+    return value ? <span className="text-teal-600 font-medium">Yes</span> : <span className="text-muted-foreground">No</span>
+  }
+  return <span>{String(value)}</span>
+}
+
+function summaryValueLabel(key: string): string {
+  return key
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/_/g, ' ')
+    .replace(/^\w/, (c) => c.toUpperCase())
+    .trim()
+}
+
+function isSummaryMoney(key: string): boolean {
+  const lower = key.toLowerCase()
+  return MONEY_KEYWORDS.some((k) => lower.includes(k)) && !PERCENT_KEYWORDS.some((k) => lower.includes(k)) && !['count', 'totaldays', 'totalshifts', 'totalrecords', 'totaltanks', 'totalfleets', 'totaltransactions', 'totalvolume', 'totalsessions', 'totalreadings', 'totalproducts', 'totalpaymentmodes', 'totalnozzles'].includes(lower)
+}
+
+function isSummaryVolume(key: string): boolean {
+  const lower = key.toLowerCase()
+  return VOLUME_KEYWORDS.some((k) => lower.includes(k)) && !PERCENT_KEYWORDS.some((k) => lower.includes(k))
+}
+
+function isSummaryPercent(key: string): boolean {
+  const lower = key.toLowerCase()
+  return PERCENT_KEYWORDS.some((k) => lower.includes(k)) || lower === 'utilization'
+}
+
+function renderSummaryValueString(key: string, value: unknown): string {
+  if (value === null || value === undefined) return '—'
+  const numVal = typeof value === 'number' ? value : parseFloat(String(value))
+  if (key === 'error') return String(value)
+  if (isSummaryPercent(key) && !isNaN(numVal)) return `${formatNumber(numVal, 2)}%`
+  if (isSummaryVolume(key) && !isNaN(numVal)) return `${formatNumber(numVal, 1)} L`
+  if (isSummaryMoney(key) && !isNaN(numVal)) return formatPKR(numVal)
+  if (!isNaN(numVal) && typeof value === 'number') return formatNumber(numVal, 0)
+  return String(value)
+}
+
+function renderSummaryValue(key: string, value: unknown): React.ReactNode {
+  if (value === null || value === undefined) return '—'
+  const numVal = typeof value === 'number' ? value : parseFloat(String(value))
+
+  if (key === 'error') return <span className="text-red-500">{String(value)}</span>
+  if (isSummaryPercent(key) && !isNaN(numVal)) return `${formatNumber(numVal, 2)}%`
+  if (isSummaryVolume(key) && !isNaN(numVal)) return `${formatNumber(numVal, 1)} L`
+  if (isSummaryMoney(key) && !isNaN(numVal)) return formatPKR(numVal)
+  if (!isNaN(numVal) && typeof value === 'number') return formatNumber(numVal, 0)
+  return String(value)
+}
+
 // ── Main Component ──────────────────────────────────
 
 export default function ReportBuilderModule() {
@@ -148,22 +304,25 @@ export default function ReportBuilderModule() {
   const [searchQuery, setSearchQuery] = useState('')
   const [dateFrom, setDateFrom] = useState(() => {
     const d = new Date()
-    d.setDate(1) // first of month
+    d.setDate(1)
     return d.toISOString().split('T')[0]
   })
   const [dateTo, setDateTo] = useState(() => new Date().toISOString().split('T')[0])
   const [expandedCategory, setExpandedCategory] = useState<string>('sales')
-  const [previewMode, setPreviewMode] = useState(false)
-  const printRef = useRef<HTMLDivElement>(null)
+  const [mobileShowReport, setMobileShowReport] = useState(false)
+  const reportContentRef = useRef<HTMLDivElement>(null)
 
   const isSuperAdmin = authUser?.role === 'superadmin'
   const tenantName = authUser?.tenant?.name || 'ApexFlow Cloud'
+  const stationName = 'Main Station'
 
   // ── Generate Report ──
   const generateReport = useCallback(async (report: ReportDefinition) => {
     setSelectedReport(report)
     setLoading(true)
     setReportData(null)
+    setMobileShowReport(true)
+
     try {
       const params = new URLSearchParams({
         type: 'report',
@@ -173,13 +332,14 @@ export default function ReportBuilderModule() {
       })
       const res = await fetch(`/api/reports?${params}`)
       const data = await res.json()
+
       if (data.report) {
         setReportData({
           reportType: report.reportType,
           reportName: report.name,
           generatedAt: new Date().toISOString(),
           period: { from: dateFrom, to: dateTo },
-          stationName: 'ApexFlow Cloud - Main Station',
+          stationName: `${tenantName} - ${stationName}`,
           tenantName,
           columns: data.report.columns || [],
           rows: data.report.rows || [],
@@ -191,543 +351,542 @@ export default function ReportBuilderModule() {
           reportName: report.name,
           generatedAt: new Date().toISOString(),
           period: { from: dateFrom, to: dateTo },
-          stationName: 'ApexFlow Cloud - Main Station',
+          stationName: `${tenantName} - ${stationName}`,
           tenantName,
           columns: [],
           rows: [],
-          summary: { error: data.error },
+          summary: {},
+          error: data.error,
         })
       }
     } catch {
-      setReportData(null)
+      setReportData({
+        reportType: report.reportType,
+        reportName: report.name,
+        generatedAt: new Date().toISOString(),
+        period: { from: dateFrom, to: dateTo },
+        stationName: `${tenantName} - ${stationName}`,
+        tenantName,
+        columns: [],
+        rows: [],
+        summary: {},
+        error: 'Failed to connect to report server',
+      })
     } finally {
       setLoading(false)
     }
   }, [dateFrom, dateTo, tenantName])
 
-  // ── Print Report ──
-  const handlePrint = useCallback(() => {
-    const printContent = printRef.current
-    if (!printContent) return
-    const printWindow = window.open('', '_blank')
-    if (!printWindow) return
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>${selectedReport?.name || 'FuelFlow Report'}</title>
-        <style>
-          @page { size: letter; margin: 0.75in 0.5in 0.75in 0.5in; }
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 10pt; color: #1a1a1a; line-height: 1.5; }
-          .report-header { border-bottom: 3px solid #0d9488; padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-start; }
-          .report-header .left { flex: 1; }
-          .report-header .right { text-align: right; font-size: 9pt; color: #666; }
-          .report-header h1 { font-size: 16pt; color: #0d9488; font-weight: 700; margin-bottom: 2px; }
-          .report-header h2 { font-size: 11pt; color: #333; font-weight: 600; }
-          .report-header .meta { font-size: 9pt; color: #666; margin-top: 4px; }
-          .report-body { margin-top: 8px; }
-          .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
-          .summary-card { border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px 12px; background: #f9fafb; }
-          .summary-card .label { font-size: 8pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
-          .summary-card .value { font-size: 14pt; font-weight: 700; color: #111; margin-top: 2px; }
-          .summary-card .value.teal { color: #0d9488; }
-          .summary-card .value.red { color: #dc2626; }
-          table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 9pt; }
-          thead th { background: #0d9488; color: #fff; padding: 7px 10px; text-align: left; font-weight: 600; font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.3px; }
-          thead th:first-child { border-radius: 4px 0 0 0; }
-          thead th:last-child { border-radius: 0 4px 0 0; }
-          tbody td { padding: 6px 10px; border-bottom: 1px solid #f3f4f6; }
-          tbody tr:nth-child(even) { background: #f9fafb; }
-          tbody tr:hover { background: #f0fdfa; }
-          .text-right { text-align: right; }
-          .text-center { text-align: center; }
-          .font-mono { font-family: 'SF Mono', 'Fira Code', monospace; }
-          .font-bold { font-weight: 700; }
-          .text-teal { color: #0d9488; }
-          .text-red { color: #dc2626; }
-          .text-green { color: #16a34a; }
-          .report-footer { border-top: 2px solid #e5e7eb; padding-top: 8px; margin-top: 20px; display: flex; justify-content: space-between; font-size: 8pt; color: #9ca3af; }
-          .badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 8pt; font-weight: 600; }
-          .badge-green { background: #dcfce7; color: #16a34a; }
-          .badge-red { background: #fee2e2; color: #dc2626; }
-          .badge-amber { background: #fef3c7; color: #d97706; }
-          .badge-teal { background: #ccfbf1; color: #0d9488; }
-          .no-data { text-align: center; padding: 40px; color: #9ca3af; font-size: 11pt; }
-          @media print {
-            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .summary-card { background: #f9fafb !important; }
-            thead th { background: #0d9488 !important; color: #fff !important; }
-          }
-        </style>
-      </head>
-      <body>
-        ${printContent.innerHTML}
-        <script>window.onload = function() { window.print(); }</script>
-      </body>
-      </html>
-    `)
-    printWindow.document.close()
-  }, [selectedReport])
-
-  // ── Export CSV ──
-  const handleExportCSV = useCallback(() => {
-    if (!reportData || !reportData.rows.length) return
-    const headers = reportData.columns.join(',')
-    const csvRows = reportData.rows.map((row) =>
-      reportData.columns.map((col) => {
-        const val = row[col]
-        if (val === null || val === undefined) return ''
-        const str = String(val)
-        return str.includes(',') || str.includes('"') || str.includes('\n')
-          ? `"${str.replace(/"/g, '""')}"`
-          : str
-      }).join(',')
-    )
-    const csv = [headers, ...csvRows].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${selectedReport?.id || 'report'}_${dateFrom}_${dateTo}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
-  }, [reportData, selectedReport, dateFrom, dateTo])
-
-  // ── Export JSON ──
-  const handleExportJSON = useCallback(() => {
-    if (!reportData) return
-    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${selectedReport?.id || 'report'}_${dateFrom}_${dateTo}.json`
-    link.click()
-    URL.revokeObjectURL(url)
-  }, [reportData, selectedReport, dateFrom, dateTo])
+  const handleRefresh = useCallback(() => {
+    if (selectedReport) generateReport(selectedReport)
+  }, [selectedReport, generateReport])
 
   // ── Filtered Reports ──
-  const filteredCategories = searchQuery
-    ? [{
-        id: 'search',
-        label: 'Search Results',
-        icon: Search,
-        color: 'text-teal-600 dark:text-teal-400',
-        reports: allReports.filter(
-          (r) =>
-            r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            r.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            r.reportType.toLowerCase().includes(searchQuery.toLowerCase())
-        ),
-      }]
-    : reportCategories
+  const filteredCategories = reportCategories.map((cat) => ({
+    ...cat,
+    reports: cat.reports.filter(
+      (r) =>
+        !searchQuery ||
+        r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.description.toLowerCase().includes(searchQuery.toLowerCase())
+    ),
+  })).filter((cat) => cat.reports.length > 0)
 
-  // ── Render Cell Value ──
-  const renderCell = (col: string, value: unknown) => {
-    if (value === null || value === undefined) return '-'
-    const colLower = col.toLowerCase()
-    // Check for volume/capacity/level FIRST (before monetary, to avoid Rs prefix on non-monetary totals)
-    if (colLower.includes('volume') || colLower.includes('capacity') || colLower.includes('level') ||
-        colLower.includes('qty') || colLower.includes('quantity') || colLower.includes('stock')) {
-      if (typeof value === 'number') return <span className="font-mono">{formatNumber(value)} L</span>
-    }
-    if (colLower.includes('variance') || colLower.includes('percentage') || colLower.includes('rate') ||
-        colLower.includes('utilization') || colLower.includes('commission')) {
-      if (typeof value === 'number') {
-        const isNeg = value < 0
-        return <span className={`font-mono ${isNeg ? 'text-red-500' : ''}`}>{formatNumber(value)}%</span>
-      }
-    }
-    // Monetary detection — exclude non-monetary totals
-    const isNonMonetaryCol = colLower.includes('count') || colLower.includes('qty') || colLower.includes('volume') ||
-      colLower.includes('capacity') || colLower.includes('level') || colLower.includes('transactions')
-    if (!isNonMonetaryCol && (
-        colLower.includes('amount') || colLower.includes('revenue') || colLower.includes('cost') ||
-        colLower.includes('price') || colLower.includes('income') || colLower.includes('expense') ||
-        colLower.includes('balance') || colLower.includes('total') || colLower.includes('net') ||
-        colLower.includes('pay') || colLower.includes('salary') || colLower.includes('outstanding') ||
-        colLower.includes('credit') || colLower.includes('debit') || colLower.includes('cash') ||
-        (colLower.includes('sales') && !colLower.includes('volume') && !colLower.includes('count') && !colLower.includes('qty')))) {
-      if (typeof value === 'number') return <span className="font-mono">{formatPKR(value)}</span>
-    }
-    if (colLower.includes('date') || colLower.includes('at') || colLower.includes('time') || colLower.includes('reading')) {
-      if (typeof value === 'string' && value.includes('T')) return formatDate(value)
-    }
-    if (typeof value === 'number') return <span className="font-mono">{formatNumber(value)}</span>
-    if (typeof value === 'boolean') return value ? <Badge className="bg-emerald-500/10 text-emerald-600 text-[9px] border-emerald-500/20">Yes</Badge> : <Badge className="bg-red-500/10 text-red-500 text-[9px] border-red-500/20">No</Badge>
-    // Status badges
-    if (typeof value === 'string') {
-      const statusColors: Record<string, string> = {
-        active: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
-        completed: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
-        paid: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
-        approved: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
-        present: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
-        idle: 'bg-slate-500/10 text-slate-500 border-slate-500/20',
-        pending: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
-        partial: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
-        inactive: 'bg-slate-500/10 text-slate-500 border-slate-500/20',
-        overdue: 'bg-red-500/10 text-red-500 border-red-500/20',
-        expired: 'bg-red-500/10 text-red-500 border-red-500/20',
-        revoked: 'bg-red-500/10 text-red-500 border-red-500/20',
-        cancelled: 'bg-red-500/10 text-red-500 border-red-500/20',
-        absent: 'bg-red-500/10 text-red-500 border-red-500/20',
-        late: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
-        normal: 'bg-teal-500/10 text-teal-600 border-teal-500/20',
-      }
-      if (statusColors[value.toLowerCase()]) {
-        return <Badge className={`text-[9px] ${statusColors[value.toLowerCase()]}`}>{String(value)}</Badge>
-      }
-    }
-    return String(value)
-  }
+  // ── Export: Print ──
+  const handlePrint = useCallback(() => {
+    if (!reportData || !selectedReport) return
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
 
-  // ── Report Preview (Letter Format) ──
-  const renderReportPreview = () => {
-    if (!reportData) return null
-    const hasData = reportData.rows.length > 0
     const summaryEntries = Object.entries(reportData.summary).filter(([k]) => k !== 'error')
+    const tableRows = reportData.rows
 
-    return (
-      <div ref={printRef} className="bg-white text-gray-900 rounded-lg shadow-sm" style={{ fontFamily: "'Helvetica Neue', Arial, sans-serif" }}>
-        {/* ── Letter Header ── */}
-        <div className="border-b-[3px] border-teal-600 pb-3 px-6 pt-5 flex justify-between items-start">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <div className="flex size-7 items-center justify-center rounded-lg bg-teal-600 text-white">
-                <Fuel className="size-3.5" />
-              </div>
-              <span className="text-[11px] font-bold text-teal-600 tracking-wide">FUELFLOW OS</span>
-            </div>
-            <h1 className="text-[18px] font-bold text-teal-700 leading-tight">{reportData.reportName}</h1>
-            <p className="text-[11px] text-gray-500 mt-0.5">{reportData.tenantName}</p>
-          </div>
-          <div className="text-right text-[10px] text-gray-500">
-            <p className="font-semibold text-gray-700">Report Details</p>
-            <p>Period: {formatDate(reportData.period.from)} — {formatDate(reportData.period.to)}</p>
-            <p>Generated: {formatDateTime(reportData.generatedAt)}</p>
-            {reportData.stationName && <p>Station: {reportData.stationName}</p>}
-            {isSuperAdmin && (
-              <div className="flex items-center gap-1 justify-end mt-1">
-                <Crown className="size-3 text-orange-500" />
-                <span className="text-orange-600 font-semibold">Super Admin</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ── Summary Cards ── */}
-        {summaryEntries.length > 0 && (
-          <div className="px-6 pt-4 pb-2">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {summaryEntries.slice(0, 8).map(([key, value]) => {
-                const kl = key.toLowerCase()
-                const isNonMonetaryTotal = kl.includes('tanks') || kl.includes('days') || kl.includes('transactions') ||
-                  kl.includes('volume') || kl.includes('capacity') || kl.includes('level') || kl.includes('count') || kl.includes('qty')
-                const isAmount = !isNonMonetaryTotal && (
-                  kl.includes('amount') || kl.includes('revenue') || kl.includes('income') || kl.includes('expense') ||
-                  kl.includes('cost') || kl.includes('balance') || kl.includes('total') || kl.includes('profit') ||
-                  kl.includes('pay') || kl.includes('outstanding') ||
-                  (kl.includes('sales') && typeof value === 'number')
-                )
-                const isNeg = typeof value === 'number' && value < 0
-                const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase())
-                return (
-                  <div key={key} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                    <p className="text-[8px] text-gray-500 uppercase tracking-wider font-medium">{label}</p>
-                    <p className={`text-[16px] font-bold mt-0.5 ${isNeg ? 'text-red-600' : isAmount ? 'text-teal-700' : 'text-gray-900'}`}>
-                      {typeof value === 'number'
-                        ? isAmount ? formatPKR(value)
-                          : kl.includes('volume') || kl.includes('capacity') || kl.includes('level') || kl.includes('qty') ? `${formatNumber(value)} L`
-                          : kl.includes('utilization') || kl.includes('variance') || kl.includes('rate') ? `${formatNumber(value)}%`
-                          : formatNumber(value)
-                        : String(value)}
-                    </p>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* ── Error State ── */}
-        {reportData.summary.error && (
-          <div className="px-6 py-3">
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-[11px] text-red-600">
-              {String(reportData.summary.error)}
-            </div>
-          </div>
-        )}
-
-        {/* ── Data Table ── */}
-        <div className="px-6 pb-4">
-          {hasData ? (
-            <div className="overflow-x-auto border border-gray-200 rounded-lg">
-              <table className="w-full text-[10px]">
-                <thead>
-                  <tr className="bg-teal-600 text-white">
-                    <th className="px-3 py-2 text-left font-semibold text-[9px] uppercase tracking-wider">#</th>
-                    {reportData.columns.map((col) => (
-                      <th key={col} className="px-3 py-2 text-left font-semibold text-[9px] uppercase tracking-wider">
-                        {col.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase())}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {reportData.rows.map((row, i) => (
-                    <tr key={i} className={`border-b border-gray-100 ${i % 2 === 1 ? 'bg-gray-50' : ''}`}>
-                      <td className="px-3 py-1.5 text-gray-400 font-mono">{i + 1}</td>
-                      {reportData.columns.map((col) => (
-                        <td key={col} className="px-3 py-1.5">{renderCell(col, row[col])}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="text-center py-12 text-gray-400">
-              <FileText className="size-10 mx-auto mb-2 opacity-30" />
-              <p className="text-[12px]">No data found for the selected period</p>
-              <p className="text-[10px] mt-1">Try adjusting the date range or select a different report</p>
-            </div>
-          )}
-        </div>
-
-        {/* ── Letter Footer ── */}
-        <div className="border-t-2 border-gray-200 px-6 py-2 flex justify-between items-center text-[8px] text-gray-400">
-          <div>
-            <span className="font-semibold text-gray-500">FuelFlow OS</span> — ApexFlow Ecosystem
-            {isSuperAdmin && <span className="ml-2 text-orange-500 font-semibold">• Super Admin Access</span>}
-          </div>
-          <div>
-            Confidential • Generated {formatDateTime(reportData.generatedAt)}
-          </div>
-        </div>
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <title>${reportData.reportName} — FuelFlow OS</title>
+  <style>
+    @page { size: letter; margin: 0.6in 0.5in; }
+    * { margin: 0; padding: 0; box-sizing: border-box; font-style: normal !important; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif; font-size: 11px; color: #1d1d1f; line-height: 1.5; }
+    .report-header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 12px; border-bottom: 3px solid #0d9488; margin-bottom: 16px; }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .logo-box { width: 36px; height: 36px; border-radius: 8px; background: #0d9488; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 16px; }
+    .header-title { font-size: 14px; font-weight: 700; color: #0d9488; letter-spacing: 0.5px; }
+    .header-report-name { font-size: 16px; font-weight: 600; color: #1d1d1f; margin-top: 2px; }
+    .header-tenant { font-size: 11px; color: #86868b; margin-top: 1px; }
+    .header-right { text-align: right; }
+    .header-detail-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #86868b; }
+    .header-detail-value { font-size: 11px; color: #1d1d1f; margin-top: 1px; }
+    .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+    .summary-card { border: 1px solid #e5e5e5; border-radius: 8px; padding: 10px 12px; }
+    .summary-label { font-size: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #86868b; margin-bottom: 2px; }
+    .summary-value { font-size: 15px; font-weight: 700; color: #1d1d1f; }
+    table { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 16px; }
+    thead th { background: #0d9488; color: white; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; padding: 6px 8px; text-align: left; }
+    thead th:first-child { border-radius: 6px 0 0 0; }
+    thead th:last-child { border-radius: 0 6px 0 0; }
+    tbody td { padding: 6px 8px; border-bottom: 0.5px solid #e5e5e5; }
+    tbody tr:nth-child(even) { background: #f9fafb; }
+    tbody tr:hover { background: #f0fdfa; }
+    .report-footer { border-top: 2px solid #e5e5e5; padding-top: 8px; display: flex; justify-content: space-between; font-size: 9px; color: #86868b; margin-top: auto; }
+    .status-badge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 9px; font-weight: 600; }
+    .status-active { background: #d1fae5; color: #065f46; }
+    .status-completed { background: #ccfbf1; color: #0f766e; }
+    .status-pending { background: #fef3c7; color: #92400e; }
+    .status-inactive { background: #f1f5f9; color: #475569; }
+    .money { font-weight: 500; }
+    @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  </style>
+</head>
+<body>
+  <div class="report-header">
+    <div class="header-left">
+      <div class="logo-box">F</div>
+      <div>
+        <div class="header-title">FUELFLOW OS</div>
+        <div class="header-report-name">${reportData.reportName}</div>
+        <div class="header-tenant">${reportData.tenantName || ''}</div>
       </div>
-    )
-  }
+    </div>
+    <div class="header-right">
+      <div class="header-detail-label">Report Details</div>
+      <div class="header-detail-value">Period: ${formatDate(reportData.period.from)} — ${formatDate(reportData.period.to)}</div>
+      <div class="header-detail-value">Generated: ${formatDateTime(reportData.generatedAt)}</div>
+      <div class="header-detail-value">${reportData.stationName || ''}</div>
+    </div>
+  </div>
+
+  ${summaryEntries.length > 0 ? `
+  <div class="summary-grid">
+    ${summaryEntries.map(([k, v]) => `<div class="summary-card"><div class="summary-label">${summaryValueLabel(k)}</div><div class="summary-value">${renderSummaryValueString(k, v)}</div></div>`).join('')}
+  </div>` : ''}
+
+  ${tableRows.length > 0 ? `
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        ${reportData.columns.map((c) => `<th>${prettyColumnName(c)}</th>`).join('')}
+      </tr>
+    </thead>
+    <tbody>
+      ${tableRows.map((row, i) => `<tr>
+        <td>${i + 1}</td>
+        ${reportData.columns.map((col) => `<td>${String(row[col] ?? '—')}</td>`).join('')}
+      </tr>`).join('')}
+    </tbody>
+  </table>` : '<p style="text-align:center;color:#86868b;padding:20px;">No data available for this period.</p>'}
+
+  <div class="report-footer">
+    <div>FuelFlow OS — ApexFlow Ecosystem</div>
+    <div>Confidential • Generated ${formatDateTime(reportData.generatedAt)}</div>
+  </div>
+</body>
+</html>`
+
+    printWindow.document.write(html)
+    printWindow.document.close()
+    setTimeout(() => printWindow.print(), 500)
+  }, [reportData, selectedReport])
+
+  // ── Export: CSV ──
+  const handleCSV = useCallback(() => {
+    if (!reportData || reportData.rows.length === 0) return
+    const headers = ['#', ...reportData.columns]
+    const csvRows = [
+      headers.map((h) => `"${prettyColumnName(h)}"`).join(','),
+      ...reportData.rows.map((row, i) =>
+        [i + 1, ...reportData.columns.map((col) => {
+          const val = row[col]
+          if (val === null || val === undefined) return '""'
+          return `"${String(val).replace(/"/g, '""')}"`
+        })].join(',')
+      ),
+    ]
+    const csvContent = csvRows.join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${reportData.reportType}_${dateFrom}_${dateTo}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [reportData, dateFrom, dateTo])
+
+  // ── Export: JSON ──
+  const handleJSON = useCallback(() => {
+    if (!reportData) return
+    const jsonContent = JSON.stringify(reportData, null, 2)
+    const blob = new Blob([jsonContent], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${reportData.reportType}_${dateFrom}_${dateTo}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [reportData, dateFrom, dateTo])
+
+  // ── Export: PDF (via Print) ──
+  const handlePDF = useCallback(() => {
+    handlePrint()
+  }, [handlePrint])
+
+  // ── Back on mobile ──
+  const handleMobileBack = useCallback(() => {
+    setMobileShowReport(false)
+  }, [])
+
+  // ── Summary entries ──
+  const summaryEntries = reportData ? Object.entries(reportData.summary).filter(([k]) => k !== 'error') : []
 
   return (
-    <div className="space-y-4">
-      {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h2 className="text-[17px] font-bold text-foreground flex items-center gap-2">
-            <BarChart3 className="size-5 text-slate-600 dark:text-slate-400" />
-            Report Center
-          </h2>
-          <p className="text-[12px] text-muted-foreground mt-0.5">Professional reports with print & export capabilities</p>
+    <div className="flex h-full w-full overflow-hidden">
+      {/* ── Left Panel: Report Browser ── */}
+      <div
+        className={`${
+          mobileShowReport ? 'hidden lg:flex' : 'flex'
+        } w-full lg:w-[300px] flex-shrink-0 flex-col border-r border-border bg-[var(--macos-sidebar)] backdrop-blur-xl`}
+      >
+        {/* Titlebar */}
+        <div className="macos-titlebar flex items-center gap-3 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-teal-600 text-white">
+              <FileText className="w-4 h-4" />
+            </div>
+            <div>
+              <h1 className="text-[13px] font-semibold text-foreground leading-tight">Report Center</h1>
+              <p className="text-[10px] text-muted-foreground">{allReports.length} reports • {reportCategories.length} categories</p>
+            </div>
+          </div>
+          {isSuperAdmin && <Crown className="w-3.5 h-3.5 text-amber-500 ml-auto" />}
         </div>
-        <div className="flex items-center gap-2">
-          {selectedReport && reportData && (
-            <>
-              <Button variant="outline" size="sm" className="h-8 text-[11px] gap-1.5" onClick={handlePrint}>
-                <Printer className="size-3.5" />
-                Print
-              </Button>
-              <Button variant="outline" size="sm" className="h-8 text-[11px] gap-1.5" onClick={handleExportCSV}>
-                <FileSpreadsheet className="size-3.5" />
-                CSV
-              </Button>
-              <Button variant="outline" size="sm" className="h-8 text-[11px] gap-1.5" onClick={handleExportJSON}>
-                <FileDown className="size-3.5" />
-                JSON
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
 
-      <div className="flex gap-4">
-        {/* ── Left Panel: Report Browser ── */}
-        <div className={`shrink-0 ${selectedReport ? 'w-[280px] hidden lg:block' : 'w-full lg:w-[340px]'} space-y-2`}>
-          {/* Search */}
+        {/* Search */}
+        <div className="px-3 py-2">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <input
+              type="text"
               placeholder="Search reports..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 pl-9 text-[12px] macos-card"
+              className="macos-search"
             />
           </div>
+        </div>
 
-          {/* Date Range */}
-          <div className="macos-card p-3 space-y-2">
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Date Range</p>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[9px] text-muted-foreground">From</label>
-                <Input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="h-8 text-[11px]"
-                />
-              </div>
-              <div>
-                <label className="text-[9px] text-muted-foreground">To</label>
-                <Input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="h-8 text-[11px]"
-                />
-              </div>
-            </div>
+        {/* Date Range */}
+        <div className="px-3 py-1.5 flex items-center gap-2">
+          <CalendarDays className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+          <div className="flex-1 flex items-center gap-1.5">
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="macos-search !pl-2 !text-[11px] flex-1"
+            />
+            <span className="text-[10px] text-muted-foreground">—</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="macos-search !pl-2 !text-[11px] flex-1"
+            />
           </div>
+        </div>
 
-          {/* Report Categories */}
-          <div className="space-y-1 max-h-[calc(100vh-380px)] overflow-y-auto pr-1">
-            {filteredCategories.map((category) => (
-              <div key={category.id}>
-                <button
-                  onClick={() => setExpandedCategory(expandedCategory === category.id ? '' : category.id)}
-                  className="w-full flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors"
+        {/* Categories & Reports */}
+        <ScrollArea className="flex-1 px-2 py-1">
+          <div className="space-y-0.5">
+            {filteredCategories.map((category) => {
+              const isExpanded = expandedCategory === category.id
+              const CategoryIcon = category.icon
+              return (
+                <div key={category.id}>
+                  <button
+                    onClick={() => setExpandedCategory(isExpanded ? '' : category.id)}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors"
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="w-3 h-3 text-muted-foreground" />
+                    )}
+                    <CategoryIcon className={`w-3.5 h-3.5 ${category.color}`} />
+                    <span className="text-[12px] font-medium text-foreground flex-1 text-left">{category.label}</span>
+                    <Badge variant="secondary" className="text-[10px] h-4 px-1.5 min-w-[18px] justify-center bg-black/[0.04] dark:bg-white/[0.06]">
+                      {category.reports.length}
+                    </Badge>
+                  </button>
+
+                  <AnimatePresence>
+                    {isExpanded && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.15 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="ml-3 pl-2 border-l border-border space-y-0.5 py-1">
+                          {category.reports.map((report) => {
+                            const isSelected = selectedReport?.id === report.id
+                            return (
+                              <button
+                                key={report.id}
+                                onClick={() => generateReport(report)}
+                                className={`macos-sidebar-item w-full text-left !px-2.5 !py-2 ${
+                                  isSelected
+                                    ? 'active !bg-teal-600 !text-white'
+                                    : ''
+                                }`}
+                              >
+                                <div>
+                                  <div className="text-[12px] font-medium leading-tight">{report.name}</div>
+                                  <div className={`text-[10px] leading-snug mt-0.5 ${isSelected ? 'text-teal-100' : 'text-muted-foreground'}`}>
+                                    {report.description}
+                                  </div>
+                                </div>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )
+            })}
+          </div>
+        </ScrollArea>
+
+        {/* Report Library Stats */}
+        <div className="border-t border-border px-4 py-3">
+          <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+            <span>Report Library</span>
+            <span>{allReports.length} reports in {reportCategories.length} categories</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Right Panel: Report Preview ── */}
+      <div className={`${mobileShowReport ? 'flex' : 'hidden lg:flex'} flex-1 flex-col min-w-0 bg-background`}>
+        {/* Actions Bar */}
+        {selectedReport && (
+          <div className="macos-titlebar flex items-center gap-2 px-4 py-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="lg:hidden h-7 w-7 p-0"
+              onClick={handleMobileBack}
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-[13px] font-semibold text-foreground truncate">{selectedReport.name}</h2>
+              <p className="text-[10px] text-muted-foreground truncate">{selectedReport.description}</p>
+            </div>
+            {reportData && !reportData.error && (
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+                  onClick={handlePrint}
+                  title="Print Report"
                 >
-                  <ChevronRight className={`size-3 text-muted-foreground transition-transform ${expandedCategory === category.id ? 'rotate-90' : ''}`} />
-                  <category.icon className={`size-3.5 ${category.color}`} />
-                  <span className="text-[12px] font-semibold text-foreground flex-1 text-left">{category.label}</span>
-                  <Badge variant="outline" className="text-[9px] px-1.5 py-0">{category.reports.length}</Badge>
-                </button>
-                <AnimatePresence>
-                  {expandedCategory === category.id && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.15 }}
-                      className="overflow-hidden ml-4"
-                    >
-                      {category.reports.map((report) => (
-                        <button
-                          key={report.id}
-                          onClick={() => generateReport(report)}
-                          className={`w-full text-left px-3 py-2.5 rounded-lg mb-0.5 transition-all ${
-                            selectedReport?.id === report.id
-                              ? 'bg-slate-600 text-white shadow-sm'
-                              : 'hover:bg-black/[0.04] dark:hover:bg-white/[0.04]'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <report.icon className={`size-3.5 ${selectedReport?.id === report.id ? 'text-white' : 'text-muted-foreground'}`} />
-                            <div className="flex-1 min-w-0">
-                              <p className={`text-[11px] font-semibold truncate ${selectedReport?.id === report.id ? 'text-white' : 'text-foreground'}`}>
-                                {report.name}
-                              </p>
-                              <p className={`text-[9px] leading-tight mt-0.5 line-clamp-2 ${selectedReport?.id === report.id ? 'text-white/60' : 'text-muted-foreground'}`}>
-                                {report.description}
-                              </p>
+                  <Printer className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Print</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+                  onClick={handlePDF}
+                  title="Export PDF"
+                >
+                  <FileDown className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">PDF</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+                  onClick={handleCSV}
+                  title="Export CSV"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">CSV</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+                  onClick={handleJSON}
+                  title="Export JSON"
+                >
+                  <FileDown className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">JSON</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+                  onClick={handleRefresh}
+                  disabled={loading}
+                  title="Refresh Report"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline">Refresh</span>
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Preview Content */}
+        <ScrollArea className="flex-1">
+          <div className="p-4 lg:p-6">
+            {!selectedReport ? (
+              /* Empty State */
+              <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
+                <div className="w-20 h-20 rounded-2xl bg-teal-50 dark:bg-teal-900/20 flex items-center justify-center mb-4">
+                  <FileText className="w-10 h-10 text-teal-600 dark:text-teal-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-1">Report Center</h3>
+                <p className="text-sm text-muted-foreground max-w-sm">
+                  Select a report from the library on the left to generate a preview. Use the date range to filter the report period.
+                </p>
+              </div>
+            ) : loading ? (
+              /* Loading State */
+              <div className="flex flex-col items-center justify-center min-h-[60vh]">
+                <Loader2 className="w-8 h-8 text-teal-600 animate-spin mb-3" />
+                <p className="text-sm text-muted-foreground">Generating report...</p>
+              </div>
+            ) : reportData?.error ? (
+              /* Error State */
+              <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
+                <div className="w-16 h-16 rounded-2xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center mb-4">
+                  <AlertCircle className="w-8 h-8 text-red-500" />
+                </div>
+                <h3 className="text-base font-semibold text-foreground mb-1">Report Unavailable</h3>
+                <p className="text-sm text-muted-foreground max-w-sm">{reportData.error}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-4 gap-1.5 text-teal-600 border-teal-200 hover:bg-teal-50"
+                  onClick={handleRefresh}
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Try Again
+                </Button>
+              </div>
+            ) : reportData ? (
+              /* Report Preview — Letter-Size */
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2 }}
+                ref={reportContentRef}
+                className="mx-auto max-w-[850px]"
+              >
+                <div className="macos-card overflow-hidden">
+                  {/* ── Report Header ── */}
+                  <div className="px-6 pt-5 pb-4 border-b-[3px] border-teal-600">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-teal-600 text-white flex-shrink-0">
+                          <Fuel className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="text-[11px] font-bold tracking-wider text-teal-600 uppercase">FuelFlow OS</div>
+                          <div className="text-[16px] font-bold text-foreground leading-tight">{reportData.reportName}</div>
+                          <div className="text-[11px] text-muted-foreground">{reportData.tenantName}</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[8px] font-semibold tracking-wider text-muted-foreground uppercase">Report Details</div>
+                        <div className="text-[11px] text-foreground mt-0.5">
+                          Period: {formatDate(reportData.period.from)} — {formatDate(reportData.period.to)}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
+                          Generated: {formatDateTime(reportData.generatedAt)}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {reportData.stationName}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── Summary Cards ── */}
+                  {summaryEntries.length > 0 && (
+                    <div className="px-6 py-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {summaryEntries.map(([key, value]) => (
+                          <div key={key} className="rounded-lg border border-border p-3 bg-muted/30">
+                            <div className="text-[8px] font-semibold tracking-wider text-muted-foreground uppercase">
+                              {summaryValueLabel(key)}
+                            </div>
+                            <div className="text-[16px] font-bold text-foreground mt-0.5">
+                              {renderSummaryValue(key, value)}
                             </div>
                           </div>
-                        </button>
-                      ))}
-                    </motion.div>
+                        ))}
+                      </div>
+                    </div>
                   )}
-                </AnimatePresence>
-              </div>
-            ))}
-          </div>
 
-          {/* Quick Stats */}
-          <div className="macos-card p-3">
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Report Library</p>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="text-center p-2 rounded-lg bg-teal-500/5 border border-teal-500/10">
-                <p className="text-[14px] font-bold text-teal-600">{allReports.length}</p>
-                <p className="text-[9px] text-muted-foreground">Total Reports</p>
-              </div>
-              <div className="text-center p-2 rounded-lg bg-violet-500/5 border border-violet-500/10">
-                <p className="text-[14px] font-bold text-violet-600">{reportCategories.length}</p>
-                <p className="text-[9px] text-muted-foreground">Categories</p>
-              </div>
-            </div>
-          </div>
-        </div>
+                  {/* ── Data Table ── */}
+                  {reportData.rows.length > 0 ? (
+                    <div className="px-6 pb-4">
+                      <div className="overflow-x-auto rounded-lg border border-border">
+                        <table className="macos-table">
+                          <thead>
+                            <tr>
+                              <th className="!bg-teal-600 !text-white w-10">#</th>
+                              {reportData.columns.map((col) => (
+                                <th key={col} className="!bg-teal-600 !text-white">
+                                  {prettyColumnName(col)}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {reportData.rows.map((row, i) => (
+                              <tr key={i} className={i % 2 === 1 ? 'bg-muted/20' : ''}>
+                                <td className="text-muted-foreground text-[11px] font-medium">{i + 1}</td>
+                                {reportData.columns.map((col) => (
+                                  <td key={col}>{renderCell(col, row[col])}</td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="px-6 py-8 text-center text-sm text-muted-foreground">
+                      No data available for the selected period.
+                    </div>
+                  )}
 
-        {/* ── Right Panel: Report Preview ── */}
-        <div className="flex-1 min-w-0">
-          {!selectedReport ? (
-            /* Empty State */
-            <div className="macos-card flex flex-col items-center justify-center py-20">
-              <div className="flex size-16 items-center justify-center rounded-2xl bg-slate-500/10 mb-4">
-                <BarChart3 className="size-7 text-slate-400" />
-              </div>
-              <h3 className="text-[15px] font-semibold text-foreground">Select a Report</h3>
-              <p className="text-[12px] text-muted-foreground mt-1 text-center max-w-xs">
-                Choose a report from the sidebar to generate a professional preview with print and export options
-              </p>
-              <div className="flex flex-wrap justify-center gap-2 mt-6">
-                {reportCategories.map((cat) => (
-                  <Badge key={cat.id} variant="outline" className={`text-[10px] ${cat.color} border-current/20`}>
-                    <cat.icon className="size-3 mr-1" />
-                    {cat.label} ({cat.reports.length})
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          ) : loading ? (
-            /* Loading State */
-            <div className="macos-card flex flex-col items-center justify-center py-20">
-              <Loader2 className="size-8 text-teal-500 animate-spin mb-3" />
-              <p className="text-[13px] font-semibold text-foreground">Generating Report</p>
-              <p className="text-[11px] text-muted-foreground mt-1">{selectedReport.name}...</p>
-            </div>
-          ) : (
-            /* Report Preview */
-            <div className="space-y-3">
-              {/* Report Actions Bar */}
-              <div className="flex items-center justify-between macos-card px-4 py-2.5">
-                <div className="flex items-center gap-2">
-                  <selectedReport.icon className="size-4 text-slate-600 dark:text-slate-400" />
-                  <span className="text-[13px] font-semibold text-foreground">{selectedReport.name}</span>
-                  <Badge variant="outline" className="text-[9px]">{selectedReport.category}</Badge>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1" onClick={() => generateReport(selectedReport)}>
-                    <RefreshCw className="size-3" />
-                    Refresh
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1" onClick={handlePrint}>
-                    <Printer className="size-3" />
-                    Print
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1" onClick={handleExportCSV}>
-                    <FileSpreadsheet className="size-3" />
-                    CSV
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1" onClick={handleExportJSON}>
-                    <FileDown className="size-3" />
-                    JSON
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-[10px] gap-1 lg:hidden"
-                    onClick={() => setSelectedReport(null)}
-                  >
-                    <X className="size-3" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Letter-Size Preview */}
-              <div className="macos-card p-4 overflow-auto max-h-[calc(100vh-260px)]">
-                {/* Page Label */}
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Letter Size Preview (8.5" × 11")</p>
-                  <div className="flex items-center gap-1.5">
-                    <div className="size-2 rounded-full bg-emerald-500" />
-                    <span className="text-[10px] text-muted-foreground">Live Data</span>
+                  {/* ── Report Footer ── */}
+                  <div className="px-6 py-3 border-t-2 border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                    <span className="text-[9px] text-muted-foreground font-medium">
+                      FuelFlow OS — ApexFlow Ecosystem
+                    </span>
+                    <span className="text-[9px] text-muted-foreground">
+                      Confidential • Generated {formatDateTime(reportData.generatedAt)}
+                    </span>
                   </div>
                 </div>
-                {renderReportPreview()}
-              </div>
-            </div>
-          )}
-        </div>
+              </motion.div>
+            ) : null}
+          </div>
+        </ScrollArea>
       </div>
     </div>
   )
