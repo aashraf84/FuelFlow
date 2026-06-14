@@ -2573,6 +2573,8 @@ model OwnerClient {
   databaseUrl     String?  // Full connection URL to the tenant's dedicated Neon database
   databaseName    String?  // Name of the tenant's dedicated database (e.g., ff_tenant_abc123)
   databaseStatus  String   @default("pending")  // pending, provisioning, active, error, suspended
+  passwordHash    String?  // Hashed password for owner login
+  apiKey          String?  @unique  // Auto-generated API key for device authentication
   onboardedAt     DateTime @default(now())
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

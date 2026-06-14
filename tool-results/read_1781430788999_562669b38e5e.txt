@@ -1,0 +1,517 @@
+  1200→                    setActiveTab('devices')
+  1201→                  }}
+  1202→                >
+  1203→                  <div className="flex items-start justify-between">
+  1204→                    <div className="size-9 rounded-[10px] flex items-center justify-center" style={{ backgroundColor: `${dt.color}15` }}>
+  1205→                      <dt.icon className="size-4" style={{ color: dt.color }} />
+  1206→                    </div>
+  1207→                    <div className="flex items-center gap-1.5">
+  1208→                      <div className={`macos-status-dot ${dt.online === dt.count ? 'macos-status-online' : 'macos-status-warning'}`} />
+  1209→                      <span className="text-[11px] text-muted-foreground">{dt.online}/{dt.count}</span>
+  1210→                    </div>
+  1211→                  </div>
+  1212→                  <div className="mt-3">
+  1213→                    <p className="text-[13px] font-semibold">{dt.type}</p>
+  1214→                    <p className="text-[11px] text-muted-foreground">{dt.count} devices registered</p>
+  1215→                  </div>
+  1216→                </motion.div>
+  1217→              )) : (
+  1218→                <div className="col-span-full macos-card p-6 text-center text-[13px] text-muted-foreground">
+  1219→                  No devices found in the system
+  1220→                </div>
+  1221→              )}
+  1222→            </div>
+  1223→          </div>
+  1224→
+  1225→          {/* Quick Stats */}
+  1226→          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+  1227→            {[
+  1228→              { label: 'Total Devices', value: overviewStats?.totalDevices ?? 0, icon: HardDrive, accent: '#e8930c' },
+  1229→              { label: 'Online', value: overviewStats?.onlineDevices ?? 0, icon: Wifi, accent: '#34c759' },
+  1230→              { label: 'Warnings', value: overviewStats?.warningDevices ?? 0, icon: AlertTriangle, accent: '#ff9f0a' },
+  1231→              { label: 'Offline', value: overviewStats?.offlineDevices ?? 0, icon: WifiOff, accent: '#ff3b30' },
+  1232→            ].map((stat) => (
+  1233→              <div key={stat.label} className="macos-card p-4">
+  1234→                <div className="flex items-center justify-between">
+  1235→                  <div>
+  1236→                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">{stat.label}</p>
+  1237→                    <p className="text-2xl font-bold mt-0.5" style={{ color: stat.accent }}>{stat.value}</p>
+  1238→                  </div>
+  1239→                  <div className="size-9 rounded-[10px] flex items-center justify-center" style={{ backgroundColor: `${stat.accent}12` }}>
+  1240→                    <stat.icon className="size-4" style={{ color: stat.accent }} />
+  1241→                  </div>
+  1242→                </div>
+  1243→              </div>
+  1244→            ))}
+  1245→          </div>
+  1246→
+  1247→          {/* Recent Events */}
+  1248→          <div>
+  1249→            <div className="flex items-center justify-between">
+  1250→              <div className="macos-section-header">Recent Events</div>
+  1251→              <button onClick={fetchData} className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+  1252→                <RefreshCw className="size-3" /> Refresh
+  1253→              </button>
+  1254→            </div>
+  1255→            <div className="macos-group mt-1">
+  1256→              {eventLog.length > 0 ? eventLog.slice(0, 5).map((ev, i) => (
+  1257→                <div key={ev.id || i} className="macos-group-item flex items-center gap-3">
+  1258→                  <div className={`macos-status-dot ${
+  1259→                    ev.severity === 'error' || ev.severity === 'critical' ? 'macos-status-error' :
+  1260→                    ev.severity === 'warning' ? 'macos-status-warning' :
+  1261→                    ev.severity === 'success' || ev.severity === 'info' ? 'macos-status-online' : 'macos-status-offline'
+  1262→                  }`} />
+  1263→                  <div className="flex-1 min-w-0">
+  1264→                    <div className="flex items-center gap-2">
+  1265→                      <span className="text-[13px] font-medium">{ev.deviceId}</span>
+  1266→                      <span className={`text-[11px] ${EVENT_LEVEL_MAP[ev.severity] || ''}`}>{ev.message}</span>
+  1267→                    </div>
+  1268→                  </div>
+  1269→                  <span className="text-[11px] text-muted-foreground whitespace-nowrap font-mono">{timeAgo(ev.createdAt)}</span>
+  1270→                  <ChevronRight className="size-3 text-muted-foreground/50" />
+  1271→                </div>
+  1272→              )) : (
+  1273→                <div className="macos-group-item text-center text-[13px] text-muted-foreground py-4">
+  1274→                  No recent events
+  1275→                </div>
+  1276→              )}
+  1277→            </div>
+  1278→          </div>
+  1279→        </TabsContent>
+  1280→
+  1281→        {/* ── Connected Devices ── */}
+  1282→        <TabsContent value="devices" className="mt-4 space-y-3">
+  1283→          <div className="flex items-center gap-3">
+  1284→            <div className="relative flex-1 max-w-xs">
+  1285→              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+  1286→              <input
+  1287→                className="macos-search pl-8 py-1.5 text-[12px]"
+  1288→                placeholder="Search devices..."
+  1289→                value={searchQuery}
+  1290→                onChange={e => setSearchQuery(e.target.value)}
+  1291→              />
+  1292→            </div>
+  1293→            <div className="flex items-center gap-1.5 flex-wrap">
+  1294→              {['all', 'Dispenser', 'ATG', 'Payment', 'Controller', 'RFID', 'ANPR'].map(t => (
+  1295→                <button
+  1296→                  key={t}
+  1297→                  onClick={() => setTypeFilter(t)}
+  1298→                  className={`text-[11px] px-2.5 py-1 rounded-md font-medium transition-colors ${
+  1299→                    typeFilter === t
+  1300→                      ? 'bg-teal-500/15 text-teal-600 dark:text-teal-400'
+  1301→                      : 'text-muted-foreground hover:bg-black/[0.03] dark:hover:bg-white/[0.04]'
+  1302→                  }`}
+  1303→                >
+  1304→                  {t === 'all' ? 'All' : t}
+  1305→                </button>
+  1306→              ))}
+  1307→              <button
+  1308→                onClick={() => setShowAddDevice(true)}
+  1309→                className="macos-btn text-[11px] px-2.5 py-1 flex items-center gap-1 ml-1"
+  1310→              >
+  1311→                <Plus className="size-3" /> Add Device
+  1312→              </button>
+  1313→            </div>
+  1314→          </div>
+  1315→
+  1316→          <div className="macos-card overflow-hidden">
+  1317→            <div className="max-h-[480px] overflow-y-auto">
+  1318→              <table className="macos-table">
+  1319→                <thead>
+  1320→                  <tr>
+  1321→                    <th>Device ID</th>
+  1322→                    <th>Name</th>
+  1323→                    <th>Type</th>
+  1324→                    <th>Brand</th>
+  1325→                    <th>Protocol</th>
+  1326→                    <th>Status</th>
+  1327→                    <th>Last Seen</th>
+  1328→                    <th>IP</th>
+  1329→                  </tr>
+  1330→                </thead>
+  1331→                <tbody>
+  1332→                  {filteredDevices.map(d => {
+  1333→                    const st = STATUS_MAP[d.status] || STATUS_MAP.offline
+  1334→                    return (
+  1335→                      <tr key={d.id}>
+  1336→                        <td className="font-mono text-[12px] text-teal-600 dark:text-teal-400">{d.id}</td>
+  1337→                        <td className="font-medium text-[13px]">{d.name}</td>
+  1338→                        <td><Badge variant="outline" className="text-[10px] px-1.5 py-0 font-medium">{d.type}</Badge></td>
+  1339→                        <td className="text-[13px]">{d.brand}</td>
+  1340→                        <td className="text-[12px] font-mono text-muted-foreground">{d.protocol}</td>
+  1341→                        <td>
+  1342→                          <div className="flex items-center gap-1.5">
+  1343→                            <div className={`macos-status-dot ${st.dot}`} />
+  1344→                            <span className={`text-[11px] font-medium capitalize ${st.text}`}>{d.status}</span>
+  1345→                          </div>
+  1346→                        </td>
+  1347→                        <td className="text-[12px] text-muted-foreground whitespace-nowrap">{d.lastSeen}</td>
+  1348→                        <td className="text-[12px] font-mono text-muted-foreground">{d.ip}</td>
+  1349→                      </tr>
+  1350→                    )
+  1351→                  })}
+  1352→                  {filteredDevices.length === 0 && (
+  1353→                    <tr>
+  1354→                      <td colSpan={8} className="text-center text-[13px] text-muted-foreground py-8">No devices match your filters</td>
+  1355→                    </tr>
+  1356→                  )}
+  1357→                </tbody>
+  1358→              </table>
+  1359→            </div>
+  1360→          </div>
+  1361→          <p className="text-[11px] text-muted-foreground">{filteredDevices.length} of {connectedDevices.length} devices shown</p>
+  1362→        </TabsContent>
+  1363→
+  1364→        {/* ── Forecourt Controllers ── */}
+  1365→        <TabsContent value="controllers" className="mt-4 space-y-4">
+  1366→          <div className="flex items-center justify-between">
+  1367→            <div className="macos-section-header">Forecourt Controllers</div>
+  1368→            <div className="flex gap-2">
+  1369→              <button onClick={() => setShowAddController(true)} className="macos-btn text-[11px] px-2.5 py-1 flex items-center gap-1">
+  1370→                <Plus className="size-3" /> Add Controller
+  1371→              </button>
+  1372→              <button onClick={fetchData} className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+  1373→                <RefreshCw className="size-3" /> Refresh
+  1374→              </button>
+  1375→            </div>
+  1376→          </div>
+  1377→          {forecourtControllers.length > 0 ? (
+  1378→            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  1379→              {forecourtControllers.map(fc => {
+  1380→                const dispensers = fc.dispensers || []
+  1381→                const connectedPumps = dispensers.length
+  1382→                const totalPumps = fc.maxDispensers || dispensers.length
+  1383→                return (
+  1384→                  <motion.div
+  1385→                    key={fc.id}
+  1386→                    initial={{ opacity: 0, y: 8 }}
+  1387→                    animate={{ opacity: 1, y: 0 }}
+  1388→                    className="macos-card p-5 space-y-4"
+  1389→                  >
+  1390→                    <div className="flex items-start justify-between">
+  1391→                      <div className="flex items-center gap-3">
+  1392→                        <div className="size-10 rounded-[10px] bg-teal-500/10 flex items-center justify-center">
+  1393→                          <Server className="size-5 text-teal-500" />
+  1394→                        </div>
+  1395→                        <div>
+  1396→                          <h3 className="text-[13px] font-semibold">{fc.name}</h3>
+  1397→                          <p className="text-[11px] text-muted-foreground">{fc.manufacturer || ''} {fc.model || ''}</p>
+  1398→                        </div>
+  1399→                      </div>
+  1400→                      <div className="flex items-center gap-1.5">
+  1401→                        <div className={`macos-status-dot ${STATUS_MAP[fc.status]?.dot || 'macos-status-offline'}`} />
+  1402→                        <span className={`text-[11px] font-medium capitalize ${STATUS_MAP[fc.status]?.text || 'text-muted-foreground'}`}>{fc.status}</span>
+  1403→                      </div>
+  1404→                    </div>
+  1405→
+  1406→                    <div className="grid grid-cols-2 gap-3">
+  1407→                      <div className="macos-group">
+  1408→                        <div className="macos-group-item">
+  1409→                          <div className="flex items-center justify-between">
+  1410→                            <span className="text-[11px] text-muted-foreground">IP Address</span>
+  1411→                            <span className="text-[13px] font-mono">{fc.ipAddress || 'N/A'}{fc.port ? `:${fc.port}` : ''}</span>
+  1412→                          </div>
+  1413→                        </div>
+  1414→                        <div className="macos-group-item">
+  1415→                          <div className="flex items-center justify-between">
+  1416→                            <span className="text-[11px] text-muted-foreground">Protocol</span>
+  1417→                            <span className="text-[13px]">{fc.protocol || fc.controllerType || 'N/A'}</span>
+  1418→                          </div>
+  1419→                        </div>
+  1420→                        <div className="macos-group-item">
+  1421→                          <div className="flex items-center justify-between">
+  1422→                            <span className="text-[11px] text-muted-foreground">Firmware</span>
+  1423→                            <span className="text-[13px] font-mono">{fc.firmwareVersion ? `v${fc.firmwareVersion}` : 'N/A'}</span>
+  1424→                          </div>
+  1425→                        </div>
+  1426→                        <div className="macos-group-item">
+  1427→                          <div className="flex items-center justify-between">
+  1428→                            <span className="text-[11px] text-muted-foreground">Serial</span>
+  1429→                            <span className="text-[12px] font-mono">{fc.serialNumber || 'N/A'}</span>
+  1430→                          </div>
+  1431→                        </div>
+  1432→                      </div>
+  1433→
+  1434→                      <div className="macos-group">
+  1435→                        <div className="macos-group-item">
+  1436→                          <div className="flex items-center justify-between">
+  1437→                            <span className="text-[11px] text-muted-foreground">Last Heartbeat</span>
+  1438→                            <span className="text-[13px]">{timeAgo(fc.lastHeartbeat)}</span>
+  1439→                          </div>
+  1440→                        </div>
+  1441→                        <div className="macos-group-item">
+  1442→                          <div className="flex items-center justify-between">
+  1443→                            <span className="text-[11px] text-muted-foreground">Pumps</span>
+  1444→                            <span className="text-[13px]">{connectedPumps}/{totalPumps}</span>
+  1445→                          </div>
+  1446→                        </div>
+  1447→                        <div className="macos-group-item">
+  1448→                          <div className="flex items-center justify-between">
+  1449→                            <span className="text-[11px] text-muted-foreground">Station</span>
+  1450→                            <span className="text-[12px]">{fc.station?.name || 'N/A'}</span>
+  1451→                          </div>
+  1452→                        </div>
+  1453→                        <div className="macos-group-item">
+  1454→                          <div className="flex items-center justify-between">
+  1455→                            <span className="text-[11px] text-muted-foreground">Last Comm</span>
+  1456→                            <span className="text-[13px]">{timeAgo(fc.lastCommunication)}</span>
+  1457→                          </div>
+  1458→                        </div>
+  1459→                      </div>
+  1460→                    </div>
+  1461→
+  1462→                    <div className="flex items-center justify-between pt-1">
+  1463→                      <span className="text-[11px] text-muted-foreground">Last heartbeat: {timeAgo(fc.lastHeartbeat)}</span>
+  1464→                      <div className="flex gap-2">
+  1465→                        <button className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+  1466→                          <RefreshCw className="size-3" /> Restart
+  1467→                        </button>
+  1468→                        <button className="macos-btn text-[11px] px-2.5 py-1 flex items-center gap-1">
+  1469→                          <Activity className="size-3" /> Diagnostics
+  1470→                        </button>
+  1471→                      </div>
+  1472→                    </div>
+  1473→                  </motion.div>
+  1474→                )
+  1475→              })}
+  1476→            </div>
+  1477→          ) : (
+  1478→            <div className="macos-card p-6 text-center text-[13px] text-muted-foreground">
+  1479→              No forecourt controllers configured
+  1480→            </div>
+  1481→          )}
+  1482→        </TabsContent>
+  1483→
+  1484→        {/* ── Command Queue ── */}
+  1485→        <TabsContent value="commands" className="mt-4 space-y-3">
+  1486→          <div className="flex items-center justify-between">
+  1487→            <div className="macos-section-header">Device Command Queue</div>
+  1488→            <div className="flex gap-2">
+  1489→              <button className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+  1490→                <Square className="size-3" /> Clear Completed
+  1491→              </button>
+  1492→              <button className="macos-btn text-[11px] px-2.5 py-1 flex items-center gap-1">
+  1493→                <Command className="size-3" /> New Command
+  1494→              </button>
+  1495→            </div>
+  1496→          </div>
+  1497→          <div className="macos-card overflow-hidden">
+  1498→            <div className="max-h-[420px] overflow-y-auto">
+  1499→              <table className="macos-table">
+  1500→                <thead>
+  1501→                  <tr>
+  1502→                    <th>Command ID</th>
+  1503→                    <th>Device</th>
+  1504→                    <th>Command</th>
+  1505→                    <th>Priority</th>
+  1506→                    <th>Status</th>
+  1507→                    <th>Retries</th>
+  1508→                    <th>Created At</th>
+  1509→                  </tr>
+  1510→                </thead>
+  1511→                <tbody>
+  1512→                  {commandQueue.length > 0 ? commandQueue.map(cmd => {
+  1513→                    const st = CMD_STATUS_MAP[cmd.status] || CMD_STATUS_MAP.queued
+  1514→                    const StatusIcon = st?.icon || Clock
+  1515→                    return (
+  1516→                      <tr key={cmd.id}>
+  1517→                        <td className="font-mono text-[12px] text-teal-600 dark:text-teal-400">{cmd.id.slice(0, 12)}</td>
+  1518→                        <td className="font-mono text-[12px]">{cmd.deviceId}</td>
+  1519→                        <td className="text-[13px] font-medium">{cmd.command}</td>
+  1520→                        <td>
+  1521→                          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-semibold capitalize ${PRIORITY_MAP[cmd.priority] || PRIORITY_MAP.medium}`}>
+  1522→                            {cmd.priority}
+  1523→                          </Badge>
+  1524→                        </td>
+  1525→                        <td>
+  1526→                          <div className="flex items-center gap-1.5">
+  1527→                            <StatusIcon className={`size-3.5 ${st?.color}`} />
+  1528→                            <span className="text-[12px] capitalize">{cmd.status}</span>
+  1529→                          </div>
+  1530→                        </td>
+  1531→                        <td className="text-[12px]">
+  1532→                          <span className={cmd.retryCount > 0 ? 'text-teal-600 dark:text-teal-400 font-medium' : 'text-muted-foreground'}>
+  1533→                            {cmd.retryCount}/{cmd.maxRetries}
+  1534→                          </span>
+  1535→                        </td>
+  1536→                        <td className="text-[12px] text-muted-foreground font-mono">{timeAgo(cmd.createdAt)}</td>
+  1537→                      </tr>
+  1538→                    )
+  1539→                  }) : (
+  1540→                    <tr>
+  1541→                      <td colSpan={7} className="text-center text-[13px] text-muted-foreground py-8">No commands in queue</td>
+  1542→                    </tr>
+  1543→                  )}
+  1544→                </tbody>
+  1545→              </table>
+  1546→            </div>
+  1547→          </div>
+  1548→        </TabsContent>
+  1549→
+  1550→        {/* ── Event Log ── */}
+  1551→        <TabsContent value="events" className="mt-4 space-y-3">
+  1552→          <div className="flex items-center justify-between">
+  1553→            <div className="macos-section-header">Recent Device Events</div>
+  1554→            <button onClick={fetchData} className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+  1555→              <RefreshCw className="size-3" /> Refresh
+  1556→            </button>
+  1557→          </div>
+  1558→          <div className="macos-group">
+  1559→            {eventLog.length > 0 ? eventLog.map((ev, i) => (
+  1560→              <motion.div
+  1561→                key={ev.id || i}
+  1562→                initial={{ opacity: 0, x: -4 }}
+  1563→                animate={{ opacity: 1, x: 0 }}
+  1564→                transition={{ delay: i * 0.03 }}
+  1565→                className="macos-group-item flex items-center gap-3"
+  1566→              >
+  1567→                <div className={`macos-status-dot ${
+  1568→                  ev.severity === 'error' || ev.severity === 'critical' ? 'macos-status-error' :
+  1569→                  ev.severity === 'warning' ? 'macos-status-warning' :
+  1570→                  ev.severity === 'success' || ev.severity === 'info' ? 'macos-status-online' : 'macos-status-offline'
+  1571→                }`} />
+  1572→                <div className="flex-1 min-w-0">
+  1573→                  <div className="flex items-center gap-2">
+  1574→                    <span className="text-[12px] font-mono font-medium text-teal-600 dark:text-teal-400">{ev.deviceId}</span>
+  1575→                    <span className={`text-[13px] ${EVENT_LEVEL_MAP[ev.severity] || ''}`}>{ev.message}</span>
+  1576→                  </div>
+  1577→                </div>
+  1578→                <span className="text-[11px] text-muted-foreground font-mono whitespace-nowrap">{timeAgo(ev.createdAt)}</span>
+  1579→              </motion.div>
+  1580→            )) : (
+  1581→              <div className="macos-group-item text-center text-[13px] text-muted-foreground py-4">
+  1582→                No events recorded
+  1583→              </div>
+  1584→            )}
+  1585→          </div>
+  1586→        </TabsContent>
+  1587→
+  1588→        {/* ── Hardware Catalog ── */}
+  1589→        <TabsContent value="catalog" className="mt-4 space-y-3">
+  1590→          <div className="macos-section-header">Hardware Catalog</div>
+  1591→          {hardwareCatalog.length > 0 ? (
+  1592→            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+  1593→              {hardwareCatalog.map((item, i) => (
+  1594→                <motion.div
+  1595→                  key={item.id}
+  1596→                  initial={{ opacity: 0, y: 8 }}
+  1597→                  animate={{ opacity: 1, y: 0 }}
+  1598→                  transition={{ delay: i * 0.05 }}
+  1599→                  className="macos-card p-4"
+  1600→                >
+  1601→                  <div className="flex items-start justify-between mb-3">
+  1602→                    <div className="flex items-center gap-2.5">
+  1603→                      <div className="size-9 rounded-[10px] bg-teal-500/10 flex items-center justify-center">
+  1604→                        <Fuel className="size-4 text-teal-500" />
+  1605→                      </div>
+  1606→                      <div>
+  1607→                        <h3 className="text-[13px] font-semibold">{item.manufacturer}</h3>
+  1608→                        <p className="text-[11px] text-muted-foreground">{item.modelName}</p>
+  1609→                      </div>
+  1610→                    </div>
+  1611→                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
+  1612→                      {item.category}
+  1613→                    </Badge>
+  1614→                  </div>
+  1615→                  <div className="space-y-2">
+  1616→                    {item.supportedProtocols && (
+  1617→                      <div className="flex items-center justify-between text-[12px]">
+  1618→                        <span className="text-muted-foreground">Protocols</span>
+  1619→                        <span className="font-mono text-teal-600 dark:text-teal-400">
+  1620→                          {Array.isArray(item.supportedProtocols) ? item.supportedProtocols.join(', ') : item.supportedProtocols}
+  1621→                        </span>
+  1622→                      </div>
+  1623→                    )}
+  1624→                    {item.communicationTypes && (
+  1625→                      <div className="flex items-center justify-between text-[12px]">
+  1626→                        <span className="text-muted-foreground">Transport</span>
+  1627→                        <span className="font-medium">
+  1628→                          {Array.isArray(item.communicationTypes) ? item.communicationTypes.join(', ') : item.communicationTypes}
+  1629→                        </span>
+  1630→                      </div>
+  1631→                    )}
+  1632→                  </div>
+  1633→                </motion.div>
+  1634→              ))}
+  1635→            </div>
+  1636→          ) : (
+  1637→            <div className="macos-card p-6 text-center text-[13px] text-muted-foreground">
+  1638→              No hardware catalog entries found
+  1639→            </div>
+  1640→          )}
+  1641→        </TabsContent>
+  1642→
+  1643→        {/* ── Communication Protocols ── */}
+  1644→        <TabsContent value="protocols" className="mt-4 space-y-3">
+  1645→          <div className="macos-section-header">Communication Protocols</div>
+  1646→          {commProtocols.length > 0 ? (
+  1647→            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+  1648→              {commProtocols.map((proto, i) => (
+  1649→                <motion.div
+  1650→                  key={proto.id}
+  1651→                  initial={{ opacity: 0, y: 8 }}
+  1652→                  animate={{ opacity: 1, y: 0 }}
+  1653→                  transition={{ delay: i * 0.04 }}
+  1654→                  className="macos-card p-4"
+  1655→                >
+  1656→                  <div className="flex items-start justify-between mb-2">
+  1657→                    <div className="flex items-center gap-2.5">
+  1658→                      <div className="size-9 rounded-[10px] bg-teal-500/10 flex items-center justify-center">
+  1659→                        <Cable className="size-4 text-teal-500" />
+  1660→                      </div>
+  1661→                      <div>
+  1662→                        <h3 className="text-[13px] font-semibold">{proto.name}</h3>
+  1663→                        <p className="text-[11px] text-muted-foreground">{proto.description || proto.protocolType || ''}</p>
+  1664→                      </div>
+  1665→                    </div>
+  1666→                    <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${proto.isActive ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-slate-500/10 text-slate-500 border-slate-500/20'}`}>
+  1667→                      {proto.isActive ? 'Active' : 'Inactive'}
+  1668→                    </Badge>
+  1669→                  </div>
+  1670→                  <div className="macos-group mt-2">
+  1671→                    {proto.protocolType && (
+  1672→                      <div className="macos-group-item">
+  1673→                        <div className="flex justify-between text-[12px]">
+  1674→                          <span className="text-muted-foreground">Type</span>
+  1675→                          <span className="font-medium">{proto.protocolType}</span>
+  1676→                        </div>
+  1677→                      </div>
+  1678→                    )}
+  1679→                    {proto.transportType && (
+  1680→                      <div className="macos-group-item">
+  1681→                        <div className="flex justify-between text-[12px]">
+  1682→                          <span className="text-muted-foreground">Transport</span>
+  1683→                          <span className="font-mono">{proto.transportType}</span>
+  1684→                        </div>
+  1685→                      </div>
+  1686→                    )}
+  1687→                    {proto.version && (
+  1688→                      <div className="macos-group-item">
+  1689→                        <div className="flex justify-between text-[12px]">
+  1690→                          <span className="text-muted-foreground">Version</span>
+  1691→                          <span className="font-mono">{proto.version}</span>
+  1692→                        </div>
+  1693→                      </div>
+  1694→                    )}
+  1695→                    <div className="macos-group-item">
+  1696→                      <div className="flex justify-between text-[12px]">
+  1697→                        <span className="text-muted-foreground">Connections</span>
+  1698→                        <span className="font-semibold text-teal-600 dark:text-teal-400">{proto.connections?.length || 0}</span>
+  1699→                      </div>
+  1700→                    </div>
+  1701→                  </div>
+  1702→                </motion.div>
+  1703→              ))}
+  1704→            </div>
+  1705→          ) : (
+  1706→            <div className="macos-card p-6 text-center text-[13px] text-muted-foreground">
+  1707→              No communication protocols configured
+  1708→            </div>
+  1709→          )}
+  1710→        </TabsContent>
+  1711→      </Tabs>
+  1712→      {addDeviceDialog}
+  1713→      {addControllerDialog}
+  1714→    </div>
+  1715→  )
+  1716→}

@@ -13,8 +13,11 @@ export async function POST(request: Request) {
       )
     }
 
+    const trimmedKey = key.trim()
+
+    // ── First check SerialKey table (tenant-level keys) ──
     const serialKey = await db.serialKey.findUnique({
-      where: { key: key.trim() },
+      where: { key: trimmedKey },
       include: {
         tenant: {
           select: {
@@ -26,79 +29,126 @@ export async function POST(request: Request) {
       },
     })
 
-    if (!serialKey) {
+    if (serialKey) {
+      // Check key status
+      if (serialKey.status === 'expired') {
+        return NextResponse.json(
+          { valid: false, error: 'This serial key has expired', status: 'expired', expiredAt: serialKey.expiresAt },
+          { status: 410 }
+        )
+      }
+
+      if (serialKey.status === 'revoked') {
+        return NextResponse.json(
+          { valid: false, error: 'This serial key has been revoked', status: 'revoked' },
+          { status: 403 }
+        )
+      }
+
+      // If inactive — valid key, not yet activated
+      if (serialKey.status === 'inactive') {
+        return NextResponse.json({
+          valid: true,
+          status: 'inactive',
+          keyId: serialKey.id,
+          plan: serialKey.plan,
+          maxStations: serialKey.maxStations,
+          maxDispensers: serialKey.maxDispensers,
+          maxUsers: serialKey.maxUsers,
+          expiresAt: serialKey.expiresAt,
+          message: 'Serial key is valid and ready for activation',
+        })
+      }
+
+      // If active — already assigned to a tenant
+      if (serialKey.status === 'active') {
+        return NextResponse.json({
+          valid: true,
+          status: 'active',
+          keyId: serialKey.id,
+          plan: serialKey.plan,
+          maxStations: serialKey.maxStations,
+          maxDispensers: serialKey.maxDispensers,
+          maxUsers: serialKey.maxUsers,
+          activatedAt: serialKey.activatedAt,
+          expiresAt: serialKey.expiresAt,
+          tenant: serialKey.tenant
+            ? { id: serialKey.tenant.id, name: serialKey.tenant.name, slug: serialKey.tenant.slug }
+            : null,
+          message: 'Serial key is already activated',
+        })
+      }
+
       return NextResponse.json(
-        { valid: false, error: 'Invalid serial key', status: 'invalid' },
-        { status: 404 }
+        { valid: false, error: `Unknown key status: ${serialKey.status}` },
+        { status: 400 }
       )
     }
 
-    // Check key status
-    if (serialKey.status === 'expired') {
-      return NextResponse.json(
-        {
-          valid: false,
-          error: 'This serial key has expired',
-          status: 'expired',
-          expiredAt: serialKey.expiresAt,
+    // ── Fallback: Check LicenseKey table (owner-level keys) ──
+    const licenseKey = await db.licenseKey.findUnique({
+      where: { key: trimmedKey },
+      include: {
+        client: {
+          select: {
+            id: true,
+            companyName: true,
+            slug: true,
+            email: true,
+            phone: true,
+          },
         },
-        { status: 410 }
-      )
-    }
-
-    if (serialKey.status === 'revoked') {
-      return NextResponse.json(
-        {
-          valid: false,
-          error: 'This serial key has been revoked',
-          status: 'revoked',
+        plan: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
         },
-        { status: 403 }
-      )
-    }
+      },
+    })
 
-    // If inactive — valid key, not yet activated
-    if (serialKey.status === 'inactive') {
+    if (licenseKey) {
+      if (licenseKey.status === 'revoked') {
+        return NextResponse.json(
+          { valid: false, error: 'This license key has been revoked', status: 'revoked' },
+          { status: 403 }
+        )
+      }
+
+      if (licenseKey.status === 'expired') {
+        return NextResponse.json(
+          { valid: false, error: 'This license key has expired', status: 'expired', expiredAt: licenseKey.expiresAt },
+          { status: 410 }
+        )
+      }
+
+      // assigned or available — valid key
+      const planSlug = licenseKey.plan?.slug || 'starter'
       return NextResponse.json({
         valid: true,
-        status: 'inactive',
-        keyId: serialKey.id,
-        plan: serialKey.plan,
-        maxStations: serialKey.maxStations,
-        maxDispensers: serialKey.maxDispensers,
-        maxUsers: serialKey.maxUsers,
-        expiresAt: serialKey.expiresAt,
-        message: 'Serial key is valid and ready for activation',
-      })
-    }
-
-    // If active — already assigned to a tenant
-    if (serialKey.status === 'active') {
-      return NextResponse.json({
-        valid: true,
-        status: 'active',
-        keyId: serialKey.id,
-        plan: serialKey.plan,
-        maxStations: serialKey.maxStations,
-        maxDispensers: serialKey.maxDispensers,
-        maxUsers: serialKey.maxUsers,
-        activatedAt: serialKey.activatedAt,
-        expiresAt: serialKey.expiresAt,
-        tenant: serialKey.tenant
-          ? {
-              id: serialKey.tenant.id,
-              name: serialKey.tenant.name,
-              slug: serialKey.tenant.slug,
-            }
+        status: licenseKey.status === 'assigned' ? 'active' : 'inactive',
+        keyId: licenseKey.id,
+        keyType: 'license',
+        plan: planSlug,
+        maxStations: licenseKey.maxStations,
+        maxDispensers: licenseKey.maxDispensers,
+        maxUsers: licenseKey.maxUsers,
+        activatedAt: licenseKey.assignedAt,
+        expiresAt: licenseKey.expiresAt,
+        tenant: licenseKey.client
+          ? { id: licenseKey.client.id, name: licenseKey.client.companyName, slug: licenseKey.client.slug }
           : null,
-        message: 'Serial key is already activated',
+        message: licenseKey.status === 'assigned'
+          ? 'License key is active and assigned'
+          : 'License key is valid and ready for activation',
       })
     }
 
-    // Fallback for unexpected status values
+    // No key found in either table
     return NextResponse.json(
-      { valid: false, error: `Unknown key status: ${serialKey.status}` },
-      { status: 400 }
+      { valid: false, error: 'Invalid serial key', status: 'invalid' },
+      { status: 404 }
     )
   } catch (error) {
     console.error('[validate-serial] Error:', error)

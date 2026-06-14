@@ -8,7 +8,7 @@ import {
   XCircle, ArrowUpDown, Send, Command, Monitor, Server,
   Cable, Plug, Wrench, Fuel, Activity, HardDrive, Database,
   Play, Square, RotateCcw, Eye, Search, Filter, Loader2,
-  Plus, X,
+  Plus, X, Key, Shield, Copy, Check, User,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -33,6 +33,41 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { useAppStore } from '@/stores/app-store'
+
+// ── Owner Registration Types ────────────────────
+
+interface OwnerRegistrationResult {
+  success: boolean
+  message: string
+  credentials: {
+    email: string
+    password: string
+    apiKey: string
+    ownerId: string
+  }
+  serialKey: {
+    key: string
+    plan: string
+    maxStations: number
+    maxDispensers: number
+    maxUsers: number
+    expiresAt: string
+    status: string
+  }
+  device: {
+    id: string
+    name: string
+    type: string
+    status: string
+  }
+  owner: {
+    id: string
+    companyName: string
+    slug: string
+    contactPerson: string
+    status: string
+  }
+}
 
 // ── Types ──────────────────────────────────────
 
@@ -698,6 +733,320 @@ function AddControllerForm({
   )
 }
 
+// ── Owner Registration Form ──────────────────────
+
+const DEVICE_TYPE_OPTIONS = [
+  { value: 'pos', label: 'POS Terminal' },
+  { value: 'dispenser_controller', label: 'Dispenser Controller' },
+  { value: 'atg', label: 'ATG / Tank Gauge' },
+  { value: 'payment_terminal', label: 'Payment Terminal' },
+  { value: 'scanner', label: 'Barcode Scanner' },
+  { value: 'other', label: 'Other Hardware' },
+]
+
+const PLAN_OPTIONS = [
+  { value: 'starter', label: 'Starter', price: 'PKR 4,999/mo', desc: '1 Station · 4 Dispensers · 5 Users' },
+  { value: 'professional', label: 'Professional', price: 'PKR 14,999/mo', desc: '5 Stations · 32 Dispensers · 25 Users', popular: true },
+  { value: 'enterprise', label: 'Enterprise', price: 'PKR 49,999/mo', desc: '50 Stations · 500 Dispensers · 200 Users' },
+]
+
+function OwnerRegistrationForm({
+  submitting,
+  onSubmit,
+  onCancel,
+}: {
+  submitting: boolean
+  onSubmit: (data: Record<string, string>) => void
+  onCancel: () => void
+}) {
+  const [form, setForm] = useState<Record<string, string>>({ plan: 'professional' })
+
+  const updateField = (key: string, value: string) => {
+    setForm(prev => ({ ...prev, [key]: value }))
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    onSubmit(form)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4" style={{ fontStyle: 'normal' }}>
+      {/* Company Info */}
+      <div>
+        <p className="text-[11px] uppercase tracking-wider font-semibold text-teal-600 dark:text-teal-400 mb-2">Company Information</p>
+        <div className="grid grid-cols-2 gap-3">
+          <FormField label="Company Name" required>
+            <Input className="h-8 text-[12px]" placeholder="e.g. Al-Noor Fuel Stations" value={form.companyName || ''} onChange={e => updateField('companyName', e.target.value)} />
+          </FormField>
+          <FormField label="Contact Person" required>
+            <Input className="h-8 text-[12px]" placeholder="e.g. Muhammad Ahmed" value={form.contactPerson || ''} onChange={e => updateField('contactPerson', e.target.value)} />
+          </FormField>
+          <FormField label="Email" required>
+            <Input className="h-8 text-[12px]" type="email" placeholder="owner@company.com" value={form.email || ''} onChange={e => updateField('email', e.target.value)} />
+          </FormField>
+          <FormField label="Phone" required>
+            <Input className="h-8 text-[12px]" placeholder="+92 300 1234567" value={form.phone || ''} onChange={e => updateField('phone', e.target.value)} />
+          </FormField>
+          <FormField label="City">
+            <Input className="h-8 text-[12px]" placeholder="e.g. Karachi" value={form.city || ''} onChange={e => updateField('city', e.target.value)} />
+          </FormField>
+          <FormField label="Address">
+            <Input className="h-8 text-[12px]" placeholder="Street address" value={form.address || ''} onChange={e => updateField('address', e.target.value)} />
+          </FormField>
+        </div>
+      </div>
+
+      {/* Device Info */}
+      <div>
+        <p className="text-[11px] uppercase tracking-wider font-semibold text-teal-600 dark:text-teal-400 mb-2">Device / Hardware</p>
+        <div className="grid grid-cols-2 gap-3">
+          <FormField label="Device Name" required>
+            <Input className="h-8 text-[12px]" placeholder="e.g. Main POS Terminal" value={form.deviceName || ''} onChange={e => updateField('deviceName', e.target.value)} />
+          </FormField>
+          <FormField label="Device Type" required>
+            <Select value={form.deviceType || ''} onValueChange={v => updateField('deviceType', v)}>
+              <SelectTrigger className="h-8 text-[12px]">
+                <SelectValue placeholder="Select type" />
+              </SelectTrigger>
+              <SelectContent>
+                {DEVICE_TYPE_OPTIONS.map(t => (
+                  <SelectItem key={t.value} value={t.value} className="text-[12px]">{t.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FormField>
+          <FormField label="Serial Number">
+            <Input className="h-8 text-[12px] font-mono" placeholder="SN-XXXX-XXXX (optional)" value={form.serialNumber || ''} onChange={e => updateField('serialNumber', e.target.value)} />
+          </FormField>
+          <FormField label="MAC Address">
+            <Input className="h-8 text-[12px] font-mono" placeholder="AA:BB:CC:DD:EE:FF (optional)" value={form.macAddress || ''} onChange={e => updateField('macAddress', e.target.value)} />
+          </FormField>
+        </div>
+      </div>
+
+      {/* Plan Selection */}
+      <div>
+        <p className="text-[11px] uppercase tracking-wider font-semibold text-teal-600 dark:text-teal-400 mb-2">Subscription Plan</p>
+        <div className="grid grid-cols-3 gap-2">
+          {PLAN_OPTIONS.map(p => (
+            <button
+              key={p.value}
+              type="button"
+              onClick={() => updateField('plan', p.value)}
+              className={`relative p-3 rounded-xl text-left transition-all border ${
+                form.plan === p.value
+                  ? 'border-teal-500 bg-teal-500/10 ring-1 ring-teal-500/30'
+                  : 'border-border hover:border-teal-500/30'
+              }`}
+            >
+              {p.popular && (
+                <span className="absolute -top-2 right-2 bg-teal-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">POPULAR</span>
+              )}
+              <p className="text-[12px] font-semibold">{p.label}</p>
+              <p className="text-[11px] text-teal-600 dark:text-teal-400 font-medium">{p.price}</p>
+              <p className="text-[10px] text-muted-foreground mt-1">{p.desc}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <DialogFooter className="gap-2">
+        <Button type="button" variant="outline" size="sm" className="text-[12px] h-8" onClick={onCancel} disabled={submitting}>
+          Cancel
+        </Button>
+        <Button type="submit" size="sm" className="text-[12px] h-8 bg-teal-600 hover:bg-teal-700 text-white" disabled={submitting || !form.companyName || !form.contactPerson || !form.email || !form.phone || !form.deviceName || !form.deviceType}>
+          {submitting ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : <Shield className="size-3.5 mr-1.5" />}
+          {submitting ? 'Registering...' : 'Register & Get Credentials'}
+        </Button>
+      </DialogFooter>
+    </form>
+  )
+}
+
+// ── Credentials Display ──────────────────────────
+
+function CredentialsDisplay({
+  result,
+  onClose,
+}: {
+  result: OwnerRegistrationResult
+  onClose: () => void
+}) {
+  const [copiedField, setCopiedField] = useState<string | null>(null)
+
+  const copyToClipboard = async (text: string, field: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedField(field)
+      toast.success(`${field} copied to clipboard`)
+      setTimeout(() => setCopiedField(null), 2000)
+    } catch {
+      toast.error('Failed to copy')
+    }
+  }
+
+  return (
+    <div className="space-y-4" style={{ fontStyle: 'normal' }}>
+      {/* Success Banner */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20"
+      >
+        <div className="flex items-center gap-2 mb-1">
+          <CheckCircle2 className="size-5 text-emerald-500" />
+          <p className="text-[14px] font-semibold text-emerald-700 dark:text-emerald-400">Registration Successful!</p>
+        </div>
+        <p className="text-[11px] text-emerald-600 dark:text-emerald-400">
+          Your device has been registered as owner. Save these credentials — the password will not be shown again.
+        </p>
+      </motion.div>
+
+      {/* Owner Info */}
+      <div className="macos-group">
+        <div className="macos-group-item">
+          <div className="flex items-center gap-2">
+            <User className="size-3.5 text-teal-500" />
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Owner Details</span>
+          </div>
+        </div>
+        <div className="p-3 space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-[11px] text-muted-foreground">Company</span>
+            <span className="text-[12px] font-medium">{result.owner.companyName}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-[11px] text-muted-foreground">Contact</span>
+            <span className="text-[12px] font-medium">{result.owner.contactPerson}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-[11px] text-muted-foreground">Status</span>
+            <Badge className="bg-emerald-500/10 text-emerald-600 text-[10px] border-emerald-500/20">Trial</Badge>
+          </div>
+        </div>
+      </div>
+
+      {/* Login Credentials */}
+      <div className="macos-group">
+        <div className="macos-group-item">
+          <div className="flex items-center gap-2">
+            <Key className="size-3.5 text-amber-500" />
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Login Credentials</span>
+          </div>
+        </div>
+        <div className="p-3 space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-[11px] text-muted-foreground">Email</span>
+            <div className="flex items-center gap-1.5">
+              <code className="text-[12px] font-mono bg-muted px-2 py-0.5 rounded">{result.credentials.email}</code>
+              <button onClick={() => copyToClipboard(result.credentials.email, 'Email')} className="p-1 hover:bg-muted rounded transition-colors">
+                {copiedField === 'Email' ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3 text-muted-foreground" />}
+              </button>
+            </div>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-[11px] text-muted-foreground">Password</span>
+            <div className="flex items-center gap-1.5">
+              <code className="text-[12px] font-mono bg-red-500/10 text-red-600 dark:text-red-400 px-2 py-0.5 rounded">{result.credentials.password}</code>
+              <button onClick={() => copyToClipboard(result.credentials.password, 'Password')} className="p-1 hover:bg-muted rounded transition-colors">
+                {copiedField === 'Password' ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3 text-muted-foreground" />}
+              </button>
+            </div>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-[11px] text-muted-foreground">API Key</span>
+            <div className="flex items-center gap-1.5">
+              <code className="text-[11px] font-mono bg-muted px-2 py-0.5 rounded max-w-[280px] truncate">{result.credentials.apiKey}</code>
+              <button onClick={() => copyToClipboard(result.credentials.apiKey, 'API Key')} className="p-1 hover:bg-muted rounded transition-colors">
+                {copiedField === 'API Key' ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3 text-muted-foreground" />}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Serial Key */}
+      <div className="macos-group">
+        <div className="macos-group-item">
+          <div className="flex items-center gap-2">
+            <Shield className="size-3.5 text-violet-500" />
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Serial Key</span>
+          </div>
+        </div>
+        <div className="p-3 space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-[11px] text-muted-foreground">Key</span>
+            <div className="flex items-center gap-1.5">
+              <code className="text-[13px] font-mono font-bold bg-violet-500/10 text-violet-600 dark:text-violet-400 px-3 py-1 rounded-lg tracking-wider">{result.serialKey.key}</code>
+              <button onClick={() => copyToClipboard(result.serialKey.key, 'Serial Key')} className="p-1 hover:bg-muted rounded transition-colors">
+                {copiedField === 'Serial Key' ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3 text-muted-foreground" />}
+              </button>
+            </div>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-[11px] text-muted-foreground">Plan</span>
+            <Badge className="bg-violet-500/10 text-violet-600 text-[10px] border-violet-500/20 capitalize">{result.serialKey.plan}</Badge>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-[11px] text-muted-foreground">Limits</span>
+            <span className="text-[11px] text-muted-foreground">
+              {result.serialKey.maxStations} station{result.serialKey.maxStations > 1 ? 's' : ''} · {result.serialKey.maxDispensers} dispensers · {result.serialKey.maxUsers} users
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-[11px] text-muted-foreground">Expires</span>
+            <span className="text-[12px] font-medium">{result.serialKey.expiresAt ? new Date(result.serialKey.expiresAt).toLocaleDateString('en-PK', { year: 'numeric', month: 'long', day: 'numeric' }) : 'No expiry'}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Device Info */}
+      <div className="macos-group">
+        <div className="macos-group-item">
+          <div className="flex items-center gap-2">
+            <HardDrive className="size-3.5 text-sky-500" />
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Registered Device</span>
+          </div>
+        </div>
+        <div className="p-3 space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-[11px] text-muted-foreground">Name</span>
+            <span className="text-[12px] font-medium">{result.device.name}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-[11px] text-muted-foreground">Type</span>
+            <Badge className="bg-sky-500/10 text-sky-600 text-[10px] border-sky-500/20">{result.device.type}</Badge>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-[11px] text-muted-foreground">Status</span>
+            <Badge className="bg-emerald-500/10 text-emerald-600 text-[10px] border-emerald-500/20 capitalize">{result.device.status}</Badge>
+          </div>
+        </div>
+      </div>
+
+      {/* Warning */}
+      <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+        <div className="flex items-start gap-2">
+          <AlertTriangle className="size-4 text-amber-500 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-[12px] font-semibold text-amber-700 dark:text-amber-400">Save Your Credentials!</p>
+            <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">
+              This is the only time your password will be displayed. Copy it now and store it securely. You can use the API key for programmatic access.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <DialogFooter>
+        <Button size="sm" className="text-[12px] h-8 bg-teal-600 hover:bg-teal-700 text-white w-full" onClick={onClose}>
+          <CheckCircle2 className="size-3.5 mr-1.5" /> I've Saved My Credentials
+        </Button>
+      </DialogFooter>
+    </div>
+  )
+}
+
 // ── Component ──────────────────────────────────────
 
 export default function DeviceIntegrationModule() {
@@ -730,6 +1079,8 @@ export default function DeviceIntegrationModule() {
   // Dialog states
   const [showAddDevice, setShowAddDevice] = useState(false)
   const [showAddController, setShowAddController] = useState(false)
+  const [showOwnerRegister, setShowOwnerRegister] = useState(false)
+  const [registrationResult, setRegistrationResult] = useState<OwnerRegistrationResult | null>(null)
   const [stations, setStations] = useState<StationOption[]>([])
   const [submitting, setSubmitting] = useState(false)
 
@@ -1047,6 +1398,29 @@ export default function DeviceIntegrationModule() {
     }
   }, [fetchData])
 
+  // Handle owner registration submit
+  const handleOwnerRegister = useCallback(async (formData: Record<string, string>) => {
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/owner/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to register owner')
+        return
+      }
+      setRegistrationResult(data)
+      toast.success('Device owner registered successfully! Save your credentials.')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to register owner')
+    } finally {
+      setSubmitting(false)
+    }
+  }, [])
+
   const filteredDevices = connectedDevices.filter(d => {
     const matchesSearch = !searchQuery ||
       d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1093,6 +1467,32 @@ export default function DeviceIntegrationModule() {
           onSubmit={handleAddController}
           onCancel={() => setShowAddController(false)}
         />
+      </DialogContent>
+    </Dialog>
+  )
+
+  // ── Owner Registration Dialog ──
+  const ownerRegisterDialog = (
+    <Dialog open={showOwnerRegister} onOpenChange={(open) => { setShowOwnerRegister(open); if (!open) setRegistrationResult(null) }}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-[15px]">
+            <Shield className="size-4 text-teal-500" />
+            {registrationResult ? 'Your Credentials & Serial Key' : 'Register as Device Owner'}
+          </DialogTitle>
+        </DialogHeader>
+        {registrationResult ? (
+          <CredentialsDisplay
+            result={registrationResult}
+            onClose={() => { setShowOwnerRegister(false); setRegistrationResult(null); fetchData() }}
+          />
+        ) : (
+          <OwnerRegistrationForm
+            submitting={submitting}
+            onSubmit={handleOwnerRegister}
+            onCancel={() => setShowOwnerRegister(false)}
+          />
+        )}
       </DialogContent>
     </Dialog>
   )
@@ -1151,29 +1551,52 @@ export default function DeviceIntegrationModule() {
             <TabsTrigger value="events" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Event Log</TabsTrigger>
             <TabsTrigger value="catalog" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Hardware Catalog</TabsTrigger>
             <TabsTrigger value="protocols" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Protocols</TabsTrigger>
+            <TabsTrigger value="owner" className="text-[11px] px-3 h-6 data-[state=active]:bg-violet-500/15 data-[state=active]:text-violet-600">Owner Registration</TabsTrigger>
           </TabsList>
         </div>
 
         {/* ── Overview ── */}
         <TabsContent value="overview" className="mt-4 space-y-4">
           {/* Integrate New Device Action */}
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="macos-card p-4 cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => setShowAddDevice(true)}
-          >
-            <div className="flex items-center gap-3">
-              <div className="size-10 rounded-[10px] fuel-gradient flex items-center justify-center shadow-sm">
-                <Plus className="size-5 text-white" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="macos-card p-4 cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => setShowAddDevice(true)}
+            >
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-[10px] fuel-gradient flex items-center justify-center shadow-sm">
+                  <Plus className="size-5 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-[13px] font-semibold">Integrate New Device / Hardware</h3>
+                  <p className="text-[11px] text-muted-foreground">Add dispensers, controllers, payment terminals, ATG systems, cameras, and more</p>
+                </div>
+                <ChevronRight className="size-4 text-muted-foreground/50" />
               </div>
-              <div className="flex-1">
-                <h3 className="text-[13px] font-semibold">Integrate New Device / Hardware</h3>
-                <p className="text-[11px] text-muted-foreground">Add dispensers, controllers, payment terminals, ATG systems, cameras, and more</p>
+            </motion.div>
+
+            {/* Register as Owner Action */}
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 }}
+              className="macos-card p-4 cursor-pointer hover:shadow-md transition-shadow ring-1 ring-violet-500/20"
+              onClick={() => setShowOwnerRegister(true)}
+            >
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-[10px] bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center shadow-sm">
+                  <Shield className="size-5 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-[13px] font-semibold">Register as Device Owner</h3>
+                  <p className="text-[11px] text-muted-foreground">Get credentials, API key & serial key for your device</p>
+                </div>
+                <ChevronRight className="size-4 text-muted-foreground/50" />
               </div>
-              <ChevronRight className="size-4 text-muted-foreground/50" />
-            </div>
-          </motion.div>
+            </motion.div>
+          </div>
 
           {/* Device Type Cards */}
           <div>
@@ -1708,9 +2131,67 @@ export default function DeviceIntegrationModule() {
             </div>
           )}
         </TabsContent>
+
+        {/* ── Owner Registration Tab ── */}
+        <TabsContent value="owner" className="mt-4 space-y-4">
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="macos-card p-6"
+          >
+            <div className="flex items-center gap-3 mb-6">
+              <div className="size-12 rounded-[12px] bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center shadow-md">
+                <Shield className="size-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-[16px] font-bold">Register as Device Owner</h3>
+                <p className="text-[12px] text-muted-foreground">Get login credentials, API key, and a unique serial key for your device</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="p-4 rounded-xl bg-violet-500/5 border border-violet-500/10">
+                <Key className="size-5 text-violet-500 mb-2" />
+                <p className="text-[13px] font-semibold">Login Credentials</p>
+                <p className="text-[11px] text-muted-foreground mt-1">Email & auto-generated secure password for your owner account</p>
+              </div>
+              <div className="p-4 rounded-xl bg-teal-500/5 border border-teal-500/10">
+                <Cpu className="size-5 text-teal-500 mb-2" />
+                <p className="text-[13px] font-semibold">API Key</p>
+                <p className="text-[11px] text-muted-foreground mt-1">Unique API key for programmatic device management access</p>
+              </div>
+              <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/10">
+                <Shield className="size-5 text-amber-500 mb-2" />
+                <p className="text-[13px] font-semibold">Serial Key</p>
+                <p className="text-[11px] text-muted-foreground mt-1">Unique FF-XXXX-XXXX-XXXX key tied to your subscription plan</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-muted/50 border mb-6">
+              <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground mb-2">What you get</p>
+              <ul className="space-y-1.5">
+                <li className="text-[12px] flex items-center gap-2"><CheckCircle2 className="size-3.5 text-emerald-500" /> Owner account with email & secure password</li>
+                <li className="text-[12px] flex items-center gap-2"><CheckCircle2 className="size-3.5 text-emerald-500" /> API key for device management</li>
+                <li className="text-[12px] flex items-center gap-2"><CheckCircle2 className="size-3.5 text-emerald-500" /> Unique serial key (FF-XXXX-XXXX-XXXX)</li>
+                <li className="text-[12px] flex items-center gap-2"><CheckCircle2 className="size-3.5 text-emerald-500" /> 30-day free trial subscription</li>
+                <li className="text-[12px] flex items-center gap-2"><CheckCircle2 className="size-3.5 text-emerald-500" /> Device registered and linked to your account</li>
+              </ul>
+            </div>
+
+            <Button
+              size="lg"
+              className="w-full bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-700 hover:to-violet-800 text-white h-10"
+              onClick={() => setShowOwnerRegister(true)}
+            >
+              <Shield className="size-4 mr-2" />
+              Register My Device as Owner
+            </Button>
+          </motion.div>
+        </TabsContent>
       </Tabs>
       {addDeviceDialog}
       {addControllerDialog}
+      {ownerRegisterDialog}
     </div>
   )
 }
