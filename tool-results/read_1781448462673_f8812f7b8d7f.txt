@@ -1,0 +1,648 @@
+     1→import { NextResponse } from 'next/server'
+     2→import { db } from '@/lib/db'
+     3→
+     4→// Helper to parse date params safely
+     5→function parseDate(value: string | null): Date | undefined {
+     6→  if (!value) return undefined
+     7→  const d = new Date(value)
+     8→  return isNaN(d.getTime()) ? undefined : d
+     9→}
+    10→
+    11→// Build common where clause for station/date filtering
+    12→function buildWhere(stationId: string | null, dateFrom?: Date, dateTo?: Date, dateField = 'createdAt') {
+    13→  const where: Record<string, unknown> = {}
+    14→  if (stationId) where.stationId = stationId
+    15→  if (dateFrom || dateTo) {
+    16→    where[dateField] = {
+    17→      ...(dateFrom ? { gte: dateFrom } : {}),
+    18→      ...(dateTo ? { lte: dateTo } : {}),
+    19→    }
+    20→  }
+    21→  return where
+    22→}
+    23→
+    24→// Standard report response structure
+    25→function reportResponse(reportType: string, columns: string[], rows: Record<string, unknown>[], summary: Record<string, unknown>, dateFrom?: Date, dateTo?: Date) {
+    26→  return NextResponse.json({
+    27→    report: {
+    28→      reportType,
+    29→      generatedAt: new Date().toISOString(),
+    30→      period: { from: (dateFrom || new Date()).toISOString(), to: (dateTo || new Date()).toISOString() },
+    31→      columns,
+    32→      rows,
+    33→      summary,
+    34→    },
+    35→  })
+    36→}
+    37→
+    38→export async function GET(request: Request) {
+    39→  try {
+    40→    const { searchParams } = new URL(request.url)
+    41→    const type = searchParams.get('type') || 'overview'
+    42→    const reportType = searchParams.get('reportType') || ''
+    43→    const stationId = searchParams.get('stationId')
+    44→    const tenantId = searchParams.get('tenantId')
+    45→    const dateFrom = parseDate(searchParams.get('dateFrom'))
+    46→    const dateTo = parseDate(searchParams.get('dateTo'))
+    47→
+    48→    switch (type) {
+    49→      case 'report': {
+    50→        return await handleReport(reportType, stationId, tenantId, dateFrom, dateTo)
+    51→      }
+    52→      case 'templates': {
+    53→        const where = tenantId ? { tenantId } : {}
+    54→        const templates = await db.reportTemplate.findMany({ where, orderBy: { createdAt: 'desc' } })
+    55→        return NextResponse.json({ templates })
+    56→      }
+    57→      case 'scheduled': {
+    58→        const where = tenantId ? { tenantId } : {}
+    59→        const scheduled = await db.scheduledReport.findMany({ where, orderBy: { nextRunAt: 'asc' } })
+    60→        return NextResponse.json({ scheduled })
+    61→      }
+    62→      case 'overview': {
+    63→        const tWhere = tenantId ? { tenantId } : {}
+    64→        const [templateCount, systemCount, customCount, scheduledCount, activeCount] = await Promise.all([
+    65→          db.reportTemplate.count({ where: tWhere }),
+    66→          db.reportTemplate.count({ where: { ...tWhere, isSystem: true } }),
+    67→          db.reportTemplate.count({ where: { ...tWhere, isSystem: false } }),
+    68→          db.scheduledReport.count({ where: tenantId ? { tenantId } : {} }),
+    69→          db.scheduledReport.count({ where: { ...tWhere, isActive: true } }),
+    70→        ])
+    71→        return NextResponse.json({
+    72→          overview: {
+    73→            templates: { total: templateCount, system: systemCount, custom: customCount },
+    74→            scheduled: { total: scheduledCount, active: activeCount },
+    75→          },
+    76→        })
+    77→      }
+    78→      default:
+    79→        return NextResponse.json({ error: `Unknown type: ${type}` }, { status: 400 })
+    80→    }
+    81→  } catch (error) {
+    82→    console.error('Reports GET error:', error)
+    83→    return NextResponse.json({ error: 'Failed to fetch report data' }, { status: 500 })
+    84→  }
+    85→}
+    86→
+    87→async function handleReport(reportType: string, stationId: string | null, tenantId: string | null, dateFrom?: Date, dateTo?: Date) {
+    88→  try {
+    89→    switch (reportType) {
+    90→      case 'daily_sales': return await dailySalesReport(stationId, dateFrom, dateTo)
+    91→      case 'shift_summary': return await shiftSummaryReport(stationId, dateFrom, dateTo)
+    92→      case 'tank_reconciliation': return await tankReconciliationReport(stationId, dateFrom, dateTo)
+    93→      case 'fuel_inventory': return await fuelInventoryReport(stationId, dateFrom, dateTo)
+    94→      case 'financial_summary': return await financialSummaryReport(stationId, tenantId, dateFrom, dateTo)
+    95→      case 'price_history': return await priceHistoryReport(tenantId, dateFrom, dateTo)
+    96→      case 'fleet_summary': return await fleetSummaryReport(tenantId, dateFrom, dateTo)
+    97→      case 'employee_performance': return await employeePerformanceReport(stationId, dateFrom, dateTo)
+    98→      case 'delivery_log': return await deliveryLogReport(stationId, dateFrom, dateTo)
+    99→      case 'retail_sales': return await retailSalesReport(stationId, dateFrom, dateTo)
+   100→      case 'loyalty_summary': return await loyaltySummaryReport(tenantId, dateFrom, dateTo)
+   101→      case 'ev_cng_sessions': return await evCngSessionsReport(stationId, dateFrom, dateTo)
+   102→      case 'expense_report': return await expenseReport(stationId, dateFrom, dateTo)
+   103→      case 'attendance_report': return await attendanceReport(stationId, dateFrom, dateTo)
+   104→      case 'reconciliation_report': return await reconciliationReport(stationId, dateFrom, dateTo)
+   105→      case 'cash_reconciliation': return await cashReconciliationReport(stationId, dateFrom, dateTo)
+   106→      case 'supplier_statement': return await supplierStatementReport(stationId, tenantId, dateFrom, dateTo)
+   107→      case 'environmental_report': return await environmentalReport(stationId, dateFrom, dateTo)
+   108→      case 'security_audit': return await securityAuditReport(tenantId, dateFrom, dateTo)
+   109→      case 'station_performance': return await stationPerformanceReport(tenantId, dateFrom, dateTo)
+   110→      default: return NextResponse.json({ error: `Unknown reportType: ${reportType}` }, { status: 400 })
+   111→    }
+   112→  } catch (error) {
+   113→    console.error(`Report error [${reportType}]:`, error)
+   114→    return reportResponse(reportType, [], [], { error: 'Failed to generate report' }, dateFrom, dateTo)
+   115→  }
+   116→}
+   117→
+   118→// =====================================================
+   119→// 1. DAILY SALES REPORT
+   120→// =====================================================
+   121→async function dailySalesReport(stationId: string | null, dateFrom?: Date, dateTo?: Date) {
+   122→  try {
+   123→    const where = buildWhere(stationId, dateFrom, dateTo, 'startedAt') as Record<string, unknown>
+   124→    where.status = 'completed'
+   125→    const fuelings = await db.fueling.findMany({ where, orderBy: { startedAt: 'desc' }, take: 5000 })
+   126→
+   127→    // Group by date
+   128→    const byDate: Record<string, { date: string; totalVolume: number; totalRevenue: number; transactionCount: number }> = {}
+   129→    for (const f of fuelings) {
+   130→      const dk = new Date(f.startedAt).toISOString().split('T')[0]
+   131→      if (!byDate[dk]) byDate[dk] = { date: dk, totalVolume: 0, totalRevenue: 0, transactionCount: 0 }
+   132→      byDate[dk].totalVolume += f.volume
+   133→      byDate[dk].totalRevenue += f.totalAmount
+   134→      byDate[dk].transactionCount += 1
+   135→    }
+   136→
+   137→    const totalVolume = fuelings.reduce((s, f) => s + f.volume, 0)
+   138→    const totalRevenue = fuelings.reduce((s, f) => s + f.totalAmount, 0)
+   139→    const columns = ['date', 'transactionCount', 'totalVolume', 'totalRevenue']
+   140→    const rows = Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date)).map((d) => ({
+   141→      date: d.date, transactionCount: d.transactionCount, totalVolume: Math.round(d.totalVolume * 100) / 100, totalRevenue: Math.round(d.totalRevenue * 100) / 100,
+   142→    }))
+   143→    return reportResponse('daily_sales', columns, rows, {
+   144→      totalDays: rows.length, totalTransactions: fuelings.length,
+   145→      totalVolume: Math.round(totalVolume * 100) / 100, totalRevenue: Math.round(totalRevenue * 100) / 100,
+   146→      averageTicket: fuelings.length ? Math.round((totalRevenue / fuelings.length) * 100) / 100 : 0,
+   147→    }, dateFrom, dateTo)
+   148→  } catch { return reportResponse('daily_sales', [], [], { totalDays: 0, totalTransactions: 0, totalVolume: 0, totalRevenue: 0 }, dateFrom, dateTo) }
+   149→}
+   150→
+   151→// =====================================================
+   152→// 2. SHIFT SUMMARY REPORT
+   153→// =====================================================
+   154→async function shiftSummaryReport(stationId: string | null, dateFrom?: Date, dateTo?: Date) {
+   155→  try {
+   156→    const where = buildWhere(stationId, dateFrom, dateTo, 'openedAt') as Record<string, unknown>
+   157→    const shifts = await db.shift.findMany({ where, orderBy: { openedAt: 'desc' }, take: 500 })
+   158→    const columns = ['shiftNumber', 'openedAt', 'closedAt', 'totalSales', 'fuelSales', 'retailSales', 'cashSales', 'cardSales', 'fleetSales', 'transactionCount', 'status']
+   159→    const rows = shifts.map((s) => ({
+   160→      shiftNumber: s.shiftNumber, openedAt: s.openedAt.toISOString(), closedAt: s.closedAt?.toISOString() || 'Open',
+   161→      totalSales: s.totalSales, fuelSales: s.fuelSales, retailSales: s.retailSales,
+   162→      cashSales: s.cashSales, cardSales: s.cardSales, fleetSales: s.fleetSales,
+   163→      transactionCount: s.transactionCount, status: s.status,
+   164→    }))
+   165→    const totalSales = shifts.reduce((s, sh) => s + sh.totalSales, 0)
+   166→    const totalFuel = shifts.reduce((s, sh) => s + sh.fuelSales, 0)
+   167→    return reportResponse('shift_summary', columns, rows, {
+   168→      totalShifts: shifts.length, totalSales: Math.round(totalSales * 100) / 100,
+   169→      totalFuelSales: Math.round(totalFuel * 100) / 100,
+   170→      avgSalesPerShift: shifts.length ? Math.round((totalSales / shifts.length) * 100) / 100 : 0,
+   171→    }, dateFrom, dateTo)
+   172→  } catch { return reportResponse('shift_summary', [], [], { totalShifts: 0, totalSales: 0, totalFuelSales: 0 }, dateFrom, dateTo) }
+   173→}
+   174→
+   175→// =====================================================
+   176→// 3. TANK RECONCILIATION
+   177→// =====================================================
+   178→async function tankReconciliationReport(stationId: string | null, dateFrom?: Date, dateTo?: Date) {
+   179→  try {
+   180→    const where = buildWhere(stationId, dateFrom, dateTo) as Record<string, unknown>
+   181→    const recons = await db.reconciliation.findMany({ where, orderBy: { date: 'desc' }, take: 500, include: { tank: { select: { name: true, fuelType: true } } } })
+   182→    const columns = ['tankName', 'fuelType', 'date', 'openingStock', 'deliveries', 'sales', 'closingStock', 'bookStock', 'actualStock', 'variance', 'variancePercentage', 'status']
+   183→    const rows = recons.map((r) => ({
+   184→      tankName: r.tank?.name || 'Unknown', fuelType: r.tank?.fuelType || 'N/A',
+   185→      date: r.date.toISOString(), openingStock: r.openingStock, deliveries: r.deliveries,
+   186→      sales: r.sales, closingStock: r.closingStock, bookStock: r.bookStock, actualStock: r.actualStock,
+   187→      variance: Math.round(r.variance * 100) / 100, variancePercentage: Math.round(r.variancePercentage * 100) / 100, status: r.status,
+   188→    }))
+   189→    const avgVariance = recons.length ? recons.reduce((s, r) => s + r.variancePercentage, 0) / recons.length : 0
+   190→    return reportResponse('tank_reconciliation', columns, rows, {
+   191→      totalRecords: recons.length, avgVariance: Math.round(avgVariance * 100) / 100,
+   192→      highVariance: recons.filter((r) => Math.abs(r.variancePercentage) > 0.5).length,
+   193→    }, dateFrom, dateTo)
+   194→  } catch { return reportResponse('tank_reconciliation', [], [], { totalRecords: 0, avgVariance: 0, highVariance: 0 }, dateFrom, dateTo) }
+   195→}
+   196→
+   197→// =====================================================
+   198→// 4. FUEL INVENTORY
+   199→// =====================================================
+   200→async function fuelInventoryReport(stationId: string | null, _dateFrom?: Date, _dateTo?: Date) {
+   201→  try {
+   202→    const where = stationId ? { stationId } : {}
+   203→    const tanks = await db.tank.findMany({ where, orderBy: { name: 'asc' } })
+   204→    const columns = ['name', 'code', 'fuelType', 'capacity', 'currentLevel', 'utilization', 'waterLevel', 'temperature', 'status', 'lastReading']
+   205→    const rows = tanks.map((t) => ({
+   206→      name: t.name, code: t.code, fuelType: t.fuelType, capacity: t.capacity,
+   207→      currentLevel: t.currentLevel, utilization: t.capacity > 0 ? Math.round((t.currentLevel / t.capacity) * 10000) / 100 : 0,
+   208→      waterLevel: t.waterLevel, temperature: Math.round(t.temperature * 10) / 10,
+   209→      status: t.status, lastReading: t.lastReading?.toISOString() || 'Never',
+   210→    }))
+   211→    const totalCapacity = tanks.reduce((s, t) => s + t.capacity, 0)
+   212→    const totalCurrent = tanks.reduce((s, t) => s + t.currentLevel, 0)
+   213→    return reportResponse('fuel_inventory', columns, rows, {
+   214→      totalTanks: tanks.length, totalCapacity, totalCurrentLevel: totalCurrent,
+   215→      avgUtilization: totalCapacity > 0 ? Math.round((totalCurrent / totalCapacity) * 10000) / 100 : 0,
+   216→      lowTanks: tanks.filter((t) => t.capacity > 0 && (t.currentLevel / t.capacity) < 0.2).length,
+   217→    }, _dateFrom, _dateTo)
+   218→  } catch { return reportResponse('fuel_inventory', [], [], { totalTanks: 0, totalCapacity: 0, totalCurrentLevel: 0 }, _dateFrom, _dateTo) }
+   219→}
+   220→
+   221→// =====================================================
+   222→// 5. FINANCIAL SUMMARY
+   223→// =====================================================
+   224→async function financialSummaryReport(stationId: string | null, tenantId: string | null, dateFrom?: Date, dateTo?: Date) {
+   225→  try {
+   226→    const tWhere = buildWhere(stationId, dateFrom, dateTo, 'date') as Record<string, unknown>
+   227→    tWhere.status = 'completed'
+   228→    if (tenantId) tWhere.tenantId = tenantId
+   229→    const transactions = await db.transaction.findMany({ where: tWhere, take: 5000 })
+   230→
+   231→    const eWhere = buildWhere(stationId, dateFrom, dateTo, 'date') as Record<string, unknown>
+   232→    eWhere.status = { in: ['approved', 'paid'] }
+   233→    const expenses = await db.expense.findMany({ where: eWhere, take: 5000 })
+   234→
+   235→    const totalIncome = transactions.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+   236→    const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0)
+   237→
+   238→    const columns = ['type', 'category', 'amount', 'paymentMethod', 'date', 'status']
+   239→    const incomeRows = transactions.filter((t) => t.type === 'income').slice(0, 200).map((t) => ({
+   240→      type: 'Income', category: t.category, amount: t.amount, paymentMethod: t.paymentMethod,
+   241→      date: t.date.toISOString(), status: t.status,
+   242→    }))
+   243→    const expenseRows = expenses.slice(0, 200).map((e) => ({
+   244→      type: 'Expense', category: e.category, amount: e.amount, paymentMethod: e.paymentMethod || 'N/A',
+   245→      date: e.date.toISOString(), status: e.status,
+   246→    }))
+   247→    const rows = [...incomeRows, ...expenseRows]
+   248→    return reportResponse('financial_summary', columns, rows, {
+   249→      totalIncome: Math.round(totalIncome * 100) / 100, totalExpenses: Math.round(totalExpenses * 100) / 100,
+   250→      netProfit: Math.round((totalIncome - totalExpenses) * 100) / 100,
+   251→      profitMargin: totalIncome > 0 ? Math.round(((totalIncome - totalExpenses) / totalIncome) * 10000) / 100 : 0,
+   252→    }, dateFrom, dateTo)
+   253→  } catch { return reportResponse('financial_summary', [], [], { totalIncome: 0, totalExpenses: 0, netProfit: 0 }, dateFrom, dateTo) }
+   254→}
+   255→
+   256→// =====================================================
+   257→// 6. PRICE HISTORY
+   258→// =====================================================
+   259→async function priceHistoryReport(tenantId: string | null, dateFrom?: Date, dateTo?: Date) {
+   260→  try {
+   261→    const where: Record<string, unknown> = {}
+   262→    if (tenantId) where.tenantId = tenantId
+   263→    if (dateFrom || dateTo) {
+   264→      where.effectiveFrom = { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) }
+   265→    }
+   266→    const prices = await db.fuelPrice.findMany({ where, orderBy: { effectiveFrom: 'desc' }, take: 500 })
+   267→    const columns = ['fuelType', 'fuelGrade', 'pricePerUnit', 'previousPrice', 'currency', 'effectiveFrom', 'effectiveTo', 'status', 'isGovernment']
+   268→    const rows = prices.map((p) => ({
+   269→      fuelType: p.fuelType, fuelGrade: p.fuelGrade || 'Standard', pricePerUnit: p.pricePerUnit,
+   270→      previousPrice: p.previousPrice, currency: p.currency, effectiveFrom: p.effectiveFrom.toISOString(),
+   271→      effectiveTo: p.effectiveTo?.toISOString() || 'Until Changed', status: p.status, isGovernment: p.isGovernment,
+   272→    }))
+   273→    return reportResponse('price_history', columns, rows, {
+   274→      totalPriceChanges: prices.length,
+   275→      fuelTypes: [...new Set(prices.map((p) => p.fuelType))].length,
+   276→      latestPetrol: prices.find((p) => p.fuelType === 'petrol')?.pricePerUnit || 0,
+   277→      latestDiesel: prices.find((p) => p.fuelType === 'diesel')?.pricePerUnit || 0,
+   278→    }, dateFrom, dateTo)
+   279→  } catch { return reportResponse('price_history', [], [], { totalPriceChanges: 0, fuelTypes: 0 }, dateFrom, dateTo) }
+   280→}
+   281→
+   282→// =====================================================
+   283→// 7. FLEET SUMMARY
+   284→// =====================================================
+   285→async function fleetSummaryReport(tenantId: string | null, _dateFrom?: Date, _dateTo?: Date) {
+   286→  try {
+   287→    const where = tenantId ? { tenantId } : {}
+   288→    const fleets = await db.fleetAccount.findMany({ where, orderBy: { companyName: 'asc' }, include: { fuelCards: true } })
+   289→    const columns = ['companyName', 'contactPerson', 'phone', 'creditLimit', 'currentBalance', 'dailyLimit', 'paymentTerms', 'status', 'fuelCardCount']
+   290→    const rows = fleets.map((f) => ({
+   291→      companyName: f.companyName, contactPerson: f.contactPerson || 'N/A', phone: f.phone || 'N/A',
+   292→      creditLimit: f.creditLimit, currentBalance: f.currentBalance, dailyLimit: f.dailyLimit || 0,
+   293→      paymentTerms: f.paymentTerms || 'N/A', status: f.status, fuelCardCount: f.fuelCards.length,
+   294→    }))
+   295→    const totalCredit = fleets.reduce((s, f) => s + f.creditLimit, 0)
+   296→    const totalOutstanding = fleets.reduce((s, f) => s + f.currentBalance, 0)
+   297→    return reportResponse('fleet_summary', columns, rows, {
+   298→      totalFleets: fleets.length, totalCreditLimit: totalCredit,
+   299→      totalOutstanding: Math.round(totalOutstanding * 100) / 100,
+   300→      activeFleets: fleets.filter((f) => f.status === 'active').length,
+   301→    }, _dateFrom, _dateTo)
+   302→  } catch { return reportResponse('fleet_summary', [], [], { totalFleets: 0, totalCreditLimit: 0, totalOutstanding: 0 }, _dateFrom, _dateTo) }
+   303→}
+   304→
+   305→// =====================================================
+   306→// 8. EMPLOYEE PERFORMANCE
+   307→// =====================================================
+   308→async function employeePerformanceReport(stationId: string | null, dateFrom?: Date, dateTo?: Date) {
+   309→  try {
+   310→    const where = stationId ? { stationId } : {}
+   311→    const employees = await db.employee.findMany({ where, orderBy: { name: 'asc' } })
+   312→    const columns = ['name', 'employeeId', 'role', 'phone', 'status', 'salary', 'commissionRate', 'hireDate']
+   313→    const rows = employees.map((e) => ({
+   314→      name: e.name, employeeId: e.employeeId || 'N/A', role: e.role,
+   315→      phone: e.phone || 'N/A', status: e.status, salary: e.salary || 0,
+   316→      commissionRate: e.commissionRate, hireDate: e.hireDate?.toISOString() || 'N/A',
+   317→    }))
+   318→    const totalSalary = employees.reduce((s, e) => s + (e.salary || 0), 0)
+   319→    return reportResponse('employee_performance', columns, rows, {
+   320→      totalEmployees: employees.length, activeEmployees: employees.filter((e) => e.status === 'active').length,
+   321→      totalMonthlyPayroll: Math.round(totalSalary * 100) / 100,
+   322→      avgSalary: employees.length ? Math.round((totalSalary / employees.length) * 100) / 100 : 0,
+   323→    }, dateFrom, dateTo)
+   324→  } catch { return reportResponse('employee_performance', [], [], { totalEmployees: 0, activeEmployees: 0, totalMonthlyPayroll: 0 }, dateFrom, dateTo) }
+   325→}
+   326→
+   327→// =====================================================
+   328→// 9. DELIVERY LOG
+   329→// =====================================================
+   330→async function deliveryLogReport(stationId: string | null, dateFrom?: Date, dateTo?: Date) {
+   331→  try {
+   332→    const where = buildWhere(stationId, dateFrom, dateTo, 'deliveryDate') as Record<string, unknown>
+   333→    const deliveries = await db.fuelDelivery.findMany({ where, orderBy: { deliveryDate: 'desc' }, take: 500 })
+   334→    const columns = ['supplierName', 'productType', 'expectedVolume', 'actualVolume', 'variance', 'density', 'temperature', 'status', 'deliveryDate', 'invoiceNumber', 'totalCost']
+   335→    const rows = deliveries.map((d) => ({
+   336→      supplierName: d.supplierName, productType: d.productType, expectedVolume: d.expectedVolume,
+   337→      actualVolume: d.actualVolume, variance: d.variance || (d.actualVolume - d.expectedVolume),
+   338→      density: d.density || 0, temperature: d.temperature || 0, status: d.status,
+   339→      deliveryDate: d.deliveryDate.toISOString(), invoiceNumber: d.invoiceNumber || 'N/A',
+   340→      totalCost: d.totalCost || 0,
+   341→    }))
+   342→    const totalExpected = deliveries.reduce((s, d) => s + d.expectedVolume, 0)
+   343→    const totalActual = deliveries.reduce((s, d) => s + d.actualVolume, 0)
+   344→    const totalCost = deliveries.reduce((s, d) => s + (d.totalCost || 0), 0)
+   345→    return reportResponse('delivery_log', columns, rows, {
+   346→      totalDeliveries: deliveries.length, totalExpectedVolume: Math.round(totalExpected * 100) / 100,
+   347→      totalActualVolume: Math.round(totalActual * 100) / 100, totalCost: Math.round(totalCost * 100) / 100,
+   348→      pendingDeliveries: deliveries.filter((d) => d.status === 'pending').length,
+   349→    }, dateFrom, dateTo)
+   350→  } catch { return reportResponse('delivery_log', [], [], { totalDeliveries: 0, totalExpectedVolume: 0, totalActualVolume: 0, totalCost: 0 }, dateFrom, dateTo) }
+   351→}
+   352→
+   353→// =====================================================
+   354→// 10. RETAIL SALES
+   355→// =====================================================
+   356→async function retailSalesReport(stationId: string | null, dateFrom?: Date, dateTo?: Date) {
+   357→  try {
+   358→    const where = buildWhere(stationId, dateFrom, dateTo) as Record<string, unknown>
+   359→    const transactions = await db.retailTransaction.findMany({ where, orderBy: { createdAt: 'desc' }, take: 2000 })
+   360→    const columns = ['id', 'totalAmount', 'paymentMethod', 'discountAmount', 'loyaltyPointsUsed', 'status', 'createdAt']
+   361→    const rows = transactions.map((t) => ({
+   362→      id: t.id.slice(-8), totalAmount: t.totalAmount, paymentMethod: t.paymentMethod,
+   363→      discountAmount: t.discountAmount, loyaltyPointsUsed: t.loyaltyPointsUsed,
+   364→      status: t.status, createdAt: t.createdAt.toISOString(),
+   365→    }))
+   366→    const totalRevenue = transactions.reduce((s, t) => s + t.totalAmount, 0)
+   367→    const totalDiscount = transactions.reduce((s, t) => s + t.discountAmount, 0)
+   368→    return reportResponse('retail_sales', columns, rows, {
+   369→      totalTransactions: transactions.length, totalRevenue: Math.round(totalRevenue * 100) / 100,
+   370→      totalDiscounts: Math.round(totalDiscount * 100) / 100,
+   371→      avgTransaction: transactions.length ? Math.round((totalRevenue / transactions.length) * 100) / 100 : 0,
+   372→    }, dateFrom, dateTo)
+   373→  } catch { return reportResponse('retail_sales', [], [], { totalTransactions: 0, totalRevenue: 0, totalDiscounts: 0 }, dateFrom, dateTo) }
+   374→}
+   375→
+   376→// =====================================================
+   377→// 11. LOYALTY SUMMARY
+   378→// =====================================================
+   379→async function loyaltySummaryReport(tenantId: string | null, _dateFrom?: Date, _dateTo?: Date) {
+   380→  try {
+   381→    const where = tenantId ? { tenantId } : {}
+   382→    const customers = await db.customer.findMany({ where, orderBy: { totalSpent: 'desc' }, take: 500 })
+   383→    const columns = ['name', 'phone', 'email', 'loyaltyPoints', 'membershipTier', 'totalSpent', 'totalVisits', 'lastVisit', 'isActive']
+   384→    const rows = customers.map((c) => ({
+   385→      name: c.name, phone: c.phone || 'N/A', email: c.email || 'N/A',
+   386→      loyaltyPoints: c.loyaltyPoints, membershipTier: c.membershipTier,
+   387→      totalSpent: c.totalSpent, totalVisits: c.totalVisits,
+   388→      lastVisit: c.lastVisit?.toISOString() || 'Never', isActive: c.isActive,
+   389→    }))
+   390→    const totalPoints = customers.reduce((s, c) => s + c.loyaltyPoints, 0)
+   391→    const totalSpent = customers.reduce((s, c) => s + c.totalSpent, 0)
+   392→    return reportResponse('loyalty_summary', columns, rows, {
+   393→      totalCustomers: customers.length, totalLoyaltyPoints: totalPoints,
+   394→      totalSpent: Math.round(totalSpent * 100) / 100,
+   395→      activeCustomers: customers.filter((c) => c.isActive).length,
+   396→    }, _dateFrom, _dateTo)
+   397→  } catch { return reportResponse('loyalty_summary', [], [], { totalCustomers: 0, totalLoyaltyPoints: 0, totalSpent: 0 }, _dateFrom, _dateTo) }
+   398→}
+   399→
+   400→// =====================================================
+   401→// 12. EV & CNG SESSIONS
+   402→// =====================================================
+   403→async function evCngSessionsReport(stationId: string | null, dateFrom?: Date, dateTo?: Date) {
+   404→  try {
+   405→    const sWhere = buildWhere(stationId, dateFrom, dateTo, 'startedAt') as Record<string, unknown>
+   406→    const sessions = await db.chargingSession.findMany({ where: sWhere, orderBy: { startedAt: 'desc' }, take: 500 })
+   407→    const columns = ['vehiclePlate', 'energyKwh', 'durationMinutes', 'pricePerKwh', 'totalAmount', 'paymentMethod', 'status', 'startedAt', 'completedAt']
+   408→    const rows = sessions.map((s) => ({
+   409→      vehiclePlate: s.vehiclePlate || 'N/A', energyKwh: s.energyKwh, durationMinutes: s.durationMinutes,
+   410→      pricePerKwh: s.pricePerKwh, totalAmount: s.totalAmount, paymentMethod: s.paymentMethod,
+   411→      status: s.status, startedAt: s.startedAt.toISOString(), completedAt: s.completedAt?.toISOString() || 'Active',
+   412→    }))
+   413→    const totalEnergy = sessions.reduce((s, se) => s + se.energyKwh, 0)
+   414→    const totalRevenue = sessions.reduce((s, se) => s + se.totalAmount, 0)
+   415→    return reportResponse('ev_cng_sessions', columns, rows, {
+   416→      totalSessions: sessions.length, totalEnergyKwh: Math.round(totalEnergy * 100) / 100,
+   417→      totalRevenue: Math.round(totalRevenue * 100) / 100,
+   418→      activeSessions: sessions.filter((s) => s.status === 'active').length,
+   419→    }, dateFrom, dateTo)
+   420→  } catch { return reportResponse('ev_cng_sessions', [], [], { totalSessions: 0, totalEnergyKwh: 0, totalRevenue: 0 }, dateFrom, dateTo) }
+   421→}
+   422→
+   423→// =====================================================
+   424→// 13. EXPENSE REPORT
+   425→// =====================================================
+   426→async function expenseReport(stationId: string | null, dateFrom?: Date, dateTo?: Date) {
+   427→  try {
+   428→    const where = buildWhere(stationId, dateFrom, dateTo, 'date') as Record<string, unknown>
+   429→    const expenses = await db.expense.findMany({ where, orderBy: { date: 'desc' }, take: 2000 })
+   430→    const columns = ['category', 'amount', 'description', 'paymentMethod', 'date', 'status', 'referenceNumber']
+   431→    const rows = expenses.map((e) => ({
+   432→      category: e.category, amount: e.amount, description: e.description || 'N/A',
+   433→      paymentMethod: e.paymentMethod || 'N/A', date: e.date.toISOString(),
+   434→      status: e.status, referenceNumber: e.referenceNumber || 'N/A',
+   435→    }))
+   436→    const totalAmount = expenses.reduce((s, e) => s + e.amount, 0)
+   437→    return reportResponse('expense_report', columns, rows, {
+   438→      totalExpenses: Math.round(totalAmount * 100) / 100, totalRecords: expenses.length,
+   439→      approved: expenses.filter((e) => e.status === 'approved' || e.status === 'paid').length,
+   440→      pending: expenses.filter((e) => e.status === 'pending').length,
+   441→    }, dateFrom, dateTo)
+   442→  } catch { return reportResponse('expense_report', [], [], { totalExpenses: 0, totalRecords: 0, approved: 0, pending: 0 }, dateFrom, dateTo) }
+   443→}
+   444→
+   445→// =====================================================
+   446→// 14. ATTENDANCE REPORT
+   447→// =====================================================
+   448→async function attendanceReport(stationId: string | null, dateFrom?: Date, dateTo?: Date) {
+   449→  try {
+   450→    const where = buildWhere(stationId, dateFrom, dateTo, 'checkIn') as Record<string, unknown>
+   451→    const records = await db.attendance.findMany({ where, orderBy: { checkIn: 'desc' }, take: 2000, include: { employee: { select: { name: true, role: true } } } })
+   452→    const columns = ['employeeName', 'role', 'checkIn', 'checkOut', 'status', 'hoursWorked', 'notes']
+   453→    const rows = records.map((r) => ({
+   454→      employeeName: r.employee?.name || 'Unknown', role: r.employee?.role || 'N/A',
+   455→      checkIn: r.checkIn.toISOString(), checkOut: r.checkOut?.toISOString() || 'Still In',
+   456→      status: r.status, hoursWorked: r.hoursWorked || 0, notes: r.notes || 'N/A',
+   457→    }))
+   458→    const totalHours = records.reduce((s, r) => s + (r.hoursWorked || 0), 0)
+   459→    return reportResponse('attendance_report', columns, rows, {
+   460→      totalRecords: records.length, totalHours: Math.round(totalHours * 100) / 100,
+   461→      present: records.filter((r) => r.status === 'present').length,
+   462→      late: records.filter((r) => r.status === 'late').length,
+   463→      absent: records.filter((r) => r.status === 'absent').length,
+   464→    }, dateFrom, dateTo)
+   465→  } catch { return reportResponse('attendance_report', [], [], { totalRecords: 0, totalHours: 0, present: 0, late: 0, absent: 0 }, dateFrom, dateTo) }
+   466→}
+   467→
+   468→// =====================================================
+   469→// 15. RECONCILIATION REPORT
+   470→// =====================================================
+   471→async function reconciliationReport(stationId: string | null, dateFrom?: Date, dateTo?: Date) {
+   472→  try {
+   473→    const where = buildWhere(stationId, dateFrom, dateTo) as Record<string, unknown>
+   474→    const recons = await db.reconciliation.findMany({ where, orderBy: { date: 'desc' }, take: 500, include: { tank: { select: { name: true, fuelType: true } } } })
+   475→    const columns = ['tankName', 'fuelType', 'date', 'openingStock', 'deliveries', 'sales', 'closingStock', 'bookStock', 'actualStock', 'variance', 'variancePercentage', 'status']
+   476→    const rows = recons.map((r) => ({
+   477→      tankName: r.tank?.name || 'Unknown', fuelType: r.tank?.fuelType || 'N/A',
+   478→      date: r.date.toISOString(), openingStock: r.openingStock, deliveries: r.deliveries,
+   479→      sales: r.sales, closingStock: r.closingStock, bookStock: r.bookStock, actualStock: r.actualStock,
+   480→      variance: Math.round(r.variance * 100) / 100, variancePercentage: Math.round(r.variancePercentage * 100) / 100,
+   481→      status: r.status,
+   482→    }))
+   483→    return reportResponse('reconciliation_report', columns, rows, {
+   484→      totalRecords: recons.length, pending: recons.filter((r) => r.status === 'pending').length,
+   485→      reviewed: recons.filter((r) => r.status === 'reviewed').length,
+   486→      approved: recons.filter((r) => r.status === 'approved').length,
+   487→    }, dateFrom, dateTo)
+   488→  } catch { return reportResponse('reconciliation_report', [], [], { totalRecords: 0, pending: 0, reviewed: 0, approved: 0 }, dateFrom, dateTo) }
+   489→}
+   490→
+   491→// =====================================================
+   492→// 16. CASH RECONCILIATION
+   493→// =====================================================
+   494→async function cashReconciliationReport(stationId: string | null, dateFrom?: Date, dateTo?: Date) {
+   495→  try {
+   496→    const where = buildWhere(stationId, dateFrom, dateTo, 'openedAt') as Record<string, unknown>
+   497→    const shifts = await db.shift.findMany({ where, orderBy: { openedAt: 'desc' }, take: 500 })
+   498→    const columns = ['shiftNumber', 'openedAt', 'closedAt', 'openingCash', 'cashSales', 'cardSales', 'fleetSales', 'expectedCash', 'closingCash', 'cashVariance', 'status']
+   499→    const rows = shifts.map((s) => ({
+   500→      shiftNumber: s.shiftNumber, openedAt: s.openedAt.toISOString(), closedAt: s.closedAt?.toISOString() || 'Open',
+   501→      openingCash: s.openingCash, cashSales: s.cashSales, cardSales: s.cardSales, fleetSales: s.fleetSales,
+   502→      expectedCash: s.expectedCash || 0, closingCash: s.closingCash || 0,
+   503→      cashVariance: s.cashVariance || 0, status: s.status,
+   504→    }))
+   505→    const totalVariance = shifts.reduce((s, sh) => s + (sh.cashVariance || 0), 0)
+   506→    return reportResponse('cash_reconciliation', columns, rows, {
+   507→      totalShifts: shifts.length, totalCashVariance: Math.round(totalVariance * 100) / 100,
+   508→      openShifts: shifts.filter((s) => s.status === 'open').length,
+   509→      reconciled: shifts.filter((s) => s.status === 'reconciled').length,
+   510→    }, dateFrom, dateTo)
+   511→  } catch { return reportResponse('cash_reconciliation', [], [], { totalShifts: 0, totalCashVariance: 0 }, dateFrom, dateTo) }
+   512→}
+   513→
+   514→// =====================================================
+   515→// 17. SUPPLIER STATEMENT
+   516→// =====================================================
+   517→async function supplierStatementReport(_stationId: string | null, tenantId: string | null, dateFrom?: Date, dateTo?: Date) {
+   518→  try {
+   519→    const where: Record<string, unknown> = {}
+   520→    if (tenantId) where.tenantId = tenantId
+   521→    const suppliers = await db.supplier.findMany({ where, orderBy: { name: 'asc' } })
+   522→    const iWhere = buildWhere(null, dateFrom, dateTo, 'invoiceDate') as Record<string, unknown>
+   523→    const invoices = await db.supplierInvoice.findMany({ where: iWhere, take: 2000 })
+   524→    const columns = ['name', 'category', 'contactPerson', 'phone', 'email', 'paymentTerms', 'isActive', 'totalInvoices', 'totalAmount', 'totalPaid', 'outstanding']
+   525→    const rows = suppliers.map((sup) => {
+   526→      const supInvoices = invoices.filter((i) => i.supplierId === sup.id)
+   527→      const totalAmount = supInvoices.reduce((s, i) => s + i.totalAmount, 0)
+   528→      const totalPaid = supInvoices.reduce((s, i) => s + i.paidAmount, 0)
+   529→      return {
+   530→        name: sup.name, category: sup.category, contactPerson: sup.contactPerson || 'N/A',
+   531→        phone: sup.phone || 'N/A', email: sup.email || 'N/A', paymentTerms: sup.paymentTerms || 'N/A',
+   532→        isActive: sup.isActive, totalInvoices: supInvoices.length,
+   533→        totalAmount: Math.round(totalAmount * 100) / 100, totalPaid: Math.round(totalPaid * 100) / 100,
+   534→        outstanding: Math.round((totalAmount - totalPaid) * 100) / 100,
+   535→      }
+   536→    })
+   537→    const totalOutstanding = rows.reduce((s, r) => s + (r.outstanding as number), 0)
+   538→    return reportResponse('supplier_statement', columns, rows, {
+   539→      totalSuppliers: suppliers.length, totalOutstanding: Math.round(totalOutstanding * 100) / 100,
+   540→      activeSuppliers: suppliers.filter((s) => s.isActive).length,
+   541→    }, dateFrom, dateTo)
+   542→  } catch { return reportResponse('supplier_statement', [], [], { totalSuppliers: 0, totalOutstanding: 0 }, dateFrom, dateTo) }
+   543→}
+   544→
+   545→// =====================================================
+   546→// 18. ENVIRONMENTAL REPORT
+   547→// =====================================================
+   548→async function environmentalReport(stationId: string | null, dateFrom?: Date, dateTo?: Date) {
+   549→  try {
+   550→    const aWhere = buildWhere(stationId, dateFrom, dateTo) as Record<string, unknown>
+   551→    const alerts = await db.environmentalAlert.findMany({ where: aWhere, orderBy: { createdAt: 'desc' }, take: 500 })
+   552→    const columns = ['type', 'severity', 'message', 'stationId', 'isResolved', 'createdAt', 'resolvedAt']
+   553→    const rows = alerts.map((a) => ({
+   554→      type: a.alertType, severity: a.severity, message: a.message,
+   555→      stationId: a.stationId?.slice(-8) || 'N/A', isResolved: a.isResolved,
+   556→      createdAt: a.createdAt.toISOString(), resolvedAt: a.resolvedAt?.toISOString() || 'Unresolved',
+   557→    }))
+   558→    return reportResponse('environmental_report', columns, rows, {
+   559→      totalAlerts: alerts.length, critical: alerts.filter((a) => a.severity === 'critical').length,
+   560→      resolved: alerts.filter((a) => a.isResolved).length,
+   561→      unresolved: alerts.filter((a) => !a.isResolved).length,
+   562→    }, dateFrom, dateTo)
+   563→  } catch { return reportResponse('environmental_report', [], [], { totalAlerts: 0, critical: 0, resolved: 0, unresolved: 0 }, dateFrom, dateTo) }
+   564→}
+   565→
+   566→// =====================================================
+   567→// 19. SECURITY AUDIT
+   568→// =====================================================
+   569→async function securityAuditReport(tenantId: string | null, dateFrom?: Date, dateTo?: Date) {
+   570→  try {
+   571→    const aWhere: Record<string, unknown> = {}
+   572→    if (tenantId) aWhere.tenantId = tenantId
+   573→    if (dateFrom || dateTo) aWhere.createdAt = { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) }
+   574→    const [alerts, sessions, logs] = await Promise.all([
+   575→      db.securityAlert.findMany({ where: aWhere, orderBy: { createdAt: 'desc' }, take: 200 }),
+   576→      db.securitySession.findMany({ where: aWhere, orderBy: { createdAt: 'desc' }, take: 200 }),
+   577→      db.auditLog.findMany({ where: aWhere, orderBy: { createdAt: 'desc' }, take: 200 }),
+   578→    ])
+   579→    const columns = ['source', 'action', 'severity', 'details', 'userId', 'createdAt']
+   580→    const rows = [
+   581→      ...alerts.map((a) => ({ source: 'Alert', action: a.alertType, severity: a.severity, details: a.message, userId: a.userId?.slice(-8) || 'System', createdAt: a.createdAt.toISOString() })),
+   582→      ...sessions.map((s) => ({ source: 'Session', action: s.action, severity: 'info', details: `IP: ${s.ipAddress || 'N/A'}`, userId: s.userId?.slice(-8) || 'N/A', createdAt: s.createdAt.toISOString() })),
+   583→      ...logs.map((l) => ({ source: 'Audit', action: l.action, severity: 'info', details: l.details || 'N/A', userId: l.userId?.slice(-8) || 'N/A', createdAt: l.createdAt.toISOString() })),
+   584→    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 500)
+   585→    return reportResponse('security_audit', columns, rows, {
+   586→      totalAlerts: alerts.length, totalSessions: sessions.length, totalAuditLogs: logs.length,
+   587→      criticalAlerts: alerts.filter((a) => a.severity === 'critical').length,
+   588→    }, dateFrom, dateTo)
+   589→  } catch { return reportResponse('security_audit', [], [], { totalAlerts: 0, totalSessions: 0, totalAuditLogs: 0 }, dateFrom, dateTo) }
+   590→}
+   591→
+   592→// =====================================================
+   593→// 20. STATION PERFORMANCE
+   594→// =====================================================
+   595→async function stationPerformanceReport(tenantId: string | null, dateFrom?: Date, dateTo?: Date) {
+   596→  try {
+   597→    const where: Record<string, unknown> = {}
+   598→    if (tenantId) where.tenantId = tenantId
+   599→    const stations = await db.station.findMany({ where, orderBy: { name: 'asc' } })
+   600→    const columns = ['name', 'code', 'city', 'stationType', 'isActive', 'timezone', 'currency']
+   601→    const rows = stations.map((s) => ({
+   602→      name: s.name, code: s.code, city: s.city || 'N/A',
+   603→      stationType: s.stationType, isActive: s.isActive,
+   604→      timezone: s.timezone, currency: s.currency,
+   605→    }))
+   606→    return reportResponse('station_performance', columns, rows, {
+   607→      totalStations: stations.length, activeStations: stations.filter((s) => s.isActive).length,
+   608→      fuelStations: stations.filter((s) => s.stationType === 'fuel' || s.stationType === 'hybrid').length,
+   609→      evStations: stations.filter((s) => s.stationType === 'ev' || s.stationType === 'hybrid').length,
+   610→    }, dateFrom, dateTo)
+   611→  } catch { return reportResponse('station_performance', [], [], { totalStations: 0, activeStations: 0 }, dateFrom, dateTo) }
+   612→}
+   613→
+   614→// Keep existing POST handler for templates and scheduled reports
+   615→export async function POST(request: Request) {
+   616→  try {
+   617→    const body = await request.json()
+   618→    const { action } = body
+   619→    switch (action) {
+   620→      case 'create_template': {
+   621→        const { tenantId, name, description, reportType, category, dataSource, columns, filters, groupBy, sortBy, chartType, isPublic, createdBy } = body
+   622→        if (!tenantId || !name || !reportType || !dataSource || !columns) {
+   623→          return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+   624→        }
+   625→        const template = await db.reportTemplate.create({
+   626→          data: { tenantId, name, description: description || null, reportType, category: category || null, dataSource, columns, filters: filters || null, groupBy: groupBy || null, sortBy: sortBy || null, chartType: chartType || null, isSystem: false, isPublic: isPublic || false, createdBy: createdBy || null },
+   627→        })
+   628→        return NextResponse.json({ template }, { status: 201 })
+   629→      }
+   630→      case 'schedule_report': {
+   631→        const { tenantId, reportTemplateId, scheduleType, scheduleTime, scheduleDay, recipients, format } = body
+   632→        if (!tenantId || !reportTemplateId || !scheduleType || !recipients) {
+   633→          return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+   634→        }
+   635→        const scheduled = await db.scheduledReport.create({
+   636→          data: { tenantId, reportTemplateId, scheduleType, scheduleTime: scheduleTime || null, scheduleDay: scheduleDay || null, recipients, format: format || 'pdf' },
+   637→        })
+   638→        return NextResponse.json({ scheduled }, { status: 201 })
+   639→      }
+   640→      default:
+   641→        return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 })
+   642→    }
+   643→  } catch (error) {
+   644→    console.error('Reports POST error:', error)
+   645→    return NextResponse.json({ error: 'Failed to process report action' }, { status: 500 })
+   646→  }
+   647→}
+   648→

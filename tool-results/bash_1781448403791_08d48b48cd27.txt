@@ -1,0 +1,1182 @@
+- main
+  - heading "Report Center" [level=2, ref=e9]
+  - paragraph
+    - StaticText "Professional reports with print & export capabilities"
+  - button "Print" [ref=e10]
+  - button "CSV" [ref=e11]
+  - button "JSON" [ref=e12]
+  - textbox "Search reports..." [ref=e37]
+  - paragraph
+    - StaticText "DATE RANGE"
+  - LabelText
+    - StaticText "From"
+  - Date: 2026-06-01
+    - generic
+      - spinbutton "Month" [ref=e47]: 6
+        - StaticText "06"
+      - StaticText "/"
+      - spinbutton "Day" [ref=e48]: 1
+        - StaticText "01"
+      - StaticText "/"
+      - spinbutton "Year" [ref=e49]: 2026
+        - StaticText "2026"
+    - button "Show date picker" [ref=e38]
+  - LabelText
+    - StaticText "To"
+  - Date: 2026-06-14
+    - generic
+      - spinbutton "Month" [ref=e50]: 6
+        - StaticText "06"
+      - StaticText "/"
+      - spinbutton "Day" [ref=e51]: 14
+        - StaticText "14"
+      - StaticText "/"
+      - spinbutton "Year" [ref=e52]: 2026
+        - StaticText "2026"
+    - button "Show date picker" [ref=e39]
+  - generic
+    - button "Sales & Revenue 4" [ref=e40]
+      - StaticText "Sales & Revenue"
+      - StaticText "4"
+    - button "Inventory & Wet Stock 4" [ref=e41]
+      - StaticText "Inventory & Wet Stock"
+      - StaticText "4"
+    - generic
+      - button "Fuel Inventory Report Current tank levels, capacity utilization, water levels, and temperature" [ref=e53]
+        - paragraph
+          - StaticText "Fuel Inventory Report"
+        - paragraph
+          - StaticText "Current tank levels, capacity utilization, water levels, and temperature"
+      - button "Tank Reconciliation Opening stock + deliveries - sales vs closing stock with variance analysis" [ref=e54]
+        - paragraph
+          - StaticText "Tank Reconciliation"
+        - paragraph
+          - StaticText "Opening stock + deliveries - sales vs closing stock with variance analysis"
+      - button "Full Reconciliation Report Comprehensive wet stock reconciliation with variance % and book vs actual" [ref=e55]
+        - paragraph
+          - StaticText "Full Reconciliation Report"
+        - paragraph
+          - StaticText "Comprehensive wet stock reconciliation with variance % and book vs actual"
+      - button "Delivery Log Report Fuel delivery history with supplier, volumes, variances, and costs" [ref=e56]
+        - paragraph
+          - StaticText "Delivery Log Report"
+        - paragraph
+          - StaticText "Fuel delivery history with supplier, volumes, variances, and costs"
+    - button "Finance & Accounting 4" [ref=e42]
+      - StaticText "Finance & Accounting"
+      - StaticText "4"
+    - button "Operations & HR 4" [ref=e43]
+      - StaticText "Operations & HR"
+      - StaticText "4"
+    - button "Customer & Loyalty 1" [ref=e44]
+      - StaticText "Customer & Loyalty"
+      - StaticText "1"
+    - button "Compliance & Security 3" [ref=e45]
+      - StaticText "Compliance & Security"
+      - StaticText "3"
+  - paragraph
+    - StaticText "REPORT LIBRARY"
+  - paragraph
+    - StaticText "20"
+  - paragraph
+    - StaticText "Total Reports"
+  - paragraph
+    - StaticText "6"
+  - paragraph
+    - StaticText "Categories"
+  - StaticText "Fuel Inventory Report"
+  - StaticText "inventory"
+  - button "Refresh" [ref=e13]
+  - button "Print" [ref=e14]
+  - button "CSV" [ref=e15]
+  - button "JSON" [ref=e16]
+  - generic
+    - paragraph
+      - StaticText "LETTER SIZE PREVIEW (8.5\" × 11\")"
+    - StaticText "Live Data"
+    - StaticText "FUELFLOW OS"
+    - heading "Fuel Inventory Report" [level=1, ref=e46]
+    - paragraph
+      - StaticText "ApexFlow Cloud"
+    - paragraph
+      - StaticText "Report Details"
+    - paragraph
+      - StaticText "Period: 1 Jun 2026 — 14 Jun 2026"
+    - paragraph
+      - StaticText "Generated: 14 Jun 2026, 02:46 pm"
+    - paragraph
+      - StaticText "Station: ApexFlow Cloud - Main Station"
+    - StaticText "Super Admin"
+    - paragraph
+      - StaticText "TOTAL TANKS"
+    - paragraph
+      - StaticText "Rs12"
+    - paragraph
+      - StaticText "TOTAL CAPACITY"
+    - paragraph
+      - StaticText "Rs260,000"
+    - paragraph
+      - StaticText "TOTAL CURRENT LEVEL"
+    - paragraph
+      - StaticText "Rs182,424"
+    - paragraph
+      - StaticText "AVG UTILIZATION"
+    - paragraph
+      - StaticText "70.16"
+    - paragraph
+      - StaticText "LOW TANKS"
+    - paragraph
+      - StaticText "0.00"
+    - table
+      - rowgroup
+        - row
+          - columnheader "#" [ref=e190]
+          - columnheader "NAME" [ref=e191]
+          - columnheader "CODE" [ref=e192]
+          - columnheader "FUEL TYPE" [ref=e193]
+          - columnheader "CAPACITY" [ref=e194]
+          - columnheader "CURRENT LEVEL" [ref=e195]
+          - columnheader "UTILIZATION" [ref=e196]
+          - columnheader "WATER LEVEL" [ref=e197]
+          - columnheader "TEMPERATURE" [ref=e198]
+          - columnheader "STATUS" [ref=e199]
+          - columnheader "LAST READING" [ref=e200]
+      - row
+        - cell "1" [ref=e58]
+        - cell "Diesel Tank 1" [ref=e59]
+        - cell "T-HSD-01" [ref=e60]
+        - cell "diesel" [ref=e61]
+        - cell "25,000.00 L" [ref=e62]
+          - StaticText "25,000.00 L"
+        - cell "18,200.00 L" [ref=e63]
+          - StaticText "18,200.00 L"
+        - cell "72.80%" [ref=e64]
+          - StaticText "72.80%"
+        - cell "0.00 L" [ref=e65]
+          - StaticText "0.00 L"
+        - cell "22.60" [ref=e66]
+        - cell "normal" [ref=e67]
+        - cell "2026-06-14T13:58:12.918Z" [ref=e68]
+      - row
+        - cell "2" [ref=e69]
+        - cell "Diesel Tank 1" [ref=e70]
+        - cell "T-HSD-01" [ref=e71]
+        - cell "diesel" [ref=e72]
+        - cell "25,000.00 L" [ref=e73]
+          - StaticText "25,000.00 L"
+        - cell "18,200.00 L" [ref=e74]
+          - StaticText "18,200.00 L"
+        - cell "72.80%" [ref=e75]
+          - StaticText "72.80%"
+        - cell "0.00 L" [ref=e76]
+          - StaticText "0.00 L"
+        - cell "22.90" [ref=e77]
+        - cell "normal" [ref=e78]
+        - cell "2026-06-14T10:24:27.421Z" [ref=e79]
+      - row
+        - cell "3" [ref=e80]
+        - cell "Diesel Tank 2" [ref=e81]
+        - cell "T-HSD-02" [ref=e82]
+        - cell "diesel" [ref=e83]
+        - cell "25,000.00 L" [ref=e84]
+          - StaticText "25,000.00 L"
+        - cell "21,000.00 L" [ref=e85]
+          - StaticText "21,000.00 L"
+        - cell "84.00%" [ref=e86]
+          - StaticText "84.00%"
+        - cell "0.00 L" [ref=e87]
+          - StaticText "0.00 L"
+        - cell "23.60" [ref=e88]
+        - cell "normal" [ref=e89]
+        - cell "2026-06-14T10:24:27.859Z" [ref=e90]
+      - row
+        - cell "4" [ref=e91]
+        - cell "Diesel Tank 2" [ref=e92]
+        - cell "T-HSD-02" [ref=e93]
+        - cell "diesel" [ref=e94]
+        - cell "25,000.00 L" [ref=e95]
+          - StaticText "25,000.00 L"
+        - cell "21,000.00 L" [ref=e96]
+          - StaticText "21,000.00 L"
+        - cell "84.00%" [ref=e97]
+          - StaticText "84.00%"
+        - cell "0.00 L" [ref=e98]
+          - StaticText "0.00 L"
+        - cell "26.40" [ref=e99]
+        - cell "normal" [ref=e100]
+        - cell "2026-06-14T13:58:13.359Z" [ref=e101]
+      - row
+        - cell "5" [ref=e102]
+        - cell "Petrol Tank 1" [ref=e103]
+        - cell "T-PMS-01" [ref=e104]
+        - cell "petrol" [ref=e105]
+        - cell "20,000.00 L" [ref=e106]
+          - StaticText "20,000.00 L"
+        - cell "14,500.00 L" [ref=e107]
+          - StaticText "14,500.00 L"
+        - cell "72.50%" [ref=e108]
+          - StaticText "72.50%"
+        - cell "0.00 L" [ref=e109]
+          - StaticText "0.00 L"
+        - cell "22.90" [ref=e110]
+        - cell "normal" [ref=e111]
+        - cell "2026-06-14T13:58:12.473Z" [ref=e112]
+      - row
+        - cell "6" [ref=e113]
+        - cell "Petrol Tank 1" [ref=e114]
+        - cell "T-PMS-01" [ref=e115]
+        - cell "petrol" [ref=e116]
+        - cell "20,000.00 L" [ref=e117]
+          - StaticText "20,000.00 L"
+        - cell "14,500.00 L" [ref=e118]
+          - StaticText "14,500.00 L"
+        - cell "72.50%" [ref=e119]
+          - StaticText "72.50%"
+        - cell "0.00 L" [ref=e120]
+          - StaticText "0.00 L"
+        - cell "24.70" [ref=e121]
+        - cell "normal" [ref=e122]
+        - cell "2026-06-14T10:24:26.976Z" [ref=e123]
+      - row
+        - cell "7" [ref=e124]
+        - cell "Premium Tank 1" [ref=e125]
+        - cell "T-PRE-01" [ref=e126]
+        - cell "premium" [ref=e127]
+        - cell "15,000.00 L" [ref=e128]
+          - StaticText "15,000.00 L"
+        - cell "8,900.00 L" [ref=e129]
+          - StaticText "8,900.00 L"
+        - cell "59.33%" [ref=e130]
+          - StaticText "59.33%"
+        - cell "0.00 L" [ref=e131]
+          - StaticText "0.00 L"
+        - cell "24.50" [ref=e132]
+        - cell "normal" [ref=e133]
+        - cell "2026-06-14T10:24:27.640Z" [ref=e134]
+      - row
+        - cell "8" [ref=e135]
+        - cell "Premium Tank 1" [ref=e136]
+        - cell "T-PRE-01" [ref=e137]
+        - cell "premium" [ref=e138]
+        - cell "15,000.00 L" [ref=e139]
+          - StaticText "15,000.00 L"
+        - cell "8,900.00 L" [ref=e140]
+          - StaticText "8,900.00 L"
+        - cell "59.33%" [ref=e141]
+          - StaticText "59.33%"
+        - cell "0.00 L" [ref=e142]
+          - StaticText "0.00 L"
+        - cell "24.90" [ref=e143]
+        - cell "normal" [ref=e144]
+        - cell "2026-06-14T13:58:13.138Z" [ref=e145]
+      - row
+        - cell "9" [ref=e146]
+        - cell "Tank A - Petrol" [ref=e147]
+        - cell "TANK-A" [ref=e148]
+        - cell "petrol" [ref=e149]
+        - cell "20,000.00 L" [ref=e150]
+          - StaticText "20,000.00 L"
+        - cell "14,851.00 L" [ref=e151]
+          - StaticText "14,851.00 L"
+        - cell "74.26%" [ref=e152]
+          - StaticText "74.26%"
+        - cell "1.00 L" [ref=e153]
+          - StaticText "1.00 L"
+        - cell "27.70" [ref=e154]
+        - cell "normal" [ref=e155]
+        - cell "Never" [ref=e156]
+      - row
+        - cell "10" [ref=e157]
+        - cell "Tank B - Diesel" [ref=e158]
+        - cell "TANK-B" [ref=e159]
+        - cell "diesel" [ref=e160]
+        - cell "25,000.00 L" [ref=e161]
+          - StaticText "25,000.00 L"
+        - cell "19,779.00 L" [ref=e162]
+          - StaticText "19,779.00 L"
+        - cell "79.12%" [ref=e163]
+          - StaticText "79.12%"
+        - cell "18.00 L" [ref=e164]
+          - StaticText "18.00 L"
+        - cell "26.70" [ref=e165]
+        - cell "normal" [ref=e166]
+        - cell "Never" [ref=e167]
+      - row
+        - cell "11" [ref=e168]
+        - cell "Tank C - Premium" [ref=e169]
+        - cell "TANK-C" [ref=e170]
+        - cell "premium" [ref=e171]
+        - cell "15,000.00 L" [ref=e172]
+          - StaticText "15,000.00 L"
+        - cell "5,279.00 L" [ref=e173]
+          - StaticText "5,279.00 L"
+        - cell "35.19%" [ref=e174]
+          - StaticText "35.19%"
+        - cell "48.00 L" [ref=e175]
+          - StaticText "48.00 L"
+        - cell "28.70" [ref=e176]
+        - cell "normal" [ref=e177]
+        - cell "Never" [ref=e178]
+      - row
+        - cell "12" [ref=e179]
+        - cell "Tank D - High Speed Diesel" [ref=e180]
+        - cell "TANK-D" [ref=e181]
+        - cell "hsd" [ref=e182]
+        - cell "30,000.00 L" [ref=e183]
+          - StaticText "30,000.00 L"
+        - cell "17,315.00 L" [ref=e184]
+          - StaticText "17,315.00 L"
+        - cell "57.72%" [ref=e185]
+          - StaticText "57.72%"
+        - cell "16.00 L" [ref=e186]
+          - StaticText "16.00 L"
+        - cell "33.30" [ref=e187]
+        - cell "normal" [ref=e188]
+        - cell "Never" [ref=e189]
+    - generic
+      - StaticText "FuelFlow OS — ApexFlow Ecosystem• Super Admin Access"
+    - generic
+      - StaticText "Confidential • Generated 14 Jun 2026, 02:46 pm"
+- heading "Report Center" [level=2, ref=e9]
+- paragraph
+  - StaticText "Professional reports with print & export capabilities"
+- button "Print" [ref=e10]
+- button "CSV" [ref=e11]
+- button "JSON" [ref=e12]
+- textbox "Search reports..." [ref=e37]
+- paragraph
+  - StaticText "DATE RANGE"
+- LabelText
+  - StaticText "From"
+- Date: 2026-06-01
+  - generic
+    - spinbutton "Month" [ref=e47]: 6
+      - StaticText "06"
+    - StaticText "/"
+    - spinbutton "Day" [ref=e48]: 1
+      - StaticText "01"
+    - StaticText "/"
+    - spinbutton "Year" [ref=e49]: 2026
+      - StaticText "2026"
+  - button "Show date picker" [ref=e38]
+- LabelText
+  - StaticText "To"
+- Date: 2026-06-14
+  - generic
+    - spinbutton "Month" [ref=e50]: 6
+      - StaticText "06"
+    - StaticText "/"
+    - spinbutton "Day" [ref=e51]: 14
+      - StaticText "14"
+    - StaticText "/"
+    - spinbutton "Year" [ref=e52]: 2026
+      - StaticText "2026"
+  - button "Show date picker" [ref=e39]
+- generic
+  - button "Sales & Revenue 4" [ref=e40]
+    - StaticText "Sales & Revenue"
+    - StaticText "4"
+  - button "Inventory & Wet Stock 4" [ref=e41]
+    - StaticText "Inventory & Wet Stock"
+    - StaticText "4"
+  - generic
+    - button "Fuel Inventory Report Current tank levels, capacity utilization, water levels, and temperature" [ref=e53]
+      - paragraph
+        - StaticText "Fuel Inventory Report"
+      - paragraph
+        - StaticText "Current tank levels, capacity utilization, water levels, and temperature"
+    - button "Tank Reconciliation Opening stock + deliveries - sales vs closing stock with variance analysis" [ref=e54]
+      - paragraph
+        - StaticText "Tank Reconciliation"
+      - paragraph
+        - StaticText "Opening stock + deliveries - sales vs closing stock with variance analysis"
+    - button "Full Reconciliation Report Comprehensive wet stock reconciliation with variance % and book vs actual" [ref=e55]
+      - paragraph
+        - StaticText "Full Reconciliation Report"
+      - paragraph
+        - StaticText "Comprehensive wet stock reconciliation with variance % and book vs actual"
+    - button "Delivery Log Report Fuel delivery history with supplier, volumes, variances, and costs" [ref=e56]
+      - paragraph
+        - StaticText "Delivery Log Report"
+      - paragraph
+        - StaticText "Fuel delivery history with supplier, volumes, variances, and costs"
+  - button "Finance & Accounting 4" [ref=e42]
+    - StaticText "Finance & Accounting"
+    - StaticText "4"
+  - button "Operations & HR 4" [ref=e43]
+    - StaticText "Operations & HR"
+    - StaticText "4"
+  - button "Customer & Loyalty 1" [ref=e44]
+    - StaticText "Customer & Loyalty"
+    - StaticText "1"
+  - button "Compliance & Security 3" [ref=e45]
+    - StaticText "Compliance & Security"
+    - StaticText "3"
+- paragraph
+  - StaticText "REPORT LIBRARY"
+- paragraph
+  - StaticText "20"
+- paragraph
+  - StaticText "Total Reports"
+- paragraph
+  - StaticText "6"
+- paragraph
+  - StaticText "Categories"
+- StaticText "Fuel Inventory Report"
+- StaticText "inventory"
+- button "Refresh" [ref=e13]
+- button "Print" [ref=e14]
+- button "CSV" [ref=e15]
+- button "JSON" [ref=e16]
+- generic
+  - paragraph
+    - StaticText "LETTER SIZE PREVIEW (8.5\" × 11\")"
+  - StaticText "Live Data"
+  - StaticText "FUELFLOW OS"
+  - heading "Fuel Inventory Report" [level=1, ref=e46]
+  - paragraph
+    - StaticText "ApexFlow Cloud"
+  - paragraph
+    - StaticText "Report Details"
+  - paragraph
+    - StaticText "Period: 1 Jun 2026 — 14 Jun 2026"
+  - paragraph
+    - StaticText "Generated: 14 Jun 2026, 02:46 pm"
+  - paragraph
+    - StaticText "Station: ApexFlow Cloud - Main Station"
+  - StaticText "Super Admin"
+  - paragraph
+    - StaticText "TOTAL TANKS"
+  - paragraph
+    - StaticText "Rs12"
+  - paragraph
+    - StaticText "TOTAL CAPACITY"
+  - paragraph
+    - StaticText "Rs260,000"
+  - paragraph
+    - StaticText "TOTAL CURRENT LEVEL"
+  - paragraph
+    - StaticText "Rs182,424"
+  - paragraph
+    - StaticText "AVG UTILIZATION"
+  - paragraph
+    - StaticText "70.16"
+  - paragraph
+    - StaticText "LOW TANKS"
+  - paragraph
+    - StaticText "0.00"
+  - table
+    - rowgroup
+      - row
+        - columnheader "#" [ref=e190]
+        - columnheader "NAME" [ref=e191]
+        - columnheader "CODE" [ref=e192]
+        - columnheader "FUEL TYPE" [ref=e193]
+        - columnheader "CAPACITY" [ref=e194]
+        - columnheader "CURRENT LEVEL" [ref=e195]
+        - columnheader "UTILIZATION" [ref=e196]
+        - columnheader "WATER LEVEL" [ref=e197]
+        - columnheader "TEMPERATURE" [ref=e198]
+        - columnheader "STATUS" [ref=e199]
+        - columnheader "LAST READING" [ref=e200]
+    - row
+      - cell "1" [ref=e58]
+      - cell "Diesel Tank 1" [ref=e59]
+      - cell "T-HSD-01" [ref=e60]
+      - cell "diesel" [ref=e61]
+      - cell "25,000.00 L" [ref=e62]
+        - StaticText "25,000.00 L"
+      - cell "18,200.00 L" [ref=e63]
+        - StaticText "18,200.00 L"
+      - cell "72.80%" [ref=e64]
+        - StaticText "72.80%"
+      - cell "0.00 L" [ref=e65]
+        - StaticText "0.00 L"
+      - cell "22.60" [ref=e66]
+      - cell "normal" [ref=e67]
+      - cell "2026-06-14T13:58:12.918Z" [ref=e68]
+    - row
+      - cell "2" [ref=e69]
+      - cell "Diesel Tank 1" [ref=e70]
+      - cell "T-HSD-01" [ref=e71]
+      - cell "diesel" [ref=e72]
+      - cell "25,000.00 L" [ref=e73]
+        - StaticText "25,000.00 L"
+      - cell "18,200.00 L" [ref=e74]
+        - StaticText "18,200.00 L"
+      - cell "72.80%" [ref=e75]
+        - StaticText "72.80%"
+      - cell "0.00 L" [ref=e76]
+        - StaticText "0.00 L"
+      - cell "22.90" [ref=e77]
+      - cell "normal" [ref=e78]
+      - cell "2026-06-14T10:24:27.421Z" [ref=e79]
+    - row
+      - cell "3" [ref=e80]
+      - cell "Diesel Tank 2" [ref=e81]
+      - cell "T-HSD-02" [ref=e82]
+      - cell "diesel" [ref=e83]
+      - cell "25,000.00 L" [ref=e84]
+        - StaticText "25,000.00 L"
+      - cell "21,000.00 L" [ref=e85]
+        - StaticText "21,000.00 L"
+      - cell "84.00%" [ref=e86]
+        - StaticText "84.00%"
+      - cell "0.00 L" [ref=e87]
+        - StaticText "0.00 L"
+      - cell "23.60" [ref=e88]
+      - cell "normal" [ref=e89]
+      - cell "2026-06-14T10:24:27.859Z" [ref=e90]
+    - row
+      - cell "4" [ref=e91]
+      - cell "Diesel Tank 2" [ref=e92]
+      - cell "T-HSD-02" [ref=e93]
+      - cell "diesel" [ref=e94]
+      - cell "25,000.00 L" [ref=e95]
+        - StaticText "25,000.00 L"
+      - cell "21,000.00 L" [ref=e96]
+        - StaticText "21,000.00 L"
+      - cell "84.00%" [ref=e97]
+        - StaticText "84.00%"
+      - cell "0.00 L" [ref=e98]
+        - StaticText "0.00 L"
+      - cell "26.40" [ref=e99]
+      - cell "normal" [ref=e100]
+      - cell "2026-06-14T13:58:13.359Z" [ref=e101]
+    - row
+      - cell "5" [ref=e102]
+      - cell "Petrol Tank 1" [ref=e103]
+      - cell "T-PMS-01" [ref=e104]
+      - cell "petrol" [ref=e105]
+      - cell "20,000.00 L" [ref=e106]
+        - StaticText "20,000.00 L"
+      - cell "14,500.00 L" [ref=e107]
+        - StaticText "14,500.00 L"
+      - cell "72.50%" [ref=e108]
+        - StaticText "72.50%"
+      - cell "0.00 L" [ref=e109]
+        - StaticText "0.00 L"
+      - cell "22.90" [ref=e110]
+      - cell "normal" [ref=e111]
+      - cell "2026-06-14T13:58:12.473Z" [ref=e112]
+    - row
+      - cell "6" [ref=e113]
+      - cell "Petrol Tank 1" [ref=e114]
+      - cell "T-PMS-01" [ref=e115]
+      - cell "petrol" [ref=e116]
+      - cell "20,000.00 L" [ref=e117]
+        - StaticText "20,000.00 L"
+      - cell "14,500.00 L" [ref=e118]
+        - StaticText "14,500.00 L"
+      - cell "72.50%" [ref=e119]
+        - StaticText "72.50%"
+      - cell "0.00 L" [ref=e120]
+        - StaticText "0.00 L"
+      - cell "24.70" [ref=e121]
+      - cell "normal" [ref=e122]
+      - cell "2026-06-14T10:24:26.976Z" [ref=e123]
+    - row
+      - cell "7" [ref=e124]
+      - cell "Premium Tank 1" [ref=e125]
+      - cell "T-PRE-01" [ref=e126]
+      - cell "premium" [ref=e127]
+      - cell "15,000.00 L" [ref=e128]
+        - StaticText "15,000.00 L"
+      - cell "8,900.00 L" [ref=e129]
+        - StaticText "8,900.00 L"
+      - cell "59.33%" [ref=e130]
+        - StaticText "59.33%"
+      - cell "0.00 L" [ref=e131]
+        - StaticText "0.00 L"
+      - cell "24.50" [ref=e132]
+      - cell "normal" [ref=e133]
+      - cell "2026-06-14T10:24:27.640Z" [ref=e134]
+    - row
+      - cell "8" [ref=e135]
+      - cell "Premium Tank 1" [ref=e136]
+      - cell "T-PRE-01" [ref=e137]
+      - cell "premium" [ref=e138]
+      - cell "15,000.00 L" [ref=e139]
+        - StaticText "15,000.00 L"
+      - cell "8,900.00 L" [ref=e140]
+        - StaticText "8,900.00 L"
+      - cell "59.33%" [ref=e141]
+        - StaticText "59.33%"
+      - cell "0.00 L" [ref=e142]
+        - StaticText "0.00 L"
+      - cell "24.90" [ref=e143]
+      - cell "normal" [ref=e144]
+      - cell "2026-06-14T13:58:13.138Z" [ref=e145]
+    - row
+      - cell "9" [ref=e146]
+      - cell "Tank A - Petrol" [ref=e147]
+      - cell "TANK-A" [ref=e148]
+      - cell "petrol" [ref=e149]
+      - cell "20,000.00 L" [ref=e150]
+        - StaticText "20,000.00 L"
+      - cell "14,851.00 L" [ref=e151]
+        - StaticText "14,851.00 L"
+      - cell "74.26%" [ref=e152]
+        - StaticText "74.26%"
+      - cell "1.00 L" [ref=e153]
+        - StaticText "1.00 L"
+      - cell "27.70" [ref=e154]
+      - cell "normal" [ref=e155]
+      - cell "Never" [ref=e156]
+    - row
+      - cell "10" [ref=e157]
+      - cell "Tank B - Diesel" [ref=e158]
+      - cell "TANK-B" [ref=e159]
+      - cell "diesel" [ref=e160]
+      - cell "25,000.00 L" [ref=e161]
+        - StaticText "25,000.00 L"
+      - cell "19,779.00 L" [ref=e162]
+        - StaticText "19,779.00 L"
+      - cell "79.12%" [ref=e163]
+        - StaticText "79.12%"
+      - cell "18.00 L" [ref=e164]
+        - StaticText "18.00 L"
+      - cell "26.70" [ref=e165]
+      - cell "normal" [ref=e166]
+      - cell "Never" [ref=e167]
+    - row
+      - cell "11" [ref=e168]
+      - cell "Tank C - Premium" [ref=e169]
+      - cell "TANK-C" [ref=e170]
+      - cell "premium" [ref=e171]
+      - cell "15,000.00 L" [ref=e172]
+        - StaticText "15,000.00 L"
+      - cell "5,279.00 L" [ref=e173]
+        - StaticText "5,279.00 L"
+      - cell "35.19%" [ref=e174]
+        - StaticText "35.19%"
+      - cell "48.00 L" [ref=e175]
+        - StaticText "48.00 L"
+      - cell "28.70" [ref=e176]
+      - cell "normal" [ref=e177]
+      - cell "Never" [ref=e178]
+    - row
+      - cell "12" [ref=e179]
+      - cell "Tank D - High Speed Diesel" [ref=e180]
+      - cell "TANK-D" [ref=e181]
+      - cell "hsd" [ref=e182]
+      - cell "30,000.00 L" [ref=e183]
+        - StaticText "30,000.00 L"
+      - cell "17,315.00 L" [ref=e184]
+        - StaticText "17,315.00 L"
+      - cell "57.72%" [ref=e185]
+        - StaticText "57.72%"
+      - cell "16.00 L" [ref=e186]
+        - StaticText "16.00 L"
+      - cell "33.30" [ref=e187]
+      - cell "normal" [ref=e188]
+      - cell "Never" [ref=e189]
+  - generic
+    - StaticText "FuelFlow OS — ApexFlow Ecosystem• Super Admin Access"
+  - generic
+    - StaticText "Confidential • Generated 14 Jun 2026, 02:46 pm"
+- button "Sales & Revenue 4" [ref=e40]
+  - StaticText "Sales & Revenue"
+  - StaticText "4"
+- button "Inventory & Wet Stock 4" [ref=e41]
+  - StaticText "Inventory & Wet Stock"
+  - StaticText "4"
+- generic
+  - button "Fuel Inventory Report Current tank levels, capacity utilization, water levels, and temperature" [ref=e53]
+    - paragraph
+      - StaticText "Fuel Inventory Report"
+    - paragraph
+      - StaticText "Current tank levels, capacity utilization, water levels, and temperature"
+  - button "Tank Reconciliation Opening stock + deliveries - sales vs closing stock with variance analysis" [ref=e54]
+    - paragraph
+      - StaticText "Tank Reconciliation"
+    - paragraph
+      - StaticText "Opening stock + deliveries - sales vs closing stock with variance analysis"
+  - button "Full Reconciliation Report Comprehensive wet stock reconciliation with variance % and book vs actual" [ref=e55]
+    - paragraph
+      - StaticText "Full Reconciliation Report"
+    - paragraph
+      - StaticText "Comprehensive wet stock reconciliation with variance % and book vs actual"
+  - button "Delivery Log Report Fuel delivery history with supplier, volumes, variances, and costs" [ref=e56]
+    - paragraph
+      - StaticText "Delivery Log Report"
+    - paragraph
+      - StaticText "Fuel delivery history with supplier, volumes, variances, and costs"
+- button "Finance & Accounting 4" [ref=e42]
+  - StaticText "Finance & Accounting"
+  - StaticText "4"
+- button "Operations & HR 4" [ref=e43]
+  - StaticText "Operations & HR"
+  - StaticText "4"
+- button "Customer & Loyalty 1" [ref=e44]
+  - StaticText "Customer & Loyalty"
+  - StaticText "1"
+- button "Compliance & Security 3" [ref=e45]
+  - StaticText "Compliance & Security"
+  - StaticText "3"
+- paragraph
+  - StaticText "LETTER SIZE PREVIEW (8.5\" × 11\")"
+- StaticText "Live Data"
+- StaticText "FUELFLOW OS"
+- heading "Fuel Inventory Report" [level=1, ref=e46]
+- paragraph
+  - StaticText "ApexFlow Cloud"
+- paragraph
+  - StaticText "Report Details"
+- paragraph
+  - StaticText "Period: 1 Jun 2026 — 14 Jun 2026"
+- paragraph
+  - StaticText "Generated: 14 Jun 2026, 02:46 pm"
+- paragraph
+  - StaticText "Station: ApexFlow Cloud - Main Station"
+- StaticText "Super Admin"
+- paragraph
+  - StaticText "TOTAL TANKS"
+- paragraph
+  - StaticText "Rs12"
+- paragraph
+  - StaticText "TOTAL CAPACITY"
+- paragraph
+  - StaticText "Rs260,000"
+- paragraph
+  - StaticText "TOTAL CURRENT LEVEL"
+- paragraph
+  - StaticText "Rs182,424"
+- paragraph
+  - StaticText "AVG UTILIZATION"
+- paragraph
+  - StaticText "70.16"
+- paragraph
+  - StaticText "LOW TANKS"
+- paragraph
+  - StaticText "0.00"
+- table
+  - rowgroup
+    - row
+      - columnheader "#" [ref=e190]
+      - columnheader "NAME" [ref=e191]
+      - columnheader "CODE" [ref=e192]
+      - columnheader "FUEL TYPE" [ref=e193]
+      - columnheader "CAPACITY" [ref=e194]
+      - columnheader "CURRENT LEVEL" [ref=e195]
+      - columnheader "UTILIZATION" [ref=e196]
+      - columnheader "WATER LEVEL" [ref=e197]
+      - columnheader "TEMPERATURE" [ref=e198]
+      - columnheader "STATUS" [ref=e199]
+      - columnheader "LAST READING" [ref=e200]
+  - row
+    - cell "1" [ref=e58]
+    - cell "Diesel Tank 1" [ref=e59]
+    - cell "T-HSD-01" [ref=e60]
+    - cell "diesel" [ref=e61]
+    - cell "25,000.00 L" [ref=e62]
+      - StaticText "25,000.00 L"
+    - cell "18,200.00 L" [ref=e63]
+      - StaticText "18,200.00 L"
+    - cell "72.80%" [ref=e64]
+      - StaticText "72.80%"
+    - cell "0.00 L" [ref=e65]
+      - StaticText "0.00 L"
+    - cell "22.60" [ref=e66]
+    - cell "normal" [ref=e67]
+    - cell "2026-06-14T13:58:12.918Z" [ref=e68]
+  - row
+    - cell "2" [ref=e69]
+    - cell "Diesel Tank 1" [ref=e70]
+    - cell "T-HSD-01" [ref=e71]
+    - cell "diesel" [ref=e72]
+    - cell "25,000.00 L" [ref=e73]
+      - StaticText "25,000.00 L"
+    - cell "18,200.00 L" [ref=e74]
+      - StaticText "18,200.00 L"
+    - cell "72.80%" [ref=e75]
+      - StaticText "72.80%"
+    - cell "0.00 L" [ref=e76]
+      - StaticText "0.00 L"
+    - cell "22.90" [ref=e77]
+    - cell "normal" [ref=e78]
+    - cell "2026-06-14T10:24:27.421Z" [ref=e79]
+  - row
+    - cell "3" [ref=e80]
+    - cell "Diesel Tank 2" [ref=e81]
+    - cell "T-HSD-02" [ref=e82]
+    - cell "diesel" [ref=e83]
+    - cell "25,000.00 L" [ref=e84]
+      - StaticText "25,000.00 L"
+    - cell "21,000.00 L" [ref=e85]
+      - StaticText "21,000.00 L"
+    - cell "84.00%" [ref=e86]
+      - StaticText "84.00%"
+    - cell "0.00 L" [ref=e87]
+      - StaticText "0.00 L"
+    - cell "23.60" [ref=e88]
+    - cell "normal" [ref=e89]
+    - cell "2026-06-14T10:24:27.859Z" [ref=e90]
+  - row
+    - cell "4" [ref=e91]
+    - cell "Diesel Tank 2" [ref=e92]
+    - cell "T-HSD-02" [ref=e93]
+    - cell "diesel" [ref=e94]
+    - cell "25,000.00 L" [ref=e95]
+      - StaticText "25,000.00 L"
+    - cell "21,000.00 L" [ref=e96]
+      - StaticText "21,000.00 L"
+    - cell "84.00%" [ref=e97]
+      - StaticText "84.00%"
+    - cell "0.00 L" [ref=e98]
+      - StaticText "0.00 L"
+    - cell "26.40" [ref=e99]
+    - cell "normal" [ref=e100]
+    - cell "2026-06-14T13:58:13.359Z" [ref=e101]
+  - row
+    - cell "5" [ref=e102]
+    - cell "Petrol Tank 1" [ref=e103]
+    - cell "T-PMS-01" [ref=e104]
+    - cell "petrol" [ref=e105]
+    - cell "20,000.00 L" [ref=e106]
+      - StaticText "20,000.00 L"
+    - cell "14,500.00 L" [ref=e107]
+      - StaticText "14,500.00 L"
+    - cell "72.50%" [ref=e108]
+      - StaticText "72.50%"
+    - cell "0.00 L" [ref=e109]
+      - StaticText "0.00 L"
+    - cell "22.90" [ref=e110]
+    - cell "normal" [ref=e111]
+    - cell "2026-06-14T13:58:12.473Z" [ref=e112]
+  - row
+    - cell "6" [ref=e113]
+    - cell "Petrol Tank 1" [ref=e114]
+    - cell "T-PMS-01" [ref=e115]
+    - cell "petrol" [ref=e116]
+    - cell "20,000.00 L" [ref=e117]
+      - StaticText "20,000.00 L"
+    - cell "14,500.00 L" [ref=e118]
+      - StaticText "14,500.00 L"
+    - cell "72.50%" [ref=e119]
+      - StaticText "72.50%"
+    - cell "0.00 L" [ref=e120]
+      - StaticText "0.00 L"
+    - cell "24.70" [ref=e121]
+    - cell "normal" [ref=e122]
+    - cell "2026-06-14T10:24:26.976Z" [ref=e123]
+  - row
+    - cell "7" [ref=e124]
+    - cell "Premium Tank 1" [ref=e125]
+    - cell "T-PRE-01" [ref=e126]
+    - cell "premium" [ref=e127]
+    - cell "15,000.00 L" [ref=e128]
+      - StaticText "15,000.00 L"
+    - cell "8,900.00 L" [ref=e129]
+      - StaticText "8,900.00 L"
+    - cell "59.33%" [ref=e130]
+      - StaticText "59.33%"
+    - cell "0.00 L" [ref=e131]
+      - StaticText "0.00 L"
+    - cell "24.50" [ref=e132]
+    - cell "normal" [ref=e133]
+    - cell "2026-06-14T10:24:27.640Z" [ref=e134]
+  - row
+    - cell "8" [ref=e135]
+    - cell "Premium Tank 1" [ref=e136]
+    - cell "T-PRE-01" [ref=e137]
+    - cell "premium" [ref=e138]
+    - cell "15,000.00 L" [ref=e139]
+      - StaticText "15,000.00 L"
+    - cell "8,900.00 L" [ref=e140]
+      - StaticText "8,900.00 L"
+    - cell "59.33%" [ref=e141]
+      - StaticText "59.33%"
+    - cell "0.00 L" [ref=e142]
+      - StaticText "0.00 L"
+    - cell "24.90" [ref=e143]
+    - cell "normal" [ref=e144]
+    - cell "2026-06-14T13:58:13.138Z" [ref=e145]
+  - row
+    - cell "9" [ref=e146]
+    - cell "Tank A - Petrol" [ref=e147]
+    - cell "TANK-A" [ref=e148]
+    - cell "petrol" [ref=e149]
+    - cell "20,000.00 L" [ref=e150]
+      - StaticText "20,000.00 L"
+    - cell "14,851.00 L" [ref=e151]
+      - StaticText "14,851.00 L"
+    - cell "74.26%" [ref=e152]
+      - StaticText "74.26%"
+    - cell "1.00 L" [ref=e153]
+      - StaticText "1.00 L"
+    - cell "27.70" [ref=e154]
+    - cell "normal" [ref=e155]
+    - cell "Never" [ref=e156]
+  - row
+    - cell "10" [ref=e157]
+    - cell "Tank B - Diesel" [ref=e158]
+    - cell "TANK-B" [ref=e159]
+    - cell "diesel" [ref=e160]
+    - cell "25,000.00 L" [ref=e161]
+      - StaticText "25,000.00 L"
+    - cell "19,779.00 L" [ref=e162]
+      - StaticText "19,779.00 L"
+    - cell "79.12%" [ref=e163]
+      - StaticText "79.12%"
+    - cell "18.00 L" [ref=e164]
+      - StaticText "18.00 L"
+    - cell "26.70" [ref=e165]
+    - cell "normal" [ref=e166]
+    - cell "Never" [ref=e167]
+  - row
+    - cell "11" [ref=e168]
+    - cell "Tank C - Premium" [ref=e169]
+    - cell "TANK-C" [ref=e170]
+    - cell "premium" [ref=e171]
+    - cell "15,000.00 L" [ref=e172]
+      - StaticText "15,000.00 L"
+    - cell "5,279.00 L" [ref=e173]
+      - StaticText "5,279.00 L"
+    - cell "35.19%" [ref=e174]
+      - StaticText "35.19%"
+    - cell "48.00 L" [ref=e175]
+      - StaticText "48.00 L"
+    - cell "28.70" [ref=e176]
+    - cell "normal" [ref=e177]
+    - cell "Never" [ref=e178]
+  - row
+    - cell "12" [ref=e179]
+    - cell "Tank D - High Speed Diesel" [ref=e180]
+    - cell "TANK-D" [ref=e181]
+    - cell "hsd" [ref=e182]
+    - cell "30,000.00 L" [ref=e183]
+      - StaticText "30,000.00 L"
+    - cell "17,315.00 L" [ref=e184]
+      - StaticText "17,315.00 L"
+    - cell "57.72%" [ref=e185]
+      - StaticText "57.72%"
+    - cell "16.00 L" [ref=e186]
+      - StaticText "16.00 L"
+    - cell "33.30" [ref=e187]
+    - cell "normal" [ref=e188]
+    - cell "Never" [ref=e189]
+- generic
+  - StaticText "FuelFlow OS — ApexFlow Ecosystem• Super Admin Access"
+- generic
+  - StaticText "Confidential • Generated 14 Jun 2026, 02:46 pm"
+- StaticText "Sales & Revenue"
+- StaticText "4"
+- StaticText "Inventory & Wet Stock"
+- StaticText "4"
+- StaticText "Finance & Accounting"
+- StaticText "4"
+- StaticText "Operations & HR"
+- StaticText "4"
+- StaticText "Customer & Loyalty"
+- StaticText "1"
+- StaticText "Compliance & Security"
+- StaticText "3"
+- paragraph
+  - StaticText "Fuel Inventory Report"
+- paragraph
+  - StaticText "Current tank levels, capacity utilization, water levels, and temperature"
+- paragraph
+  - StaticText "Tank Reconciliation"
+- paragraph
+  - StaticText "Opening stock + deliveries - sales vs closing stock with variance analysis"
+- paragraph
+  - StaticText "Full Reconciliation Report"
+- paragraph
+  - StaticText "Comprehensive wet stock reconciliation with variance % and book vs actual"
+- paragraph
+  - StaticText "Delivery Log Report"
+- paragraph
+  - StaticText "Fuel delivery history with supplier, volumes, variances, and costs"
+- row
+  - cell "1" [ref=e58]
+  - cell "Diesel Tank 1" [ref=e59]
+  - cell "T-HSD-01" [ref=e60]
+  - cell "diesel" [ref=e61]
+  - cell "25,000.00 L" [ref=e62]
+    - StaticText "25,000.00 L"
+  - cell "18,200.00 L" [ref=e63]
+    - StaticText "18,200.00 L"
+  - cell "72.80%" [ref=e64]
+    - StaticText "72.80%"
+  - cell "0.00 L" [ref=e65]
+    - StaticText "0.00 L"
+  - cell "22.60" [ref=e66]
+  - cell "normal" [ref=e67]
+  - cell "2026-06-14T13:58:12.918Z" [ref=e68]
+- row
+  - cell "2" [ref=e69]
+  - cell "Diesel Tank 1" [ref=e70]
+  - cell "T-HSD-01" [ref=e71]
+  - cell "diesel" [ref=e72]
+  - cell "25,000.00 L" [ref=e73]
+    - StaticText "25,000.00 L"
+  - cell "18,200.00 L" [ref=e74]
+    - StaticText "18,200.00 L"
+  - cell "72.80%" [ref=e75]
+    - StaticText "72.80%"
+  - cell "0.00 L" [ref=e76]
+    - StaticText "0.00 L"
+  - cell "22.90" [ref=e77]
+  - cell "normal" [ref=e78]
+  - cell "2026-06-14T10:24:27.421Z" [ref=e79]
+- row
+  - cell "3" [ref=e80]
+  - cell "Diesel Tank 2" [ref=e81]
+  - cell "T-HSD-02" [ref=e82]
+  - cell "diesel" [ref=e83]
+  - cell "25,000.00 L" [ref=e84]
+    - StaticText "25,000.00 L"
+  - cell "21,000.00 L" [ref=e85]
+    - StaticText "21,000.00 L"
+  - cell "84.00%" [ref=e86]
+    - StaticText "84.00%"
+  - cell "0.00 L" [ref=e87]
+    - StaticText "0.00 L"
+  - cell "23.60" [ref=e88]
+  - cell "normal" [ref=e89]
+  - cell "2026-06-14T10:24:27.859Z" [ref=e90]
+- row
+  - cell "4" [ref=e91]
+  - cell "Diesel Tank 2" [ref=e92]
+  - cell "T-HSD-02" [ref=e93]
+  - cell "diesel" [ref=e94]
+  - cell "25,000.00 L" [ref=e95]
+    - StaticText "25,000.00 L"
+  - cell "21,000.00 L" [ref=e96]
+    - StaticText "21,000.00 L"
+  - cell "84.00%" [ref=e97]
+    - StaticText "84.00%"
+  - cell "0.00 L" [ref=e98]
+    - StaticText "0.00 L"
+  - cell "26.40" [ref=e99]
+  - cell "normal" [ref=e100]
+  - cell "2026-06-14T13:58:13.359Z" [ref=e101]
+- row
+  - cell "5" [ref=e102]
+  - cell "Petrol Tank 1" [ref=e103]
+  - cell "T-PMS-01" [ref=e104]
+  - cell "petrol" [ref=e105]
+  - cell "20,000.00 L" [ref=e106]
+    - StaticText "20,000.00 L"
+  - cell "14,500.00 L" [ref=e107]
+    - StaticText "14,500.00 L"
+  - cell "72.50%" [ref=e108]
+    - StaticText "72.50%"
+  - cell "0.00 L" [ref=e109]
+    - StaticText "0.00 L"
+  - cell "22.90" [ref=e110]
+  - cell "normal" [ref=e111]
+  - cell "2026-06-14T13:58:12.473Z" [ref=e112]
+- row
+  - cell "6" [ref=e113]
+  - cell "Petrol Tank 1" [ref=e114]
+  - cell "T-PMS-01" [ref=e115]
+  - cell "petrol" [ref=e116]
+  - cell "20,000.00 L" [ref=e117]
+    - StaticText "20,000.00 L"
+  - cell "14,500.00 L" [ref=e118]
+    - StaticText "14,500.00 L"
+  - cell "72.50%" [ref=e119]
+    - StaticText "72.50%"
+  - cell "0.00 L" [ref=e120]
+    - StaticText "0.00 L"
+  - cell "24.70" [ref=e121]
+  - cell "normal" [ref=e122]
+  - cell "2026-06-14T10:24:26.976Z" [ref=e123]
+- row
+  - cell "7" [ref=e124]
+  - cell "Premium Tank 1" [ref=e125]
+  - cell "T-PRE-01" [ref=e126]
+  - cell "premium" [ref=e127]
+  - cell "15,000.00 L" [ref=e128]
+    - StaticText "15,000.00 L"
+  - cell "8,900.00 L" [ref=e129]
+    - StaticText "8,900.00 L"
+  - cell "59.33%" [ref=e130]
+    - StaticText "59.33%"
+  - cell "0.00 L" [ref=e131]
+    - StaticText "0.00 L"
+  - cell "24.50" [ref=e132]
+  - cell "normal" [ref=e133]
+  - cell "2026-06-14T10:24:27.640Z" [ref=e134]
+- row
+  - cell "8" [ref=e135]
+  - cell "Premium Tank 1" [ref=e136]
+  - cell "T-PRE-01" [ref=e137]
+  - cell "premium" [ref=e138]
+  - cell "15,000.00 L" [ref=e139]
+    - StaticText "15,000.00 L"
+  - cell "8,900.00 L" [ref=e140]
+    - StaticText "8,900.00 L"
+  - cell "59.33%" [ref=e141]
+    - StaticText "59.33%"
+  - cell "0.00 L" [ref=e142]
+    - StaticText "0.00 L"
+  - cell "24.90" [ref=e143]
+  - cell "normal" [ref=e144]
+  - cell "2026-06-14T13:58:13.138Z" [ref=e145]
+- row
+  - cell "9" [ref=e146]
+  - cell "Tank A - Petrol" [ref=e147]
+  - cell "TANK-A" [ref=e148]
+  - cell "petrol" [ref=e149]
+  - cell "20,000.00 L" [ref=e150]
+    - StaticText "20,000.00 L"
+  - cell "14,851.00 L" [ref=e151]
+    - StaticText "14,851.00 L"
+  - cell "74.26%" [ref=e152]
+    - StaticText "74.26%"
+  - cell "1.00 L" [ref=e153]
+    - StaticText "1.00 L"
+  - cell "27.70" [ref=e154]
+  - cell "normal" [ref=e155]
+  - cell "Never" [ref=e156]
+- row
+  - cell "10" [ref=e157]
+  - cell "Tank B - Diesel" [ref=e158]
+  - cell "TANK-B" [ref=e159]
+  - cell "diesel" [ref=e160]
+  - cell "25,000.00 L" [ref=e161]
+    - StaticText "25,000.00 L"
+  - cell "19,779.00 L" [ref=e162]
+    - StaticText "19,779.00 L"
+  - cell "79.12%" [ref=e163]
+    - StaticText "79.12%"
+  - cell "18.00 L" [ref=e164]
+    - StaticText "18.00 L"
+  - cell "26.70" [ref=e165]
+  - cell "normal" [ref=e166]
+  - cell "Never" [ref=e167]
+- row
+  - cell "11" [ref=e168]
+  - cell "Tank C - Premium" [ref=e169]
+  - cell "TANK-C" [ref=e170]
+  - cell "premium" [ref=e171]
+  - cell "15,000.00 L" [ref=e172]
+    - StaticText "15,000.00 L"
+  - cell "5,279.00 L" [ref=e173]
+    - StaticText "5,279.00 L"
+  - cell "35.19%" [ref=e174]
+    - StaticText "35.19%"
+  - cell "48.00 L" [ref=e175]
+    - StaticText "48.00 L"
+  - cell "28.70" [ref=e176]
+  - cell "normal" [ref=e177]
+  - cell "Never" [ref=e178]
+- row
+  - cell "12" [ref=e179]
+  - cell "Tank D - High Speed Diesel" [ref=e180]
+  - cell "TANK-D" [ref=e181]
+  - cell "hsd" [ref=e182]
+  - cell "30,000.00 L" [ref=e183]
+    - StaticText "30,000.00 L"
+  - cell "17,315.00 L" [ref=e184]
+    - StaticText "17,315.00 L"
+  - cell "57.72%" [ref=e185]
+    - StaticText "57.72%"
+  - cell "16.00 L" [ref=e186]
+    - StaticText "16.00 L"
+  - cell "33.30" [ref=e187]
+  - cell "normal" [ref=e188]
+  - cell "Never" [ref=e189]
