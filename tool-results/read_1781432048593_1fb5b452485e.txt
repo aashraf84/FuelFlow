@@ -1,0 +1,2002 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useCallback } from 'react'
+     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→import {
+     6→  Cpu, Wifi, WifiOff, CreditCard, Zap, Gauge, Droplets, Radio,
+     7→  RefreshCw, ChevronRight, Clock, AlertTriangle, CheckCircle2,
+     8→  XCircle, ArrowUpDown, Send, Command, Monitor, Server,
+     9→  Cable, Plug, Wrench, Fuel, Activity, HardDrive, Database,
+    10→  Play, Square, RotateCcw, Eye, Search, Filter, Loader2,
+    11→  Plus, X, Key, Shield, Copy, Check, User,
+    12→} from 'lucide-react'
+    13→import { Badge } from '@/components/ui/badge'
+    14→import { Button } from '@/components/ui/button'
+    15→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    16→import { Input } from '@/components/ui/input'
+    17→import { ScrollArea } from '@/components/ui/scroll-area'
+    18→import {
+    19→  Dialog,
+    20→  DialogContent,
+    21→  DialogHeader,
+    22→  DialogTitle,
+    23→  DialogFooter,
+    24→} from '@/components/ui/dialog'
+    25→import { Label } from '@/components/ui/label'
+    26→import {
+    27→  Select,
+    28→  SelectContent,
+    29→  SelectItem,
+    30→  SelectTrigger,
+    31→  SelectValue,
+    32→} from '@/components/ui/select'
+    33→import { Textarea } from '@/components/ui/textarea'
+    34→import { toast } from 'sonner'
+    35→import { useAppStore } from '@/stores/app-store'
+    36→
+    37→// ── Owner Registration Types ────────────────────
+    38→
+    39→interface OwnerRegistrationResult {
+    40→  success: boolean
+    41→  message: string
+    42→  credentials: {
+    43→    email: string
+    44→    password: string
+    45→    apiKey: string
+    46→    ownerId: string
+    47→  }
+    48→  serialKey: {
+    49→    key: string
+    50→    plan: string
+    51→    maxStations: number
+    52→    maxDispensers: number
+    53→    maxUsers: number
+    54→    expiresAt: string
+    55→    status: string
+    56→  }
+    57→  device: {
+    58→    id: string
+    59→    name: string
+    60→    type: string
+    61→    status: string
+    62→  }
+    63→  owner: {
+    64→    id: string
+    65→    companyName: string
+    66→    slug: string
+    67→    contactPerson: string
+    68→    status: string
+    69→  }
+    70→}
+    71→
+    72→// ── Types ──────────────────────────────────────
+    73→
+    74→interface DeviceCategory {
+    75→  type: string
+    76→  icon: React.ElementType
+    77→  count: number
+    78→  online: number
+    79→  color: string
+    80→}
+    81→
+    82→interface ConnectedDevice {
+    83→  id: string
+    84→  name: string
+    85→  type: string
+    86→  brand: string
+    87→  protocol: string
+    88→  status: string
+    89→  lastSeen: string
+    90→  ip: string
+    91→}
+    92→
+    93→interface CommandEntry {
+    94→  id: string
+    95→  deviceType: string
+    96→  deviceId: string
+    97→  command: string
+    98→  priority: string
+    99→  status: string
+   100→  retryCount: number
+   101→  maxRetries: number
+   102→  createdAt: string
+   103→  parameters?: string | null
+   104→}
+   105→
+   106→interface EventEntry {
+   107→  id: string
+   108→  deviceType: string
+   109→  deviceId: string
+   110→  eventType: string
+   111→  severity: string
+   112→  message: string
+   113→  createdAt: string
+   114→}
+   115→
+   116→interface ForecourtController {
+   117→  id: string
+   118→  name: string
+   119→  manufacturer: string
+   120→  model: string
+   121→  ipAddress: string | null
+   122→  port: number | null
+   123→  protocol: string | null
+   124→  status: string
+   125→  firmwareVersion: string | null
+   126→  serialNumber: string | null
+   127→  lastHeartbeat: Date | null
+   128→  lastCommunication: Date | null
+   129→  connectedDispensers: number | null
+   130→  maxDispensers: number | null
+   131→  dispensers?: Array<{
+   132→    id: string
+   133→    name: string
+   134→    code: string
+   135→    status: string
+   136→    nozzleCount: number
+   137→  }>
+   138→  station?: { id: string; name: string; code: string }
+   139→}
+   140→
+   141→interface HardwareCatalogItem {
+   142→  id: string
+   143→  manufacturer: string
+   144→  modelName: string
+   145→  category: string
+   146→  supportedProtocols?: string
+   147→  communicationTypes?: string
+   148→  description?: string | null
+   149→  isActive: boolean
+   150→}
+   151→
+   152→interface CommProtocol {
+   153→  id: string
+   154→  name: string
+   155→  protocolType: string | null
+   156→  transportType: string | null
+   157→  version: string | null
+   158→  description: string | null
+   159→  isActive: boolean
+   160→  connections?: Array<Record<string, unknown>>
+   161→}
+   162→
+   163→interface StationOption {
+   164→  id: string
+   165→  name: string
+   166→  code: string
+   167→}
+   168→
+   169→// ── Device Category Options ──────────────────────────────
+   170→
+   171→const DEVICE_CATEGORIES = [
+   172→  { value: 'controller', label: 'Forecourt Controller', icon: Server },
+   173→  { value: 'dispenser', label: 'Dispenser / Pump', icon: Fuel },
+   174→  { value: 'payment_terminal', label: 'Payment Terminal', icon: CreditCard },
+   175→  { value: 'atg', label: 'ATG / Tank Gauge', icon: Droplets },
+   176→  { value: 'price_board', label: 'Price Board / Display', icon: Monitor },
+   177→  { value: 'camera', label: 'Surveillance Camera', icon: Eye },
+   178→  { value: 'rfid_reader', label: 'RFID Reader', icon: Radio },
+   179→  { value: 'anpr_camera', label: 'ANPR Camera', icon: Eye },
+   180→  { value: 'generator', label: 'Generator', icon: Zap },
+   181→  { value: 'fire_alarm', label: 'Fire Alarm System', icon: AlertTriangle },
+   182→  { value: 'utility_meter', label: 'Utility Meter', icon: Gauge },
+   183→  { value: 'weather_station', label: 'Weather Station', icon: Activity },
+   184→  { value: 'tanker_tracker', label: 'Tanker Tracker', icon: Radio },
+   185→  { value: 'car_wash', label: 'Car Wash System', icon: Droplets },
+   186→  { value: 'air_compressor', label: 'Air Compressor', icon: Cpu },
+   187→  { value: 'vacuum_station', label: 'Vacuum Station', icon: Cpu },
+   188→] as const
+   189→
+   190→const COMM_TYPES = ['tcpip', 'serial', 'rs485', 'mqtt', 'http', 'wiegand', 'modbus', 'ifsf', 'other'] as const
+   191→
+   192→// ── Helpers ──────────────────────────────────────
+   193→
+   194→const STATUS_MAP: Record<string, { dot: string; text: string }> = {
+   195→  online: { dot: 'macos-status-online', text: 'text-emerald-600 dark:text-emerald-400' },
+   196→  warning: { dot: 'macos-status-warning', text: 'text-teal-600 dark:text-teal-400' },
+   197→  offline: { dot: 'macos-status-offline', text: 'text-muted-foreground' },
+   198→  error: { dot: 'macos-status-error', text: 'text-red-600 dark:text-red-400' },
+   199→  idle: { dot: 'macos-status-online', text: 'text-emerald-600 dark:text-emerald-400' },
+   200→  active: { dot: 'macos-status-online', text: 'text-emerald-600 dark:text-emerald-400' },
+   201→  fueling: { dot: 'macos-status-warning', text: 'text-teal-600 dark:text-teal-400' },
+   202→  disabled: { dot: 'macos-status-offline', text: 'text-muted-foreground' },
+   203→  maintenance: { dot: 'macos-status-warning', text: 'text-teal-600 dark:text-teal-400' },
+   204→  busy: { dot: 'macos-status-warning', text: 'text-teal-600 dark:text-teal-400' },
+   205→  standby: { dot: 'macos-status-offline', text: 'text-muted-foreground' },
+   206→  recording: { dot: 'macos-status-online', text: 'text-emerald-600 dark:text-emerald-400' },
+   207→  moving: { dot: 'macos-status-online', text: 'text-emerald-600 dark:text-emerald-400' },
+   208→  parked: { dot: 'macos-status-offline', text: 'text-muted-foreground' },
+   209→  running: { dot: 'macos-status-online', text: 'text-emerald-600 dark:text-emerald-400' },
+   210→  normal: { dot: 'macos-status-online', text: 'text-emerald-600 dark:text-emerald-400' },
+   211→}
+   212→
+   213→const PRIORITY_MAP: Record<string, string> = {
+   214→  critical: 'bg-red-500/10 text-red-600 border-red-500/20',
+   215→  high: 'bg-teal-500/10 text-teal-600 border-teal-500/20',
+   216→  medium: 'bg-sky-500/10 text-sky-600 border-sky-500/20',
+   217→  low: 'bg-slate-500/10 text-slate-500 border-slate-500/20',
+   218→}
+   219→
+   220→const CMD_STATUS_MAP: Record<string, { icon: React.ElementType; color: string }> = {
+   221→  executing: { icon: Play, color: 'text-teal-500' },
+   222→  queued: { icon: Clock, color: 'text-sky-500' },
+   223→  completed: { icon: CheckCircle2, color: 'text-emerald-500' },
+   224→  retrying: { icon: RotateCcw, color: 'text-teal-500' },
+   225→  failed: { icon: XCircle, color: 'text-red-500' },
+   226→}
+   227→
+   228→const EVENT_LEVEL_MAP: Record<string, string> = {
+   229→  info: 'text-muted-foreground',
+   230→  success: 'text-emerald-600 dark:text-emerald-400',
+   231→  warning: 'text-teal-600 dark:text-teal-400',
+   232→  error: 'text-red-600 dark:text-red-400',
+   233→  critical: 'text-red-600 dark:text-red-400',
+   234→}
+   235→
+   236→const DEVICE_TYPE_ICONS: Record<string, { icon: React.ElementType; color: string; label: string }> = {
+   237→  forecourt_controller: { icon: Server, color: '#30d158', label: 'Forecourt Controllers' },
+   238→  payment_terminal: { icon: CreditCard, color: '#ff9f0a', label: 'Payment Terminals' },
+   239→  generator: { icon: Zap, color: '#ffd60a', label: 'Generators' },
+   240→  surveillance_camera: { icon: Eye, color: '#64d2ff', label: 'Surveillance Cameras' },
+   241→  fire_alarm: { icon: AlertTriangle, color: '#ff375f', label: 'Fire Alarm Systems' },
+   242→  utility_meter: { icon: Gauge, color: '#e8930c', label: 'Utility Meters' },
+   243→  weather_station: { icon: Activity, color: '#64d2ff', label: 'Weather Stations' },
+   244→  tanker_tracker: { icon: Radio, color: '#bf5af2', label: 'Tanker Trackers' },
+   245→  car_wash: { icon: Zap, color: '#ffd60a', label: 'Car Wash Systems' },
+   246→  air_compressor: { icon: Cpu, color: '#ff9f0a', label: 'Air Compressors' },
+   247→  vacuum_station: { icon: Cpu, color: '#bf5af2', label: 'Vacuum Stations' },
+   248→  dispenser: { icon: Fuel, color: '#e8930c', label: 'Dispensers' },
+   249→  anpr_camera: { icon: Eye, color: '#64d2ff', label: 'ANPR Cameras' },
+   250→  rfid_reader: { icon: Radio, color: '#bf5af2', label: 'RFID Readers' },
+   251→  price_board: { icon: Monitor, color: '#ff375f', label: 'Price Boards' },
+   252→  atg: { icon: Droplets, color: '#34c759', label: 'ATG Systems' },
+   253→}
+   254→
+   255→function timeAgo(date: Date | string | null): string {
+   256→  if (!date) return 'N/A'
+   257→  const d = typeof date === 'string' ? new Date(date) : date
+   258→  const diff = Date.now() - d.getTime()
+   259→  if (diff < 60000) return 'just now'
+   260→  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`
+   261→  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`
+   262→  return `${Math.floor(diff / 86400000)}d ago`
+   263→}
+   264→
+   265→// ── Skeleton ──────────────────────────────────────
+   266→
+   267→function Skeleton({ className }: { className?: string }) {
+   268→  return <div className={`animate-pulse rounded-md bg-muted ${className ?? ''}`} />
+   269→}
+   270→
+   271→// ── Form Field Helper ──
+   272→function FormField({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
+   273→  return (
+   274→    <div className="space-y-1.5">
+   275→      <Label className="text-[11px] font-medium text-muted-foreground">
+   276→        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+   277→      </Label>
+   278→      {children}
+   279→    </div>
+   280→  )
+   281→}
+   282→
+   283→// ── Add Device Form ──
+   284→function AddDeviceForm({
+   285→  stations,
+   286→  controllers,
+   287→  submitting,
+   288→  onSubmit,
+   289→  onCancel,
+   290→}: {
+   291→  stations: StationOption[]
+   292→  controllers: ForecourtController[]
+   293→  submitting: boolean
+   294→  onSubmit: (data: Record<string, string>) => void
+   295→  onCancel: () => void
+   296→}) {
+   297→  const [category, setCategory] = useState('')
+   298→  const [form, setForm] = useState<Record<string, string>>({})
+   299→
+   300→  const updateField = (key: string, value: string) => {
+   301→    setForm(prev => ({ ...prev, [key]: value }))
+   302→  }
+   303→
+   304→  const handleSubmit = (e: React.FormEvent) => {
+   305→    e.preventDefault()
+   306→    onSubmit({ category, ...form })
+   307→  }
+   308→
+   309→  const selectedCat = DEVICE_CATEGORIES.find(c => c.value === category)
+   310→
+   311→  return (
+   312→    <form onSubmit={handleSubmit} className="space-y-4" style={{ fontStyle: 'normal' }}>
+   313→      {/* Category Selector */}
+   314→      <div className="macos-group">
+   315→        <div className="macos-group-item">
+   316→          <div className="flex items-center justify-between">
+   317→            <span className="text-[11px] text-muted-foreground font-medium">Device Category</span>
+   318→            <span className="text-[10px] text-muted-foreground">{DEVICE_CATEGORIES.length} types available</span>
+   319→          </div>
+   320→        </div>
+   321→        <div className="p-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+   322→          {DEVICE_CATEGORIES.map(cat => {
+   323→            const Icon = cat.icon
+   324→            return (
+   325→              <button
+   326→                key={cat.value}
+   327→                type="button"
+   328→                onClick={() => { setCategory(cat.value); setForm({}) }}
+   329→                className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-[11px] font-medium transition-all ${
+   330→                  category === cat.value
+   331→                    ? 'bg-teal-500/15 text-teal-700 dark:text-teal-400 ring-1 ring-teal-500/30'
+   332→                    : 'text-muted-foreground hover:bg-black/[0.03] dark:hover:bg-white/[0.04]'
+   333→                }`}
+   334→              >
+   335→                <Icon className="size-3.5 shrink-0" />
+   336→                <span className="truncate">{cat.label}</span>
+   337→              </button>
+   338→            )
+   339→          })}
+   340→        </div>
+   341→      </div>
+   342→
+   343→      {category && (
+   344→        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+   345→          {/* Common Fields */}
+   346→          <div className="grid grid-cols-2 gap-3">
+   347→            <FormField label="Station" required>
+   348→              <Select value={form.stationId || ''} onValueChange={v => updateField('stationId', v)}>
+   349→                <SelectTrigger className="h-8 text-[12px]">
+   350→                  <SelectValue placeholder="Select station" />
+   351→                </SelectTrigger>
+   352→                <SelectContent>
+   353→                  {stations.map(s => (
+   354→                    <SelectItem key={s.id} value={s.id} className="text-[12px]">{s.name} ({s.code})</SelectItem>
+   355→                  ))}
+   356→                </SelectContent>
+   357→              </Select>
+   358→            </FormField>
+   359→            <FormField label="Device Code" required>
+   360→              <Input className="h-8 text-[12px]" placeholder="e.g. DSP-007" value={form.code || ''} onChange={e => updateField('code', e.target.value)} />
+   361→            </FormField>
+   362→          </div>
+   363→          <div className="grid grid-cols-2 gap-3">
+   364→            <FormField label="Device Name" required>
+   365→              <Input className="h-8 text-[12px]" placeholder="e.g. Pump #7 Island B" value={form.name || ''} onChange={e => updateField('name', e.target.value)} />
+   366→            </FormField>
+   367→            <FormField label="Manufacturer">
+   368→              <Input className="h-8 text-[12px]" placeholder="e.g. Gilbarco" value={form.manufacturer || ''} onChange={e => updateField('manufacturer', e.target.value)} />
+   369→            </FormField>
+   370→          </div>
+   371→
+   372→          {/* Controller-specific fields */}
+   373→          {category === 'controller' && (
+   374→            <div className="grid grid-cols-2 gap-3">
+   375→              <FormField label="Controller Type" required>
+   376→                <Select value={form.controllerType || ''} onValueChange={v => updateField('controllerType', v)}>
+   377→                  <SelectTrigger className="h-8 text-[12px]">
+   378→                    <SelectValue placeholder="Select type" />
+   379→                  </SelectTrigger>
+   380→                  <SelectContent>
+   381→                    {['IFSF', 'DOMS', 'TATSUNO', 'WAYNE', 'GILBARCO', 'VEEDER-ROOT'].map(t => (
+   382→                      <SelectItem key={t} value={t} className="text-[12px]">{t}</SelectItem>
+   383→                    ))}
+   384→                  </SelectContent>
+   385→                </Select>
+   386→              </FormField>
+   387→              <FormField label="Model">
+   388→                <Input className="h-8 text-[12px]" placeholder="e.g. ENC-7000" value={form.model || ''} onChange={e => updateField('model', e.target.value)} />
+   389→              </FormField>
+   390→              <FormField label="IP Address">
+   391→                <Input className="h-8 text-[12px] font-mono" placeholder="192.168.1.100" value={form.ipAddress || ''} onChange={e => updateField('ipAddress', e.target.value)} />
+   392→              </FormField>
+   393→              <FormField label="Port">
+   394→                <Input className="h-8 text-[12px] font-mono" placeholder="5000" value={form.port || ''} onChange={e => updateField('port', e.target.value)} />
+   395→              </FormField>
+   396→              <FormField label="Communication">
+   397→                <Select value={form.communicationType || ''} onValueChange={v => updateField('communicationType', v)}>
+   398→                  <SelectTrigger className="h-8 text-[12px]">
+   399→                    <SelectValue placeholder="Select comm type" />
+   400→                  </SelectTrigger>
+   401→                  <SelectContent>
+   402→                    {COMM_TYPES.map(t => (
+   403→                      <SelectItem key={t} value={t} className="text-[12px]">{t.toUpperCase()}</SelectItem>
+   404→                    ))}
+   405→                  </SelectContent>
+   406→                </Select>
+   407→              </FormField>
+   408→              <FormField label="Max Dispensers">
+   409→                <Input className="h-8 text-[12px]" type="number" placeholder="32" value={form.maxDispensers || ''} onChange={e => updateField('maxDispensers', e.target.value)} />
+   410→              </FormField>
+   411→              <FormField label="Serial Number">
+   412→                <Input className="h-8 text-[12px] font-mono" placeholder="SN-XXXX" value={form.serialNumber || ''} onChange={e => updateField('serialNumber', e.target.value)} />
+   413→              </FormField>
+   414→              <FormField label="Firmware Version">
+   415→                <Input className="h-8 text-[12px] font-mono" placeholder="v1.2.3" value={form.firmwareVersion || ''} onChange={e => updateField('firmwareVersion', e.target.value)} />
+   416→              </FormField>
+   417→              <FormField label="Polling Interval (ms)">
+   418→                <Input className="h-8 text-[12px]" type="number" placeholder="1000" value={form.pollingInterval || ''} onChange={e => updateField('pollingInterval', e.target.value)} />
+   419→              </FormField>
+   420→              <FormField label="Timeout (ms)">
+   421→                <Input className="h-8 text-[12px]" type="number" placeholder="5000" value={form.timeout || ''} onChange={e => updateField('timeout', e.target.value)} />
+   422→              </FormField>
+   423→            </div>
+   424→          )}
+   425→
+   426→          {/* Dispenser-specific fields */}
+   427→          {category === 'dispenser' && (
+   428→            <>
+   429→              <div className="grid grid-cols-2 gap-3">
+   430→                <FormField label="Forecourt Controller" required>
+   431→                  <Select value={form.forecourtControllerId || ''} onValueChange={v => updateField('forecourtControllerId', v)}>
+   432→                    <SelectTrigger className="h-8 text-[12px]">
+   433→                      <SelectValue placeholder="Select controller" />
+   434→                    </SelectTrigger>
+   435→                    <SelectContent>
+   436→                      {controllers.map(c => (
+   437→                        <SelectItem key={c.id} value={c.id} className="text-[12px]">{c.name} ({c.code})</SelectItem>
+   438→                      ))}
+   439→                    </SelectContent>
+   440→                  </Select>
+   441→                </FormField>
+   442→                <FormField label="Model">
+   443→                  <Input className="h-8 text-[12px]" placeholder="e.g. SK700-II" value={form.model || ''} onChange={e => updateField('model', e.target.value)} />
+   444→                </FormField>
+   445→              </div>
+   446→              <div className="grid grid-cols-2 gap-3">
+   447→                <FormField label="Pump Lane">
+   448→                  <Input className="h-8 text-[12px]" type="number" placeholder="1" value={form.pumpLane || ''} onChange={e => updateField('pumpLane', e.target.value)} />
+   449→                </FormField>
+   450→                <FormField label="Pump Address">
+   451→                  <Input className="h-8 text-[12px]" type="number" placeholder="1" value={form.pumpAddress || ''} onChange={e => updateField('pumpAddress', e.target.value)} />
+   452→                </FormField>
+   453→                <FormField label="Nozzle Count">
+   454→                  <Input className="h-8 text-[12px]" type="number" placeholder="2" value={form.nozzleCount || ''} onChange={e => updateField('nozzleCount', e.target.value)} />
+   455→                </FormField>
+   456→                <FormField label="Flow Rate (L/min)">
+   457→                  <Input className="h-8 text-[12px]" type="number" placeholder="60" value={form.flowRate || ''} onChange={e => updateField('flowRate', e.target.value)} />
+   458→                </FormField>
+   459→                <FormField label="IP Address">
+   460→                  <Input className="h-8 text-[12px] font-mono" placeholder="192.168.1.107" value={form.ipAddress || ''} onChange={e => updateField('ipAddress', e.target.value)} />
+   461→                </FormField>
+   462→                <FormField label="Communication">
+   463→                  <Select value={form.communicationType || ''} onValueChange={v => updateField('communicationType', v)}>
+   464→                    <SelectTrigger className="h-8 text-[12px]">
+   465→                      <SelectValue placeholder="Select comm type" />
+   466→                    </SelectTrigger>
+   467→                    <SelectContent>
+   468→                      {COMM_TYPES.map(t => (
+   469→                        <SelectItem key={t} value={t} className="text-[12px]">{t.toUpperCase()}</SelectItem>
+   470→                      ))}
+   471→                    </SelectContent>
+   472→                  </Select>
+   473→                </FormField>
+   474→                <FormField label="Protocol">
+   475→                  <Input className="h-8 text-[12px]" placeholder="IFSF" value={form.protocol || ''} onChange={e => updateField('protocol', e.target.value)} />
+   476→                </FormField>
+   477→                <FormField label="Serial Number">
+   478→                  <Input className="h-8 text-[12px] font-mono" placeholder="SN-XXXX" value={form.serialNumber || ''} onChange={e => updateField('serialNumber', e.target.value)} />
+   479→                </FormField>
+   480→              </div>
+   481→            </>
+   482→          )}
+   483→
+   484→          {/* Generic fields for other device types */}
+   485→          {category !== 'controller' && category !== 'dispenser' && (
+   486→            <div className="grid grid-cols-2 gap-3">
+   487→              <FormField label="Model">
+   488→                <Input className="h-8 text-[12px]" placeholder="Model number" value={form.model || ''} onChange={e => updateField('model', e.target.value)} />
+   489→              </FormField>
+   490→              <FormField label="Serial Number">
+   491→                <Input className="h-8 text-[12px] font-mono" placeholder="SN-XXXX" value={form.serialNumber || ''} onChange={e => updateField('serialNumber', e.target.value)} />
+   492→              </FormField>
+   493→              <FormField label="IP Address">
+   494→                <Input className="h-8 text-[12px] font-mono" placeholder="192.168.1.x" value={form.ipAddress || ''} onChange={e => updateField('ipAddress', e.target.value)} />
+   495→              </FormField>
+   496→              <FormField label="Communication Type">
+   497→                <Select value={form.communicationType || ''} onValueChange={v => updateField('communicationType', v)}>
+   498→                  <SelectTrigger className="h-8 text-[12px]">
+   499→                    <SelectValue placeholder="Select comm type" />
+   500→                  </SelectTrigger>
+   501→                  <SelectContent>
+   502→                    {COMM_TYPES.map(t => (
+   503→                      <SelectItem key={t} value={t} className="text-[12px]">{t.toUpperCase()}</SelectItem>
+   504→                    ))}
+   505→                  </SelectContent>
+   506→                </Select>
+   507→              </FormField>
+   508→              {category === 'atg' && (
+   509→                <>
+   510→                  <FormField label="ATG Type">
+   511→                    <Select value={form.atgType || ''} onValueChange={v => updateField('atgType', v)}>
+   512→                      <SelectTrigger className="h-8 text-[12px]">
+   513→                        <SelectValue placeholder="Select ATG type" />
+   514→                      </SelectTrigger>
+   515→                      <SelectContent>
+   516→                        {['magnetostrictive', 'capacitive', 'radar', 'ultrasonic', 'float'].map(t => (
+   517→                          <SelectItem key={t} value={t} className="text-[12px]">{t.charAt(0).toUpperCase() + t.slice(1)}</SelectItem>
+   518→                        ))}
+   519→                      </SelectContent>
+   520→                    </Select>
+   521→                  </FormField>
+   522→                  <FormField label="Port">
+   523→                    <Input className="h-8 text-[12px] font-mono" placeholder="5000" value={form.port || ''} onChange={e => updateField('port', e.target.value)} />
+   524→                  </FormField>
+   525→                </>
+   526→              )}
+   527→              {category === 'price_board' && (
+   528→                <>
+   529→                  <FormField label="Display Type">
+   530→                    <Select value={form.displayType || ''} onValueChange={v => updateField('displayType', v)}>
+   531→                      <SelectTrigger className="h-8 text-[12px]">
+   532→                        <SelectValue placeholder="Select type" />
+   533→                      </SelectTrigger>
+   534→                      <SelectContent>
+   535→                        {['LED', 'LCD', 'Flip-Disc', 'E-Ink'].map(t => (
+   536→                          <SelectItem key={t} value={t.toLowerCase()} className="text-[12px]">{t}</SelectItem>
+   537→                        ))}
+   538→                      </SelectContent>
+   539→                    </Select>
+   540→                  </FormField>
+   541→                  <FormField label="Line Count">
+   542→                    <Input className="h-8 text-[12px]" type="number" placeholder="4" value={form.lineCount || ''} onChange={e => updateField('lineCount', e.target.value)} />
+   543→                  </FormField>
+   544→                </>
+   545→              )}
+   546→              {category === 'camera' && (
+   547→                <>
+   548→                  <FormField label="Resolution">
+   549→                    <Select value={form.resolution || ''} onValueChange={v => updateField('resolution', v)}>
+   550→                      <SelectTrigger className="h-8 text-[12px]">
+   551→                        <SelectValue placeholder="Select resolution" />
+   552→                      </SelectTrigger>
+   553→                      <SelectContent>
+   554→                        {['720p', '1080p', '2K', '4K'].map(t => (
+   555→                          <SelectItem key={t} value={t.toLowerCase()} className="text-[12px]">{t}</SelectItem>
+   556→                        ))}
+   557→                      </SelectContent>
+   558→                    </Select>
+   559→                  </FormField>
+   560→                  <FormField label="Port">
+   561→                    <Input className="h-8 text-[12px] font-mono" placeholder="554" value={form.port || ''} onChange={e => updateField('port', e.target.value)} />
+   562→                  </FormField>
+   563→                </>
+   564→              )}
+   565→            </div>
+   566→          )}
+   567→
+   568→          {/* Notes / Config JSON */}
+   569→          <FormField label="Configuration JSON (optional)">
+   570→            <Textarea className="text-[12px] font-mono min-h-[60px]" placeholder='{"key": "value"}' value={form.configJson || ''} onChange={e => updateField('configJson', e.target.value)} />
+   571→          </FormField>
+   572→        </motion.div>
+   573→      )}
+   574→
+   575→      <DialogFooter className="gap-2">
+   576→        <Button type="button" variant="outline" size="sm" className="text-[12px] h-8" onClick={onCancel} disabled={submitting}>
+   577→          Cancel
+   578→        </Button>
+   579→        <Button type="submit" size="sm" className="text-[12px] h-8 bg-teal-600 hover:bg-teal-700 text-white" disabled={submitting || !category || !form.stationId || !form.name || !form.code}>
+   580→          {submitting ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : <Plus className="size-3.5 mr-1.5" />}
+   581→          {submitting ? 'Adding...' : `Add ${selectedCat?.label || 'Device'}`}
+   582→        </Button>
+   583→      </DialogFooter>
+   584→    </form>
+   585→  )
+   586→}
+   587→
+   588→// ── Add Controller Form ──
+   589→function AddControllerForm({
+   590→  stations,
+   591→  submitting,
+   592→  onSubmit,
+   593→  onCancel,
+   594→}: {
+   595→  stations: StationOption[]
+   596→  submitting: boolean
+   597→  onSubmit: (data: Record<string, string>) => void
+   598→  onCancel: () => void
+   599→}) {
+   600→  const [form, setForm] = useState<Record<string, string>>({})
+   601→
+   602→  const updateField = (key: string, value: string) => {
+   603→    setForm(prev => ({ ...prev, [key]: value }))
+   604→  }
+   605→
+   606→  const handleSubmit = (e: React.FormEvent) => {
+   607→    e.preventDefault()
+   608→    onSubmit(form)
+   609→  }
+   610→
+   611→  return (
+   612→    <form onSubmit={handleSubmit} className="space-y-4" style={{ fontStyle: 'normal' }}>
+   613→      {/* Core Identity */}
+   614→      <div>
+   615→        <p className="text-[11px] uppercase tracking-wider font-semibold text-teal-600 dark:text-teal-400 mb-2">Core Identity</p>
+   616→        <div className="grid grid-cols-2 gap-3">
+   617→          <FormField label="Station" required>
+   618→            <Select value={form.stationId || ''} onValueChange={v => updateField('stationId', v)}>
+   619→              <SelectTrigger className="h-8 text-[12px]">
+   620→                <SelectValue placeholder="Select station" />
+   621→              </SelectTrigger>
+   622→              <SelectContent>
+   623→                {stations.map(s => (
+   624→                  <SelectItem key={s.id} value={s.id} className="text-[12px]">{s.name} ({s.code})</SelectItem>
+   625→                ))}
+   626→              </SelectContent>
+   627→            </Select>
+   628→          </FormField>
+   629→          <FormField label="Controller Type" required>
+   630→            <Select value={form.controllerType || ''} onValueChange={v => updateField('controllerType', v)}>
+   631→              <SelectTrigger className="h-8 text-[12px]">
+   632→                <SelectValue placeholder="Select protocol" />
+   633→              </SelectTrigger>
+   634→              <SelectContent>
+   635→                {['IFSF', 'DOMS', 'TATSUNO', 'WAYNE', 'GILBARCO', 'VEEDER-ROOT'].map(t => (
+   636→                  <SelectItem key={t} value={t} className="text-[12px]">{t}</SelectItem>
+   637→                ))}
+   638→              </SelectContent>
+   639→            </Select>
+   640→          </FormField>
+   641→          <FormField label="Controller Name" required>
+   642→            <Input className="h-8 text-[12px]" placeholder="e.g. Main Forecourt Controller" value={form.name || ''} onChange={e => updateField('name', e.target.value)} />
+   643→          </FormField>
+   644→          <FormField label="Code" required>
+   645→            <Input className="h-8 text-[12px] font-mono" placeholder="e.g. FC-001" value={form.code || ''} onChange={e => updateField('code', e.target.value)} />
+   646→          </FormField>
+   647→        </div>
+   648→      </div>
+   649→
+   650→      {/* Hardware Details */}
+   651→      <div>
+   652→        <p className="text-[11px] uppercase tracking-wider font-semibold text-teal-600 dark:text-teal-400 mb-2">Hardware Details</p>
+   653→        <div className="grid grid-cols-2 gap-3">
+   654→          <FormField label="Manufacturer">
+   655→            <Input className="h-8 text-[12px]" placeholder="e.g. Wayne Fueling" value={form.manufacturer || ''} onChange={e => updateField('manufacturer', e.target.value)} />
+   656→          </FormField>
+   657→          <FormField label="Model">
+   658→            <Input className="h-8 text-[12px]" placeholder="e.g. iX Pay" value={form.model || ''} onChange={e => updateField('model', e.target.value)} />
+   659→          </FormField>
+   660→          <FormField label="Serial Number">
+   661→            <Input className="h-8 text-[12px] font-mono" placeholder="SN-XXXX-XXXX" value={form.serialNumber || ''} onChange={e => updateField('serialNumber', e.target.value)} />
+   662→          </FormField>
+   663→          <FormField label="Firmware Version">
+   664→            <Input className="h-8 text-[12px] font-mono" placeholder="v1.0.0" value={form.firmwareVersion || ''} onChange={e => updateField('firmwareVersion', e.target.value)} />
+   665→          </FormField>
+   666→        </div>
+   667→      </div>
+   668→
+   669→      {/* Network Configuration */}
+   670→      <div>
+   671→        <p className="text-[11px] uppercase tracking-wider font-semibold text-teal-600 dark:text-teal-400 mb-2">Network Configuration</p>
+   672→        <div className="grid grid-cols-2 gap-3">
+   673→          <FormField label="Communication Type">
+   674→            <Select value={form.communicationType || ''} onValueChange={v => updateField('communicationType', v)}>
+   675→              <SelectTrigger className="h-8 text-[12px]">
+   676→                <SelectValue placeholder="Select type" />
+   677→              </SelectTrigger>
+   678→              <SelectContent>
+   679→                {COMM_TYPES.map(t => (
+   680→                  <SelectItem key={t} value={t} className="text-[12px]">{t.toUpperCase()}</SelectItem>
+   681→                ))}
+   682→              </SelectContent>
+   683→            </Select>
+   684→          </FormField>
+   685→          <FormField label="Protocol">
+   686→            <Input className="h-8 text-[12px]" placeholder="IFSF" value={form.protocol || ''} onChange={e => updateField('protocol', e.target.value)} />
+   687→          </FormField>
+   688→          <FormField label="IP Address">
+   689→            <Input className="h-8 text-[12px] font-mono" placeholder="192.168.1.100" value={form.ipAddress || ''} onChange={e => updateField('ipAddress', e.target.value)} />
+   690→          </FormField>
+   691→          <FormField label="Port">
+   692→            <Input className="h-8 text-[12px] font-mono" placeholder="5000" value={form.port || ''} onChange={e => updateField('port', e.target.value)} />
+   693→          </FormField>
+   694→          <FormField label="Baud Rate">
+   695→            <Input className="h-8 text-[12px] font-mono" placeholder="9600" value={form.baudRate || ''} onChange={e => updateField('baudRate', e.target.value)} />
+   696→          </FormField>
+   697→          <FormField label="COM Port">
+   698→            <Input className="h-8 text-[12px] font-mono" placeholder="COM1" value={form.comPort || ''} onChange={e => updateField('comPort', e.target.value)} />
+   699→          </FormField>
+   700→        </div>
+   701→      </div>
+   702→
+   703→      {/* Operational Settings */}
+   704→      <div>
+   705→        <p className="text-[11px] uppercase tracking-wider font-semibold text-teal-600 dark:text-teal-400 mb-2">Operational Settings</p>
+   706→        <div className="grid grid-cols-2 gap-3">
+   707→          <FormField label="Max Dispensers">
+   708→            <Input className="h-8 text-[12px]" type="number" placeholder="32" value={form.maxDispensers || ''} onChange={e => updateField('maxDispensers', e.target.value)} />
+   709→          </FormField>
+   710→          <FormField label="Polling Interval (ms)">
+   711→            <Input className="h-8 text-[12px]" type="number" placeholder="1000" value={form.pollingInterval || ''} onChange={e => updateField('pollingInterval', e.target.value)} />
+   712→          </FormField>
+   713→          <FormField label="Timeout (ms)">
+   714→            <Input className="h-8 text-[12px]" type="number" placeholder="5000" value={form.timeout || ''} onChange={e => updateField('timeout', e.target.value)} />
+   715→          </FormField>
+   716→        </div>
+   717→      </div>
+   718→
+   719→      <FormField label="Configuration JSON (optional)">
+   720→        <Textarea className="text-[12px] font-mono min-h-[60px]" placeholder='{"key": "value"}' value={form.configJson || ''} onChange={e => updateField('configJson', e.target.value)} />
+   721→      </FormField>
+   722→
+   723→      <DialogFooter className="gap-2">
+   724→        <Button type="button" variant="outline" size="sm" className="text-[12px] h-8" onClick={onCancel} disabled={submitting}>
+   725→          Cancel
+   726→        </Button>
+   727→        <Button type="submit" size="sm" className="text-[12px] h-8 bg-teal-600 hover:bg-teal-700 text-white" disabled={submitting || !form.stationId || !form.name || !form.code || !form.controllerType}>
+   728→          {submitting ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : <Server className="size-3.5 mr-1.5" />}
+   729→          {submitting ? 'Registering...' : 'Register Controller'}
+   730→        </Button>
+   731→      </DialogFooter>
+   732→    </form>
+   733→  )
+   734→}
+   735→
+   736→// ── Owner Registration Form ──────────────────────
+   737→
+   738→const DEVICE_TYPE_OPTIONS = [
+   739→  { value: 'pos', label: 'POS Terminal' },
+   740→  { value: 'dispenser_controller', label: 'Dispenser Controller' },
+   741→  { value: 'atg', label: 'ATG / Tank Gauge' },
+   742→  { value: 'payment_terminal', label: 'Payment Terminal' },
+   743→  { value: 'scanner', label: 'Barcode Scanner' },
+   744→  { value: 'other', label: 'Other Hardware' },
+   745→]
+   746→
+   747→const PLAN_OPTIONS = [
+   748→  { value: 'starter', label: 'Starter', price: 'PKR 4,999/mo', desc: '1 Station · 4 Dispensers · 5 Users' },
+   749→  { value: 'professional', label: 'Professional', price: 'PKR 14,999/mo', desc: '5 Stations · 32 Dispensers · 25 Users', popular: true },
+   750→  { value: 'enterprise', label: 'Enterprise', price: 'PKR 49,999/mo', desc: '50 Stations · 500 Dispensers · 200 Users' },
+   751→]
+   752→
+   753→function OwnerRegistrationForm({
+   754→  submitting,
+   755→  onSubmit,
+   756→  onCancel,
+   757→}: {
+   758→  submitting: boolean
+   759→  onSubmit: (data: Record<string, string>) => void
+   760→  onCancel: () => void
+   761→}) {
+   762→  const [form, setForm] = useState<Record<string, string>>({ plan: 'professional' })
+   763→
+   764→  const updateField = (key: string, value: string) => {
+   765→    setForm(prev => ({ ...prev, [key]: value }))
+   766→  }
+   767→
+   768→  const handleSubmit = (e: React.FormEvent) => {
+   769→    e.preventDefault()
+   770→    onSubmit(form)
+   771→  }
+   772→
+   773→  return (
+   774→    <form onSubmit={handleSubmit} className="space-y-4" style={{ fontStyle: 'normal' }}>
+   775→      {/* Company Info */}
+   776→      <div>
+   777→        <p className="text-[11px] uppercase tracking-wider font-semibold text-teal-600 dark:text-teal-400 mb-2">Company Information</p>
+   778→        <div className="grid grid-cols-2 gap-3">
+   779→          <FormField label="Company Name" required>
+   780→            <Input className="h-8 text-[12px]" placeholder="e.g. Al-Noor Fuel Stations" value={form.companyName || ''} onChange={e => updateField('companyName', e.target.value)} />
+   781→          </FormField>
+   782→          <FormField label="Contact Person" required>
+   783→            <Input className="h-8 text-[12px]" placeholder="e.g. Muhammad Ahmed" value={form.contactPerson || ''} onChange={e => updateField('contactPerson', e.target.value)} />
+   784→          </FormField>
+   785→          <FormField label="Email" required>
+   786→            <Input className="h-8 text-[12px]" type="email" placeholder="owner@company.com" value={form.email || ''} onChange={e => updateField('email', e.target.value)} />
+   787→          </FormField>
+   788→          <FormField label="Phone" required>
+   789→            <Input className="h-8 text-[12px]" placeholder="+92 300 1234567" value={form.phone || ''} onChange={e => updateField('phone', e.target.value)} />
+   790→          </FormField>
+   791→          <FormField label="City">
+   792→            <Input className="h-8 text-[12px]" placeholder="e.g. Karachi" value={form.city || ''} onChange={e => updateField('city', e.target.value)} />
+   793→          </FormField>
+   794→          <FormField label="Address">
+   795→            <Input className="h-8 text-[12px]" placeholder="Street address" value={form.address || ''} onChange={e => updateField('address', e.target.value)} />
+   796→          </FormField>
+   797→        </div>
+   798→      </div>
+   799→
+   800→      {/* Device Info */}
+   801→      <div>
+   802→        <p className="text-[11px] uppercase tracking-wider font-semibold text-teal-600 dark:text-teal-400 mb-2">Device / Hardware</p>
+   803→        <div className="grid grid-cols-2 gap-3">
+   804→          <FormField label="Device Name" required>
+   805→            <Input className="h-8 text-[12px]" placeholder="e.g. Main POS Terminal" value={form.deviceName || ''} onChange={e => updateField('deviceName', e.target.value)} />
+   806→          </FormField>
+   807→          <FormField label="Device Type" required>
+   808→            <Select value={form.deviceType || ''} onValueChange={v => updateField('deviceType', v)}>
+   809→              <SelectTrigger className="h-8 text-[12px]">
+   810→                <SelectValue placeholder="Select type" />
+   811→              </SelectTrigger>
+   812→              <SelectContent>
+   813→                {DEVICE_TYPE_OPTIONS.map(t => (
+   814→                  <SelectItem key={t.value} value={t.value} className="text-[12px]">{t.label}</SelectItem>
+   815→                ))}
+   816→              </SelectContent>
+   817→            </Select>
+   818→          </FormField>
+   819→          <FormField label="Serial Number">
+   820→            <Input className="h-8 text-[12px] font-mono" placeholder="SN-XXXX-XXXX (optional)" value={form.serialNumber || ''} onChange={e => updateField('serialNumber', e.target.value)} />
+   821→          </FormField>
+   822→          <FormField label="MAC Address">
+   823→            <Input className="h-8 text-[12px] font-mono" placeholder="AA:BB:CC:DD:EE:FF (optional)" value={form.macAddress || ''} onChange={e => updateField('macAddress', e.target.value)} />
+   824→          </FormField>
+   825→        </div>
+   826→      </div>
+   827→
+   828→      {/* Plan Selection */}
+   829→      <div>
+   830→        <p className="text-[11px] uppercase tracking-wider font-semibold text-teal-600 dark:text-teal-400 mb-2">Subscription Plan</p>
+   831→        <div className="grid grid-cols-3 gap-2">
+   832→          {PLAN_OPTIONS.map(p => (
+   833→            <button
+   834→              key={p.value}
+   835→              type="button"
+   836→              onClick={() => updateField('plan', p.value)}
+   837→              className={`relative p-3 rounded-xl text-left transition-all border ${
+   838→                form.plan === p.value
+   839→                  ? 'border-teal-500 bg-teal-500/10 ring-1 ring-teal-500/30'
+   840→                  : 'border-border hover:border-teal-500/30'
+   841→              }`}
+   842→            >
+   843→              {p.popular && (
+   844→                <span className="absolute -top-2 right-2 bg-teal-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">POPULAR</span>
+   845→              )}
+   846→              <p className="text-[12px] font-semibold">{p.label}</p>
+   847→              <p className="text-[11px] text-teal-600 dark:text-teal-400 font-medium">{p.price}</p>
+   848→              <p className="text-[10px] text-muted-foreground mt-1">{p.desc}</p>
+   849→            </button>
+   850→          ))}
+   851→        </div>
+   852→      </div>
+   853→
+   854→      <DialogFooter className="gap-2">
+   855→        <Button type="button" variant="outline" size="sm" className="text-[12px] h-8" onClick={onCancel} disabled={submitting}>
+   856→          Cancel
+   857→        </Button>
+   858→        <Button type="submit" size="sm" className="text-[12px] h-8 bg-teal-600 hover:bg-teal-700 text-white" disabled={submitting || !form.companyName || !form.contactPerson || !form.email || !form.phone || !form.deviceName || !form.deviceType}>
+   859→          {submitting ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : <Shield className="size-3.5 mr-1.5" />}
+   860→          {submitting ? 'Registering...' : 'Register & Get Credentials'}
+   861→        </Button>
+   862→      </DialogFooter>
+   863→    </form>
+   864→  )
+   865→}
+   866→
+   867→// ── Credentials Display ──────────────────────────
+   868→
+   869→function CredentialsDisplay({
+   870→  result,
+   871→  onClose,
+   872→}: {
+   873→  result: OwnerRegistrationResult
+   874→  onClose: () => void
+   875→}) {
+   876→  const [copiedField, setCopiedField] = useState<string | null>(null)
+   877→
+   878→  const copyToClipboard = async (text: string, field: string) => {
+   879→    try {
+   880→      await navigator.clipboard.writeText(text)
+   881→      setCopiedField(field)
+   882→      toast.success(`${field} copied to clipboard`)
+   883→      setTimeout(() => setCopiedField(null), 2000)
+   884→    } catch {
+   885→      toast.error('Failed to copy')
+   886→    }
+   887→  }
+   888→
+   889→  return (
+   890→    <div className="space-y-4" style={{ fontStyle: 'normal' }}>
+   891→      {/* Success Banner */}
+   892→      <motion.div
+   893→        initial={{ opacity: 0, scale: 0.95 }}
+   894→        animate={{ opacity: 1, scale: 1 }}
+   895→        className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20"
+   896→      >
+   897→        <div className="flex items-center gap-2 mb-1">
+   898→          <CheckCircle2 className="size-5 text-emerald-500" />
+   899→          <p className="text-[14px] font-semibold text-emerald-700 dark:text-emerald-400">Registration Successful!</p>
+   900→        </div>
+   901→        <p className="text-[11px] text-emerald-600 dark:text-emerald-400">
+   902→          Your device has been registered as owner. Save these credentials — the password will not be shown again.
+   903→        </p>
+   904→      </motion.div>
+   905→
+   906→      {/* Owner Info */}
+   907→      <div className="macos-group">
+   908→        <div className="macos-group-item">
+   909→          <div className="flex items-center gap-2">
+   910→            <User className="size-3.5 text-teal-500" />
+   911→            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Owner Details</span>
+   912→          </div>
+   913→        </div>
+   914→        <div className="p-3 space-y-2">
+   915→          <div className="flex justify-between items-center">
+   916→            <span className="text-[11px] text-muted-foreground">Company</span>
+   917→            <span className="text-[12px] font-medium">{result.owner.companyName}</span>
+   918→          </div>
+   919→          <div className="flex justify-between items-center">
+   920→            <span className="text-[11px] text-muted-foreground">Contact</span>
+   921→            <span className="text-[12px] font-medium">{result.owner.contactPerson}</span>
+   922→          </div>
+   923→          <div className="flex justify-between items-center">
+   924→            <span className="text-[11px] text-muted-foreground">Status</span>
+   925→            <Badge className="bg-emerald-500/10 text-emerald-600 text-[10px] border-emerald-500/20">Trial</Badge>
+   926→          </div>
+   927→        </div>
+   928→      </div>
+   929→
+   930→      {/* Login Credentials */}
+   931→      <div className="macos-group">
+   932→        <div className="macos-group-item">
+   933→          <div className="flex items-center gap-2">
+   934→            <Key className="size-3.5 text-amber-500" />
+   935→            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Login Credentials</span>
+   936→          </div>
+   937→        </div>
+   938→        <div className="p-3 space-y-2">
+   939→          <div className="flex justify-between items-center">
+   940→            <span className="text-[11px] text-muted-foreground">Email</span>
+   941→            <div className="flex items-center gap-1.5">
+   942→              <code className="text-[12px] font-mono bg-muted px-2 py-0.5 rounded">{result.credentials.email}</code>
+   943→              <button onClick={() => copyToClipboard(result.credentials.email, 'Email')} className="p-1 hover:bg-muted rounded transition-colors">
+   944→                {copiedField === 'Email' ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3 text-muted-foreground" />}
+   945→              </button>
+   946→            </div>
+   947→          </div>
+   948→          <div className="flex justify-between items-center">
+   949→            <span className="text-[11px] text-muted-foreground">Password</span>
+   950→            <div className="flex items-center gap-1.5">
+   951→              <code className="text-[12px] font-mono bg-red-500/10 text-red-600 dark:text-red-400 px-2 py-0.5 rounded">{result.credentials.password}</code>
+   952→              <button onClick={() => copyToClipboard(result.credentials.password, 'Password')} className="p-1 hover:bg-muted rounded transition-colors">
+   953→                {copiedField === 'Password' ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3 text-muted-foreground" />}
+   954→              </button>
+   955→            </div>
+   956→          </div>
+   957→          <div className="flex justify-between items-center">
+   958→            <span className="text-[11px] text-muted-foreground">API Key</span>
+   959→            <div className="flex items-center gap-1.5">
+   960→              <code className="text-[11px] font-mono bg-muted px-2 py-0.5 rounded max-w-[280px] truncate">{result.credentials.apiKey}</code>
+   961→              <button onClick={() => copyToClipboard(result.credentials.apiKey, 'API Key')} className="p-1 hover:bg-muted rounded transition-colors">
+   962→                {copiedField === 'API Key' ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3 text-muted-foreground" />}
+   963→              </button>
+   964→            </div>
+   965→          </div>
+   966→        </div>
+   967→      </div>
+   968→
+   969→      {/* Serial Key */}
+   970→      <div className="macos-group">
+   971→        <div className="macos-group-item">
+   972→          <div className="flex items-center gap-2">
+   973→            <Shield className="size-3.5 text-violet-500" />
+   974→            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Serial Key</span>
+   975→          </div>
+   976→        </div>
+   977→        <div className="p-3 space-y-2">
+   978→          <div className="flex justify-between items-center">
+   979→            <span className="text-[11px] text-muted-foreground">Key</span>
+   980→            <div className="flex items-center gap-1.5">
+   981→              <code className="text-[13px] font-mono font-bold bg-violet-500/10 text-violet-600 dark:text-violet-400 px-3 py-1 rounded-lg tracking-wider">{result.serialKey.key}</code>
+   982→              <button onClick={() => copyToClipboard(result.serialKey.key, 'Serial Key')} className="p-1 hover:bg-muted rounded transition-colors">
+   983→                {copiedField === 'Serial Key' ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3 text-muted-foreground" />}
+   984→              </button>
+   985→            </div>
+   986→          </div>
+   987→          <div className="flex justify-between items-center">
+   988→            <span className="text-[11px] text-muted-foreground">Plan</span>
+   989→            <Badge className="bg-violet-500/10 text-violet-600 text-[10px] border-violet-500/20 capitalize">{result.serialKey.plan}</Badge>
+   990→          </div>
+   991→          <div className="flex justify-between items-center">
+   992→            <span className="text-[11px] text-muted-foreground">Limits</span>
+   993→            <span className="text-[11px] text-muted-foreground">
+   994→              {result.serialKey.maxStations} station{result.serialKey.maxStations > 1 ? 's' : ''} · {result.serialKey.maxDispensers} dispensers · {result.serialKey.maxUsers} users
+   995→            </span>
+   996→          </div>
+   997→          <div className="flex justify-between items-center">
+   998→            <span className="text-[11px] text-muted-foreground">Expires</span>
+   999→            <span className="text-[12px] font-medium">{result.serialKey.expiresAt ? new Date(result.serialKey.expiresAt).toLocaleDateString('en-PK', { year: 'numeric', month: 'long', day: 'numeric' }) : 'No expiry'}</span>
+  1000→          </div>
+  1001→        </div>
+  1002→      </div>
+  1003→
+  1004→      {/* Device Info */}
+  1005→      <div className="macos-group">
+  1006→        <div className="macos-group-item">
+  1007→          <div className="flex items-center gap-2">
+  1008→            <HardDrive className="size-3.5 text-sky-500" />
+  1009→            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Registered Device</span>
+  1010→          </div>
+  1011→        </div>
+  1012→        <div className="p-3 space-y-2">
+  1013→          <div className="flex justify-between items-center">
+  1014→            <span className="text-[11px] text-muted-foreground">Name</span>
+  1015→            <span className="text-[12px] font-medium">{result.device.name}</span>
+  1016→          </div>
+  1017→          <div className="flex justify-between items-center">
+  1018→            <span className="text-[11px] text-muted-foreground">Type</span>
+  1019→            <Badge className="bg-sky-500/10 text-sky-600 text-[10px] border-sky-500/20">{result.device.type}</Badge>
+  1020→          </div>
+  1021→          <div className="flex justify-between items-center">
+  1022→            <span className="text-[11px] text-muted-foreground">Status</span>
+  1023→            <Badge className="bg-emerald-500/10 text-emerald-600 text-[10px] border-emerald-500/20 capitalize">{result.device.status}</Badge>
+  1024→          </div>
+  1025→        </div>
+  1026→      </div>
+  1027→
+  1028→      {/* Warning */}
+  1029→      <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+  1030→        <div className="flex items-start gap-2">
+  1031→          <AlertTriangle className="size-4 text-amber-500 shrink-0 mt-0.5" />
+  1032→          <div>
+  1033→            <p className="text-[12px] font-semibold text-amber-700 dark:text-amber-400">Save Your Credentials!</p>
+  1034→            <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">
+  1035→              This is the only time your password will be displayed. Copy it now and store it securely. You can use the API key for programmatic access.
+  1036→            </p>
+  1037→          </div>
+  1038→        </div>
+  1039→      </div>
+  1040→
+  1041→      <DialogFooter>
+  1042→        <Button size="sm" className="text-[12px] h-8 bg-teal-600 hover:bg-teal-700 text-white w-full" onClick={onClose}>
+  1043→          <CheckCircle2 className="size-3.5 mr-1.5" /> I've Saved My Credentials
+  1044→        </Button>
+  1045→      </DialogFooter>
+  1046→    </div>
+  1047→  )
+  1048→}
+  1049→
+  1050→// ── Component ──────────────────────────────────────
+  1051→
+  1052→export default function DeviceIntegrationModule() {
+  1053→  const [activeTab, setActiveTab] = useState('overview')
+  1054→  const [searchQuery, setSearchQuery] = useState('')
+  1055→  const [typeFilter, setTypeFilter] = useState('all')
+  1056→
+  1057→  // Data states
+  1058→  const [deviceCategories, setDeviceCategories] = useState<DeviceCategory[]>([])
+  1059→  const [connectedDevices, setConnectedDevices] = useState<ConnectedDevice[]>([])
+  1060→  const [commandQueue, setCommandQueue] = useState<CommandEntry[]>([])
+  1061→  const [eventLog, setEventLog] = useState<EventEntry[]>([])
+  1062→  const [forecourtControllers, setForecourtControllers] = useState<ForecourtController[]>([])
+  1063→  const [hardwareCatalog, setHardwareCatalog] = useState<HardwareCatalogItem[]>([])
+  1064→  const [commProtocols, setCommProtocols] = useState<CommProtocol[]>([])
+  1065→  const [overviewStats, setOverviewStats] = useState<{
+  1066→    totalDevices: number
+  1067→    onlineDevices: number
+  1068→    warningDevices: number
+  1069→    offlineDevices: number
+  1070→    eventLogCount: number
+  1071→    commandQueueCount: number
+  1072→    pendingCommands: number
+  1073→  } | null>(null)
+  1074→
+  1075→  // Loading / error
+  1076→  const [loading, setLoading] = useState(true)
+  1077→  const [error, setError] = useState<string | null>(null)
+  1078→
+  1079→  // Dialog states
+  1080→  const [showAddDevice, setShowAddDevice] = useState(false)
+  1081→  const [showAddController, setShowAddController] = useState(false)
+  1082→  const [showOwnerRegister, setShowOwnerRegister] = useState(false)
+  1083→  const [registrationResult, setRegistrationResult] = useState<OwnerRegistrationResult | null>(null)
+  1084→  const [stations, setStations] = useState<StationOption[]>([])
+  1085→  const [submitting, setSubmitting] = useState(false)
+  1086→
+  1087→  const fetchData = useCallback(async () => {
+  1088→    setLoading(true)
+  1089→    setError(null)
+  1090→    try {
+  1091→      // Fetch all data in parallel
+  1092→      const [
+  1093→        overviewRes,
+  1094→        eventLogsRes,
+  1095→        commandsRes,
+  1096→        controllersRes,
+  1097→        catalogRes,
+  1098→        commsProtocolsRes,
+  1099→        dispensersRes,
+  1100→        anprRes,
+  1101→        rfidRes,
+  1102→        priceBoardsRes,
+  1103→        atgRes,
+  1104→      ] = await Promise.allSettled([
+  1105→        fetch('/api/devices?type=overview'),
+  1106→        fetch('/api/devices?type=event_logs&limit=20'),
+  1107→        fetch('/api/devices?type=command_queue&limit=20'),
+  1108→        fetch('/api/hardware?action=controllers'),
+  1109→        fetch('/api/hardware?action=catalog&limit=50'),
+  1110→        fetch('/api/comms?section=protocols'),
+  1111→        fetch('/api/dispensers'),
+  1112→        fetch('/api/anpr-cameras'),
+  1113→        fetch('/api/rfid-readers'),
+  1114→        fetch('/api/price-boards'),
+  1115→        fetch('/api/tanks'),
+  1116→      ])
+  1117→
+  1118→      // Parse all responses once — Response body can only be read once
+  1119→      const safeJson = async (res: PromiseSettledResult<Response>) => {
+  1120→        if (res.status !== 'fulfilled') return null
+  1121→        try { return await res.value.json() } catch { return null }
+  1122→      }
+  1123→
+  1124→      const [overviewData, eventLogsData, commandsData, controllersData, catalogData, commsData, dispensersData, anprData, rfidData, priceBoardsData, atgData] = await Promise.all([
+  1125→        safeJson(overviewRes),
+  1126→        safeJson(eventLogsRes),
+  1127→        safeJson(commandsRes),
+  1128→        safeJson(controllersRes),
+  1129→        safeJson(catalogRes),
+  1130→        safeJson(commsProtocolsRes),
+  1131→        safeJson(dispensersRes),
+  1132→        safeJson(anprRes),
+  1133→        safeJson(rfidRes),
+  1134→        safeJson(priceBoardsRes),
+  1135→        safeJson(atgRes),
+  1136→      ])
+  1137→
+  1138→      // Process overview
+  1139→      if (overviewData) {
+  1140→        const ov = overviewData.overview || {}
+  1141→
+  1142→        // Build device categories from overview counts
+  1143→        const counts = ov.deviceCounts || {}
+  1144→        const statusBreakdown = ov.statusBreakdown || {}
+  1145→        const categories: DeviceCategory[] = []
+  1146→        for (const [key, count] of Object.entries(counts)) {
+  1147→          if ((count as number) > 0) {
+  1148→            const info = DEVICE_TYPE_ICONS[key] || { icon: HardDrive, color: '#e8930c', label: key }
+  1149→            const breakdown = statusBreakdown[key] || {}
+  1150→            const online = (breakdown.online || 0) + (breakdown.active || 0) + (breakdown.idle || 0) + (breakdown.fueling || 0)
+  1151→            categories.push({
+  1152→              type: info.label,
+  1153→              icon: info.icon,
+  1154→              count: count as number,
+  1155→              online: online as number,
+  1156→              color: info.color,
+  1157→            })
+  1158→          }
+  1159→        }
+  1160→        setDeviceCategories(categories)
+  1161→
+  1162→        // Compute overview stats
+  1163→        const totalDevices = ov.totalDevices || 0
+  1164→        let onlineDevices = 0
+  1165→        let warningDevices = 0
+  1166→        let offlineDevices = 0
+  1167→        for (const breakdown of Object.values(statusBreakdown) as Record<string, number>[]) {
+  1168→          onlineDevices += (breakdown.online || 0) + (breakdown.active || 0) + (breakdown.idle || 0) + (breakdown.fueling || 0)
+  1169→          warningDevices += (breakdown.warning || 0) + (breakdown.maintenance || 0)
+  1170→          offlineDevices += (breakdown.offline || 0) + (breakdown.disabled || 0) + (breakdown.error || 0)
+  1171→        }
+  1172→        setOverviewStats({
+  1173→          totalDevices,
+  1174→          onlineDevices,
+  1175→          warningDevices,
+  1176→          offlineDevices,
+  1177→          eventLogCount: ov.eventLogCount || 0,
+  1178→          commandQueueCount: ov.commandQueueCount || 0,
+  1179→          pendingCommands: ov.pendingCommands || 0,
+  1180→        })
+  1181→      }
+  1182→
+  1183→      // Process event logs
+  1184→      if (eventLogsData) {
+  1185→        setEventLog(eventLogsData.eventLogs || [])
+  1186→      }
+  1187→
+  1188→      // Process command queue
+  1189→      if (commandsData) {
+  1190→        setCommandQueue(commandsData.commands || [])
+  1191→      }
+  1192→
+  1193→      // Process forecourt controllers
+  1194→      if (controllersData) {
+  1195→        setForecourtControllers(controllersData.controllers || [])
+  1196→      }
+  1197→
+  1198→      // Process hardware catalog
+  1199→      if (catalogData) {
+  1200→        setHardwareCatalog(catalogData.items || [])
+  1201→      }
+  1202→
+  1203→      // Process comm protocols
+  1204→      if (commsData) {
+  1205→        setCommProtocols(commsData.protocols || [])
+  1206→      }
+  1207→
+  1208→      // Build connected devices from multiple sources (using already-parsed data)
+  1209→      const allDevices: ConnectedDevice[] = []
+  1210→
+  1211→      // From dispensers
+  1212→      if (dispensersData) {
+  1213→        for (const d of dispensersData.dispensers || []) {
+  1214→          allDevices.push({
+  1215→            id: d.code || d.id,
+  1216→            name: d.name,
+  1217→            type: 'Dispenser',
+  1218→            brand: d.manufacturer || 'Unknown',
+  1219→            protocol: d.controllerType || d.communicationType || 'IFSF',
+  1220→            status: d.status || 'offline',
+  1221→            lastSeen: timeAgo(d.lastCommunication || d.updatedAt),
+  1222→            ip: d.ipAddress || 'N/A',
+  1223→          })
+  1224→        }
+  1225→      }
+  1226→
+  1227→      // From ANPR cameras
+  1228→      if (anprData) {
+  1229→        for (const c of anprData.cameras || []) {
+  1230→          allDevices.push({
+  1231→            id: c.code || c.id,
+  1232→            name: c.name,
+  1233→            type: 'ANPR',
+  1234→            brand: c.manufacturer || 'Unknown',
+  1235→            protocol: c.communicationType || 'HTTP',
+  1236→            status: c.status || 'offline',
+  1237→            lastSeen: timeAgo(c.lastRecordingAt || c.updatedAt),
+  1238→            ip: c.ipAddress || 'N/A',
+  1239→          })
+  1240→        }
+  1241→      }
+  1242→
+  1243→      // From RFID readers
+  1244→      if (rfidData) {
+  1245→        for (const r of rfidData.readers || []) {
+  1246→          allDevices.push({
+  1247→            id: r.code || r.id,
+  1248→            name: r.name,
+  1249→            type: 'RFID',
+  1250→            brand: r.manufacturer || 'Unknown',
+  1251→            protocol: r.communicationType || 'Wiegand',
+  1252→            status: r.status || 'offline',
+  1253→            lastSeen: timeAgo(r.updatedAt),
+  1254→            ip: r.ipAddress || 'N/A',
+  1255→          })
+  1256→        }
+  1257→      }
+  1258→
+  1259→      // From price boards
+  1260→      if (priceBoardsData) {
+  1261→        for (const pb of priceBoardsData.boards || []) {
+  1262→          allDevices.push({
+  1263→            id: pb.code || pb.id,
+  1264→            name: pb.name,
+  1265→            type: 'Price Board',
+  1266→            brand: pb.manufacturer || 'Unknown',
+  1267→            protocol: pb.communicationType || 'RS485',
+  1268→            status: pb.status || 'offline',
+  1269→            lastSeen: timeAgo(pb.updatedAt),
+  1270→            ip: pb.ipAddress || 'N/A',
+  1271→          })
+  1272→        }
+  1273→      }
+  1274→
+  1275→      // From ATG/tanks
+  1276→      if (atgData) {
+  1277→        for (const t of atgData.tanks || []) {
+  1278→          allDevices.push({
+  1279→            id: t.code || t.id,
+  1280→            name: t.name || `ATG Tank ${t.code || t.id}`,
+  1281→            type: 'ATG',
+  1282→            brand: t.atgType ? String(t.atgType).charAt(0).toUpperCase() + String(t.atgType).slice(1) : 'Unknown',
+  1283→            protocol: 'TLS-350',
+  1284→            status: t.status || 'offline',
+  1285→            lastSeen: timeAgo(t.lastReading || t.updatedAt),
+  1286→            ip: 'N/A',
+  1287→          })
+  1288→        }
+  1289→      }
+  1290→
+  1291→      // From forecourt controllers (reusing already-parsed data)
+  1292→      if (controllersData) {
+  1293→        for (const fc of controllersData.controllers || []) {
+  1294→          allDevices.push({
+  1295→            id: fc.code || fc.id,
+  1296→            name: fc.name,
+  1297→            type: 'Controller',
+  1298→            brand: fc.manufacturer || 'Unknown',
+  1299→            protocol: fc.protocol || fc.controllerType || 'IFSF',
+  1300→            status: fc.status || 'offline',
+  1301→            lastSeen: timeAgo(fc.lastHeartbeat || fc.lastCommunication || fc.updatedAt),
+  1302→            ip: fc.ipAddress || 'N/A',
+  1303→          })
+  1304→        }
+  1305→      }
+  1306→
+  1307→      // Fetch payment terminals
+  1308→      try {
+  1309→        const ptRes = await fetch('/api/devices?type=payment_terminal')
+  1310→        if (ptRes.ok) {
+  1311→          const data = await ptRes.json()
+  1312→          for (const pt of data.devices || []) {
+  1313→            allDevices.push({
+  1314→              id: pt.code || pt.id,
+  1315→              name: pt.name,
+  1316→              type: 'Payment',
+  1317→              brand: pt.manufacturer || 'Unknown',
+  1318→              protocol: pt.communicationType || 'ISO 8583',
+  1319→              status: pt.status || 'offline',
+  1320→              lastSeen: timeAgo(pt.lastTransaction || pt.updatedAt),
+  1321→              ip: pt.ipAddress || 'N/A',
+  1322→            })
+  1323→          }
+  1324→        }
+  1325→      } catch { /* ignore */ }
+  1326→
+  1327→      setConnectedDevices(allDevices)
+  1328→    } catch (err) {
+  1329→      console.error('DeviceIntegration fetchData error:', err)
+  1330→      setError(err instanceof Error ? err.message : 'Failed to load device data')
+  1331→    } finally {
+  1332→      setLoading(false)
+  1333→    }
+  1334→  }, [])
+  1335→
+  1336→  useEffect(() => {
+  1337→    fetchData()
+  1338→  }, [fetchData])
+  1339→
+  1340→  // Fetch stations when dialog opens
+  1341→  const fetchStations = useCallback(async () => {
+  1342→    if (stations.length > 0) return
+  1343→    try {
+  1344→      const res = await fetch('/api/stations')
+  1345→      if (res.ok) {
+  1346→        const data = await res.json()
+  1347→        setStations((data.stations || []).map((s: { id: string; name: string; code: string }) => ({ id: s.id, name: s.name, code: s.code })))
+  1348→      }
+  1349→    } catch { /* ignore */ }
+  1350→  }, [stations.length])
+  1351→
+  1352→  // Handle add device submit
+  1353→  const handleAddDevice = useCallback(async (formData: Record<string, string>) => {
+  1354→    setSubmitting(true)
+  1355→    try {
+  1356→      const { category, ...rest } = formData
+  1357→      const res = await fetch('/api/hardware', {
+  1358→        method: 'POST',
+  1359→        headers: { 'Content-Type': 'application/json' },
+  1360→        body: JSON.stringify({ action: 'add_hardware', category, ...rest }),
+  1361→      })
+  1362→      const data = await res.json()
+  1363→      if (!res.ok) {
+  1364→        toast.error(data.error || 'Failed to add device')
+  1365→        return
+  1366→      }
+  1367→      toast.success(`${DEVICE_CATEGORIES.find(c => c.value === category)?.label || 'Device'} "${rest.name}" added successfully`)
+  1368→      setShowAddDevice(false)
+  1369→      fetchData()
+  1370→    } catch (err) {
+  1371→      toast.error(err instanceof Error ? err.message : 'Failed to add device')
+  1372→    } finally {
+  1373→      setSubmitting(false)
+  1374→    }
+  1375→  }, [fetchData])
+  1376→
+  1377→  // Handle add controller submit
+  1378→  const handleAddController = useCallback(async (formData: Record<string, string>) => {
+  1379→    setSubmitting(true)
+  1380→    try {
+  1381→      const res = await fetch('/api/hardware', {
+  1382→        method: 'POST',
+  1383→        headers: { 'Content-Type': 'application/json' },
+  1384→        body: JSON.stringify({ action: 'add_controller', ...formData }),
+  1385→      })
+  1386→      const data = await res.json()
+  1387→      if (!res.ok) {
+  1388→        toast.error(data.error || 'Failed to add controller')
+  1389→        return
+  1390→      }
+  1391→      toast.success(`Controller "${formData.name}" registered successfully`)
+  1392→      setShowAddController(false)
+  1393→      fetchData()
+  1394→    } catch (err) {
+  1395→      toast.error(err instanceof Error ? err.message : 'Failed to add controller')
+  1396→    } finally {
+  1397→      setSubmitting(false)
+  1398→    }
+  1399→  }, [fetchData])
+  1400→
+  1401→  // Handle owner registration submit
+  1402→  const handleOwnerRegister = useCallback(async (formData: Record<string, string>) => {
+  1403→    setSubmitting(true)
+  1404→    try {
+  1405→      const res = await fetch('/api/owner/register', {
+  1406→        method: 'POST',
+  1407→        headers: { 'Content-Type': 'application/json' },
+  1408→        body: JSON.stringify(formData),
+  1409→      })
+  1410→      const data = await res.json()
+  1411→      if (!res.ok) {
+  1412→        toast.error(data.error || 'Failed to register owner')
+  1413→        return
+  1414→      }
+  1415→      setRegistrationResult(data)
+  1416→      toast.success('Device owner registered successfully! Save your credentials.')
+  1417→    } catch (err) {
+  1418→      toast.error(err instanceof Error ? err.message : 'Failed to register owner')
+  1419→    } finally {
+  1420→      setSubmitting(false)
+  1421→    }
+  1422→  }, [])
+  1423→
+  1424→  const filteredDevices = connectedDevices.filter(d => {
+  1425→    const matchesSearch = !searchQuery ||
+  1426→      d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  1427→      d.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  1428→      d.brand.toLowerCase().includes(searchQuery.toLowerCase())
+  1429→    const matchesType = typeFilter === 'all' || d.type === typeFilter
+  1430→    return matchesSearch && matchesType
+  1431→  })
+  1432→
+  1433→  // ── Add Device Dialog ──
+  1434→  const addDeviceDialog = (
+  1435→    <Dialog open={showAddDevice} onOpenChange={(open) => { setShowAddDevice(open); if (open) fetchStations() }}>
+  1436→      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+  1437→        <DialogHeader>
+  1438→          <DialogTitle className="flex items-center gap-2 text-[15px]">
+  1439→            <Plus className="size-4 text-teal-500" />
+  1440→            Add New Device
+  1441→          </DialogTitle>
+  1442→        </DialogHeader>
+  1443→        <AddDeviceForm
+  1444→          stations={stations}
+  1445→          controllers={forecourtControllers}
+  1446→          submitting={submitting}
+  1447→          onSubmit={handleAddDevice}
+  1448→          onCancel={() => setShowAddDevice(false)}
+  1449→        />
+  1450→      </DialogContent>
+  1451→    </Dialog>
+  1452→  )
+  1453→
+  1454→  // ── Add Controller Dialog ──
+  1455→  const addControllerDialog = (
+  1456→    <Dialog open={showAddController} onOpenChange={(open) => { setShowAddController(open); if (open) fetchStations() }}>
+  1457→      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+  1458→        <DialogHeader>
+  1459→          <DialogTitle className="flex items-center gap-2 text-[15px]">
+  1460→            <Server className="size-4 text-teal-500" />
+  1461→            Register Forecourt Controller
+  1462→          </DialogTitle>
+  1463→        </DialogHeader>
+  1464→        <AddControllerForm
+  1465→          stations={stations}
+  1466→          submitting={submitting}
+  1467→          onSubmit={handleAddController}
+  1468→          onCancel={() => setShowAddController(false)}
+  1469→        />
+  1470→      </DialogContent>
+  1471→    </Dialog>
+  1472→  )
+  1473→
+  1474→  // ── Owner Registration Dialog ──
+  1475→  const ownerRegisterDialog = (
+  1476→    <Dialog open={showOwnerRegister} onOpenChange={(open) => { setShowOwnerRegister(open); if (!open) setRegistrationResult(null) }}>
+  1477→      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+  1478→        <DialogHeader>
+  1479→          <DialogTitle className="flex items-center gap-2 text-[15px]">
+  1480→            <Shield className="size-4 text-teal-500" />
+  1481→            {registrationResult ? 'Your Credentials & Serial Key' : 'Register as Device Owner'}
+  1482→          </DialogTitle>
+  1483→        </DialogHeader>
+  1484→        {registrationResult ? (
+  1485→          <CredentialsDisplay
+  1486→            result={registrationResult}
+  1487→            onClose={() => { setShowOwnerRegister(false); setRegistrationResult(null); fetchData() }}
+  1488→          />
+  1489→        ) : (
+  1490→          <OwnerRegistrationForm
+  1491→            submitting={submitting}
+  1492→            onSubmit={handleOwnerRegister}
+  1493→            onCancel={() => setShowOwnerRegister(false)}
+  1494→          />
+  1495→        )}
+  1496→      </DialogContent>
+  1497→    </Dialog>
+  1498→  )
+  1499→
+  1500→  // ── Loading state ──
+  1501→  if (loading) {
+  1502→    return (
+  1503→      <div className="space-y-4" style={{ fontStyle: 'normal !important' } as React.CSSProperties}>
+  1504→        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+  1505→          {Array.from({ length: 8 }).map((_, i) => (
+  1506→            <div key={i} className="macos-card p-4">
+  1507→              <Skeleton className="h-4 w-16 mb-2" />
+  1508→              <Skeleton className="h-6 w-12" />
+  1509→            </div>
+  1510→          ))}
+  1511→        </div>
+  1512→        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+  1513→          {Array.from({ length: 4 }).map((_, i) => (
+  1514→            <div key={i} className="macos-card p-4">
+  1515→              <Skeleton className="h-4 w-20 mb-2" />
+  1516→              <Skeleton className="h-8 w-16" />
+  1517→            </div>
+  1518→          ))}
+  1519→        </div>
+  1520→        <div className="macos-card p-4 flex items-center justify-center gap-2 text-muted-foreground">
+  1521→          <Loader2 className="size-4 animate-spin" />
+  1522→          <span className="text-[13px]">Loading device data from database…</span>
+  1523→        </div>
+  1524→      </div>
+  1525→    )
+  1526→  }
+  1527→
+  1528→  // ── Error state ──
+  1529→  if (error) {
+  1530→    return (
+  1531→      <div className="macos-card p-6 text-center" style={{ fontStretch: 'normal' }}>
+  1532→        <AlertTriangle className="size-8 text-red-500 mx-auto mb-3" />
+  1533→        <p className="text-[14px] font-semibold mb-1">Failed to Load Device Data</p>
+  1534→        <p className="text-[12px] text-muted-foreground mb-4">{error}</p>
+  1535→        <button onClick={fetchData} className="macos-btn text-[12px] px-4 py-1.5 flex items-center gap-2 mx-auto">
+  1536→          <RefreshCw className="size-3.5" /> Retry
+  1537→        </button>
+  1538→      </div>
+  1539→    )
+  1540→  }
+  1541→
+  1542→  return (
+  1543→    <div className="space-y-4" style={{ fontStretch: 'normal' }}>
+  1544→      <Tabs value={activeTab} onValueChange={setActiveTab}>
+  1545→        <div className="overflow-x-auto pb-1">
+  1546→          <TabsList className="h-8 w-max gap-0.5 bg-muted/50">
+  1547→            <TabsTrigger value="overview" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Overview</TabsTrigger>
+  1548→            <TabsTrigger value="devices" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Connected Devices</TabsTrigger>
+  1549→            <TabsTrigger value="controllers" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Controllers</TabsTrigger>
+  1550→            <TabsTrigger value="commands" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Command Queue</TabsTrigger>
+  1551→            <TabsTrigger value="events" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Event Log</TabsTrigger>
+  1552→            <TabsTrigger value="catalog" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Hardware Catalog</TabsTrigger>
+  1553→            <TabsTrigger value="protocols" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Protocols</TabsTrigger>
+  1554→            <TabsTrigger value="owner" className="text-[11px] px-3 h-6 data-[state=active]:bg-violet-500/15 data-[state=active]:text-violet-600">Owner Registration</TabsTrigger>
+  1555→          </TabsList>
+  1556→        </div>
+  1557→
+  1558→        {/* ── Overview ── */}
+  1559→        <TabsContent value="overview" className="mt-4 space-y-4">
+  1560→          {/* Integrate New Device Action */}
+  1561→          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+  1562→            <motion.div
+  1563→              initial={{ opacity: 0, y: 8 }}
+  1564→              animate={{ opacity: 1, y: 0 }}
+  1565→              className="macos-card p-4 cursor-pointer hover:shadow-md transition-shadow"
+  1566→              onClick={() => setShowAddDevice(true)}
+  1567→            >
+  1568→              <div className="flex items-center gap-3">
+  1569→                <div className="size-10 rounded-[10px] fuel-gradient flex items-center justify-center shadow-sm">
+  1570→                  <Plus className="size-5 text-white" />
+  1571→                </div>
+  1572→                <div className="flex-1">
+  1573→                  <h3 className="text-[13px] font-semibold">Integrate New Device / Hardware</h3>
+  1574→                  <p className="text-[11px] text-muted-foreground">Add dispensers, controllers, payment terminals, ATG systems, cameras, and more</p>
+  1575→                </div>
+  1576→                <ChevronRight className="size-4 text-muted-foreground/50" />
+  1577→              </div>
+  1578→            </motion.div>
+  1579→
+  1580→            {/* Register as Owner Action */}
+  1581→            <motion.div
+  1582→              initial={{ opacity: 0, y: 8 }}
+  1583→              animate={{ opacity: 1, y: 0 }}
+  1584→              transition={{ delay: 0.05 }}
+  1585→              className="macos-card p-4 cursor-pointer hover:shadow-md transition-shadow ring-1 ring-violet-500/20"
+  1586→              onClick={() => setShowOwnerRegister(true)}
+  1587→            >
+  1588→              <div className="flex items-center gap-3">
+  1589→                <div className="size-10 rounded-[10px] bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center shadow-sm">
+  1590→                  <Shield className="size-5 text-white" />
+  1591→                </div>
+  1592→                <div className="flex-1">
+  1593→                  <h3 className="text-[13px] font-semibold">Register as Device Owner</h3>
+  1594→                  <p className="text-[11px] text-muted-foreground">Get credentials, API key & serial key for your device</p>
+  1595→                </div>
+  1596→                <ChevronRight className="size-4 text-muted-foreground/50" />
+  1597→              </div>
+  1598→            </motion.div>
+  1599→          </div>
+  1600→
+  1601→          {/* Device Type Cards */}
+  1602→          <div>
+  1603→            <div className="macos-section-header">Device Categories</div>
+  1604→            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-1">
+  1605→              {deviceCategories.length > 0 ? deviceCategories.map((dt, i) => (
+  1606→                <motion.div
+  1607→                  key={dt.type}
+  1608→                  initial={{ opacity: 0, y: 8 }}
+  1609→                  animate={{ opacity: 1, y: 0 }}
+  1610→                  transition={{ delay: i * 0.04 }}
+  1611→                  className="macos-card p-4 cursor-pointer"
+  1612→                  onClick={() => {
+  1613→                    const typeMap: Record<string, string> = {
+  1614→                      'Dispensers': 'Dispenser',
+  1615→                      'ATG Systems': 'ATG',
+  1616→                      'Payment Terminals': 'Payment',
+  1617→                      'Forecourt Controllers': 'Controller',
+  1618→                      'Price Boards': 'Price Board',
+  1619→                      'RFID Readers': 'RFID',
+  1620→                      'ANPR Cameras': 'ANPR',
+  1621→                    }
+  1622→                    setTypeFilter(typeMap[dt.type] || dt.type)
+  1623→                    setActiveTab('devices')
+  1624→                  }}
+  1625→                >
+  1626→                  <div className="flex items-start justify-between">
+  1627→                    <div className="size-9 rounded-[10px] flex items-center justify-center" style={{ backgroundColor: `${dt.color}15` }}>
+  1628→                      <dt.icon className="size-4" style={{ color: dt.color }} />
+  1629→                    </div>
+  1630→                    <div className="flex items-center gap-1.5">
+  1631→                      <div className={`macos-status-dot ${dt.online === dt.count ? 'macos-status-online' : 'macos-status-warning'}`} />
+  1632→                      <span className="text-[11px] text-muted-foreground">{dt.online}/{dt.count}</span>
+  1633→                    </div>
+  1634→                  </div>
+  1635→                  <div className="mt-3">
+  1636→                    <p className="text-[13px] font-semibold">{dt.type}</p>
+  1637→                    <p className="text-[11px] text-muted-foreground">{dt.count} devices registered</p>
+  1638→                  </div>
+  1639→                </motion.div>
+  1640→              )) : (
+  1641→                <div className="col-span-full macos-card p-6 text-center text-[13px] text-muted-foreground">
+  1642→                  No devices found in the system
+  1643→                </div>
+  1644→              )}
+  1645→            </div>
+  1646→          </div>
+  1647→
+  1648→          {/* Quick Stats */}
+  1649→          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+  1650→            {[
+  1651→              { label: 'Total Devices', value: overviewStats?.totalDevices ?? 0, icon: HardDrive, accent: '#e8930c' },
+  1652→              { label: 'Online', value: overviewStats?.onlineDevices ?? 0, icon: Wifi, accent: '#34c759' },
+  1653→              { label: 'Warnings', value: overviewStats?.warningDevices ?? 0, icon: AlertTriangle, accent: '#ff9f0a' },
+  1654→              { label: 'Offline', value: overviewStats?.offlineDevices ?? 0, icon: WifiOff, accent: '#ff3b30' },
+  1655→            ].map((stat) => (
+  1656→              <div key={stat.label} className="macos-card p-4">
+  1657→                <div className="flex items-center justify-between">
+  1658→                  <div>
+  1659→                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">{stat.label}</p>
+  1660→                    <p className="text-2xl font-bold mt-0.5" style={{ color: stat.accent }}>{stat.value}</p>
+  1661→                  </div>
+  1662→                  <div className="size-9 rounded-[10px] flex items-center justify-center" style={{ backgroundColor: `${stat.accent}12` }}>
+  1663→                    <stat.icon className="size-4" style={{ color: stat.accent }} />
+  1664→                  </div>
+  1665→                </div>
+  1666→              </div>
+  1667→            ))}
+  1668→          </div>
+  1669→
+  1670→          {/* Recent Events */}
+  1671→          <div>
+  1672→            <div className="flex items-center justify-between">
+  1673→              <div className="macos-section-header">Recent Events</div>
+  1674→              <button onClick={fetchData} className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+  1675→                <RefreshCw className="size-3" /> Refresh
+  1676→              </button>
+  1677→            </div>
+  1678→            <div className="macos-group mt-1">
+  1679→              {eventLog.length > 0 ? eventLog.slice(0, 5).map((ev, i) => (
+  1680→                <div key={ev.id || i} className="macos-group-item flex items-center gap-3">
+  1681→                  <div className={`macos-status-dot ${
+  1682→                    ev.severity === 'error' || ev.severity === 'critical' ? 'macos-status-error' :
+  1683→                    ev.severity === 'warning' ? 'macos-status-warning' :
+  1684→                    ev.severity === 'success' || ev.severity === 'info' ? 'macos-status-online' : 'macos-status-offline'
+  1685→                  }`} />
+  1686→                  <div className="flex-1 min-w-0">
+  1687→                    <div className="flex items-center gap-2">
+  1688→                      <span className="text-[13px] font-medium">{ev.deviceId}</span>
+  1689→                      <span className={`text-[11px] ${EVENT_LEVEL_MAP[ev.severity] || ''}`}>{ev.message}</span>
+  1690→                    </div>
+  1691→                  </div>
+  1692→                  <span className="text-[11px] text-muted-foreground whitespace-nowrap font-mono">{timeAgo(ev.createdAt)}</span>
+  1693→                  <ChevronRight className="size-3 text-muted-foreground/50" />
+  1694→                </div>
+  1695→              )) : (
+  1696→                <div className="macos-group-item text-center text-[13px] text-muted-foreground py-4">
+  1697→                  No recent events
+  1698→                </div>
+  1699→              )}
+  1700→            </div>
+  1701→          </div>
+  1702→        </TabsContent>
+  1703→
+  1704→        {/* ── Connected Devices ── */}
+  1705→        <TabsContent value="devices" className="mt-4 space-y-3">
+  1706→          <div className="flex items-center gap-3">
+  1707→            <div className="relative flex-1 max-w-xs">
+  1708→              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+  1709→              <input
+  1710→                className="macos-search pl-8 py-1.5 text-[12px]"
+  1711→                placeholder="Search devices..."
+  1712→                value={searchQuery}
+  1713→                onChange={e => setSearchQuery(e.target.value)}
+  1714→              />
+  1715→            </div>
+  1716→            <div className="flex items-center gap-1.5 flex-wrap">
+  1717→              {['all', 'Dispenser', 'ATG', 'Payment', 'Controller', 'RFID', 'ANPR'].map(t => (
+  1718→                <button
+  1719→                  key={t}
+  1720→                  onClick={() => setTypeFilter(t)}
+  1721→                  className={`text-[11px] px-2.5 py-1 rounded-md font-medium transition-colors ${
+  1722→                    typeFilter === t
+  1723→                      ? 'bg-teal-500/15 text-teal-600 dark:text-teal-400'
+  1724→                      : 'text-muted-foreground hover:bg-black/[0.03] dark:hover:bg-white/[0.04]'
+  1725→                  }`}
+  1726→                >
+  1727→                  {t === 'all' ? 'All' : t}
+  1728→                </button>
+  1729→              ))}
+  1730→              <button
+  1731→                onClick={() => setShowAddDevice(true)}
+  1732→                className="macos-btn text-[11px] px-2.5 py-1 flex items-center gap-1 ml-1"
+  1733→              >
+  1734→                <Plus className="size-3" /> Add Device
+  1735→              </button>
+  1736→            </div>
+  1737→          </div>
+  1738→
+  1739→          <div className="macos-card overflow-hidden">
+  1740→            <div className="max-h-[480px] overflow-y-auto">
+  1741→              <table className="macos-table">
+  1742→                <thead>
+  1743→                  <tr>
+  1744→                    <th>Device ID</th>
+  1745→                    <th>Name</th>
+  1746→                    <th>Type</th>
+  1747→                    <th>Brand</th>
+  1748→                    <th>Protocol</th>
+  1749→                    <th>Status</th>
+  1750→                    <th>Last Seen</th>
+  1751→                    <th>IP</th>
+  1752→                  </tr>
+  1753→                </thead>
+  1754→                <tbody>
+  1755→                  {filteredDevices.map(d => {
+  1756→                    const st = STATUS_MAP[d.status] || STATUS_MAP.offline
+  1757→                    return (
+  1758→                      <tr key={d.id}>
+  1759→                        <td className="font-mono text-[12px] text-teal-600 dark:text-teal-400">{d.id}</td>
+  1760→                        <td className="font-medium text-[13px]">{d.name}</td>
+  1761→                        <td><Badge variant="outline" className="text-[10px] px-1.5 py-0 font-medium">{d.type}</Badge></td>
+  1762→                        <td className="text-[13px]">{d.brand}</td>
+  1763→                        <td className="text-[12px] font-mono text-muted-foreground">{d.protocol}</td>
+  1764→                        <td>
+  1765→                          <div className="flex items-center gap-1.5">
+  1766→                            <div className={`macos-status-dot ${st.dot}`} />
+  1767→                            <span className={`text-[11px] font-medium capitalize ${st.text}`}>{d.status}</span>
+  1768→                          </div>
+  1769→                        </td>
+  1770→                        <td className="text-[12px] text-muted-foreground whitespace-nowrap">{d.lastSeen}</td>
+  1771→                        <td className="text-[12px] font-mono text-muted-foreground">{d.ip}</td>
+  1772→                      </tr>
+  1773→                    )
+  1774→                  })}
+  1775→                  {filteredDevices.length === 0 && (
+  1776→                    <tr>
+  1777→                      <td colSpan={8} className="text-center text-[13px] text-muted-foreground py-8">No devices match your filters</td>
+  1778→                    </tr>
+  1779→                  )}
+  1780→                </tbody>
+  1781→              </table>
+  1782→            </div>
+  1783→          </div>
+  1784→          <p className="text-[11px] text-muted-foreground">{filteredDevices.length} of {connectedDevices.length} devices shown</p>
+  1785→        </TabsContent>
+  1786→
+  1787→        {/* ── Forecourt Controllers ── */}
+  1788→        <TabsContent value="controllers" className="mt-4 space-y-4">
+  1789→          <div className="flex items-center justify-between">
+  1790→            <div className="macos-section-header">Forecourt Controllers</div>
+  1791→            <div className="flex gap-2">
+  1792→              <button onClick={() => setShowAddController(true)} className="macos-btn text-[11px] px-2.5 py-1 flex items-center gap-1">
+  1793→                <Plus className="size-3" /> Add Controller
+  1794→              </button>
+  1795→              <button onClick={fetchData} className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+  1796→                <RefreshCw className="size-3" /> Refresh
+  1797→              </button>
+  1798→            </div>
+  1799→          </div>
+  1800→          {forecourtControllers.length > 0 ? (
+  1801→            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  1802→              {forecourtControllers.map(fc => {
+  1803→                const dispensers = fc.dispensers || []
+  1804→                const connectedPumps = dispensers.length
+  1805→                const totalPumps = fc.maxDispensers || dispensers.length
+  1806→                return (
+  1807→                  <motion.div
+  1808→                    key={fc.id}
+  1809→                    initial={{ opacity: 0, y: 8 }}
+  1810→                    animate={{ opacity: 1, y: 0 }}
+  1811→                    className="macos-card p-5 space-y-4"
+  1812→                  >
+  1813→                    <div className="flex items-start justify-between">
+  1814→                      <div className="flex items-center gap-3">
+  1815→                        <div className="size-10 rounded-[10px] bg-teal-500/10 flex items-center justify-center">
+  1816→                          <Server className="size-5 text-teal-500" />
+  1817→                        </div>
+  1818→                        <div>
+  1819→                          <h3 className="text-[13px] font-semibold">{fc.name}</h3>
+  1820→                          <p className="text-[11px] text-muted-foreground">{fc.manufacturer || ''} {fc.model || ''}</p>
+  1821→                        </div>
+  1822→                      </div>
+  1823→                      <div className="flex items-center gap-1.5">
+  1824→                        <div className={`macos-status-dot ${STATUS_MAP[fc.status]?.dot || 'macos-status-offline'}`} />
+  1825→                        <span className={`text-[11px] font-medium capitalize ${STATUS_MAP[fc.status]?.text || 'text-muted-foreground'}`}>{fc.status}</span>
+  1826→                      </div>
+  1827→                    </div>
+  1828→
+  1829→                    <div className="grid grid-cols-2 gap-3">
+  1830→                      <div className="macos-group">
+  1831→                        <div className="macos-group-item">
+  1832→                          <div className="flex items-center justify-between">
+  1833→                            <span className="text-[11px] text-muted-foreground">IP Address</span>
+  1834→                            <span className="text-[13px] font-mono">{fc.ipAddress || 'N/A'}{fc.port ? `:${fc.port}` : ''}</span>
+  1835→                          </div>
+  1836→                        </div>
+  1837→                        <div className="macos-group-item">
+  1838→                          <div className="flex items-center justify-between">
+  1839→                            <span className="text-[11px] text-muted-foreground">Protocol</span>
+  1840→                            <span className="text-[13px]">{fc.protocol || fc.controllerType || 'N/A'}</span>
+  1841→                          </div>
+  1842→                        </div>
+  1843→                        <div className="macos-group-item">
+  1844→                          <div className="flex items-center justify-between">
+  1845→                            <span className="text-[11px] text-muted-foreground">Firmware</span>
+  1846→                            <span className="text-[13px] font-mono">{fc.firmwareVersion ? `v${fc.firmwareVersion}` : 'N/A'}</span>
+  1847→                          </div>
+  1848→                        </div>
+  1849→                        <div className="macos-group-item">
+  1850→                          <div className="flex items-center justify-between">
+  1851→                            <span className="text-[11px] text-muted-foreground">Serial</span>
+  1852→                            <span className="text-[12px] font-mono">{fc.serialNumber || 'N/A'}</span>
+  1853→                          </div>
+  1854→                        </div>
+  1855→                      </div>
+  1856→
+  1857→                      <div className="macos-group">
+  1858→                        <div className="macos-group-item">
+  1859→                          <div className="flex items-center justify-between">
+  1860→                            <span className="text-[11px] text-muted-foreground">Last Heartbeat</span>
+  1861→                            <span className="text-[13px]">{timeAgo(fc.lastHeartbeat)}</span>
+  1862→                          </div>
+  1863→                        </div>
+  1864→                        <div className="macos-group-item">
+  1865→                          <div className="flex items-center justify-between">
+  1866→                            <span className="text-[11px] text-muted-foreground">Pumps</span>
+  1867→                            <span className="text-[13px]">{connectedPumps}/{totalPumps}</span>
+  1868→                          </div>
+  1869→                        </div>
+  1870→                        <div className="macos-group-item">
+  1871→                          <div className="flex items-center justify-between">
+  1872→                            <span className="text-[11px] text-muted-foreground">Station</span>
+  1873→                            <span className="text-[12px]">{fc.station?.name || 'N/A'}</span>
+  1874→                          </div>
+  1875→                        </div>
+  1876→                        <div className="macos-group-item">
+  1877→                          <div className="flex items-center justify-between">
+  1878→                            <span className="text-[11px] text-muted-foreground">Last Comm</span>
+  1879→                            <span className="text-[13px]">{timeAgo(fc.lastCommunication)}</span>
+  1880→                          </div>
+  1881→                        </div>
+  1882→                      </div>
+  1883→                    </div>
+  1884→
+  1885→                    <div className="flex items-center justify-between pt-1">
+  1886→                      <span className="text-[11px] text-muted-foreground">Last heartbeat: {timeAgo(fc.lastHeartbeat)}</span>
+  1887→                      <div className="flex gap-2">
+  1888→                        <button className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+  1889→                          <RefreshCw className="size-3" /> Restart
+  1890→                        </button>
+  1891→                        <button className="macos-btn text-[11px] px-2.5 py-1 flex items-center gap-1">
+  1892→                          <Activity className="size-3" /> Diagnostics
+  1893→                        </button>
+  1894→                      </div>
+  1895→                    </div>
+  1896→                  </motion.div>
+  1897→                )
+  1898→              })}
+  1899→            </div>
+  1900→          ) : (
+  1901→            <div className="macos-card p-6 text-center text-[13px] text-muted-foreground">
+  1902→              No forecourt controllers configured
+  1903→            </div>
+  1904→          )}
+  1905→        </TabsContent>
+  1906→
+  1907→        {/* ── Command Queue ── */}
+  1908→        <TabsContent value="commands" className="mt-4 space-y-3">
+  1909→          <div className="flex items-center justify-between">
+  1910→            <div className="macos-section-header">Device Command Queue</div>
+  1911→            <div className="flex gap-2">
+  1912→              <button className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+  1913→                <Square className="size-3" /> Clear Completed
+  1914→              </button>
+  1915→              <button className="macos-btn text-[11px] px-2.5 py-1 flex items-center gap-1">
+  1916→                <Command className="size-3" /> New Command
+  1917→              </button>
+  1918→            </div>
+  1919→          </div>
+  1920→          <div className="macos-card overflow-hidden">
+  1921→            <div className="max-h-[420px] overflow-y-auto">
+  1922→              <table className="macos-table">
+  1923→                <thead>
+  1924→                  <tr>
+  1925→                    <th>Command ID</th>
+  1926→                    <th>Device</th>
+  1927→                    <th>Command</th>
+  1928→                    <th>Priority</th>
+  1929→                    <th>Status</th>
+  1930→                    <th>Retries</th>
+  1931→                    <th>Created At</th>
+  1932→                  </tr>
+  1933→                </thead>
+  1934→                <tbody>
+  1935→                  {commandQueue.length > 0 ? commandQueue.map(cmd => {
+  1936→                    const st = CMD_STATUS_MAP[cmd.status] || CMD_STATUS_MAP.queued
+  1937→                    const StatusIcon = st?.icon || Clock
+  1938→                    return (
+  1939→                      <tr key={cmd.id}>
+  1940→                        <td className="font-mono text-[12px] text-teal-600 dark:text-teal-400">{cmd.id.slice(0, 12)}</td>
+  1941→                        <td className="font-mono text-[12px]">{cmd.deviceId}</td>
+  1942→                        <td className="text-[13px] font-medium">{cmd.command}</td>
+  1943→                        <td>
+  1944→                          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-semibold capitalize ${PRIORITY_MAP[cmd.priority] || PRIORITY_MAP.medium}`}>
+  1945→                            {cmd.priority}
+  1946→                          </Badge>
+  1947→                        </td>
+  1948→                        <td>
+  1949→                          <div className="flex items-center gap-1.5">
+  1950→                            <StatusIcon className={`size-3.5 ${st?.color}`} />
+  1951→                            <span className="text-[12px] capitalize">{cmd.status}</span>
+  1952→                          </div>
+  1953→                        </td>
+  1954→                        <td className="text-[12px]">
+  1955→                          <span className={cmd.retryCount > 0 ? 'text-teal-600 dark:text-teal-400 font-medium' : 'text-muted-foreground'}>
+  1956→                            {cmd.retryCount}/{cmd.maxRetries}
+  1957→                          </span>
+  1958→                        </td>
+  1959→                        <td className="text-[12px] text-muted-foreground font-mono">{timeAgo(cmd.createdAt)}</td>
+  1960→                      </tr>
+  1961→                    )
+  1962→                  }) : (
+  1963→                    <tr>
+  1964→                      <td colSpan={7} className="text-center text-[13px] text-muted-foreground py-8">No commands in queue</td>
+  1965→                    </tr>
+  1966→                  )}
+  1967→                </tbody>
+  1968→              </table>
+  1969→            </div>
+  1970→          </div>
+  1971→        </TabsContent>
+  1972→
+  1973→        {/* ── Event Log ── */}
+  1974→        <TabsContent value="events" className="mt-4 space-y-3">
+  1975→          <div className="flex items-center justify-between">
+  1976→            <div className="macos-section-header">Recent Device Events</div>
+  1977→            <button onClick={fetchData} className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+  1978→              <RefreshCw className="size-3" /> Refresh
+  1979→            </button>
+  1980→          </div>
+  1981→          <div className="macos-group">
+  1982→            {eventLog.length > 0 ? eventLog.map((ev, i) => (
+  1983→              <motion.div
+  1984→                key={ev.id || i}
+  1985→                initial={{ opacity: 0, x: -4 }}
+  1986→                animate={{ opacity: 1, x: 0 }}
+  1987→                transition={{ delay: i * 0.03 }}
+  1988→                className="macos-group-item flex items-center gap-3"
+  1989→              >
+  1990→                <div className={`macos-status-dot ${
+  1991→                  ev.severity === 'error' || ev.severity === 'critical' ? 'macos-status-error' :
+  1992→                  ev.severity === 'warning' ? 'macos-status-warning' :
+  1993→                  ev.severity === 'success' || ev.severity === 'info' ? 'macos-status-online' : 'macos-status-offline'
+  1994→                }`} />
+  1995→                <div className="flex-1 min-w-0">
+  1996→                  <div className="flex items-center gap-2">
+  1997→                    <span className="text-[12px] font-mono font-medium text-teal-600 dark:text-teal-400">{ev.deviceId}</span>
+  1998→                    <span className={`text-[13px] ${EVENT_LEVEL_MAP[ev.severity] || ''}`}>{ev.message}</span>
+  1999→                  </div>
+  2000→                </div>
+
+[showing lines 1-2000 of 2198; use offset=2001 with limit to continue reading]

@@ -287,14 +287,17 @@ function SidebarNavContent({
       {/* User Profile at Bottom */}
       <div className="border-t border-border px-3 py-2.5">
         <div className="flex items-center gap-2.5">
-          <Avatar className="size-7 border border-teal-500/20">
-            <AvatarFallback className="bg-teal-500/10 text-teal-600 dark:text-teal-400 text-[10px] font-bold rounded-md">
-              JM
+          <Avatar className={`size-7 border ${isSuperAdmin ? 'border-orange-500/30' : 'border-teal-500/20'}`}>
+            <AvatarFallback className={`${isSuperAdmin ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400' : 'bg-teal-500/10 text-teal-600 dark:text-teal-400'} text-[10px] font-bold rounded-md`}>
+              {userInitials}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-[12px] font-semibold text-foreground truncate">James Morrison</p>
-            <p className="text-[10px] text-muted-foreground">Station Manager</p>
+            <p className="text-[12px] font-semibold text-foreground truncate">{userName}</p>
+            <div className="flex items-center gap-1.5">
+              {isSuperAdmin && <Crown className="size-2.5 text-orange-500" />}
+              <p className={`text-[10px] ${isSuperAdmin ? 'text-orange-500 font-semibold' : 'text-muted-foreground'}`}>{userRole}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -333,6 +336,7 @@ export default function Home() {
   const stationLabel = staticStations.find((s) => s.value === selectedStation)?.label ?? 'All Stations'
   const isViewOnly = accessLevel === 'view-only'
 
+  const isSuperAdmin = authUser?.role === 'superadmin'
   const userName = authUser?.name || 'James Morrison'
   const userInitials = userName
     .split(' ')
@@ -340,7 +344,7 @@ export default function Home() {
     .join('')
     .toUpperCase()
     .slice(0, 2)
-  const userRole = authUser?.isDemo ? 'Demo Viewer' : authUser?.role || 'Station Manager'
+  const userRole = authUser?.isDemo ? 'Demo Viewer' : authUser?.role === 'superadmin' ? 'Super Admin' : authUser?.role || 'Station Manager'
 
   const handleLogout = useCallback(async () => {
     try {
@@ -487,8 +491,8 @@ export default function Home() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-1.5 rounded-md px-1.5 py-1 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors">
-                  <Avatar className="size-6 border border-teal-500/15">
-                    <AvatarFallback className="bg-teal-500/10 text-teal-600 dark:text-teal-400 text-[9px] font-bold rounded-[5px]">
+                  <Avatar className={`size-6 border ${isSuperAdmin ? 'border-orange-500/20' : 'border-teal-500/15'}`}>
+                    <AvatarFallback className={`${isSuperAdmin ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400' : 'bg-teal-500/10 text-teal-600 dark:text-teal-400'} text-[9px] font-bold rounded-[5px]`}>
                       {userInitials}
                     </AvatarFallback>
                   </Avatar>
@@ -497,14 +501,25 @@ export default function Home() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-52 rounded-xl shadow-lg border-border/50">
                 <div className="px-3 py-2">
-                  <p className="text-[13px] font-semibold">{userName}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-[13px] font-semibold">{userName}</p>
+                    {isSuperAdmin && <Crown className="size-3 text-orange-500" />}
+                  </div>
                   <p className="text-[11px] text-muted-foreground">{authUser?.email || 'j.morrison@apexfuel.com'}</p>
-                  {isViewOnly && (
-                    <Badge variant="outline" className="mt-1 text-[9px] px-1.5 py-0 border-teal-500/20 text-teal-500 bg-teal-500/5 rounded-md">
-                      <Eye className="size-2.5 mr-0.5" />
-                      View Only
-                    </Badge>
-                  )}
+                  <div className="flex items-center gap-1.5 mt-1">
+                    {isSuperAdmin && (
+                      <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-orange-500/20 text-orange-500 bg-orange-500/5 rounded-md">
+                        <Crown className="size-2.5 mr-0.5" />
+                        Super Admin
+                      </Badge>
+                    )}
+                    {isViewOnly && (
+                      <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-teal-500/20 text-teal-500 bg-teal-500/5 rounded-md">
+                        <Eye className="size-2.5 mr-0.5" />
+                        View Only
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-[13px] rounded-md">

@@ -1,0 +1,2002 @@
+     1→import { NextResponse } from 'next/server'
+     2→import { db } from '@/lib/db'
+     3→
+     4→export async function GET() {
+     5→  try {
+     6→    // Clean up existing data (order matters due to foreign keys)
+     7→    // Wrapped in try/catch per table for resilience
+     8→    const deleteTable = async (fn: () => Promise<unknown>) => { try { await fn() } catch { /* skip */ } }
+     9→
+    10→    // Children first (referencing other tables)
+    11→    await deleteTable(() => db.webhookDelivery.deleteMany())
+    12→    await deleteTable(() => db.webhookEndpoint.deleteMany())
+    13→    await deleteTable(() => db.aPIKey.deleteMany())
+    14→    await deleteTable(() => db.scheduledReport.deleteMany())
+    15→    await deleteTable(() => db.reportTemplate.deleteMany())
+    16→    await deleteTable(() => db.shiftHandover.deleteMany())
+    17→    await deleteTable(() => db.nozzleEvent.deleteMany())
+    18→    await deleteTable(() => db.cNGStorage.deleteMany())
+    19→    await deleteTable(() => db.cNGCompressor.deleteMany())
+    20→    await deleteTable(() => db.customerComplaint.deleteMany())
+    21→    await deleteTable(() => db.giftCard.deleteMany())
+    22→    await deleteTable(() => db.loyaltyTransaction.deleteMany())
+    23→    await deleteTable(() => db.safeDrop.deleteMany())
+    24→    await deleteTable(() => db.cashDrawer.deleteMany())
+    25→    await deleteTable(() => db.taxConfig.deleteMany())
+    26→    await deleteTable(() => db.accountPayable.deleteMany())
+    27→    await deleteTable(() => db.accountReceivable.deleteMany())
+    28→    await deleteTable(() => db.journalLine.deleteMany())
+    29→    await deleteTable(() => db.journalEntry.deleteMany())
+    30→    await deleteTable(() => db.gLAccount.deleteMany())
+    31→    await deleteTable(() => db.shrinkageRecord.deleteMany())
+    32→    await deleteTable(() => db.theftAlert.deleteMany())
+    33→    await deleteTable(() => db.fuelTransfer.deleteMany())
+    34→    await deleteTable(() => db.aTGProfile.deleteMany())
+    35→    await deleteTable(() => db.dispenserProfile.deleteMany())
+    36→    await deleteTable(() => db.commLog.deleteMany())
+    37→    await deleteTable(() => db.commConnection.deleteMany())
+    38→    await deleteTable(() => db.commProtocol.deleteMany())
+    39→    await deleteTable(() => db.encryptionKey.deleteMany())
+    40→    await deleteTable(() => db.backupRecord.deleteMany())
+    41→    await deleteTable(() => db.securityAlert.deleteMany())
+    42→    await deleteTable(() => db.rBACPermission.deleteMany())
+    43→    await deleteTable(() => db.securitySession.deleteMany())
+    44→    await deleteTable(() => db.oMSLicense.deleteMany())
+    45→    await deleteTable(() => db.oMSSyncLog.deleteMany())
+    46→    await deleteTable(() => db.oMSPayment.deleteMany())
+    47→    await deleteTable(() => db.oMSInvoice.deleteMany())
+    48→    await deleteTable(() => db.oMSPackage.deleteMany())
+    49→    await deleteTable(() => db.oMSClient.deleteMany())
+    50→    await deleteTable(() => db.deviceCommandQueue.deleteMany())
+    51→    await deleteTable(() => db.deviceEventLog.deleteMany())
+    52→    await deleteTable(() => db.deviceConfig.deleteMany())
+    53→    await deleteTable(() => db.vacuumStation.deleteMany())
+    54→    await deleteTable(() => db.airCompressor.deleteMany())
+    55→    await deleteTable(() => db.carWashSystem.deleteMany())
+    56→    await deleteTable(() => db.tankerTracker.deleteMany())
+    57→    await deleteTable(() => db.weatherStation.deleteMany())
+    58→    await deleteTable(() => db.utilityMeter.deleteMany())
+    59→    await deleteTable(() => db.fireAlarmSystem.deleteMany())
+    60→    await deleteTable(() => db.surveillanceCamera.deleteMany())
+    61→    await deleteTable(() => db.generator.deleteMany())
+    62→    await deleteTable(() => db.paymentTerminal.deleteMany())
+    63→    await deleteTable(() => db.forecourtController.deleteMany())
+    64→    await deleteTable(() => db.auditLog.deleteMany())
+    65→    await deleteTable(() => db.aIForecast.deleteMany())
+    66→    await deleteTable(() => db.aIAlert.deleteMany())
+    67→    await deleteTable(() => db.notification.deleteMany())
+    68→    await deleteTable(() => db.dailyReport.deleteMany())
+    69→    await deleteTable(() => db.vaporRecoveryReading.deleteMany())
+    70→    await deleteTable(() => db.environmentalAlert.deleteMany())
+    71→    await deleteTable(() => db.promotionUsage.deleteMany())
+    72→    await deleteTable(() => db.promotion.deleteMany())
+    73→    await deleteTable(() => db.loyaltyRule.deleteMany())
+    74→    await deleteTable(() => db.customer.deleteMany())
+    75→    await deleteTable(() => db.leaveRequest.deleteMany())
+    76→    await deleteTable(() => db.payrollRecord.deleteMany())
+    77→    await deleteTable(() => db.attendance.deleteMany())
+    78→    await deleteTable(() => db.maintenanceRecord.deleteMany())
+    79→    await deleteTable(() => db.expense.deleteMany())
+    80→    await deleteTable(() => db.transaction.deleteMany())
+    81→    await deleteTable(() => db.supplierInvoice.deleteMany())
+    82→    await deleteTable(() => db.purchaseOrder.deleteMany())
+    83→    await deleteTable(() => db.supplier.deleteMany())
+    84→    await deleteTable(() => db.lotterySale.deleteMany())
+    85→    await deleteTable(() => db.carWashSession.deleteMany())
+    86→    await deleteTable(() => db.retailTransaction.deleteMany())
+    87→    await deleteTable(() => db.lubricantProduct.deleteMany())
+    88→    await deleteTable(() => db.retailProduct.deleteMany())
+    89→    await deleteTable(() => db.chargingSession.deleteMany())
+    90→    await deleteTable(() => db.fueling.deleteMany())
+    91→    await deleteTable(() => db.meterRecord.deleteMany())
+    92→    await deleteTable(() => db.shift.deleteMany())
+    93→    await deleteTable(() => db.tankCalibration.deleteMany())
+    94→    await deleteTable(() => db.reconciliation.deleteMany())
+    95→    await deleteTable(() => db.tankReading.deleteMany())
+    96→    await deleteTable(() => db.fuelDelivery.deleteMany())
+    97→    await deleteTable(() => db.tank.deleteMany())
+    98→    await deleteTable(() => db.nozzle.deleteMany())
+    99→    await deleteTable(() => db.dispenser.deleteMany())
+   100→    await deleteTable(() => db.eVCharger.deleteMany())
+   101→    await deleteTable(() => db.cNGDispenser.deleteMany())
+   102→    await deleteTable(() => db.aNPRCamera.deleteMany())
+   103→    await deleteTable(() => db.rFIDReader.deleteMany())
+   104→    await deleteTable(() => db.priceBoard.deleteMany())
+   105→    await deleteTable(() => db.fuelPrice.deleteMany())
+   106→    await deleteTable(() => db.employee.deleteMany())
+   107→    await deleteTable(() => db.fuelCard.deleteMany())
+   108→    await deleteTable(() => db.vehicle.deleteMany())
+   109→    await deleteTable(() => db.driver.deleteMany())
+   110→    await deleteTable(() => db.fleetAccount.deleteMany())
+   111→    await deleteTable(() => db.hardwareCatalog.deleteMany())
+   112→    await deleteTable(() => db.controllerProfile.deleteMany())
+   113→    await deleteTable(() => db.controllerProtocol.deleteMany())
+   114→    await deleteTable(() => db.serialKey.deleteMany())
+   115→    await deleteTable(() => db.user.deleteMany())
+   116→    await deleteTable(() => db.station.deleteMany())
+   117→    await deleteTable(() => db.tenant.deleteMany())
+   118→    // Owner module tables
+   119→    await deleteTable(() => db.invoicePayment.deleteMany())
+   120→    await deleteTable(() => db.invoiceItem.deleteMany())
+   121→    await deleteTable(() => db.invoice.deleteMany())
+   122→    await deleteTable(() => db.quotationItem.deleteMany())
+   123→    await deleteTable(() => db.quotation.deleteMany())
+   124→    await deleteTable(() => db.licenseKey.deleteMany())
+   125→    await deleteTable(() => db.clientDevice.deleteMany())
+   126→    await deleteTable(() => db.clientSubscription.deleteMany())
+   127→    await deleteTable(() => db.subscriptionPlan.deleteMany())
+   128→    await deleteTable(() => db.tenantDatabase.deleteMany())
+   129→    await deleteTable(() => db.ownerClient.deleteMany())
+   130→
+   131→    // =====================================================
+   132→    // 1. TENANT
+   133→    // =====================================================
+   134→    const tenant = await db.tenant.create({
+   135→      data: {
+   136→        name: 'ApexFlow Energy Corp',
+   137→        slug: 'apexflow-energy',
+   138→        primaryColor: '#f59e0b',
+   139→        address: 'Blue Area, Jinnah Avenue',
+   140→        city: 'Islamabad',
+   141→        country: 'Pakistan',
+   142→        phone: '+92-51-1234567',
+   143→        email: 'ops@apexflow.pk',
+   144→        subscription: 'enterprise',
+   145→        taxId: 'NTN-1234567-8',
+   146→        registrationNumber: 'SEC-2024-PK-001',
+   147→        isActive: true,
+   148→      }
+   149→    })
+   150→
+   151→    // =====================================================
+   152→    // 2. STATIONS (5 across Pakistan)
+   153→    // =====================================================
+   154→    const stationData = [
+   155→      { name: 'Islamabad Main Station', code: 'ISB-001', city: 'Islamabad', region: 'ICT', stationType: 'hybrid', lat: 33.6844, lng: 73.0479 },
+   156→      { name: 'Lahore Canal Station', code: 'LHR-001', city: 'Lahore', region: 'Punjab', stationType: 'fuel', lat: 31.5204, lng: 74.3587 },
+   157→      { name: 'Karachi Port Station', code: 'KHI-001', city: 'Karachi', region: 'Sindh', stationType: 'fuel', lat: 24.8607, lng: 67.0011 },
+   158→      { name: 'Peshawar GT Station', code: 'PEW-001', city: 'Peshawar', region: 'KPK', stationType: 'cng', lat: 34.0151, lng: 71.5249 },
+   159→      { name: 'Faisalabad Sargodha Station', code: 'FSD-001', city: 'Faisalabad', region: 'Punjab', stationType: 'hybrid', lat: 31.4504, lng: 73.1350 },
+   160→    ]
+   161→
+   162→    const stations: Awaited<ReturnType<typeof db.station.create>>[] = []
+   163→    for (const s of stationData) {
+   164→      const station = await db.station.create({
+   165→        data: {
+   166→          tenantId: tenant.id,
+   167→          name: s.name,
+   168→          code: s.code,
+   169→          city: s.city,
+   170→          region: s.region,
+   171→          country: 'Pakistan',
+   172→          stationType: s.stationType,
+   173→          address: `${s.code}, ${s.city}`,
+   174→          latitude: s.lat,
+   175→          longitude: s.lng,
+   176→          phone: `+92-${s.code.slice(0,3)}-000000`,
+   177→          email: `${s.code.toLowerCase()}@apexflow.pk`,
+   178→          isActive: true,
+   179→          operatingHours: '06:00-23:00',
+   180→          timezone: 'Asia/Karachi',
+   181→          currency: 'PKR',
+   182→        }
+   183→      })
+   184→      stations.push(station)
+   185→    }
+   186→
+   187→    const mainStation = stations[0]
+   188→
+   189→    // =====================================================
+   190→    // 3. USERS
+   191→    // =====================================================
+   192→    const { hashPassword } = await import('@/lib/auth')
+   193→    const defaultPasswordHash = await hashPassword('fuelflow123')
+   194→    
+   195→    const users = await Promise.all([
+   196→      db.user.create({ data: { tenantId: tenant.id, email: 'superadmin@apexflow.pk', name: 'Imran Akhtar', role: 'superadmin', passwordHash: defaultPasswordHash, isActive: true, lastLogin: new Date() } }),
+   197→      db.user.create({ data: { tenantId: tenant.id, email: 'admin@apexflow.pk', name: 'Fatima Noor', role: 'admin', passwordHash: defaultPasswordHash, isActive: true, lastLogin: new Date() } }),
+   198→      db.user.create({ data: { tenantId: tenant.id, email: 'manager1@apexflow.pk', name: 'Hassan Rizvi', role: 'manager', passwordHash: defaultPasswordHash, isActive: true, lastLogin: new Date() } }),
+   199→      db.user.create({ data: { tenantId: tenant.id, email: 'manager2@apexflow.pk', name: 'Ayesha Siddiqui', role: 'manager', passwordHash: defaultPasswordHash, isActive: true } }),
+   200→      db.user.create({ data: { tenantId: tenant.id, email: 'operator1@apexflow.pk', name: 'Bilal Khan', role: 'operator', passwordHash: defaultPasswordHash, isActive: true } }),
+   201→      db.user.create({ data: { tenantId: tenant.id, email: 'operator2@apexflow.pk', name: 'Sana Rehman', role: 'operator', passwordHash: defaultPasswordHash, isActive: true } }),
+   202→    ])
+   203→
+   204→    // =====================================================
+   205→    // 3b. SERIAL KEYS
+   206→    // =====================================================
+   207→    await Promise.all([
+   208→      db.serialKey.create({
+   209→        data: {
+   210→          key: 'FF-PROF-A1B2-C3D4-E5F6',
+   211→          tenantId: tenant.id,
+   212→          status: 'active',
+   213→          plan: 'professional',
+   214→          maxStations: 3,
+   215→          maxDispensers: 24,
+   216→          maxUsers: 15,
+   217→          activatedAt: new Date('2024-06-01'),
+   218→          expiresAt: new Date('2026-06-01'),
+   219→          notes: 'Main professional license for ApexFlow Energy Corp',
+   220→        },
+   221→      }),
+   222→      db.serialKey.create({
+   223→        data: {
+   224→          key: 'FF-ENTR-G7H8-I9J0-K1L2',
+   225→          tenantId: tenant.id,
+   226→          status: 'active',
+   227→          plan: 'enterprise',
+   228→          maxStations: 50,
+   229→          maxDispensers: 500,
+   230→          maxUsers: 100,
+   231→          activatedAt: new Date('2024-01-15'),
+   232→          expiresAt: new Date('2027-01-15'),
+   233→          notes: 'Enterprise license - all features unlocked',
+   234→        },
+   235→      }),
+   236→      db.serialKey.create({
+   237→        data: {
+   238→          key: 'FF-STAR-M3N4-O5P6-Q7R8',
+   239→          status: 'inactive',
+   240→          plan: 'starter',
+   241→          maxStations: 1,
+   242→          maxDispensers: 8,
+   243→          maxUsers: 5,
+   244→          expiresAt: new Date('2026-12-31'),
+   245→          notes: 'Starter plan - ready for activation',
+   246→        },
+   247→      }),
+   248→      db.serialKey.create({
+   249→        data: {
+   250→          key: 'FF-PROF-S9T0-U1V2-W3X4',
+   251→          status: 'inactive',
+   252→          plan: 'professional',
+   253→          maxStations: 5,
+   254→          maxDispensers: 40,
+   255→          maxUsers: 20,
+   256→          expiresAt: new Date('2027-06-30'),
+   257→          notes: 'Professional plan - ready for activation',
+   258→        },
+   259→      }),
+   260→      db.serialKey.create({
+   261→        data: {
+   262→          key: 'FF-EXP-Y5Z6-A7B8-C9D0',
+   263→          status: 'expired',
+   264→          plan: 'starter',
+   265→          maxStations: 1,
+   266→          maxDispensers: 4,
+   267→          maxUsers: 3,
+   268→          activatedAt: new Date('2023-01-01'),
+   269→          expiresAt: new Date('2024-01-01'),
+   270→          notes: 'Expired starter license',
+   271→        },
+   272→      }),
+   273→    ])
+   274→
+   275→    // =====================================================
+   276→    // 4. EMPLOYEES (8)
+   277→    // =====================================================
+   278→    const employeeNames = [
+   279→      { name: 'Ahmed Khan', role: 'manager', salary: 85000, comm: 0 },
+   280→      { name: 'Muhammad Ali', role: 'supervisor', salary: 55000, comm: 0 },
+   281→      { name: 'Bilal Hussain', role: 'attendant', salary: 35000, comm: 0.5 },
+   282→      { name: 'Usman Sheikh', role: 'attendant', salary: 35000, comm: 0.5 },
+   283→      { name: 'Farhan Raza', role: 'attendant', salary: 35000, comm: 0.5 },
+   284→      { name: 'Tariq Mehmood', role: 'attendant', salary: 35000, comm: 0.5 },
+   285→      { name: 'Zain Ahmed', role: 'cashier', salary: 40000, comm: 0 },
+   286→      { name: 'Kamran Siddiqui', role: 'maintenance', salary: 40000, comm: 0 },
+   287→    ]
+   288→
+   289→    const employees: Awaited<ReturnType<typeof db.employee.create>>[] = []
+   290→    for (const e of employeeNames) {
+   291→      const emp = await db.employee.create({
+   292→        data: {
+   293→          stationId: mainStation.id,
+   294→          name: e.name,
+   295→          role: e.role,
+   296→          salary: e.salary,
+   297→          commissionRate: e.comm,
+   298→          status: 'active',
+   299→          hireDate: new Date('2024-06-01'),
+   300→          employeeId: `EMP-${String(employeeNames.indexOf(e) + 1).padStart(4, '0')}`,
+   301→        }
+   302→      })
+   303→      employees.push(emp)
+   304→    }
+   305→
+   306→    // =====================================================
+   307→    // 5. TANKS (4)
+   308→    // =====================================================
+   309→    const tankTypes = [
+   310→      { name: 'Tank A - Petrol', code: 'TANK-A', fuelType: 'petrol', capacity: 20000 },
+   311→      { name: 'Tank B - Diesel', code: 'TANK-B', fuelType: 'diesel', capacity: 25000 },
+   312→      { name: 'Tank C - Premium', code: 'TANK-C', fuelType: 'premium', capacity: 15000 },
+   313→      { name: 'Tank D - High Speed Diesel', code: 'TANK-D', fuelType: 'hsd', capacity: 30000 },
+   314→    ]
+   315→
+   316→    const tanks: Awaited<ReturnType<typeof db.tank.create>>[] = []
+   317→    for (const t of tankTypes) {
+   318→      const currentLevel = t.capacity * (0.3 + Math.random() * 0.5)
+   319→      const tank = await db.tank.create({
+   320→        data: {
+   321→          stationId: mainStation.id,
+   322→          name: t.name,
+   323→          code: t.code,
+   324→          fuelType: t.fuelType,
+   325→          capacity: t.capacity,
+   326→          currentLevel: Math.round(currentLevel),
+   327→          waterLevel: Math.round(Math.random() * 50),
+   328→          temperature: 25 + Math.random() * 10,
+   329→          density: 0.74 + Math.random() * 0.05,
+   330→          atgType: 'veeder-root',
+   331→          status: currentLevel / t.capacity < 0.25 ? 'low' : 'normal',
+   332→        }
+   333→      })
+   334→      tanks.push(tank)
+   335→    }
+   336→
+   337→    // =====================================================
+   338→    // 6. DISPENSERS (8) with 2 nozzles each (16 nozzles)
+   339→    // =====================================================
+   340→    const dispenserData = [
+   341→      { name: 'Pump 1', code: 'P-01', manufacturer: 'tatsuno', controller: 'pts', comm: 'tcpip' },
+   342→      { name: 'Pump 2', code: 'P-02', manufacturer: 'gilbarco', controller: 'fusion', comm: 'tcpip' },
+   343→      { name: 'Pump 3', code: 'P-03', manufacturer: 'wayne', controller: 'pts', comm: 'rs485' },
+   344→      { name: 'Pump 4', code: 'P-04', manufacturer: 'tokheim', controller: 'doms', comm: 'ethernet' },
+   345→      { name: 'Pump 5', code: 'P-05', manufacturer: 'tatsuno', controller: 'pts', comm: 'tcpip' },
+   346→      { name: 'Pump 6', code: 'P-06', manufacturer: 'gilbarco', controller: 'fusion', comm: 'tcpip' },
+   347→      { name: 'Pump 7', code: 'P-07', manufacturer: 'sanki', controller: 'pts', comm: 'rs232' },
+   348→      { name: 'Pump 8', code: 'P-08', manufacturer: 'censtar', controller: 'hectronic', comm: 'ethernet' },
+   349→    ]
+   350→
+   351→    const dispensers: Awaited<ReturnType<typeof db.dispenser.create>>[] = []
+   352→    const allNozzles: Awaited<ReturnType<typeof db.nozzle.create>>[] = []
+   353→    const statuses = ['idle', 'fueling', 'idle', 'idle', 'maintenance', 'idle', 'idle', 'fueling']
+   354→
+   355→    for (let idx = 0; idx < dispenserData.length; idx++) {
+   356→      const d = dispenserData[idx]
+   357→      const dispenser = await db.dispenser.create({
+   358→        data: {
+   359→          stationId: mainStation.id,
+   360→          name: d.name,
+   361→          code: d.code,
+   362→          manufacturer: d.manufacturer,
+   363→          controllerType: d.controller,
+   364→          communicationType: d.comm,
+   365→          status: statuses[idx],
+   366→          isActive: true,
+   367→        }
+   368→      })
+   369→      dispensers.push(dispenser)
+   370→
+   371→      // Create 2 nozzles per dispenser
+   372→      const nozzleFuelTypes: [string, string][] = idx % 2 === 0
+   373→        ? [['petrol', 'Petrol'], ['diesel', 'Diesel']]
+   374→        : [['premium', 'Premium'], ['hsd', 'High Speed Diesel']]
+   375→
+   376→      for (let n = 0; n < nozzleFuelTypes.length; n++) {
+   377→        const meterReading = 100000 + Math.floor(Math.random() * 500000)
+   378→        const nozzle = await db.nozzle.create({
+   379→          data: {
+   380→            dispenserId: dispenser.id,
+   381→            nozzleNumber: n + 1,
+   382→            fuelType: nozzleFuelTypes[n][0],
+   383→            fuelGrade: nozzleFuelTypes[n][1],
+   384→            meterReading,
+   385→            previousReading: meterReading - 1000 - Math.floor(Math.random() * 500),
+   386→            totalizer: meterReading,
+   387→            status: statuses[idx] === 'fueling' && n === 0 ? 'fueling' : 'idle',
+   388→            calibrationFactor: 1.0,
+   389→            calibrationDate: new Date('2025-01-15'),
+   390→          }
+   391→        })
+   392→        allNozzles.push(nozzle)
+   393→      }
+   394→    }
+   395→
+   396→    // =====================================================
+   397→    // 7. TANK READINGS (24 per tank = 96)
+   398→    // =====================================================
+   399→    for (const tank of tanks) {
+   400→      for (let i = 0; i < 24; i++) {
+   401→        await db.tankReading.create({
+   402→          data: {
+   403→            tankId: tank.id,
+   404→            level: tank.currentLevel * (0.7 + Math.random() * 0.3),
+   405→            volume: tank.currentLevel * (0.7 + Math.random() * 0.3),
+   406→            waterLevel: Math.random() * 50,
+   407→            temperature: 25 + Math.random() * 10,
+   408→            readingType: 'automatic',
+   409→            readingAt: new Date(Date.now() - i * 3600000),
+   410→          }
+   411→        })
+   412→      }
+   413→    }
+   414→
+   415→    // =====================================================
+   416→    // 8. SUPPLIERS (5)
+   417→    // =====================================================
+   418→    const suppliers = await Promise.all([
+   419→      db.supplier.create({ data: { tenantId: tenant.id, name: 'Pakistan State Oil', code: 'PSO', contactPerson: 'Aslam Pervaiz', phone: '+92-21-111-PSO-11', email: 'supply@pso.com.pk', address: 'PSO House, Karachi', city: 'Karachi', category: 'fuel', paymentTerms: 'net30', taxId: 'NTN-PSO-001', isActive: true } }),
+   420→      db.supplier.create({ data: { tenantId: tenant.id, name: 'Shell Pakistan', code: 'SHELL', contactPerson: 'Naveed Qureshi', phone: '+92-21-111-SHELL', email: 'orders@shell.pk', address: 'Shell House, Karachi', city: 'Karachi', category: 'fuel', paymentTerms: 'net15', taxId: 'NTN-SHELL-001', isActive: true } }),
+   421→      db.supplier.create({ data: { tenantId: tenant.id, name: 'Castrol Pakistan', code: 'CASTROL', contactPerson: 'Rizwan Ahmad', phone: '+92-42-35761234', email: 'lubricants@castrol.pk', address: 'Lahore', city: 'Lahore', category: 'lubricant', paymentTerms: 'net30', isActive: true } }),
+   422→      db.supplier.create({ data: { tenantId: tenant.id, name: 'Metro Wholesale', code: 'METRO', contactPerson: 'Khalid Butt', phone: '+92-51-28901234', email: 'orders@metro.pk', address: 'Islamabad', city: 'Islamabad', category: 'retail', paymentTerms: 'cod', isActive: true } }),
+   423→      db.supplier.create({ data: { tenantId: tenant.id, name: 'TechServe Maintenance', code: 'TECHSERVE', contactPerson: 'Javed Iqbal', phone: '+92-300-9876543', email: 'service@techserve.pk', address: 'Rawalpindi', city: 'Rawalpindi', category: 'maintenance', paymentTerms: 'net15', isActive: true } }),
+   424→    ])
+   425→
+   426→    // =====================================================
+   427→    // 9. FUEL DELIVERIES (5)
+   428→    // =====================================================
+   429→    const deliveries = await Promise.all([
+   430→      db.fuelDelivery.create({ data: { stationId: mainStation.id, tankId: tanks[0].id, supplierId: suppliers[0].id, supplierName: 'Pakistan State Oil', tankerNumber: 'TK-4521', driverName: 'Rashid Ali', expectedVolume: 10000, actualVolume: 10000, density: 0.745, temperature: 26, productType: 'petrol', status: 'completed', deliveryDate: new Date(Date.now() - 2 * 86400000), completedAt: new Date(Date.now() - 2 * 86400000 + 3600000), variance: 0, invoiceNumber: 'INV-PSO-001', costPerUnit: 250, totalCost: 2500000 } }),
+   431→      db.fuelDelivery.create({ data: { stationId: mainStation.id, tankId: tanks[1].id, supplierId: suppliers[0].id, supplierName: 'Pakistan State Oil', tankerNumber: 'TK-4522', driverName: 'Majeed Khan', expectedVolume: 15000, actualVolume: 14980, density: 0.835, temperature: 25, productType: 'diesel', status: 'completed', deliveryDate: new Date(Date.now() - 86400000), completedAt: new Date(Date.now() - 86400000 + 4200000), variance: -20, invoiceNumber: 'INV-PSO-002', costPerUnit: 245, totalCost: 3670100 } }),
+   432→      db.fuelDelivery.create({ data: { stationId: mainStation.id, tankId: tanks[2].id, supplierId: suppliers[1].id, supplierName: 'Shell Pakistan', tankerNumber: 'SH-8834', driverName: 'Imtiaz Hussain', expectedVolume: 8000, actualVolume: 8000, density: 0.752, temperature: 27, productType: 'premium', status: 'completed', deliveryDate: new Date(Date.now() - 3 * 86400000), completedAt: new Date(Date.now() - 3 * 86400000 + 3000000), variance: 0, invoiceNumber: 'INV-SHELL-001', costPerUnit: 278, totalCost: 2224000 } }),
+   433→      db.fuelDelivery.create({ data: { stationId: mainStation.id, tankId: tanks[3].id, supplierId: suppliers[1].id, supplierName: 'Shell Pakistan', tankerNumber: 'SH-8835', driverName: 'Waqar Younis', expectedVolume: 20000, actualVolume: 0, productType: 'hsd', status: 'pending', deliveryDate: new Date(Date.now() + 86400000), notes: 'Scheduled delivery tomorrow' } }),
+   434→      db.fuelDelivery.create({ data: { stationId: mainStation.id, tankId: tanks[0].id, supplierId: suppliers[0].id, supplierName: 'Pakistan State Oil', tankerNumber: 'TK-4523', driverName: 'Shahid Afridi', expectedVolume: 12000, actualVolume: 11850, density: 0.748, temperature: 28, productType: 'petrol', status: 'discrepancy', deliveryDate: new Date(Date.now() - 43200000), completedAt: new Date(Date.now() - 43200000 + 5400000), variance: -150, invoiceNumber: 'INV-PSO-003', costPerUnit: 250, totalCost: 2962500, notes: '150L variance detected - under investigation' } }),
+   435→    ])
+   436→
+   437→    // =====================================================
+   438→    // 10. RECONCILIATIONS
+   439→    // =====================================================
+   440→    for (const tank of tanks) {
+   441→      const opening = tank.currentLevel + 2000 + Math.random() * 3000
+   442→      const sales = 1500 + Math.random() * 3000
+   443→      const delivery = sales - opening + tank.currentLevel + (Math.random() * 100 - 50)
+   444→      const closing = opening + delivery - sales
+   445→      const bookStock = closing
+   446→      const actualStock = closing + (Math.random() * 60 - 30)
+   447→      const variance = actualStock - bookStock
+   448→      await db.reconciliation.create({
+   449→        data: {
+   450→          tankId: tank.id,
+   451→          stationId: mainStation.id,
+   452→          date: new Date(Date.now() - 86400000),
+   453→          openingStock: Math.round(opening),
+   454→          deliveries: Math.round(Math.max(0, delivery)),
+   455→          sales: Math.round(sales),
+   456→          closingStock: Math.round(closing),
+   457→          bookStock: Math.round(bookStock),
+   458→          actualStock: Math.round(actualStock),
+   459→          variance: Math.round(variance),
+   460→          variancePercentage: Math.round(Math.abs(variance / bookStock) * 10000) / 100,
+   461→          status: 'approved',
+   462→          reviewedBy: users[1].id,
+   463→        }
+   464→      })
+   465→    }
+   466→
+   467→    // =====================================================
+   468→    // 11. TANK CALIBRATIONS
+   469→    // =====================================================
+   470→    for (const tank of tanks) {
+   471→      const volumeTable = JSON.stringify(
+   472→        Array.from({ length: 10 }, (_, i) => ({
+   473→          heightCm: (i + 1) * 20,
+   474→          volumeLitres: Math.round(tank.capacity * ((i + 1) / 10)),
+   475→        }))
+   476→      )
+   477→      await db.tankCalibration.create({
+   478→        data: {
+   479→          stationId: mainStation.id,
+   480→          tankId: tank.id,
+   481→          calibrationDate: new Date('2025-01-15'),
+   482→          calibratedBy: 'Pakistan Weights & Measures Dept',
+   483→          certificateNumber: `CAL-${tank.code}-2025`,
+   484→          volumeTable,
+   485→          notes: 'Annual calibration per regulatory requirements',
+   486→        }
+   487→      })
+   488→    }
+   489→
+   490→    // =====================================================
+   491→    // 12. SHIFTS (1 open + 2 closed)
+   492→    // =====================================================
+   493→    const now = new Date()
+   494→    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+   495→
+   496→    // Closed shift 1 (yesterday night)
+   497→    const closedShift1 = await db.shift.create({
+   498→      data: {
+   499→        stationId: mainStation.id,
+   500→        shiftNumber: 1,
+   501→        attendantId: employees[2].id,
+   502→        supervisorId: employees[1].id,
+   503→        openedAt: new Date(todayStart.getTime() - 86400000 + 6 * 3600000),
+   504→        closedAt: new Date(todayStart.getTime() - 86400000 + 14 * 3600000),
+   505→        openingCash: 50000,
+   506→        closingCash: 285000,
+   507→        expectedCash: 287500,
+   508→        cashVariance: -2500,
+   509→        totalSales: 287500,
+   510→        totalVolume: 1100,
+   511→        fuelSales: 262500,
+   512→        retailSales: 25000,
+   513→        cardSales: 87500,
+   514→        fleetSales: 52500,
+   515→        creditSales: 17500,
+   516→        cashSales: 130000,
+   517→        transactionCount: 42,
+   518→        status: 'reconciled',
+   519→      }
+   520→    })
+   521→
+   522→    // Closed shift 2 (today morning)
+   523→    const closedShift2 = await db.shift.create({
+   524→      data: {
+   525→        stationId: mainStation.id,
+   526→        shiftNumber: 2,
+   527→        attendantId: employees[3].id,
+   528→        supervisorId: employees[1].id,
+   529→        openedAt: new Date(todayStart.getTime() + 6 * 3600000),
+   530→        closedAt: new Date(todayStart.getTime() + 14 * 3600000),
+   531→        openingCash: 60000,
+   532→        closingCash: 195000,
+   533→        expectedCash: 198000,
+   534→        cashVariance: -3000,
+   535→        totalSales: 198000,
+   536→        totalVolume: 750,
+   537→        fuelSales: 178000,
+   538→        retailSales: 20000,
+   539→        cardSales: 58000,
+   540→        fleetSales: 42000,
+   541→        creditSales: 12000,
+   542→        cashSales: 86000,
+   543→        transactionCount: 31,
+   544→        status: 'closed',
+   545→      }
+   546→    })
+   547→
+   548→    // Open shift (current)
+   549→    const openShift = await db.shift.create({
+   550→      data: {
+   551→        stationId: mainStation.id,
+   552→        shiftNumber: 3,
+   553→        attendantId: employees[4].id,
+   554→        supervisorId: employees[0].id,
+   555→        openedAt: new Date(todayStart.getTime() + 14 * 3600000),
+   556→        openingCash: 50000,
+   557→        totalSales: 0,
+   558→        totalVolume: 0,
+   559→        fuelSales: 0,
+   560→        retailSales: 0,
+   561→        cardSales: 0,
+   562→        fleetSales: 0,
+   563→        creditSales: 0,
+   564→        cashSales: 0,
+   565→        status: 'open',
+   566→      }
+   567→    })
+   568→
+   569→    // =====================================================
+   570→    // 13. FUELING TRANSACTIONS (60+)
+   571→    // =====================================================
+   572→    const fuelTypes = ['petrol', 'diesel', 'premium', 'hsd']
+   573→    const paymentMethods = ['cash', 'card', 'fleet', 'rfid', 'mobile']
+   574→    const prices: Record<string, number> = { petrol: 272.50, diesel: 268.00, premium: 302.50, hsd: 275.00 }
+   575→
+   576→    let openShiftSales = 0
+   577→    let openShiftVolume = 0
+   578→    let openShiftFuelSales = 0
+   579→    let openShiftCardSales = 0
+   580→    let openShiftFleetSales = 0
+   581→    let openShiftCreditSales = 0
+   582→    let openShiftCashSales = 0
+   583→
+   584→    // Transactions for closed shift 1
+   585→    for (let i = 0; i < 20; i++) {
+   586→      const fuelType = fuelTypes[Math.floor(Math.random() * fuelTypes.length)]
+   587→      const volume = 5 + Math.floor(Math.random() * 55)
+   588→      const price = prices[fuelType]
+   589→      const amount = Math.round(volume * price * 100) / 100
+   590→      const paymentMethod = paymentMethods[Math.floor(Math.random() * paymentMethods.length)]
+   591→      const dispenserIdx = Math.floor(Math.random() * dispensers.length)
+   592→      const nozzlesForDispenser = allNozzles.filter(n => n.dispenserId === dispensers[dispenserIdx].id)
+   593→      const nozzle = nozzlesForDispenser[Math.floor(Math.random() * nozzlesForDispenser.length)]
+   594→      if (!nozzle) continue
+   595→
+   596→      const hoursAgo = 20 + Math.floor(Math.random() * 8)
+   597→      const startTime = new Date(now.getTime() - hoursAgo * 3600000)
+   598→
+   599→      await db.fueling.create({
+   600→        data: {
+   601→          stationId: mainStation.id,
+   602→          dispenserId: dispensers[dispenserIdx].id,
+   603→          nozzleId: nozzle.id,
+   604→          shiftId: closedShift1.id,
+   605→          fuelType,
+   606→          volume,
+   607→          pricePerUnit: price,
+   608→          totalAmount: amount,
+   609→          paymentMethod,
+   610→          meterStart: nozzle.meterReading - volume - Math.floor(Math.random() * 10),
+   611→          meterEnd: nozzle.meterReading - Math.floor(Math.random() * 10),
+   612→          attendantId: employees[2].id,
+   613→          status: 'completed',
+   614→          startedAt: startTime,
+   615→          completedAt: new Date(startTime.getTime() + 120000 + Math.random() * 300000),
+   616→        }
+   617→      })
+   618→    }
+   619→
+   620→    // Transactions for closed shift 2
+   621→    for (let i = 0; i < 20; i++) {
+   622→      const fuelType = fuelTypes[Math.floor(Math.random() * fuelTypes.length)]
+   623→      const volume = 5 + Math.floor(Math.random() * 55)
+   624→      const price = prices[fuelType]
+   625→      const amount = Math.round(volume * price * 100) / 100
+   626→      const paymentMethod = paymentMethods[Math.floor(Math.random() * paymentMethods.length)]
+   627→      const dispenserIdx = Math.floor(Math.random() * dispensers.length)
+   628→      const nozzlesForDispenser = allNozzles.filter(n => n.dispenserId === dispensers[dispenserIdx].id)
+   629→      const nozzle = nozzlesForDispenser[Math.floor(Math.random() * nozzlesForDispenser.length)]
+   630→      if (!nozzle) continue
+   631→
+   632→      const hoursAgo = 8 + Math.floor(Math.random() * 6)
+   633→      const startTime = new Date(now.getTime() - hoursAgo * 3600000)
+   634→
+   635→      await db.fueling.create({
+   636→        data: {
+   637→          stationId: mainStation.id,
+   638→          dispenserId: dispensers[dispenserIdx].id,
+   639→          nozzleId: nozzle.id,
+   640→          shiftId: closedShift2.id,
+   641→          fuelType,
+   642→          volume,
+   643→          pricePerUnit: price,
+   644→          totalAmount: amount,
+   645→          paymentMethod,
+   646→          meterStart: nozzle.meterReading - volume - Math.floor(Math.random() * 10),
+   647→          meterEnd: nozzle.meterReading - Math.floor(Math.random() * 10),
+   648→          attendantId: employees[3].id,
+   649→          status: 'completed',
+   650→          startedAt: startTime,
+   651→          completedAt: new Date(startTime.getTime() + 120000 + Math.random() * 300000),
+   652→        }
+   653→      })
+   654→    }
+   655→
+   656→    // Transactions for open shift (current)
+   657→    for (let i = 0; i < 25; i++) {
+   658→      const fuelType = fuelTypes[Math.floor(Math.random() * fuelTypes.length)]
+   659→      const volume = 5 + Math.floor(Math.random() * 55)
+   660→      const price = prices[fuelType]
+   661→      const amount = Math.round(volume * price * 100) / 100
+   662→      const paymentMethod = paymentMethods[Math.floor(Math.random() * paymentMethods.length)]
+   663→      const dispenserIdx = Math.floor(Math.random() * dispensers.length)
+   664→      const nozzlesForDispenser = allNozzles.filter(n => n.dispenserId === dispensers[dispenserIdx].id)
+   665→      const nozzle = nozzlesForDispenser[Math.floor(Math.random() * nozzlesForDispenser.length)]
+   666→      if (!nozzle) continue
+   667→
+   668→      const hoursAgo = Math.floor(Math.random() * 6)
+   669→      const startTime = new Date(now.getTime() - hoursAgo * 3600000)
+   670→
+   671→      openShiftSales += amount
+   672→      openShiftVolume += volume
+   673→      openShiftFuelSales += amount
+   674→      if (paymentMethod === 'card') openShiftCardSales += amount
+   675→      else if (paymentMethod === 'fleet') openShiftFleetSales += amount
+   676→      else if (paymentMethod === 'cash') openShiftCashSales += amount
+   677→      else openShiftCreditSales += amount
+   678→
+   679→      await db.fueling.create({
+   680→        data: {
+   681→          stationId: mainStation.id,
+   682→          dispenserId: dispensers[dispenserIdx].id,
+   683→          nozzleId: nozzle.id,
+   684→          shiftId: openShift.id,
+   685→          fuelType,
+   686→          volume,
+   687→          pricePerUnit: price,
+   688→          totalAmount: amount,
+   689→          paymentMethod,
+   690→          meterStart: nozzle.meterReading - volume - Math.floor(Math.random() * 10),
+   691→          meterEnd: nozzle.meterReading - Math.floor(Math.random() * 10),
+   692→          attendantId: employees[4 + Math.floor(Math.random() * 2)].id,
+   693→          status: 'completed',
+   694→          startedAt: startTime,
+   695→          completedAt: new Date(startTime.getTime() + 120000 + Math.random() * 300000),
+   696→        }
+   697→      })
+   698→    }
+   699→
+   700→    // Update open shift totals
+   701→    await db.shift.update({
+   702→      where: { id: openShift.id },
+   703→      data: {
+   704→        totalSales: Math.round(openShiftSales * 100) / 100,
+   705→        totalVolume: Math.round(openShiftVolume),
+   706→        fuelSales: Math.round(openShiftFuelSales * 100) / 100,
+   707→        cardSales: Math.round(openShiftCardSales * 100) / 100,
+   708→        fleetSales: Math.round(openShiftFleetSales * 100) / 100,
+   709→        creditSales: Math.round(openShiftCreditSales * 100) / 100,
+   710→        cashSales: Math.round(openShiftCashSales * 100) / 100,
+   711→      }
+   712→    })
+   713→
+   714→    // =====================================================
+   715→    // 14. METER RECORDS
+   716→    // =====================================================
+   717→    for (const nozzle of allNozzles) {
+   718→      const readingStart = nozzle.meterReading - 2000 - Math.floor(Math.random() * 1000)
+   719→      await db.meterRecord.create({
+   720→        data: {
+   721→          stationId: mainStation.id,
+   722→          nozzleId: nozzle.id,
+   723→          shiftId: closedShift1.id,
+   724→          readingStart,
+   725→          readingEnd: readingStart + 500 + Math.floor(Math.random() * 1000),
+   726→          volumeDispensed: 500 + Math.floor(Math.random() * 1000),
+   727→          recordedAt: new Date(Date.now() - 86400000),
+   728→        }
+   729→      })
+   730→      // Meter record for closed shift 2
+   731→      const readingStart2 = nozzle.previousReading + Math.floor(Math.random() * 500)
+   732→      await db.meterRecord.create({
+   733→        data: {
+   734→          stationId: mainStation.id,
+   735→          nozzleId: nozzle.id,
+   736→          shiftId: closedShift2.id,
+   737→          readingStart: readingStart2,
+   738→          readingEnd: readingStart2 + 300 + Math.floor(Math.random() * 700),
+   739→          volumeDispensed: 300 + Math.floor(Math.random() * 700),
+   740→          recordedAt: new Date(todayStart.getTime() + 6 * 3600000),
+   741→        }
+   742→      })
+   743→      await db.meterRecord.create({
+   744→        data: {
+   745→          stationId: mainStation.id,
+   746→          nozzleId: nozzle.id,
+   747→          shiftId: openShift.id,
+   748→          readingStart: nozzle.meterReading - 1000 - Math.floor(Math.random() * 500),
+   749→          readingEnd: nozzle.meterReading,
+   750→          volumeDispensed: 500 + Math.floor(Math.random() * 500),
+   751→          recordedAt: new Date(),
+   752→        }
+   753→      })
+   754→    }
+   755→
+   756→    // =====================================================
+   757→    // 15. FLEET ACCOUNTS (4) with vehicles, drivers, fuel cards
+   758→    // =====================================================
+   759→    const fleetData = [
+   760→      { name: 'Pakistan Post Fleet', contact: 'Malik Aslam', daily: 5000 },
+   761→      { name: 'Daewoo Express', contact: 'Syed Wajahat', daily: 15000 },
+   762→      { name: 'NLC Logistics', contact: 'Col. Rashid', daily: 25000 },
+   763→      { name: 'Metro Bus Operations', contact: 'Engr. Farooq', daily: 20000 },
+   764→    ]
+   765→
+   766→    const fleetAccounts: Awaited<ReturnType<typeof db.fleetAccount.create>>[] = []
+   767→    for (const f of fleetData) {
+   768→      const fleet = await db.fleetAccount.create({
+   769→        data: {
+   770→          tenantId: tenant.id,
+   771→          companyName: f.name,
+   772→          contactPerson: f.contact,
+   773→          phone: '+92-300-1234567',
+   774→          email: `fleet@${f.name.toLowerCase().replace(/\s/g, '')}.pk`,
+   775→          creditLimit: 5000000,
+   776→          currentBalance: 2500000 + Math.floor(Math.random() * 2000000),
+   777→          dailyLimit: f.daily,
+   778→          monthlyLimit: f.daily * 30,
+   779→          fuelTypes: 'petrol,diesel,hsd',
+   780→          status: 'active',
+   781→          paymentTerms: 'net30',
+   782→        }
+   783→      })
+   784→      fleetAccounts.push(fleet)
+   785→
+   786→      // 3 vehicles per fleet
+   787→      const vehicleMakes = ['Toyota', 'Suzuki', 'Honda', 'Isuzu', 'Hino', 'Daewoo', 'Hyundai', 'Mitsubishi', 'Kia', 'Foton', 'MAN', 'Volvo']
+   788→      for (let v = 0; v < 3; v++) {
+   789→        await db.vehicle.create({
+   790→          data: {
+   791→            fleetAccountId: fleet.id,
+   792→            plateNumber: `LEA-${Math.floor(Math.random() * 9000 + 1000)}`,
+   793→            make: vehicleMakes[Math.floor(Math.random() * vehicleMakes.length)],
+   794→            model: `${2020 + Math.floor(Math.random() * 5)}`,
+   795→            year: 2020 + Math.floor(Math.random() * 5),
+   796→            vehicleType: v === 0 ? 'sedan' : v === 1 ? 'bus' : 'truck',
+   797→            rfidTag: `RFID-${fleet.id.slice(-4)}-${v + 1}`,
+   798→            fuelType: v === 0 ? 'petrol' : 'diesel',
+   799→            tankCapacity: v === 0 ? 50 : v === 1 ? 200 : 400,
+   800→            dailyLimit: f.daily / 3,
+   801→            odometer: 50000 + Math.floor(Math.random() * 100000),
+   802→            isActive: true,
+   803→          }
+   804→        })
+   805→      }
+   806→
+   807→      // 3 drivers per fleet
+   808→      const driverNames = ['Akram Shah', 'Nasir Javed', 'Waqas Malik', 'Faisal Iqbal', 'Sajid Mehmood', 'Rizwan Ahmed', 'Shoaib Akhtar', 'Asif Khan', 'Younis Raza', 'Kamran Yousuf', 'Imran Butt', 'Haris Sohail']
+   809→      for (let d = 0; d < 3; d++) {
+   810→        await db.driver.create({
+   811→          data: {
+   812→            fleetAccountId: fleet.id,
+   813→            name: driverNames[fleetData.indexOf(f) * 3 + d],
+   814→            licenseNumber: `DL-${Math.floor(Math.random() * 900000 + 100000)}`,
+   815→            phone: `+92-3${Math.floor(Math.random() * 10)}0-${Math.floor(Math.random() * 9000000 + 1000000)}`,
+   816→            rfidCard: `DRV-${fleet.id.slice(-4)}-${d + 1}`,
+   817→            isActive: true,
+   818→          }
+   819→        })
+   820→      }
+   821→
+   822→      // 5 fuel cards per fleet
+   823→      for (let c = 0; c < 5; c++) {
+   824→        await db.fuelCard.create({
+   825→          data: {
+   826→            tenantId: tenant.id,
+   827→            cardNumber: `FC-${fleet.id.slice(-4)}-${String(c + 1).padStart(4, '0')}`,
+   828→            fleetAccountId: fleet.id,
+   829→            cardType: 'fleet',
+   830→            rfidTag: `FC-RFID-${fleet.id.slice(-4)}-${c + 1}`,
+   831→            pin: String(1000 + c),
+   832→            dailyLimit: f.daily / 5,
+   833→            monthlyLimit: f.daily * 6,
+   834→            balance: 100000 + Math.floor(Math.random() * 200000),
+   835→            isActive: true,
+   836→            expiryDate: new Date('2026-12-31'),
+   837→          }
+   838→        })
+   839→      }
+   840→    }
+   841→
+   842→    // =====================================================
+   843→    // 16. FUEL PRICES
+   844→    // =====================================================
+   845→    const fuelPriceData = [
+   846→      { fuelType: 'petrol', pricePerUnit: 272.50, previousPrice: 270.00 },
+   847→      { fuelType: 'diesel', pricePerUnit: 268.00, previousPrice: 265.50 },
+   848→      { fuelType: 'premium', pricePerUnit: 302.50, previousPrice: 298.00 },
+   849→      { fuelType: 'hsd', pricePerUnit: 275.00, previousPrice: 272.50 },
+   850→    ]
+   851→
+   852→    for (const fp of fuelPriceData) {
+   853→      await db.fuelPrice.create({
+   854→        data: {
+   855→          tenantId: tenant.id,
+   856→          stationId: mainStation.id,
+   857→          fuelType: fp.fuelType,
+   858→          pricePerUnit: fp.pricePerUnit,
+   859→          previousPrice: fp.previousPrice,
+   860→          currency: 'PKR',
+   861→          effectiveFrom: new Date('2025-03-01'),
+   862→          status: 'active',
+   863→          isGovernment: true,
+   864→          updatedBy: users[0].id,
+   865→        }
+   866→      })
+   867→    }
+   868→
+   869→    // =====================================================
+   870→    // 17. PRICE BOARDS (2) - NO code field
+   871→    // =====================================================
+   872→    await db.priceBoard.createMany({
+   873→      data: [
+   874→        { stationId: mainStation.id, name: 'Main Price Board', boardType: 'led', status: 'online', ipAddress: '192.168.1.100', port: 8080, lastUpdate: new Date() },
+   875→        { stationId: mainStation.id, name: 'Canopy Display', boardType: 'digital', status: 'online', ipAddress: '192.168.1.101', port: 8081, lastUpdate: new Date() },
+   876→      ]
+   877→    })
+   878→
+   879→    // =====================================================
+   880→    // 18. RETAIL PRODUCTS (8+)
+   881→    // =====================================================
+   882→    const retailItems = [
+   883→      { name: 'Mineral Water 500ml', category: 'beverages', price: 80, stock: 200, sku: 'BEV-001' },
+   884→      { name: 'Cold Drink 345ml', category: 'beverages', price: 120, stock: 150, sku: 'BEV-002' },
+   885→      { name: 'Energy Drink 250ml', category: 'beverages', price: 280, stock: 80, sku: 'BEV-003' },
+   886→      { name: 'Snack Pack', category: 'snacks', price: 150, stock: 100, sku: 'SNK-001' },
+   887→      { name: 'Chips Variety', category: 'snacks', price: 100, stock: 120, sku: 'SNK-002' },
+   888→      { name: 'Engine Oil 1L', category: 'automotive', price: 850, stock: 50, sku: 'AUTO-001' },
+   889→      { name: 'Windshield Washer', category: 'automotive', price: 350, stock: 30, sku: 'AUTO-002' },
+   890→      { name: 'Car Freshener', category: 'automotive', price: 250, stock: 60, sku: 'AUTO-003' },
+   891→      { name: 'First Aid Kit', category: 'automotive', price: 1200, stock: 15, sku: 'AUTO-004' },
+   892→    ]
+   893→
+   894→    for (const r of retailItems) {
+   895→      await db.retailProduct.create({
+   896→        data: {
+   897→          stationId: mainStation.id,
+   898→          name: r.name,
+   899→          category: r.category,
+   900→          price: r.price,
+   901→          costPrice: r.price * 0.7,
+   902→          stockQty: r.stock,
+   903→          minStock: 10,
+   904→          unit: 'piece',
+   905→          sku: r.sku,
+   906→          supplierId: r.category === 'beverages' || r.category === 'snacks' ? suppliers[3].id : null,
+   907→        }
+   908→      })
+   909→    }
+   910→
+   911→    // =====================================================
+   912→    // 19. LUBRICANT PRODUCTS (6)
+   913→    // =====================================================
+   914→    const lubricantItems = [
+   915→      { name: '5W-30 Full Synthetic', brand: 'Castrol EDGE', viscosity: '5W-30', category: 'engine_oil', price: 4500, stock: 20 },
+   916→      { name: '10W-40 Semi Synthetic', brand: 'Castrol MAGNATEC', viscosity: '10W-40', category: 'engine_oil', price: 3200, stock: 30 },
+   917→      { name: '75W-90 Gear Oil', brand: 'Castrol Syntrax', viscosity: '75W-90', category: 'gear_oil', price: 2800, stock: 15 },
+   918→      { name: 'DOT 4 Brake Fluid', brand: 'Castrol React', viscosity: null, category: 'brake_fluid', price: 950, stock: 25 },
+   919→      { name: 'Automatic ATF', brand: 'Castrol Transmax', viscosity: 'ATF', category: 'transmission', price: 3500, stock: 10 },
+   920→      { name: 'Coolant Ready Mix', brand: 'Castrol Radicool', viscosity: null, category: 'coolant', price: 1200, stock: 20 },
+   921→    ]
+   922→
+   923→    for (const l of lubricantItems) {
+   924→      await db.lubricantProduct.create({
+   925→        data: {
+   926→          stationId: mainStation.id,
+   927→          name: l.name,
+   928→          brand: l.brand,
+   929→          viscosity: l.viscosity,
+   930→          category: l.category,
+   931→          price: l.price,
+   932→          costPrice: l.price * 0.65,
+   933→          stockQty: l.stock,
+   934→          minStock: 5,
+   935→          isActive: true,
+   936→        }
+   937→      })
+   938→    }
+   939→
+   940→    // =====================================================
+   941→    // 20. RETAIL TRANSACTIONS (5)
+   942→    // =====================================================
+   943→    for (let i = 0; i < 5; i++) {
+   944→      const items = JSON.stringify([
+   945→        { name: retailItems[Math.floor(Math.random() * retailItems.length)].name, qty: 1 + Math.floor(Math.random() * 3), price: retailItems[Math.floor(Math.random() * retailItems.length)].price }
+   946→      ])
+   947→      const totalAmount = 200 + Math.floor(Math.random() * 2000)
+   948→      await db.retailTransaction.create({
+   949→        data: {
+   950→          stationId: mainStation.id,
+   951→          shiftId: openShift.id,
+   952→          totalAmount,
+   953→          paymentMethod: Math.random() > 0.5 ? 'cash' : 'card',
+   954→          items,
+   955→          posTerminal: 'POS-01',
+   956→          discountAmount: Math.random() > 0.7 ? Math.floor(totalAmount * 0.05) : 0,
+   957→          status: 'completed',
+   958→        }
+   959→      })
+   960→    }
+   961→
+   962→    // =====================================================
+   963→    // 21. CAR WASH SESSIONS (4)
+   964→    // =====================================================
+   965→    const washTypes = ['basic', 'premium', 'deluxe']
+   966→    const washPrices: Record<string, number> = { basic: 500, premium: 1200, deluxe: 2500 }
+   967→    for (let i = 0; i < 4; i++) {
+   968→      const washType = washTypes[Math.floor(Math.random() * washTypes.length)]
+   969→      await db.carWashSession.create({
+   970→        data: {
+   971→          stationId: mainStation.id,
+   972→          shiftId: openShift.id,
+   973→          vehiclePlate: `ISB-${Math.floor(Math.random() * 900 + 100)}`,
+   974→          washType,
+   975→          amount: washPrices[washType],
+   976→          paymentMethod: Math.random() > 0.5 ? 'cash' : 'card',
+   977→          status: 'completed',
+   978→          startedAt: new Date(Date.now() - (i + 1) * 3600000),
+   979→          completedAt: new Date(Date.now() - (i + 1) * 3600000 + 1800000),
+   980→        }
+   981→      })
+   982→    }
+   983→
+   984→    // =====================================================
+   985→    // 22. LOTTERY SALES (3)
+   986→    // =====================================================
+   987→    const lotteryGames = ['scratch', 'draw', 'online']
+   988→    for (let i = 0; i < 3; i++) {
+   989→      const ticketCount = 1 + Math.floor(Math.random() * 5)
+   990→      const saleAmount = ticketCount * (100 + Math.floor(Math.random() * 200))
+   991→      await db.lotterySale.create({
+   992→        data: {
+   993→          stationId: mainStation.id,
+   994→          shiftId: openShift.id,
+   995→          gameType: lotteryGames[i],
+   996→          ticketCount,
+   997→          saleAmount,
+   998→          commission: Math.round(saleAmount * 0.05),
+   999→          status: 'completed',
+  1000→        }
+  1001→      })
+  1002→    }
+  1003→
+  1004→    // =====================================================
+  1005→    // 23. SUPPLIER INVOICES (3)
+  1006→    // =====================================================
+  1007→    await db.supplierInvoice.createMany({
+  1008→      data: [
+  1009→        { stationId: mainStation.id, supplierId: suppliers[0].id, invoiceNumber: 'INV-PSO-2025-001', invoiceDate: new Date(Date.now() - 5 * 86400000), dueDate: new Date(Date.now() + 25 * 86400000), totalAmount: 2500000, taxAmount: 450000, netAmount: 2950000, status: 'pending', paidAmount: 0, notes: 'Monthly fuel supply - March 2025' },
+  1010→        { stationId: mainStation.id, supplierId: suppliers[1].id, invoiceNumber: 'INV-SHELL-2025-001', invoiceDate: new Date(Date.now() - 10 * 86400000), dueDate: new Date(Date.now() + 5 * 86400000), totalAmount: 1800000, taxAmount: 324000, netAmount: 2124000, status: 'approved', paidAmount: 0, notes: 'Diesel & HSD supply - Feb 2025' },
+  1011→        { stationId: mainStation.id, supplierId: suppliers[2].id, invoiceNumber: 'INV-CASTROL-2025-001', invoiceDate: new Date(Date.now() - 15 * 86400000), dueDate: new Date(Date.now() - 1 * 86400000), totalAmount: 450000, taxAmount: 81000, netAmount: 531000, status: 'paid', paidAmount: 531000, paidDate: new Date(Date.now() - 3 * 86400000), notes: 'Lubricant stock replenishment' },
+  1012→      ]
+  1013→    })
+  1014→
+  1015→    // =====================================================
+  1016→    // 24. PURCHASE ORDERS (2)
+  1017→    // =====================================================
+  1018→    await db.purchaseOrder.createMany({
+  1019→      data: [
+  1020→        { stationId: mainStation.id, supplierId: suppliers[3].id, poNumber: 'PO-2025-001', orderDate: new Date(Date.now() - 3 * 86400000), expectedDate: new Date(Date.now() + 4 * 86400000), items: JSON.stringify([{ name: 'Mineral Water 500ml', qty: 200, unitPrice: 56 }, { name: 'Energy Drink 250ml', qty: 100, unitPrice: 196 }]), totalAmount: 30800, status: 'submitted', notes: 'Urgent retail stock replenishment' },
+  1021→        { stationId: mainStation.id, supplierId: suppliers[4].id, poNumber: 'PO-2025-002', orderDate: new Date(Date.now() - 7 * 86400000), expectedDate: new Date(Date.now() - 2 * 86400000), items: JSON.stringify([{ name: 'Pump Nozzle Calibration', qty: 16, unitPrice: 5000 }, { name: 'ATG Sensor Check', qty: 4, unitPrice: 3500 }]), totalAmount: 94000, status: 'received', approvedBy: users[1].id, notes: 'Quarterly maintenance service' },
+  1022→      ]
+  1023→    })
+  1024→
+  1025→    // =====================================================
+  1026→    // 25. ATTENDANCE RECORDS (today)
+  1027→    // =====================================================
+  1028→    for (const emp of employees) {
+  1029→      if (emp.role === 'maintenance') continue
+  1030→      const checkInHour = emp.role === 'manager' ? 8 : 6 + Math.floor(Math.random() * 2)
+  1031→      await db.attendance.create({
+  1032→        data: {
+  1033→          employeeId: emp.id,
+  1034→          stationId: mainStation.id,
+  1035→          checkIn: new Date(todayStart.getTime() + checkInHour * 3600000),
+  1036→          checkOut: null,
+  1037→          status: checkInHour > 7 ? 'late' : 'present',
+  1038→          hoursWorked: null,
+  1039→        }
+  1040→      })
+  1041→    }
+  1042→
+  1043→    // =====================================================
+  1044→    // 26. PAYROLL RECORDS (current month - all employees)
+  1045→    // =====================================================
+  1046→    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  1047→    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  1048→    for (const emp of employees) {
+  1049→      const overtimeHours = emp.role === 'attendant' ? Math.floor(Math.random() * 20) : Math.floor(Math.random() * 10)
+  1050→      const overtimeRate = emp.salary / 200 // hourly rate approximation
+  1051→      const overtimePay = Math.round(overtimeHours * overtimeRate)
+  1052→      const commissions = emp.commissionRate ? Math.round(emp.salary * emp.commissionRate * 0.01 * (10 + Math.random() * 20)) : 0
+  1053→      const deductions = Math.round(emp.salary * 0.02)
+  1054→      const taxDeductions = Math.round(emp.salary * 0.1)
+  1055→      const netPay = emp.salary + overtimePay + commissions - deductions - taxDeductions
+  1056→      await db.payrollRecord.create({
+  1057→        data: {
+  1058→          stationId: mainStation.id,
+  1059→          employeeId: emp.id,
+  1060→          periodStart: currentMonthStart,
+  1061→          periodEnd: currentMonthEnd,
+  1062→          baseSalary: emp.salary,
+  1063→          overtimeHours,
+  1064→          overtimePay,
+  1065→          commissions,
+  1066→          deductions,
+  1067→          taxDeductions,
+  1068→          netPay,
+  1069→          status: emp.role === 'manager' || emp.role === 'supervisor' ? 'approved' : 'pending',
+  1070→        }
+  1071→      })
+  1072→    }
+  1073→
+  1074→    // Legacy payroll records for February
+  1075→    await db.payrollRecord.create({
+  1076→      data: {
+  1077→        stationId: mainStation.id,
+  1078→        employeeId: employees[0].id,
+  1079→        periodStart: new Date('2025-02-01'),
+  1080→        periodEnd: new Date('2025-02-28'),
+  1081→        baseSalary: 85000,
+  1082→        overtimeHours: 12,
+  1083→        overtimePay: 6000,
+  1084→        commissions: 0,
+  1085→        deductions: 2000,
+  1086→        taxDeductions: 8500,
+  1087→        netPay: 80500,
+  1088→        status: 'paid',
+  1089→        paidDate: new Date('2025-03-01'),
+  1090→      }
+  1091→    })
+  1092→    await db.payrollRecord.create({
+  1093→      data: {
+  1094→        stationId: mainStation.id,
+  1095→        employeeId: employees[1].id,
+  1096→        periodStart: new Date('2025-02-01'),
+  1097→        periodEnd: new Date('2025-02-28'),
+  1098→        baseSalary: 55000,
+  1099→        overtimeHours: 8,
+  1100→        overtimePay: 4000,
+  1101→        commissions: 0,
+  1102→        deductions: 1500,
+  1103→        taxDeductions: 5500,
+  1104→        netPay: 52000,
+  1105→        status: 'paid',
+  1106→        paidDate: new Date('2025-03-01'),
+  1107→      }
+  1108→    })
+  1109→
+  1110→    // =====================================================
+  1111→    // 27. LEAVE REQUESTS (1 approved, 1 pending)
+  1112→    // =====================================================
+  1113→    await db.leaveRequest.create({
+  1114→      data: {
+  1115→        stationId: mainStation.id,
+  1116→        employeeId: employees[2].id,
+  1117→        leaveType: 'sick',
+  1118→        startDate: new Date(Date.now() - 2 * 86400000),
+  1119→        endDate: new Date(Date.now() - 1 * 86400000),
+  1120→        reason: 'Medical appointment - flu symptoms',
+  1121→        status: 'approved',
+  1122→        approvedBy: users[1].id,
+  1123→      }
+  1124→    })
+  1125→    await db.leaveRequest.create({
+  1126→      data: {
+  1127→        stationId: mainStation.id,
+  1128→        employeeId: employees[5].id,
+  1129→        leaveType: 'annual',
+  1130→        startDate: new Date(Date.now() + 3 * 86400000),
+  1131→        endDate: new Date(Date.now() + 5 * 86400000),
+  1132→        reason: 'Family wedding in Lahore',
+  1133→        status: 'pending',
+  1134→      }
+  1135→    })
+  1136→
+  1137→    // =====================================================
+  1138→    // 28. AI ALERTS (6)
+  1139→    // =====================================================
+  1140→    const alertData = [
+  1141→      { type: 'fuel_loss', severity: 'critical', title: 'Unusual Fuel Loss Detected - Tank B', desc: 'Variance of 142L detected in Tank B (Diesel) during shift reconciliation. This exceeds the 0.5% threshold.' },
+  1142→      { type: 'theft', severity: 'critical', title: 'Potential Fuel Theft Alert - Pump 3', desc: 'Meter readings show discrepancy of 23L on Pump 3 Nozzle 1. Pattern matches known meter manipulation.' },
+  1143→      { type: 'variance', severity: 'warning', title: 'Stock Variance - Tank A', desc: 'Tank A (Petrol) showing 0.3% variance over last 3 shifts. Recommend investigation.' },
+  1144→      { type: 'maintenance', severity: 'warning', title: 'Pump 7 Calibration Due', desc: 'Pump 7 last calibrated 89 days ago. Recommended calibration interval is 90 days.' },
+  1145→      { type: 'demand', severity: 'info', title: 'High Demand Forecast - Weekend', desc: 'AI predicts 35% increase in petrol demand this weekend based on historical patterns and local events.' },
+  1146→      { type: 'leakage', severity: 'critical', title: 'Possible Tank Leak - Tank C', desc: 'Continuous level drop of 2.1L/hour detected in Tank C (Premium) with no corresponding sales.' },
+  1147→    ]
+  1148→
+  1149→    for (const a of alertData) {
+  1150→      await db.aIAlert.create({
+  1151→        data: {
+  1152→          tenantId: tenant.id,
+  1153→          stationId: mainStation.id,
+  1154→          alertType: a.type,
+  1155→          severity: a.severity,
+  1156→          title: a.title,
+  1157→          description: a.desc,
+  1158→          confidence: 0.75 + Math.random() * 0.2,
+  1159→          isRead: false,
+  1160→          isResolved: false,
+  1161→        }
+  1162→      })
+  1163→    }
+  1164→
+  1165→    // =====================================================
+  1166→    // 29. AI FORECASTS (14 days × 3 types × 3 fuels = 126)
+  1167→    // =====================================================
+  1168→    const forecastTypes = ['demand', 'revenue', 'inventory']
+  1169→    const aiForecastFuelTypes = ['petrol', 'diesel', 'premium']
+  1170→
+  1171→    for (let dayOffset = -7; dayOffset <= 7; dayOffset++) {
+  1172→      const periodStart = new Date()
+  1173→      periodStart.setDate(periodStart.getDate() + dayOffset)
+  1174→      periodStart.setHours(0, 0, 0, 0)
+  1175→
+  1176→      const periodEnd = new Date(periodStart)
+  1177→      periodEnd.setHours(23, 59, 59, 999)
+  1178→
+  1179→      for (const forecastType of forecastTypes) {
+  1180→        for (const fuelType of aiForecastFuelTypes) {
+  1181→          let predictedValue: number
+  1182→          if (forecastType === 'demand') {
+  1183→            // Demand in liters: 5000-25000
+  1184→            predictedValue = 5000 + Math.random() * 20000
+  1185→          } else if (forecastType === 'revenue') {
+  1186→            // Revenue in PKR: 150000-800000
+  1187→            predictedValue = 150000 + Math.random() * 650000
+  1188→          } else {
+  1189→            // Inventory in liters: 10000-50000
+  1190→            predictedValue = 10000 + Math.random() * 40000
+  1191→          }
+  1192→
+  1193→          // Confidence: 0.65-0.95, slightly higher for past dates (already observed)
+  1194→          const baseConfidence = dayOffset <= 0 ? 0.80 : 0.65
+  1195→          const confidenceRange = dayOffset <= 0 ? 0.15 : 0.20
+  1196→          const confidence = baseConfidence + Math.random() * confidenceRange
+  1197→
+  1198→          await db.aIForecast.create({
+  1199→            data: {
+  1200→              tenantId: tenant.id,
+  1201→              stationId: mainStation.id,
+  1202→              forecastType,
+  1203→              fuelType,
+  1204→              predictedValue: Math.round(predictedValue * 100) / 100,
+  1205→              confidence: Math.round(confidence * 1000) / 1000,
+  1206→              periodStart,
+  1207→              periodEnd,
+  1208→            }
+  1209→          })
+  1210→        }
+  1211→      }
+  1212→    }
+  1213→
+  1214→    // =====================================================
+  1215→    // 30. NOTIFICATIONS (6)
+  1216→    // =====================================================
+  1217→    const notificationData = [
+  1218→      { title: 'Shift 3 Opened', message: 'Shift #3 has been opened by Farhan Raza at 14:00', type: 'shift', priority: 'normal' },
+  1219→      { title: 'Fuel Delivery Arriving', message: 'Shell Pakistan HSD delivery expected tomorrow at 08:00', type: 'delivery', priority: 'high' },
+  1220→      { title: 'Tank B Low Alert', message: 'Tank B (Diesel) has dropped below 25% capacity', type: 'alert', priority: 'high' },
+  1221→      { title: 'Price Update Scheduled', message: 'Government fuel price revision effective from March 15, 2025', type: 'system', priority: 'normal' },
+  1222→      { title: 'Fleet Payment Due', message: 'Daewoo Express monthly invoice of PKR 1.2M due in 5 days', type: 'warning', priority: 'high' },
+  1223→      { title: 'Daily Report Ready', message: "Yesterday's daily report has been generated and is ready for review", type: 'info', priority: 'low' },
+  1224→    ]
+  1225→
+  1226→    for (const n of notificationData) {
+  1227→      await db.notification.create({
+  1228→        data: {
+  1229→          tenantId: tenant.id,
+  1230→          stationId: mainStation.id,
+  1231→          title: n.title,
+  1232→          message: n.message,
+  1233→          type: n.type,
+  1234→          priority: n.priority,
+  1235→          isRead: false,
+  1236→        }
+  1237→      })
+  1238→    }
+  1239→
+  1240→    // =====================================================
+  1241→    // 31. CUSTOMERS with loyalty data (10)
+  1242→    // =====================================================
+  1243→    const customerNames = [
+  1244→      'Asad Mahmood', 'Bushra Khan', 'Chaudhry Naveed', 'Dr. Saeed Ahmad', 'Erum Fatima',
+  1245→      'Ghulam Mustafa', 'Hina Shahid', 'Irfan-ul-Haq', 'Javeria Siddiqui', 'Khalid Mehmood'
+  1246→    ]
+  1247→
+  1248→    for (let i = 0; i < customerNames.length; i++) {
+  1249→      const tier = i < 2 ? 'platinum' : i < 5 ? 'gold' : i < 8 ? 'silver' : 'basic'
+  1250→      await db.customer.create({
+  1251→        data: {
+  1252→          tenantId: tenant.id,
+  1253→          name: customerNames[i],
+  1254→          phone: `+92-3${Math.floor(Math.random() * 10)}0-${Math.floor(Math.random() * 9000000 + 1000000)}`,
+  1255→          email: `${customerNames[i].toLowerCase().replace(/\s/g, '.')}@email.pk`,
+  1256→          loyaltyPoints: i < 2 ? 5000 + Math.floor(Math.random() * 5000) : 500 + Math.floor(Math.random() * 2000),
+  1257→          membershipTier: tier,
+  1258→          totalSpent: i < 2 ? 500000 + Math.floor(Math.random() * 500000) : 50000 + Math.floor(Math.random() * 200000),
+  1259→          totalVisits: 10 + Math.floor(Math.random() * 100),
+  1260→          lastVisit: new Date(Date.now() - Math.floor(Math.random() * 7) * 86400000),
+  1261→          isActive: true,
+  1262→        }
+  1263→      })
+  1264→    }
+  1265→
+  1266→    // =====================================================
+  1267→    // 32. LOYALTY RULES (2)
+  1268→    // =====================================================
+  1269→    await db.loyaltyRule.createMany({
+  1270→      data: [
+  1271→        { tenantId: tenant.id, name: 'Standard Fuel Points', pointsPerUnit: 1, fuelType: null, minimumPurchase: 500, bonusMultiplier: 1, isActive: true, validFrom: new Date('2025-01-01'), validTo: new Date('2025-12-31') },
+  1272→        { tenantId: tenant.id, name: 'Premium Double Points', pointsPerUnit: 2, fuelType: 'premium', minimumPurchase: 1000, bonusMultiplier: 2, isActive: true, validFrom: new Date('2025-03-01'), validTo: new Date('2025-04-30') },
+  1273→      ]
+  1274→    })
+  1275→
+  1276→    // =====================================================
+  1277→    // 33. PROMOTIONS with usage (2)
+  1278→    // =====================================================
+  1279→    const promo1 = await db.promotion.create({
+  1280→      data: {
+  1281→        tenantId: tenant.id,
+  1282→        name: 'Weekend Fuel Discount',
+  1283→        description: '5% off on all fuel types during weekends',
+  1284→        discountType: 'percentage',
+  1285→        discountValue: 5,
+  1286→        applicableTo: 'fuel',
+  1287→        fuelType: null,
+  1288→        minimumPurchase: 2000,
+  1289→        validFrom: new Date('2025-03-01'),
+  1290→        validTo: new Date('2025-03-31'),
+  1291→        isActive: true,
+  1292→      }
+  1293→    })
+  1294→
+  1295→    const promo2 = await db.promotion.create({
+  1296→      data: {
+  1297→        tenantId: tenant.id,
+  1298→        name: 'Car Wash Bundle',
+  1299→        description: 'Free basic car wash with 40L+ fuel purchase',
+  1300→        discountType: 'fixed',
+  1301→        discountValue: 500,
+  1302→        applicableTo: 'car_wash',
+  1303→        fuelType: null,
+  1304→        minimumPurchase: 10000,
+  1305→        validFrom: new Date('2025-03-01'),
+  1306→        validTo: new Date('2025-04-30'),
+  1307→        isActive: true,
+  1308→      }
+  1309→    })
+  1310→
+  1311→    // Promotion usage
+  1312→    await db.promotionUsage.createMany({
+  1313→      data: [
+  1314→        { stationId: mainStation.id, promotionId: promo1.id, customerName: 'Asad Mahmood', discountAmount: 750 },
+  1315→        { stationId: mainStation.id, promotionId: promo1.id, customerName: 'Bushra Khan', discountAmount: 520 },
+  1316→        { stationId: mainStation.id, promotionId: promo2.id, customerName: 'Chaudhry Naveed', discountAmount: 500 },
+  1317→      ]
+  1318→    })
+  1319→
+  1320→    // =====================================================
+  1321→    // 34. ENVIRONMENTAL ALERTS (3)
+  1322→    // =====================================================
+  1323→    await db.environmentalAlert.createMany({
+  1324→      data: [
+  1325→        { stationId: mainStation.id, alertType: 'vapor', severity: 'warning', tankId: tanks[1].id, description: 'Vapor recovery system showing elevated pressure readings on Tank B', epaCode: 'EPA-VRR-001', isReportable: false, isResolved: false },
+  1326→        { stationId: mainStation.id, alertType: 'water_intrusion', severity: 'warning', tankId: tanks[0].id, description: 'Water level in Tank A exceeding normal thresholds - 48mm detected', epaCode: 'EPA-WI-003', isReportable: false, isResolved: false },
+  1327→        { stationId: mainStation.id, alertType: 'overfill', severity: 'critical', tankId: tanks[2].id, description: 'Overfill alarm triggered during fuel delivery to Tank C', epaCode: 'EPA-OF-002', isReportable: true, isResolved: false, reportedToAgency: true },
+  1328→      ]
+  1329→    })
+  1330→
+  1331→    // =====================================================
+  1332→    // 35. VAPOR RECOVERY READINGS (2)
+  1333→    // =====================================================
+  1334→    await db.vaporRecoveryReading.createMany({
+  1335→      data: [
+  1336→        { stationId: mainStation.id, tankId: tanks[0].id, vaporPressure: 2.5, recoveryRate: 98.5, status: 'normal', readingAt: new Date(Date.now() - 3600000) },
+  1337→        { stationId: mainStation.id, tankId: tanks[1].id, vaporPressure: 4.8, recoveryRate: 92.1, status: 'warning', readingAt: new Date() },
+  1338→      ]
+  1339→    })
+  1340→
+  1341→    // =====================================================
+  1342→    // 36. DAILY REPORTS (last 7 days)
+  1343→    // =====================================================
+  1344→    for (let i = 1; i <= 7; i++) {
+  1345→      const reportDate = new Date(now)
+  1346→      reportDate.setDate(reportDate.getDate() - i)
+  1347→      reportDate.setHours(0, 0, 0, 0)
+  1348→
+  1349→      const fuelRevenue = 400000 + Math.floor(Math.random() * 300000)
+  1350→      const retailRevenue = 20000 + Math.floor(Math.random() * 30000)
+  1351→      const totalVolume = 1500 + Math.floor(Math.random() * 1500)
+  1352→      const expenses = 50000 + Math.floor(Math.random() * 40000)
+  1353→
+  1354→      await db.dailyReport.create({
+  1355→        data: {
+  1356→          stationId: mainStation.id,
+  1357→          reportDate,
+  1358→          totalRevenue: fuelRevenue + retailRevenue,
+  1359→          fuelRevenue,
+  1360→          retailRevenue,
+  1361→          totalVolume,
+  1362→          transactionCount: 50 + Math.floor(Math.random() * 40),
+  1363→          averageTicket: Math.round((fuelRevenue + retailRevenue) / (50 + Math.floor(Math.random() * 40))),
+  1364→          cashVariance: Math.round((Math.random() - 0.5) * 5000),
+  1365→          fuelVariance: Math.round((Math.random() - 0.5) * 200),
+  1366→          expenses,
+  1367→          netProfit: fuelRevenue + retailRevenue - expenses,
+  1368→        }
+  1369→      })
+  1370→    }
+  1371→
+  1372→    // =====================================================
+  1373→    // 37. AUDIT LOGS (20+)
+  1374→    // =====================================================
+  1375→    const auditActions = [
+  1376→      { action: 'LOGIN', entity: 'User', details: 'Superadmin logged in from 192.168.1.10' },
+  1377→      { action: 'CREATE', entity: 'Shift', details: 'Shift #3 opened by Ahmed Khan' },
+  1378→      { action: 'UPDATE', entity: 'FuelPrice', details: 'Petrol price updated from PKR 270.00 to PKR 272.50' },
+  1379→      { action: 'CREATE', entity: 'Fueling', details: 'Fueling transaction #001 created - 35L Petrol' },
+  1380→      { action: 'UPDATE', entity: 'Tank', details: 'Tank A level updated - current: 8,500L' },
+  1381→      { action: 'CREATE', entity: 'FuelDelivery', details: 'Fuel delivery scheduled from PSO - 10,000L Petrol' },
+  1382→      { action: 'APPROVE', entity: 'Reconciliation', details: 'Tank A reconciliation approved by Fatima Noor' },
+  1383→      { action: 'UPDATE', entity: 'Employee', details: 'Employee Bilal Hussain marked as present' },
+  1384→      { action: 'CREATE', entity: 'FleetAccount', details: 'New fleet account created - Pakistan Post Fleet' },
+  1385→      { action: 'UPDATE', entity: 'Dispenser', details: 'Pump 5 status changed to maintenance' },
+  1386→      { action: 'LOGIN', entity: 'User', details: 'Admin Fatima Noor logged in from 192.168.1.11' },
+  1387→      { action: 'CREATE', entity: 'CarWashSession', details: 'Deluxe car wash session started for plate LEA-4521' },
+  1388→      { action: 'UPDATE', entity: 'SupplierInvoice', details: 'Invoice INV-CASTROL-2025-001 marked as paid' },
+  1389→      { action: 'CREATE', entity: 'RetailTransaction', details: 'Retail sale of PKR 1,200 completed at POS-01' },
+  1390→      { action: 'UPDATE', entity: 'PriceBoard', details: 'Main Price Board updated with new fuel prices' },
+  1391→      { action: 'CREATE', entity: 'LeaveRequest', details: 'Tariq Mehmood requested annual leave for 3 days' },
+  1392→      { action: 'UPDATE', entity: 'MeterRecord', details: 'Meter record updated for Pump 1 Nozzle 1' },
+  1393→      { action: 'RESOLVE', entity: 'AIAlert', details: 'Fuel loss alert for Tank B acknowledged by Ahmed Khan' },
+  1394→      { action: 'CREATE', entity: 'PayrollRecord', details: 'Payroll processed for Ahmed Khan - PKR 80,500' },
+  1395→      { action: 'UPDATE', entity: 'Promotion', details: 'Weekend Fuel Discount promotion activated' },
+  1396→      { action: 'CREATE', entity: 'PurchaseOrder', details: 'PO-2025-001 created for Metro Wholesale' },
+  1397→    ]
+  1398→
+  1399→    for (let i = 0; i < auditActions.length; i++) {
+  1400→      const a = auditActions[i]
+  1401→      await db.auditLog.create({
+  1402→        data: {
+  1403→          userId: i < 10 ? users[0].id : users[1].id,
+  1404→          tenantId: tenant.id,
+  1405→          action: a.action,
+  1406→          entity: a.entity,
+  1407→          entityId: `seed-${i + 1}`,
+  1408→          details: a.details,
+  1409→          ipAddress: `192.168.1.${10 + (i % 5)}`,
+  1410→          userAgent: 'Mozilla/5.0 FuelFlow-OS/1.0',
+  1411→        }
+  1412→      })
+  1413→    }
+  1414→
+  1415→    // =====================================================
+  1416→    // 38. EV CHARGERS + CNG DISPENSERS
+  1417→    // =====================================================
+  1418→    await db.eVCharger.createMany({
+  1419→      data: [
+  1420→        { stationId: mainStation.id, name: 'EV Charger 1', code: 'EV-01', connectorType: 'type2', maxPowerKw: 22, status: 'available', isActive: true },
+  1421→        { stationId: mainStation.id, name: 'EV Charger 2', code: 'EV-02', connectorType: 'ccs', maxPowerKw: 50, status: 'charging', currentSession: 'active', isActive: true },
+  1422→        { stationId: mainStation.id, name: 'EV Charger 3', code: 'EV-03', connectorType: 'chademo', maxPowerKw: 50, status: 'available', isActive: true },
+  1423→      ]
+  1424→    })
+  1425→
+  1426→    // Charging sessions
+  1427→    const evChargers = await db.eVCharger.findMany({ where: { stationId: mainStation.id } })
+  1428→    if (evChargers.length >= 2) {
+  1429→      await db.chargingSession.create({
+  1430→        data: {
+  1431→          chargerId: evChargers[1].id,
+  1432→          stationId: mainStation.id,
+  1433→          vehiclePlate: 'ISB-EV-001',
+  1434→          energyKwh: 15.5,
+  1435→          durationMinutes: 45,
+  1436→          pricePerKwh: 35,
+  1437→          totalAmount: 542.5,
+  1438→          paymentMethod: 'card',
+  1439→          status: 'active',
+  1440→          startedAt: new Date(Date.now() - 2700000),
+  1441→        }
+  1442→      })
+  1443→    }
+  1444→
+  1445→    await db.cNGDispenser.createMany({
+  1446→      data: [
+  1447→        { stationId: mainStation.id, name: 'CNG Dispenser 1', code: 'CNG-01', pressure: 220, status: 'idle', isActive: true },
+  1448→        { stationId: mainStation.id, name: 'CNG Dispenser 2', code: 'CNG-02', pressure: 215, status: 'dispensing', isActive: true },
+  1449→      ]
+  1450→    })
+  1451→
+  1452→    // =====================================================
+  1453→    // 39. RFID READERS + ANPR CAMERAS
+  1454→    // =====================================================
+  1455→    await db.rFIDReader.createMany({
+  1456→      data: [
+  1457→        { stationId: mainStation.id, name: 'RFID Lane 1', code: 'RFID-01', readerType: 'vehicle', ipAddress: '192.168.1.200', port: 5000, status: 'online', isActive: true },
+  1458→        { stationId: mainStation.id, name: 'RFID Lane 2', code: 'RFID-02', readerType: 'driver', ipAddress: '192.168.1.201', port: 5001, status: 'online', isActive: true },
+  1459→      ]
+  1460→    })
+  1461→
+  1462→    await db.aNPRCamera.createMany({
+  1463→      data: [
+  1464→        { stationId: mainStation.id, name: 'Entry ANPR', code: 'ANPR-01', location: 'Entry Gate', ipAddress: '192.168.1.210', port: 6000, status: 'online', isActive: true },
+  1465→        { stationId: mainStation.id, name: 'Exit ANPR', code: 'ANPR-02', location: 'Exit Gate', ipAddress: '192.168.1.211', port: 6001, status: 'online', isActive: true },
+  1466→      ]
+  1467→    })
+  1468→
+  1469→    // =====================================================
+  1470→    // 40. FINANCIAL TRANSACTIONS (income + expenses)
+  1471→    // =====================================================
+  1472→    const today = new Date()
+  1473→    for (let i = 0; i < 15; i++) {
+  1474→      const isIncome = Math.random() > 0.3
+  1475→      await db.transaction.create({
+  1476→        data: {
+  1477→          stationId: mainStation.id,
+  1478→          tenantId: tenant.id,
+  1479→          type: isIncome ? 'income' : 'expense',
+  1480→          category: isIncome ? 'fuel_sale' : ['utilities', 'maintenance', 'salary', 'supplies'][Math.floor(Math.random() * 4)],
+  1481→          amount: isIncome ? 50000 + Math.floor(Math.random() * 200000) : 5000 + Math.floor(Math.random() * 30000),
+  1482→          paymentMethod: isIncome ? 'cash' : 'bank_transfer',
+  1483→          status: 'completed',
+  1484→          date: new Date(today.getTime() - Math.floor(Math.random() * 7) * 86400000),
+  1485→          description: isIncome ? 'Daily fuel sales collection' : 'Operational expense payment',
+  1486→          referenceNumber: `TXN-${String(i + 1).padStart(5, '0')}`,
+  1487→        }
+  1488→      })
+  1489→    }
+  1490→
+  1491→    // Additional expenses
+  1492→    const expenseCategories = ['utilities', 'maintenance', 'supplies', 'insurance']
+  1493→    for (let i = 0; i < 5; i++) {
+  1494→      await db.expense.create({
+  1495→        data: {
+  1496→          stationId: mainStation.id,
+  1497→          category: expenseCategories[Math.floor(Math.random() * expenseCategories.length)],
+  1498→          amount: 5000 + Math.floor(Math.random() * 50000),
+  1499→          description: `${expenseCategories[Math.floor(Math.random() * expenseCategories.length)]} expense - March 2025`,
+  1500→          vendor: ['WAPDA', 'SNGPL', 'TechServe', 'State Life', 'Local Supplier'][i],
+  1501→          receiptNumber: `RCT-${String(i + 1).padStart(4, '0')}`,
+  1502→          date: new Date(today.getTime() - Math.floor(Math.random() * 7) * 86400000),
+  1503→          approvedBy: users[1].id,
+  1504→          status: 'approved',
+  1505→        }
+  1506→      })
+  1507→    }
+  1508→
+  1509→    // =====================================================
+  1510→    // 41. MAINTENANCE RECORDS
+  1511→    // =====================================================
+  1512→    await db.maintenanceRecord.createMany({
+  1513→      data: [
+  1514→        { stationId: mainStation.id, equipmentType: 'dispenser', equipmentId: dispensers[4].id, nozzleId: allNozzles.find(n => n.dispenserId === dispensers[4].id)?.id || null, type: 'preventive', description: 'Quarterly pump calibration and inspection', technician: 'Kamran Siddiqui', cost: 15000, status: 'scheduled', scheduledDate: new Date(Date.now() + 2 * 86400000) },
+  1515→        { stationId: mainStation.id, equipmentType: 'tank', equipmentId: tanks[2].id, type: 'corrective', description: 'Overfill alarm sensor replacement for Tank C', technician: 'External - TechServe', cost: 25000, status: 'in_progress', scheduledDate: new Date() },
+  1516→      ]
+  1517→    })
+  1518→
+  1519→    // =====================================================
+  1520→    // 42. DEVICE INTEGRATION - FORECOURT CONTROLLERS (2)
+  1521→    // =====================================================
+  1522→    const ptsController = await db.forecourtController.create({
+  1523→      data: {
+  1524→        stationId: mainStation.id,
+  1525→        name: 'PTS-FC-01',
+  1526→        code: 'PTS-01',
+  1527→        controllerType: 'pts',
+  1528→        manufacturer: 'Petroinnovations',
+  1529→        model: 'PTS-2000',
+  1530→        serialNumber: 'PTS-SN-2024-001',
+  1531→        firmwareVersion: '4.2.1',
+  1532→        communicationType: 'tcpip',
+  1533→        ipAddress: '192.168.1.100',
+  1534→        port: 5000,
+  1535→        protocol: 'ifsf',
+  1536→        pollingInterval: 1000,
+  1537→        timeout: 5000,
+  1538→        maxDispensers: 32,
+  1539→        connectedDispensers: 8,
+  1540→        status: 'online',
+  1541→        lastHeartbeat: new Date(),
+  1542→        lastCommunication: new Date(),
+  1543→        isActive: true,
+  1544→      }
+  1545→    })
+  1546→
+  1547→    const fusionController = await db.forecourtController.create({
+  1548→      data: {
+  1549→        stationId: mainStation.id,
+  1550→        name: 'FUSION-FC-02',
+  1551→        code: 'FUS-02',
+  1552→        controllerType: 'fusion',
+  1553→        manufacturer: 'Gilbarco Veeder-Root',
+  1554→        model: 'Fusion 3.0',
+  1555→        serialNumber: 'GVR-FSN-2024-002',
+  1556→        firmwareVersion: '3.5.0',
+  1557→        communicationType: 'tcpip',
+  1558→        ipAddress: '192.168.1.101',
+  1559→        port: 5010,
+  1560→        protocol: 'gilbarco-g-site',
+  1561→        pollingInterval: 2000,
+  1562→        timeout: 5000,
+  1563→        maxDispensers: 16,
+  1564→        connectedDispensers: 4,
+  1565→        status: 'online',
+  1566→        lastHeartbeat: new Date(),
+  1567→        lastCommunication: new Date(),
+  1568→        isActive: true,
+  1569→      }
+  1570→    })
+  1571→
+  1572→    // =====================================================
+  1573→    // 43. DEVICE INTEGRATION - PAYMENT TERMINALS (3)
+  1574→    // =====================================================
+  1575→    const posTerminal = await db.paymentTerminal.create({
+  1576→      data: {
+  1577→        stationId: mainStation.id,
+  1578→        name: 'POS-T1',
+  1579→        code: 'POS-T1',
+  1580→        terminalType: 'pos',
+  1581→        manufacturer: 'Ingenico',
+  1582→        model: 'iCT250',
+  1583→        serialNumber: 'ING-250-001',
+  1584→        communicationType: 'tcpip',
+  1585→        ipAddress: '192.168.1.110',
+  1586→        port: 8000,
+  1587→        protocol: 'iso8583',
+  1588→        merchantId: 'MERCH-001-PK',
+  1589→        terminalId: 'TERM-001-PK',
+  1590→        supportedCards: '["visa","mastercard","unionpay"]',
+  1591→        supportedMethods: '["emv","contactless","nfc"]',
+  1592→        status: 'online',
+  1593→        transactionCount: 156,
+  1594→        lastTransaction: new Date(Date.now() - 3600000),
+  1595→        isActive: true,
+  1596→      }
+  1597→    })
+  1598→
+  1599→    const eftposTerminal = await db.paymentTerminal.create({
+  1600→      data: {
+  1601→        stationId: mainStation.id,
+  1602→        name: 'EFTPOS-T2',
+  1603→        code: 'EFT-T2',
+  1604→        terminalType: 'eftpos',
+  1605→        manufacturer: 'Verifone',
+  1606→        model: 'Vx520',
+  1607→        serialNumber: 'VF-520-002',
+  1608→        communicationType: 'tcpip',
+  1609→        ipAddress: '192.168.1.111',
+  1610→        port: 8001,
+  1611→        protocol: 'nac',
+  1612→        merchantId: 'MERCH-001-PK',
+  1613→        terminalId: 'TERM-002-PK',
+  1614→        supportedCards: '["visa","mastercard"]',
+  1615→        supportedMethods: '["emv","contactless"]',
+  1616→        status: 'online',
+  1617→        transactionCount: 89,
+  1618→        lastTransaction: new Date(Date.now() - 1800000),
+  1619→        isActive: true,
+  1620→      }
+  1621→    })
+  1622→
+  1623→    const papTerminal = await db.paymentTerminal.create({
+  1624→      data: {
+  1625→        stationId: mainStation.id,
+  1626→        name: 'PAP-T3',
+  1627→        code: 'PAP-T3',
+  1628→        terminalType: 'pay_at_pump',
+  1629→        manufacturer: 'PAX',
+  1630→        model: 'S920',
+  1631→        serialNumber: 'PAX-S920-003',
+  1632→        communicationType: 'tcpip',
+  1633→        ipAddress: '192.168.1.112',
+  1634→        port: 8002,
+  1635→        protocol: 'ompi',
+  1636→        merchantId: 'MERCH-001-PK',
+  1637→        terminalId: 'TERM-003-PK',
+  1638→        supportedCards: '["visa","mastercard","unionpay"]',
+  1639→        supportedMethods: '["emv","contactless","nfc","qr"]',
+  1640→        status: 'busy',
+  1641→        transactionCount: 234,
+  1642→        lastTransaction: new Date(Date.now() - 300000),
+  1643→        isActive: true,
+  1644→      }
+  1645→    })
+  1646→
+  1647→    // =====================================================
+  1648→    // 44. DEVICE INTEGRATION - GENERATOR (1)
+  1649→    // =====================================================
+  1650→    const generator = await db.generator.create({
+  1651→      data: {
+  1652→        stationId: mainStation.id,
+  1653→        name: 'GEN-MAIN-01',
+  1654→        code: 'GEN-01',
+  1655→        manufacturer: 'Cummins',
+  1656→        model: 'C330 D5',
+  1657→        serialNumber: 'CUM-330-2024',
+  1658→        fuelType: 'diesel',
+  1659→        capacityKva: 330,
+  1660→        currentLoadKva: 0,
+  1661→        fuelLevel: 85,
+  1662→        runHours: 1250.5,
+  1663→        voltage: 220,
+  1664→        frequency: 50,
+  1665→        oilPressure: 55,
+  1666→        coolantTemp: 72,
+  1667→        communicationType: 'tcpip',
+  1668→        ipAddress: '192.168.1.120',
+  1669→        port: 502,
+  1670→        protocol: 'modbus',
+  1671→        autoStart: true,
+  1672→        autoTransfer: true,
+  1673→        status: 'standby',
+  1674→        lastStartedAt: new Date(Date.now() - 2 * 86400000),
+  1675→        nextServiceDate: new Date(Date.now() + 30 * 86400000),
+  1676→        isActive: true,
+  1677→      }
+  1678→    })
+  1679→
+  1680→    // =====================================================
+  1681→    // 45. DEVICE INTEGRATION - SURVEILLANCE CAMERAS (5)
+  1682→    // =====================================================
+  1683→    const cameraForecourt = await db.surveillanceCamera.create({
+  1684→      data: {
+  1685→        stationId: mainStation.id,
+  1686→        name: 'CAM-FORE-01',
+  1687→        code: 'CAM-01',
+  1688→        cameraType: 'dome',
+  1689→        manufacturer: 'Hikvision',
+  1690→        model: 'DS-2DE4425IW',
+  1691→        serialNumber: 'HKV-DS-001',
+  1692→        resolution: '4k',
+  1693→        location: 'forecourt',
+  1694→        ipAddress: '192.168.1.130',
+  1695→        port: 554,
+  1696→        rtspUrl: 'rtsp://192.168.1.130:554/stream1',
+  1697→        httpUrl: 'http://192.168.1.130:80',
+  1698→        onvifSupported: true,
+  1699→        ptzEnabled: true,
+  1700→        nightVision: true,
+  1701→        recordingEnabled: true,
+  1702→        analyticsEnabled: true,
+  1703→        analyticsType: 'motion',
+  1704→        status: 'recording',
+  1705→        lastRecordingAt: new Date(),
+  1706→        isActive: true,
+  1707→      }
+  1708→    })
+  1709→
+  1710→    const cameraEntrance = await db.surveillanceCamera.create({
+  1711→      data: {
+  1712→        stationId: mainStation.id,
+  1713→        name: 'CAM-ENTRY-02',
+  1714→        code: 'CAM-02',
+  1715→        cameraType: 'bullet',
+  1716→        manufacturer: 'Dahua',
+  1717→        model: 'IPC-HFW5442T',
+  1718→        serialNumber: 'DH-IPC-002',
+  1719→        resolution: '5mp',
+  1720→        location: 'entrance',
+  1721→        ipAddress: '192.168.1.131',
+  1722→        onvifSupported: true,
+  1723→        nightVision: true,
+  1724→        recordingEnabled: true,
+  1725→        status: 'recording',
+  1726→        isActive: true,
+  1727→      }
+  1728→    })
+  1729→
+  1730→    const cameraExit = await db.surveillanceCamera.create({
+  1731→      data: {
+  1732→        stationId: mainStation.id,
+  1733→        name: 'CAM-EXIT-03',
+  1734→        code: 'CAM-03',
+  1735→        cameraType: 'ptz',
+  1736→        manufacturer: 'Axis',
+  1737→        model: 'Q6135-LE',
+  1738→        serialNumber: 'AX-Q61-003',
+  1739→        resolution: '1080p',
+  1740→        location: 'exit',
+  1741→        ipAddress: '192.168.1.132',
+  1742→        ptzEnabled: true,
+  1743→        onvifSupported: true,
+  1744→        nightVision: true,
+  1745→        analyticsEnabled: true,
+  1746→        analyticsType: 'plate',
+  1747→        status: 'recording',
+  1748→        isActive: true,
+  1749→      }
+  1750→    })
+  1751→
+  1752→    const cameraStore = await db.surveillanceCamera.create({
+  1753→      data: {
+  1754→        stationId: mainStation.id,
+  1755→        name: 'CAM-STORE-04',
+  1756→        code: 'CAM-04',
+  1757→        cameraType: 'dome',
+  1758→        manufacturer: 'Hikvision',
+  1759→        model: 'DS-2CD2143G2',
+  1760→        serialNumber: 'HKV-DS-004',
+  1761→        resolution: '4k',
+  1762→        location: 'store',
+  1763→        ipAddress: '192.168.1.133',
+  1764→        nightVision: true,
+  1765→        recordingEnabled: true,
+  1766→        status: 'recording',
+  1767→        isActive: true,
+  1768→      }
+  1769→    })
+  1770→
+  1771→    const cameraTankFarm = await db.surveillanceCamera.create({
+  1772→      data: {
+  1773→        stationId: mainStation.id,
+  1774→        name: 'CAM-TANK-05',
+  1775→        code: 'CAM-05',
+  1776→        cameraType: 'thermal',
+  1777→        manufacturer: 'Axis',
+  1778→        model: 'Q1942-E',
+  1779→        serialNumber: 'AX-Q19-005',
+  1780→        resolution: '1080p',
+  1781→        location: 'tank_farm',
+  1782→        ipAddress: '192.168.1.134',
+  1783→        nightVision: true,
+  1784→        analyticsEnabled: true,
+  1785→        analyticsType: 'intrusion',
+  1786→        status: 'recording',
+  1787→        isActive: true,
+  1788→      }
+  1789→    })
+  1790→
+  1791→    // =====================================================
+  1792→    // 46. DEVICE INTEGRATION - FIRE ALARM SYSTEM (1)
+  1793→    // =====================================================
+  1794→    const fireAlarm = await db.fireAlarmSystem.create({
+  1795→      data: {
+  1796→        stationId: mainStation.id,
+  1797→        name: 'FAS-MAIN-01',
+  1798→        code: 'FAS-01',
+  1799→        systemType: 'addressable',
+  1800→        manufacturer: 'Honeywell',
+  1801→        model: 'XLS100',
+  1802→        serialNumber: 'HW-XLS-001',
+  1803→        firmwareVersion: '2.1.0',
+  1804→        zoneCount: 12,
+  1805→        detectorCount: 48,
+  1806→        communicationType: 'tcpip',
+  1807→        ipAddress: '192.168.1.140',
+  1808→        port: 502,
+  1809→        protocol: 'modbus',
+  1810→        suppressionType: 'foam',
+  1811→        autoSuppress: false,
+  1812→        linkedToDispensers: true,
+  1813→        linkedToTanks: true,
+  1814→        status: 'normal',
+  1815→        lastTestDate: new Date(Date.now() - 30 * 86400000),
+  1816→        nextTestDate: new Date(Date.now() + 60 * 86400000),
+  1817→        isActive: true,
+  1818→      }
+  1819→    })
+  1820→
+  1821→    // =====================================================
+  1822→    // 47. DEVICE INTEGRATION - UTILITY METERS (3)
+  1823→    // =====================================================
+  1824→    const electricityMeter = await db.utilityMeter.create({
+  1825→      data: {
+  1826→        stationId: mainStation.id,
+  1827→        name: 'ELEC-MTR-01',
+  1828→        code: 'ELC-01',
+  1829→        meterType: 'electricity',
+  1830→        manufacturer: 'ABB',
+  1831→        model: 'ABB B23',
+  1832→        serialNumber: 'ABB-B23-001',
+  1833→        meterNumber: 'IESCO-EL-001234',
+  1834→        communicationType: 'tcpip',
+  1835→        ipAddress: '192.168.1.150',
+  1836→        port: 502,
+  1837→        protocol: 'modbus',
+  1838→        currentReading: 45678.5,
+  1839→        previousReading: 45000,
+  1840→        consumption: 678.5,
+  1841→        unit: 'kwh',
+  1842→        peakDemand: 85.2,
+  1843→        powerFactor: 0.92,
+  1844→        tariffRate: 25.5,
+  1845→        status: 'online',
+  1846→        lastReading: new Date(Date.now() - 900000),
+  1847→        isActive: true,
+  1848→      }
+  1849→    })
+  1850→
+  1851→    const waterMeter = await db.utilityMeter.create({
+  1852→      data: {
+  1853→        stationId: mainStation.id,
+  1854→        name: 'WATER-MTR-01',
+  1855→        code: 'WTR-01',
+  1856→        meterType: 'water',
+  1857→        manufacturer: 'Siemens',
+  1858→        model: 'SITRANS F M',
+  1859→        serialNumber: 'SIE-FM-001',
+  1860→        meterNumber: 'CDA-WTR-005678',
+  1861→        communicationType: 'tcpip',
+  1862→        ipAddress: '192.168.1.151',
+  1863→        protocol: 'modbus',
+  1864→        currentReading: 12345.0,
+  1865→        previousReading: 12200.0,
+  1866→        consumption: 145.0,
+  1867→        unit: 'cubic_meters',
+  1868→        tariffRate: 45.0,
+  1869→        status: 'online',
+  1870→        lastReading: new Date(Date.now() - 900000),
+  1871→        isActive: true,
+  1872→      }
+  1873→    })
+  1874→
+  1875→    const gasMeter = await db.utilityMeter.create({
+  1876→      data: {
+  1877→        stationId: mainStation.id,
+  1878→        name: 'GAS-MTR-01',
+  1879→        code: 'GAS-01',
+  1880→        meterType: 'gas',
+  1881→        manufacturer: 'Landis+Gyr',
+  1882→        model: 'G470',
+  1883→        serialNumber: 'LG-G470-001',
+  1884→        meterNumber: 'SNGPL-GAS-009012',
+  1885→        communicationType: 'tcpip',
+  1886→        ipAddress: '192.168.1.152',
+  1887→        protocol: 'dlms',
+  1888→        currentReading: 8900.5,
+  1889→        previousReading: 8850.0,
+  1890→        consumption: 50.5,
+  1891→        unit: 'cubic_meters',
+  1892→        tariffRate: 120.0,
+  1893→        status: 'online',
+  1894→        lastReading: new Date(Date.now() - 1800000),
+  1895→        isActive: true,
+  1896→      }
+  1897→    })
+  1898→
+  1899→    // =====================================================
+  1900→    // 48. DEVICE INTEGRATION - WEATHER STATION (1)
+  1901→    // =====================================================
+  1902→    const weatherStation = await db.weatherStation.create({
+  1903→      data: {
+  1904→        stationId: mainStation.id,
+  1905→        name: 'WX-STN-01',
+  1906→        code: 'WX-01',
+  1907→        manufacturer: 'Davis',
+  1908→        model: 'Vantage Pro2',
+  1909→        serialNumber: 'DVP-VP2-001',
+  1910→        communicationType: 'tcpip',
+  1911→        ipAddress: '192.168.1.160',
+  1912→        port: 80,
+  1913→        protocol: 'http',
+  1914→        temperature: 32.5,
+  1915→        humidity: 45,
+  1916→        windSpeed: 8.5,
+  1917→        windDirection: 'SW',
+  1918→        pressure: 1013.2,
+  1919→        rainfall: 0,
+  1920→        uvIndex: 7,
+  1921→        visibility: 10.0,
+  1922→        dewPoint: 18.5,
+  1923→        status: 'online',
+  1924→        lastReading: new Date(Date.now() - 300000),
+  1925→        isActive: true,
+  1926→      }
+  1927→    })
+  1928→
+  1929→    // =====================================================
+  1930→    // 49. DEVICE INTEGRATION - TANKER TRACKERS (2)
+  1931→    // =====================================================
+  1932→    const tanker1 = await db.tankerTracker.create({
+  1933→      data: {
+  1934→        stationId: mainStation.id,
+  1935→        name: 'TANKER-TK-01',
+  1936→        code: 'TK-01',
+  1937→        trackerType: 'gps_gsm',
+  1938→        manufacturer: 'Teltonika',
+  1939→        model: 'FM5300',
+  1940→        serialNumber: 'TLT-FM5-001',
+  1941→        simCardNumber: '+923001234567',
+  1942→        imei: '356938035642801',
+  1943→        communicationType: 'gsm',
+  1944→        ipAddress: '0.0.0.0',
+  1945→        port: 5027,
+  1946→        protocol: 'h02',
+  1947→        latitude: 33.6844,
+  1948→        longitude: 73.0479,
+  1949→        speed: 0,
+  1950→        heading: 0,
+  1951→        altitude: 540,
+  1952→        odometer: 45000,
+  1953→        fuelLevel: 75,
+  1954→        ignitionStatus: false,
+  1955→        doorStatus: false,
+  1956→        geofenceEnabled: true,
+  1957→        geofenceRadius: 500,
+  1958→        status: 'parked',
+  1959→        lastLocationAt: new Date(Date.now() - 600000),
+  1960→        isActive: true,
+  1961→      }
+  1962→    })
+  1963→
+  1964→    const tanker2 = await db.tankerTracker.create({
+  1965→      data: {
+  1966→        stationId: mainStation.id,
+  1967→        name: 'TANKER-TK-02',
+  1968→        code: 'TK-02',
+  1969→        trackerType: 'gps_gsm',
+  1970→        manufacturer: 'Queclink',
+  1971→        model: 'GV300W',
+  1972→        serialNumber: 'QL-GV3-002',
+  1973→        simCardNumber: '+923009876543',
+  1974→        imei: '867584020053402',
+  1975→        communicationType: 'gsm',
+  1976→        protocol: 'gt06',
+  1977→        latitude: 33.7294,
+  1978→        longitude: 73.0931,
+  1979→        speed: 45,
+  1980→        heading: 90,
+  1981→        altitude: 520,
+  1982→        odometer: 32000,
+  1983→        fuelLevel: 60,
+  1984→        ignitionStatus: true,
+  1985→        doorStatus: true,
+  1986→        geofenceEnabled: true,
+  1987→        geofenceRadius: 500,
+  1988→        status: 'moving',
+  1989→        lastLocationAt: new Date(Date.now() - 120000),
+  1990→        isActive: true,
+  1991→      }
+  1992→    })
+  1993→
+  1994→    // =====================================================
+  1995→    // 50. DEVICE INTEGRATION - CAR WASH SYSTEM (1)
+  1996→    // =====================================================
+  1997→    const carWashSystem = await db.carWashSystem.create({
+  1998→      data: {
+  1999→        stationId: mainStation.id,
+  2000→        name: 'CW-SYS-01',
+
+[showing lines 1-2000 of 2778; use offset=2001 with limit to continue reading]
