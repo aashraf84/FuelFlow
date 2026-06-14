@@ -1,0 +1,558 @@
+     1→     1→'use client'
+     2→     2→
+     3→     3→import { useState, useRef, useEffect } from 'react'
+     4→     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→     5→import {
+     6→     6→  Brain,
+     7→     7→  AlertTriangle,
+     8→     8→  Bell,
+     9→     9→  CheckCircle2,
+    10→    10→  TrendingUp,
+    11→    11→  Send,
+    12→    12→  Lightbulb,
+    13→    13→  BarChart3,
+    14→    14→  Shield,
+    15→    15→  Zap,
+    16→    16→  Eye,
+    17→    17→  Sparkles,
+    18→    18→  Cpu,
+    19→    19→  Target,
+    20→    20→  Activity,
+    21→    21→  MessageSquare,
+    22→    22→  ChevronRight,
+    23→    23→  Bot,
+    24→    24→  User,
+    25→    25→  Clock,
+    26→    26→} from 'lucide-react'
+    27→    27→import { Badge } from '@/components/ui/badge'
+    28→    28→import { ScrollArea } from '@/components/ui/scroll-area'
+    29→    29→import { Input } from '@/components/ui/input'
+    30→    30→import { Button } from '@/components/ui/button'
+    31→    31→import {
+    32→    32→  AreaChart,
+    33→    33→  Area,
+    34→    34→  LineChart,
+    35→    35→  Line,
+    36→    36→  XAxis,
+    37→    37→  YAxis,
+    38→    38→  Tooltip,
+    39→    39→  ResponsiveContainer,
+    40→    40→  CartesianGrid,
+    41→    41→  Legend,
+    42→    42→} from 'recharts'
+    43→    43→
+    44→    44→// ── Static Data ──────────────────────────────────────────
+    45→    45→
+    46→    46→const insightCards = [
+    47→    47→  {
+    48→    48→    title: 'Demand Forecast',
+    49→    49→    description: 'Petrol demand expected to increase 18% this weekend based on historical patterns and upcoming holiday traffic.',
+    50→    50→    type: 'forecast' as const,
+    51→    51→    confidence: 92,
+    52→    52→    icon: TrendingUp,
+    53→    53→    color: 'text-amber-600 dark:text-amber-400',
+    54→    54→    bg: 'bg-amber-500/10',
+    55→    55→    accent: 'border-amber-500/20',
+    56→    56→  },
+    57→    57→  {
+    58→    58→    title: 'Anomaly Detected',
+    59→    59→    description: 'Unusual fuel variance of 3.2% detected at Highway Plaza Pump 12. Possible calibration drift or meter issue.',
+    60→    60→    type: 'anomaly' as const,
+    61→    61→    confidence: 87,
+    62→    62→    icon: AlertTriangle,
+    63→    63→    color: 'text-red-500 dark:text-red-400',
+    64→    64→    bg: 'bg-red-500/10',
+    65→    65→    accent: 'border-red-500/20',
+    66→    66→  },
+    67→    67→  {
+    68→    68→    title: 'Price Optimization',
+    69→    69→    description: 'Adjusting Diesel price by +PKR 1.5/L could increase margin by 4.2% with minimal volume loss based on elasticity model.',
+    70→    70→    type: 'optimization' as const,
+    71→    71→    confidence: 78,
+    72→    72→    icon: Zap,
+    73→    73→    color: 'text-emerald-600 dark:text-emerald-400',
+    74→    74→    bg: 'bg-emerald-500/10',
+    75→    75→    accent: 'border-emerald-500/20',
+    76→    76→  },
+    77→    77→  {
+    78→    78→    title: 'Inventory Alert',
+    79→    79→    description: 'Downtown Station Tank 3 (Diesel) will reach reorder level in ~6 hours at current dispensing rate. Schedule delivery.',
+    80→    80→    type: 'inventory' as const,
+    81→    81→    confidence: 95,
+    82→    82→    icon: Target,
+    83→    83→    color: 'text-orange-600 dark:text-orange-400',
+    84→    84→    bg: 'bg-orange-500/10',
+    85→    85→    accent: 'border-orange-500/20',
+    86→    86→  },
+    87→    87→]
+    88→    88→
+    89→    89→const forecastData = [
+    90→    90→  { day: 'Mon', actual: 184000, predicted: 178000 },
+    91→    91→  { day: 'Tue', actual: 195000, predicted: 190000 },
+    92→    92→  { day: 'Wed', actual: 178000, predicted: 185000 },
+    93→    93→  { day: 'Thu', actual: 202000, predicted: 196000 },
+    94→    94→  { day: 'Fri', actual: 225000, predicted: 218000 },
+    95→    95→  { day: 'Sat', actual: 268000, predicted: 254000 },
+    96→    96→  { day: 'Sun', actual: 245000, predicted: 240000 },
+    97→    97→  { day: 'Mon*', actual: 0, predicted: 192000 },
+    98→    98→  { day: 'Tue*', actual: 0, predicted: 198000 },
+    99→    99→  { day: 'Wed*', actual: 0, predicted: 210000 },
+   100→   100→  { day: 'Thu*', actual: 0, predicted: 228000 },
+   101→   101→  { day: 'Fri*', actual: 0, predicted: 246000 },
+   102→   102→  { day: 'Sat*', actual: 0, predicted: 284000 },
+   103→   103→  { day: 'Sun*', actual: 0, predicted: 260000 },
+   104→   104→]
+   105→   105→
+   106→   106→const aiAlerts = [
+   107→   107→  { id: '1', severity: 'critical' as const, title: 'Pump 7 Flow Sensor Malfunction', description: 'Highway Plaza — Dispenser 7 reporting intermittent flow readings. Possible sensor failure. Immediate technician dispatch recommended.', time: '12 min ago', station: 'Highway Plaza', type: 'Equipment' },
+   108→   108→  { id: '2', severity: 'critical' as const, title: 'CNG Compressor Pressure Drop', description: 'Compressor B pressure fell below 180 bar threshold. Auto-shutdown risk. CNG Hub Faisalabad.', time: '28 min ago', station: 'CNG Hub', type: 'Safety' },
+   109→   109→  { id: '3', severity: 'warning' as const, title: 'Fuel Variance Exceeds Threshold', description: 'Downtown Station reporting 3.1% variance on Petrol — above 2% threshold. Possible meter calibration issue on Pump 3.', time: '1 hour ago', station: 'Downtown', type: 'Variance' },
+   110→   110→  { id: '4', severity: 'warning' as const, title: 'Tank 3 Low Level Prediction', description: 'Diesel tank at Downtown Station projected to hit reorder level in 6 hours at current dispensing rate.', time: '2 hours ago', station: 'Downtown', type: 'Inventory' },
+   111→   111→  { id: '5', severity: 'info' as const, title: 'Weekend Demand Surge Expected', description: 'Based on historical patterns, expect 18-22% increase in Petrol demand this weekend. Consider preemptive tank topping.', time: '3 hours ago', station: 'All Stations', type: 'Demand' },
+   112→   112→  { id: '6', severity: 'info' as const, title: 'EV Charger 2 Maintenance Due', description: 'Airport Terminal EV Charger 2 has completed 5,000 sessions. Preventive maintenance recommended.', time: '5 hours ago', station: 'Airport Terminal', type: 'Maintenance' },
+   113→   113→]
+   114→   114→
+   115→   115→const modelStatuses = [
+   116→   116→  { name: 'Demand Forecast v3.2', accuracy: 94.2, status: 'online' as const, lastTrained: '2 hours ago', predictions: 1247 },
+   117→   117→  { name: 'Anomaly Detection v2.8', accuracy: 89.7, status: 'online' as const, lastTrained: '6 hours ago', predictions: 3891 },
+   118→   118→  { name: 'Price Optimizer v1.5', accuracy: 82.4, status: 'online' as const, lastTrained: '12 hours ago', predictions: 562 },
+   119→   119→  { name: 'Inventory Predictor v2.1', accuracy: 96.1, status: 'online' as const, lastTrained: '1 hour ago', predictions: 2154 },
+   120→   120→  { name: 'Fraud Detector v1.9', accuracy: 91.3, status: 'warning' as const, lastTrained: '2 days ago', predictions: 8434 },
+   121→   121→  { name: 'Sentiment Analyzer v1.2', accuracy: 76.8, status: 'offline' as const, lastTrained: '5 days ago', predictions: 0 },
+   122→   122→]
+   123→   123→
+   124→   124→interface ChatMessage {
+   125→   125→  role: 'user' | 'assistant'
+   126→   126→  content: string
+   127→   127→  time: string
+   128→   128→}
+   129→   129→
+   130→   130→const initialMessages: ChatMessage[] = [
+   131→   131→  {
+   132→   132→    role: 'assistant',
+   133→   133→    content: 'Welcome to FuelFlow AI! I can help you with fuel management, inventory forecasting, pump diagnostics, and business analytics. What would you like to know?',
+   134→   134→    time: '10:00 AM',
+   135→   135→  },
+   136→   136→]
+   137→   137→
+   138→   138→const severityStyle: Record<string, { dot: string; border: string; text: string; bg: string }> = {
+   139→   139→  critical: { dot: 'macos-status-error', border: 'border-red-500/15', text: 'text-red-500', bg: 'bg-red-500/5' },
+   140→   140→  warning: { dot: 'macos-status-warning', border: 'border-amber-500/15', text: 'text-amber-500', bg: 'bg-amber-500/5' },
+   141→   141→  info: { dot: 'macos-status-online', border: 'border-emerald-500/15', text: 'text-emerald-500', bg: 'bg-emerald-500/5' },
+   142→   142→}
+   143→   143→
+   144→   144→// ── Component ────────────────────────────────────────────
+   145→   145→
+   146→   146→export default function AISuiteModule() {
+   147→   147→  const [activeTab, setActiveTab] = useState<'insights' | 'chat' | 'forecast' | 'alerts' | 'models'>('insights')
+   148→   148→  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(initialMessages)
+   149→   149→  const [chatInput, setChatInput] = useState('')
+   150→   150→  const [chatLoading, setChatLoading] = useState(false)
+   151→   151→  const [severityFilter, setSeverityFilter] = useState<string>('all')
+   152→   152→  const chatEndRef = useRef<HTMLDivElement>(null)
+   153→   153→
+   154→   154→  useEffect(() => {
+   155→   155→    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+   156→   156→  }, [chatMessages])
+   157→   157→
+   158→   158→  const handleSendMessage = () => {
+   159→   159→    if (!chatInput.trim() || chatLoading) return
+   160→   160→
+   161→   161→    const userMsg: ChatMessage = { role: 'user', content: chatInput, time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) }
+   162→   162→    setChatMessages((prev) => [...prev, userMsg])
+   163→   163→    setChatInput('')
+   164→   164→    setChatLoading(true)
+   165→   165→
+   166→   166→    // Simulate AI response
+   167→   167→    setTimeout(() => {
+   168→   168→      const responses: Record<string, string> = {
+   169→   169→        default: "I've analyzed your query across our data models. Based on current trends, I'd recommend reviewing the demand forecast for this weekend — we're projecting an 18% surge in Petrol sales. Would you like me to generate a detailed breakdown by station?",
+   170→   170→        fuel: "Current fuel inventory across all stations shows 72% average capacity. Downtown Station's Diesel tank is at 23% and will need replenishment within 6 hours. I recommend scheduling a Shell Pakistan delivery for Tank 3.",
+   171→   171→        price: "Our Price Optimizer model suggests a +PKR 1.5/L adjustment on Diesel would yield a 4.2% margin improvement with less than 1% volume impact based on current price elasticity. The optimal window for this change is before the weekend surge.",
+   172→   172→        pump: "Pump 7 at Highway Plaza is showing intermittent flow sensor readings. This typically indicates either sensor drift or early-stage hardware failure. I recommend dispatching a technician within the next 2 hours to avoid extended downtime during peak hours.",
+   173→   173→      }
+   174→   174→
+   175→   175→      const input = chatInput.toLowerCase()
+   176→   176→      let response = responses.default
+   177→   177→      if (input.includes('fuel') || input.includes('inventory') || input.includes('tank')) response = responses.fuel
+   178→   178→      else if (input.includes('price') || input.includes('cost') || input.includes('margin')) response = responses.price
+   179→   179→      else if (input.includes('pump') || input.includes('dispenser') || input.includes('sensor')) response = responses.pump
+   180→   180→
+   181→   181→      setChatMessages((prev) => [...prev, {
+   182→   182→        role: 'assistant',
+   183→   183→        content: response,
+   184→   184→        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+   185→   185→      }])
+   186→   186→      setChatLoading(false)
+   187→   187→    }, 1500)
+   188→   188→  }
+   189→   189→
+   190→   190→  const filteredAlerts = severityFilter === 'all' ? aiAlerts : aiAlerts.filter((a) => a.severity === severityFilter)
+   191→   191→
+   192→   192→  const tabs = [
+   193→   193→    { key: 'insights' as const, label: 'Insights' },
+   194→   194→    { key: 'chat' as const, label: 'AI Chat' },
+   195→   195→    { key: 'forecast' as const, label: 'Forecast' },
+   196→   196→    { key: 'alerts' as const, label: 'Alerts' },
+   197→   197→    { key: 'models' as const, label: 'Models' },
+   198→   198→  ]
+   199→   199→
+   200→   200→  const fadeUp = {
+   201→   201→    initial: { opacity: 0, y: 8 },
+   202→   202→    animate: { opacity: 1, y: 0 },
+   203→   203→    transition: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
+   204→   204→  }
+   205→   205→
+   206→   206→  return (
+   207→   207→    <div className="space-y-5">
+   208→   208→      {/* AI Header Badge */}
+   209→   209→      <div className="flex items-center gap-3">
+   210→   210→        <div className="flex size-9 items-center justify-center rounded-xl bg-amber-500/10">
+   211→   211→          <Brain className="size-5 text-amber-500" />
+   212→   212→        </div>
+   213→   213→        <div>
+   214→   214→          <h2 className="text-[15px] font-semibold">AI Suite</h2>
+   215→   215→          <p className="text-[11px] text-muted-foreground">5 active models · 2 critical alerts</p>
+   216→   216→        </div>
+   217→   217→      </div>
+   218→   218→
+   219→   219→      {/* Tab Bar */}
+   220→   220→      <div className="flex items-center gap-1 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] p-1 w-fit overflow-x-auto">
+   221→   221→        {tabs.map((tab) => (
+   222→   222→          <button
+   223→   223→            key={tab.key}
+   224→   224→            onClick={() => setActiveTab(tab.key)}
+   225→   225→            className={`px-4 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-150 whitespace-nowrap ${
+   226→   226→              activeTab === tab.key
+   227→   227→                ? 'bg-card text-foreground shadow-sm'
+   228→   228→                : 'text-muted-foreground hover:text-foreground'
+   229→   229→            }`}
+   230→   230→          >
+   231→   231→            {tab.label}
+   232→   232→          </button>
+   233→   233→        ))}
+   234→   234→      </div>
+   235→   235→
+   236→   236→      <AnimatePresence mode="wait">
+   237→   237→        {/* ── Insights Tab ── */}
+   238→   238→        {activeTab === 'insights' && (
+   239→   239→          <motion.div key="insights" {...fadeUp} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   240→   240→            {insightCards.map((card, i) => (
+   241→   241→              <motion.div
+   242→   242→                key={card.title}
+   243→   243→                initial={{ opacity: 0, y: 8 }}
+   244→   244→                animate={{ opacity: 1, y: 0 }}
+   245→   245→                transition={{ delay: i * 0.08, duration: 0.3 }}
+   246→   246→                className={`macos-card p-4 border ${card.accent}`}
+   247→   247→              >
+   248→   248→                <div className="flex items-start gap-3">
+   249→   249→                  <div className={`flex size-9 items-center justify-center rounded-xl ${card.bg} shrink-0`}>
+   250→   250→                    <card.icon className={`size-[18px] ${card.color}`} />
+   251→   251→                  </div>
+   252→   252→                  <div className="flex-1 min-w-0">
+   253→   253→                    <div className="flex items-center justify-between gap-2">
+   254→   254→                      <h4 className="text-[13px] font-semibold">{card.title}</h4>
+   255→   255→                      <span className="macos-pill bg-black/[0.04] dark:bg-white/[0.06] text-[11px] tabular-nums">{card.confidence}%</span>
+   256→   256→                    </div>
+   257→   257→                    <p className="text-[12px] text-muted-foreground mt-1 leading-relaxed">{card.description}</p>
+   258→   258→                    <div className="flex items-center gap-1 mt-2">
+   259→   259→                      <Sparkles className="size-3 text-amber-500" />
+   260→   260→                      <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">AI Generated</span>
+   261→   261→                    </div>
+   262→   262→                  </div>
+   263→   263→                </div>
+   264→   264→              </motion.div>
+   265→   265→            ))}
+   266→   266→          </motion.div>
+   267→   267→        )}
+   268→   268→
+   269→   269→        {/* ── Chat Tab ── */}
+   270→   270→        {activeTab === 'chat' && (
+   271→   271→          <motion.div key="chat" {...fadeUp} className="macos-card flex flex-col" style={{ height: '520px' }}>
+   272→   272→            {/* Chat Header */}
+   273→   273→            <div className="flex items-center gap-2 p-4 pb-3 border-b border-border/50 shrink-0">
+   274→   274→              <div className="flex size-7 items-center justify-center rounded-lg bg-amber-500/10">
+   275→   275→                <Bot className="size-4 text-amber-500" />
+   276→   276→              </div>
+   277→   277→              <div className="flex-1">
+   278→   278→                <h4 className="text-[13px] font-semibold">FuelFlow AI Assistant</h4>
+   279→   279→                <div className="flex items-center gap-1.5">
+   280→   280→                  <div className="macos-status-dot macos-status-online" />
+   281→   281→                  <span className="text-[11px] text-muted-foreground">Online · Powered by 5 models</span>
+   282→   282→                </div>
+   283→   283→              </div>
+   284→   284→            </div>
+   285→   285→
+   286→   286→            {/* Messages */}
+   287→   287→            <ScrollArea className="flex-1 p-4">
+   288→   288→              <div className="space-y-4">
+   289→   289→                {chatMessages.map((msg, idx) => (
+   290→   290→                  <div key={idx} className={`flex gap-2.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+   291→   291→                    {msg.role === 'assistant' && (
+   292→   292→                      <div className="flex size-7 items-center justify-center rounded-lg bg-amber-500/10 shrink-0 mt-0.5">
+   293→   293→                        <Bot className="size-3.5 text-amber-500" />
+   294→   294→                      </div>
+   295→   295→                    )}
+   296→   296→                    <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${
+   297→   297→                      msg.role === 'user'
+   298→   298→                        ? 'bg-amber-500 text-white rounded-br-md'
+   299→   299→                        : 'bg-black/[0.03] dark:bg-white/[0.05] rounded-bl-md'
+   300→   300→                    }`}>
+   301→   301→                      <p className="text-[13px] leading-relaxed">{msg.content}</p>
+   302→   302→                      <p className={`text-[10px] mt-1.5 ${msg.role === 'user' ? 'text-amber-100/70' : 'text-muted-foreground'}`}>
+   303→   303→                        {msg.time}
+   304→   304→                      </p>
+   305→   305→                    </div>
+   306→   306→                    {msg.role === 'user' && (
+   307→   307→                      <div className="flex size-7 items-center justify-center rounded-lg bg-black/[0.06] dark:bg-white/[0.08] shrink-0 mt-0.5">
+   308→   308→                        <User className="size-3.5 text-muted-foreground" />
+   309→   309→                      </div>
+   310→   310→                    )}
+   311→   311→                  </div>
+   312→   312→                ))}
+   313→   313→
+   314→   314→                {chatLoading && (
+   315→   315→                  <div className="flex gap-2.5">
+   316→   316→                    <div className="flex size-7 items-center justify-center rounded-lg bg-amber-500/10 shrink-0">
+   317→   317→                      <Bot className="size-3.5 text-amber-500" />
+   318→   318→                    </div>
+   319→   319→                    <div className="bg-black/[0.03] dark:bg-white/[0.05] rounded-2xl rounded-bl-md px-4 py-3">
+   320→   320→                      <div className="flex gap-1.5">
+   321→   321→                        <div className="size-2 rounded-full bg-amber-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+   322→   322→                        <div className="size-2 rounded-full bg-amber-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+   323→   323→                        <div className="size-2 rounded-full bg-amber-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+   324→   324→                      </div>
+   325→   325→                    </div>
+   326→   326→                  </div>
+   327→   327→                )}
+   328→   328→                <div ref={chatEndRef} />
+   329→   329→              </div>
+   330→   330→            </ScrollArea>
+   331→   331→
+   332→   332→            {/* Input */}
+   333→   333→            <div className="flex gap-2 p-4 pt-3 border-t border-border/50 shrink-0">
+   334→   334→              <Input
+   335→   335→                placeholder="Ask about fuel management, forecasts, or anomalies..."
+   336→   336→                value={chatInput}
+   337→   337→                onChange={(e) => setChatInput(e.target.value)}
+   338→   338→                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+   339→   339→                className="text-[13px] h-9 rounded-xl"
+   340→   340→                disabled={chatLoading}
+   341→   341→              />
+   342→   342→              <Button
+   343→   343→                size="sm"
+   344→   344→                onClick={handleSendMessage}
+   345→   345→                disabled={chatLoading || !chatInput.trim()}
+   346→   346→                className="h-9 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white"
+   347→   347→              >
+   348→   348→                <Send className="size-4" />
+   349→   349→              </Button>
+   350→   350→            </div>
+   351→   351→          </motion.div>
+   352→   352→        )}
+   353→   353→
+   354→   354→        {/* ── Forecast Tab ── */}
+   355→   355→        {activeTab === 'forecast' && (
+   356→   356→          <motion.div key="forecast" {...fadeUp} className="space-y-5">
+   357→   357→            <div className="macos-card p-5">
+   358→   358→              <div className="flex items-center justify-between mb-4">
+   359→   359→                <div className="flex items-center gap-2">
+   360→   360→                  <TrendingUp className="size-4 text-amber-500" />
+   361→   361→                  <h3 className="text-[13px] font-semibold">Sales Forecast — Predicted vs Actual</h3>
+   362→   362→                </div>
+   363→   363→                <div className="flex items-center gap-4">
+   364→   364→                  <div className="flex items-center gap-1.5">
+   365→   365→                    <div className="size-2.5 rounded-full bg-amber-500" />
+   366→   366→                    <span className="text-[11px] text-muted-foreground">Actual</span>
+   367→   367→                  </div>
+   368→   368→                  <div className="flex items-center gap-1.5">
+   369→   369→                    <div className="size-2.5 rounded-full border-2 border-amber-300 dark:border-amber-600 bg-transparent" />
+   370→   370→                    <span className="text-[11px] text-muted-foreground">Predicted</span>
+   371→   371→                  </div>
+   372→   372→                  <div className="flex items-center gap-1.5">
+   373→   373→                    <div className="size-2.5 rounded-full bg-amber-500/20" />
+   374→   374→                    <span className="text-[11px] text-muted-foreground">Future</span>
+   375→   375→                  </div>
+   376→   376→                </div>
+   377→   377→              </div>
+   378→   378→              <div className="h-72">
+   379→   379→                <ResponsiveContainer width="100%" height="100%">
+   380→   380→                  <AreaChart data={forecastData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+   381→   381→                    <defs>
+   382→   382→                      <linearGradient id="actualGrad" x1="0" y1="0" x2="0" y2="1">
+   383→   383→                        <stop offset="0%" stopColor="#e8930c" stopOpacity={0.15} />
+   384→   384→                        <stop offset="100%" stopColor="#e8930c" stopOpacity={0} />
+   385→   385→                      </linearGradient>
+   386→   386→                      <linearGradient id="predGrad" x1="0" y1="0" x2="0" y2="1">
+   387→   387→                        <stop offset="0%" stopColor="#e8930c" stopOpacity={0.06} />
+   388→   388→                        <stop offset="100%" stopColor="#e8930c" stopOpacity={0} />
+   389→   389→                      </linearGradient>
+   390→   390→                    </defs>
+   391→   391→                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+   392→   392→                    <XAxis dataKey="day" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+   393→   393→                    <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
+   394→   394→                    <Tooltip
+   395→   395→                      contentStyle={{ fontSize: 12, borderRadius: 10, border: '0.5px solid var(--border)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+   396→   396→                      formatter={(value: number, name: string) => [`${value.toLocaleString()} L`, name === 'actual' ? 'Actual' : 'Predicted']}
+   397→   397→                    />
+   398→   398→                    <Area type="monotone" dataKey="predicted" stroke="#e8930c" strokeWidth={2} strokeDasharray="6 3" fill="url(#predGrad)" />
+   399→   399→                    <Area type="monotone" dataKey="actual" stroke="#e8930c" strokeWidth={2} fill="url(#actualGrad)" />
+   400→   400→                  </AreaChart>
+   401→   401→                </ResponsiveContainer>
+   402→   402→              </div>
+   403→   403→            </div>
+   404→   404→
+   405→   405→            {/* Forecast Accuracy */}
+   406→   406→            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+   407→   407→              <div className="macos-card p-4 text-center">
+   408→   408→                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">MAPE Score</p>
+   409→   409→                <p className="text-[22px] font-bold mt-1 text-amber-600 dark:text-amber-400">5.8%</p>
+   410→   410→                <p className="text-[11px] text-muted-foreground mt-0.5">Very good accuracy</p>
+   411→   411→              </div>
+   412→   412→              <div className="macos-card p-4 text-center">
+   413→   413→                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Avg Confidence</p>
+   414→   414→                <p className="text-[22px] font-bold mt-1">87.3%</p>
+   415→   415→                <p className="text-[11px] text-muted-foreground mt-0.5">Across all predictions</p>
+   416→   416→              </div>
+   417→   417→              <div className="macos-card p-4 text-center">
+   418→   418→                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Next Peak</p>
+   419→   419→                <p className="text-[22px] font-bold mt-1 text-emerald-600 dark:text-emerald-400">Sat*</p>
+   420→   420→                <p className="text-[11px] text-muted-foreground mt-0.5">284K litres predicted</p>
+   421→   421→              </div>
+   422→   422→            </div>
+   423→   423→          </motion.div>
+   424→   424→        )}
+   425→   425→
+   426→   426→        {/* ── Alerts Tab ── */}
+   427→   427→        {activeTab === 'alerts' && (
+   428→   428→          <motion.div key="alerts" {...fadeUp} className="space-y-4">
+   429→   429→            {/* Filter */}
+   430→   430→            <div className="flex items-center justify-between">
+   431→   431→              <p className="text-[12px] text-muted-foreground">{filteredAlerts.length} AI-generated alerts</p>
+   432→   432→              <div className="flex items-center gap-1">
+   433→   433→                {['all', 'critical', 'warning', 'info'].map((f) => (
+   434→   434→                  <button
+   435→   435→                    key={f}
+   436→   436→                    onClick={() => setSeverityFilter(f)}
+   437→   437→                    className={`px-3 py-1 rounded-lg text-[11px] font-medium transition-all duration-150 capitalize ${
+   438→   438→                      severityFilter === f
+   439→   439→                        ? 'bg-card text-foreground shadow-sm'
+   440→   440→                        : 'text-muted-foreground hover:text-foreground'
+   441→   441→                    }`}
+   442→   442→                  >
+   443→   443→                    {f}
+   444→   444→                  </button>
+   445→   445→                ))}
+   446→   446→              </div>
+   447→   447→            </div>
+   448→   448→
+   449→   449→            {/* Alert Cards */}
+   450→   450→            <ScrollArea className="max-h-[520px]">
+   451→   451→              <div className="space-y-3">
+   452→   452→                {filteredAlerts.map((alert, i) => {
+   453→   453→                  const style = severityStyle[alert.severity]
+   454→   454→                  return (
+   455→   455→                    <motion.div
+   456→   456→                      key={alert.id}
+   457→   457→                      initial={{ opacity: 0, y: 6 }}
+   458→   458→                      animate={{ opacity: 1, y: 0 }}
+   459→   459→                      transition={{ delay: i * 0.05, duration: 0.25 }}
+   460→   460→                      className={`macos-card border ${style.border} ${style.bg} p-4`}
+   461→   461→                    >
+   462→   462→                      <div className="flex items-start gap-3">
+   463→   463→                        <div className={`macos-status-dot ${style.dot} mt-1.5 shrink-0`} />
+   464→   464→                        <div className="flex-1 min-w-0">
+   465→   465→                          <div className="flex items-start justify-between gap-2">
+   466→   466→                            <div>
+   467→   467→                              <h4 className="text-[13px] font-semibold">{alert.title}</h4>
+   468→   468→                              <div className="flex items-center gap-2 mt-1">
+   469→   469→                                <span className={`macos-pill ${style.bg} ${style.text} text-[10px] capitalize`}>{alert.severity}</span>
+   470→   470→                                <span className="macos-pill bg-black/[0.04] dark:bg-white/[0.06] text-[10px]">{alert.type}</span>
+   471→   471→                                <span className="text-[11px] text-muted-foreground">{alert.station}</span>
+   472→   472→                              </div>
+   473→   473→                            </div>
+   474→   474→                            <span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0">{alert.time}</span>
+   475→   475→                          </div>
+   476→   476→                          <p className="text-[12px] text-muted-foreground mt-2 leading-relaxed">{alert.description}</p>
+   477→   477→                        </div>
+   478→   478→                      </div>
+   479→   479→                    </motion.div>
+   480→   480→                  )
+   481→   481→                })}
+   482→   482→              </div>
+   483→   483→            </ScrollArea>
+   484→   484→          </motion.div>
+   485→   485→        )}
+   486→   486→
+   487→   487→        {/* ── Models Tab ── */}
+   488→   488→        {activeTab === 'models' && (
+   489→   489→          <motion.div key="models" {...fadeUp} className="space-y-4">
+   490→   490→            <div className="flex items-center gap-2">
+   491→   491→              <Cpu className="size-4 text-amber-500" />
+   492→   492→              <h3 className="text-[13px] font-semibold">Active AI Models</h3>
+   493→   493→            </div>
+   494→   494→
+   495→   495→            <div className="macos-card overflow-hidden">
+   496→   496→              <ScrollArea className="max-h-[450px]">
+   497→   497→                <table className="macos-table">
+   498→   498→                  <thead>
+   499→   499→                    <tr>
+   500→   500→                      <th>Model</th>
+   501→   501→                      <th>Accuracy</th>
+   502→   502→                      <th>Status</th>
+   503→   503→                      <th>Last Trained</th>
+   504→   504→                      <th className="text-right">Predictions</th>
+   505→   505→                    </tr>
+   506→   506→                  </thead>
+   507→   507→                  <tbody>
+   508→   508→                    {modelStatuses.map((model) => (
+   509→   509→                      <tr key={model.name}>
+   510→   510→                        <td>
+   511→   511→                          <div className="flex items-center gap-2">
+   512→   512→                            <Cpu className="size-3.5 text-amber-500" />
+   513→   513→                            <span className="text-[13px] font-medium">{model.name}</span>
+   514→   514→                          </div>
+   515→   515→                        </td>
+   516→   516→                        <td>
+   517→   517→                          <div className="flex items-center gap-2">
+   518→   518→                            <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+   519→   519→                              <div
+   520→   520→                                className={`h-full rounded-full ${
+   521→   521→                                  model.accuracy >= 90 ? 'bg-emerald-500' :
+   522→   522→                                  model.accuracy >= 80 ? 'bg-amber-500' : 'bg-red-500'
+   523→   523→                                }`}
+   524→   524→                                style={{ width: `${model.accuracy}%` }}
+   525→   525→                              />
+   526→   526→                            </div>
+   527→   527→                            <span className="text-[12px] font-medium tabular-nums">{model.accuracy}%</span>
+   528→   528→                          </div>
+   529→   529→                        </td>
+   530→   530→                        <td>
+   531→   531→                          <div className="flex items-center gap-1.5">
+   532→   532→                            <div className={`macos-status-dot macos-status-${model.status}`} />
+   533→   533→                            <span className="text-[11px] text-muted-foreground capitalize">{model.status}</span>
+   534→   534→                          </div>
+   535→   535→                        </td>
+   536→   536→                        <td className="text-[12px] text-muted-foreground">{model.lastTrained}</td>
+   537→   537→                        <td className="text-right text-[13px] font-medium tabular-nums">{model.predictions.toLocaleString()}</td>
+   538→   538→                      </tr>
+   539→   539→                    ))}
+   540→   540→                  </tbody>
+   541→   541→                </table>
+   542→   542→              </ScrollArea>
+   543→   543→            </div>
+   544→   544→
+   545→   545→            {/* Model Note */}
+   546→   546→            <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/5 border border-amber-500/10">
+   547→   547→              <Sparkles className="size-4 text-amber-500 shrink-0" />
+   548→   548→              <p className="text-[12px] text-amber-700 dark:text-amber-400">
+   549→   549→                Models are automatically retrained when accuracy drops below 85% or new data exceeds the training window. Fraud Detector v1.9 is due for retraining.
+   550→   550→              </p>
+   551→   551→            </div>
+   552→   552→          </motion.div>
+   553→   553→        )}
+   554→   554→      </AnimatePresence>
+   555→   555→    </div>
+   556→   556→  )
+   557→   557→}
+   558→   558→

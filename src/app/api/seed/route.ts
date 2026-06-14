@@ -4,56 +4,129 @@ import { db } from '@/lib/db'
 export async function GET() {
   try {
     // Clean up existing data (order matters due to foreign keys)
-    await db.auditLog.deleteMany()
-    await db.aIForecast.deleteMany()
-    await db.aIAlert.deleteMany()
-    await db.notification.deleteMany()
-    await db.dailyReport.deleteMany()
-    await db.vaporRecoveryReading.deleteMany()
-    await db.environmentalAlert.deleteMany()
-    await db.promotionUsage.deleteMany()
-    await db.promotion.deleteMany()
-    await db.loyaltyRule.deleteMany()
-    await db.customer.deleteMany()
-    await db.leaveRequest.deleteMany()
-    await db.payrollRecord.deleteMany()
-    await db.attendance.deleteMany()
-    await db.maintenanceRecord.deleteMany()
-    await db.expense.deleteMany()
-    await db.transaction.deleteMany()
-    await db.supplierInvoice.deleteMany()
-    await db.purchaseOrder.deleteMany()
-    await db.supplier.deleteMany()
-    await db.lotterySale.deleteMany()
-    await db.carWashSession.deleteMany()
-    await db.retailTransaction.deleteMany()
-    await db.lubricantProduct.deleteMany()
-    await db.retailProduct.deleteMany()
-    await db.chargingSession.deleteMany()
-    await db.fueling.deleteMany()
-    await db.meterRecord.deleteMany()
-    await db.shift.deleteMany()
-    await db.tankCalibration.deleteMany()
-    await db.reconciliation.deleteMany()
-    await db.tankReading.deleteMany()
-    await db.fuelDelivery.deleteMany()
-    await db.tank.deleteMany()
-    await db.nozzle.deleteMany()
-    await db.dispenser.deleteMany()
-    await db.eVCharger.deleteMany()
-    await db.cNGDispenser.deleteMany()
-    await db.aNPRCamera.deleteMany()
-    await db.rFIDReader.deleteMany()
-    await db.priceBoard.deleteMany()
-    await db.fuelPrice.deleteMany()
-    await db.employee.deleteMany()
-    await db.fuelCard.deleteMany()
-    await db.vehicle.deleteMany()
-    await db.driver.deleteMany()
-    await db.fleetAccount.deleteMany()
-    await db.user.deleteMany()
-    await db.station.deleteMany()
-    await db.tenant.deleteMany()
+    // Wrapped in try/catch per table for resilience
+    const deleteTable = async (fn: () => Promise<unknown>) => { try { await fn() } catch { /* skip */ } }
+
+    // Children first (referencing other tables)
+    await deleteTable(() => db.webhookDelivery.deleteMany())
+    await deleteTable(() => db.webhookEndpoint.deleteMany())
+    await deleteTable(() => db.aPIKey.deleteMany())
+    await deleteTable(() => db.scheduledReport.deleteMany())
+    await deleteTable(() => db.reportTemplate.deleteMany())
+    await deleteTable(() => db.shiftHandover.deleteMany())
+    await deleteTable(() => db.nozzleEvent.deleteMany())
+    await deleteTable(() => db.cNGStorage.deleteMany())
+    await deleteTable(() => db.cNGCompressor.deleteMany())
+    await deleteTable(() => db.customerComplaint.deleteMany())
+    await deleteTable(() => db.giftCard.deleteMany())
+    await deleteTable(() => db.loyaltyTransaction.deleteMany())
+    await deleteTable(() => db.safeDrop.deleteMany())
+    await deleteTable(() => db.cashDrawer.deleteMany())
+    await deleteTable(() => db.taxConfig.deleteMany())
+    await deleteTable(() => db.accountPayable.deleteMany())
+    await deleteTable(() => db.accountReceivable.deleteMany())
+    await deleteTable(() => db.journalLine.deleteMany())
+    await deleteTable(() => db.journalEntry.deleteMany())
+    await deleteTable(() => db.gLAccount.deleteMany())
+    await deleteTable(() => db.shrinkageRecord.deleteMany())
+    await deleteTable(() => db.theftAlert.deleteMany())
+    await deleteTable(() => db.fuelTransfer.deleteMany())
+    await deleteTable(() => db.aTGProfile.deleteMany())
+    await deleteTable(() => db.dispenserProfile.deleteMany())
+    await deleteTable(() => db.commLog.deleteMany())
+    await deleteTable(() => db.commConnection.deleteMany())
+    await deleteTable(() => db.commProtocol.deleteMany())
+    await deleteTable(() => db.encryptionKey.deleteMany())
+    await deleteTable(() => db.backupRecord.deleteMany())
+    await deleteTable(() => db.securityAlert.deleteMany())
+    await deleteTable(() => db.rBACPermission.deleteMany())
+    await deleteTable(() => db.securitySession.deleteMany())
+    await deleteTable(() => db.oMSLicense.deleteMany())
+    await deleteTable(() => db.oMSSyncLog.deleteMany())
+    await deleteTable(() => db.oMSPayment.deleteMany())
+    await deleteTable(() => db.oMSInvoice.deleteMany())
+    await deleteTable(() => db.oMSPackage.deleteMany())
+    await deleteTable(() => db.oMSClient.deleteMany())
+    await deleteTable(() => db.deviceCommandQueue.deleteMany())
+    await deleteTable(() => db.deviceEventLog.deleteMany())
+    await deleteTable(() => db.deviceConfig.deleteMany())
+    await deleteTable(() => db.vacuumStation.deleteMany())
+    await deleteTable(() => db.airCompressor.deleteMany())
+    await deleteTable(() => db.carWashSystem.deleteMany())
+    await deleteTable(() => db.tankerTracker.deleteMany())
+    await deleteTable(() => db.weatherStation.deleteMany())
+    await deleteTable(() => db.utilityMeter.deleteMany())
+    await deleteTable(() => db.fireAlarmSystem.deleteMany())
+    await deleteTable(() => db.surveillanceCamera.deleteMany())
+    await deleteTable(() => db.generator.deleteMany())
+    await deleteTable(() => db.paymentTerminal.deleteMany())
+    await deleteTable(() => db.forecourtController.deleteMany())
+    await deleteTable(() => db.auditLog.deleteMany())
+    await deleteTable(() => db.aIForecast.deleteMany())
+    await deleteTable(() => db.aIAlert.deleteMany())
+    await deleteTable(() => db.notification.deleteMany())
+    await deleteTable(() => db.dailyReport.deleteMany())
+    await deleteTable(() => db.vaporRecoveryReading.deleteMany())
+    await deleteTable(() => db.environmentalAlert.deleteMany())
+    await deleteTable(() => db.promotionUsage.deleteMany())
+    await deleteTable(() => db.promotion.deleteMany())
+    await deleteTable(() => db.loyaltyRule.deleteMany())
+    await deleteTable(() => db.customer.deleteMany())
+    await deleteTable(() => db.leaveRequest.deleteMany())
+    await deleteTable(() => db.payrollRecord.deleteMany())
+    await deleteTable(() => db.attendance.deleteMany())
+    await deleteTable(() => db.maintenanceRecord.deleteMany())
+    await deleteTable(() => db.expense.deleteMany())
+    await deleteTable(() => db.transaction.deleteMany())
+    await deleteTable(() => db.supplierInvoice.deleteMany())
+    await deleteTable(() => db.purchaseOrder.deleteMany())
+    await deleteTable(() => db.supplier.deleteMany())
+    await deleteTable(() => db.lotterySale.deleteMany())
+    await deleteTable(() => db.carWashSession.deleteMany())
+    await deleteTable(() => db.retailTransaction.deleteMany())
+    await deleteTable(() => db.lubricantProduct.deleteMany())
+    await deleteTable(() => db.retailProduct.deleteMany())
+    await deleteTable(() => db.chargingSession.deleteMany())
+    await deleteTable(() => db.fueling.deleteMany())
+    await deleteTable(() => db.meterRecord.deleteMany())
+    await deleteTable(() => db.shift.deleteMany())
+    await deleteTable(() => db.tankCalibration.deleteMany())
+    await deleteTable(() => db.reconciliation.deleteMany())
+    await deleteTable(() => db.tankReading.deleteMany())
+    await deleteTable(() => db.fuelDelivery.deleteMany())
+    await deleteTable(() => db.tank.deleteMany())
+    await deleteTable(() => db.nozzle.deleteMany())
+    await deleteTable(() => db.dispenser.deleteMany())
+    await deleteTable(() => db.eVCharger.deleteMany())
+    await deleteTable(() => db.cNGDispenser.deleteMany())
+    await deleteTable(() => db.aNPRCamera.deleteMany())
+    await deleteTable(() => db.rFIDReader.deleteMany())
+    await deleteTable(() => db.priceBoard.deleteMany())
+    await deleteTable(() => db.fuelPrice.deleteMany())
+    await deleteTable(() => db.employee.deleteMany())
+    await deleteTable(() => db.fuelCard.deleteMany())
+    await deleteTable(() => db.vehicle.deleteMany())
+    await deleteTable(() => db.driver.deleteMany())
+    await deleteTable(() => db.fleetAccount.deleteMany())
+    await deleteTable(() => db.hardwareCatalog.deleteMany())
+    await deleteTable(() => db.controllerProfile.deleteMany())
+    await deleteTable(() => db.controllerProtocol.deleteMany())
+    await deleteTable(() => db.serialKey.deleteMany())
+    await deleteTable(() => db.user.deleteMany())
+    await deleteTable(() => db.station.deleteMany())
+    await deleteTable(() => db.tenant.deleteMany())
+    // Owner module tables
+    await deleteTable(() => db.invoicePayment.deleteMany())
+    await deleteTable(() => db.invoiceItem.deleteMany())
+    await deleteTable(() => db.invoice.deleteMany())
+    await deleteTable(() => db.quotationItem.deleteMany())
+    await deleteTable(() => db.quotation.deleteMany())
+    await deleteTable(() => db.licenseKey.deleteMany())
+    await deleteTable(() => db.clientDevice.deleteMany())
+    await deleteTable(() => db.clientSubscription.deleteMany())
+    await deleteTable(() => db.subscriptionPlan.deleteMany())
+    await deleteTable(() => db.tenantDatabase.deleteMany())
+    await deleteTable(() => db.ownerClient.deleteMany())
 
     // =====================================================
     // 1. TENANT
@@ -116,13 +189,87 @@ export async function GET() {
     // =====================================================
     // 3. USERS
     // =====================================================
+    const { hashPassword } = await import('@/lib/auth')
+    const defaultPasswordHash = await hashPassword('fuelflow123')
+    
     const users = await Promise.all([
-      db.user.create({ data: { tenantId: tenant.id, email: 'superadmin@apexflow.pk', name: 'Imran Akhtar', role: 'superadmin', isActive: true, lastLogin: new Date() } }),
-      db.user.create({ data: { tenantId: tenant.id, email: 'admin@apexflow.pk', name: 'Fatima Noor', role: 'admin', isActive: true, lastLogin: new Date() } }),
-      db.user.create({ data: { tenantId: tenant.id, email: 'manager1@apexflow.pk', name: 'Hassan Rizvi', role: 'manager', isActive: true, lastLogin: new Date() } }),
-      db.user.create({ data: { tenantId: tenant.id, email: 'manager2@apexflow.pk', name: 'Ayesha Siddiqui', role: 'manager', isActive: true } }),
-      db.user.create({ data: { tenantId: tenant.id, email: 'operator1@apexflow.pk', name: 'Bilal Khan', role: 'operator', isActive: true } }),
-      db.user.create({ data: { tenantId: tenant.id, email: 'operator2@apexflow.pk', name: 'Sana Rehman', role: 'operator', isActive: true } }),
+      db.user.create({ data: { tenantId: tenant.id, email: 'superadmin@apexflow.pk', name: 'Imran Akhtar', role: 'superadmin', passwordHash: defaultPasswordHash, isActive: true, lastLogin: new Date() } }),
+      db.user.create({ data: { tenantId: tenant.id, email: 'admin@apexflow.pk', name: 'Fatima Noor', role: 'admin', passwordHash: defaultPasswordHash, isActive: true, lastLogin: new Date() } }),
+      db.user.create({ data: { tenantId: tenant.id, email: 'manager1@apexflow.pk', name: 'Hassan Rizvi', role: 'manager', passwordHash: defaultPasswordHash, isActive: true, lastLogin: new Date() } }),
+      db.user.create({ data: { tenantId: tenant.id, email: 'manager2@apexflow.pk', name: 'Ayesha Siddiqui', role: 'manager', passwordHash: defaultPasswordHash, isActive: true } }),
+      db.user.create({ data: { tenantId: tenant.id, email: 'operator1@apexflow.pk', name: 'Bilal Khan', role: 'operator', passwordHash: defaultPasswordHash, isActive: true } }),
+      db.user.create({ data: { tenantId: tenant.id, email: 'operator2@apexflow.pk', name: 'Sana Rehman', role: 'operator', passwordHash: defaultPasswordHash, isActive: true } }),
+    ])
+
+    // =====================================================
+    // 3b. SERIAL KEYS
+    // =====================================================
+    await Promise.all([
+      db.serialKey.create({
+        data: {
+          key: 'FF-PROF-A1B2-C3D4-E5F6',
+          tenantId: tenant.id,
+          status: 'active',
+          plan: 'professional',
+          maxStations: 3,
+          maxDispensers: 24,
+          maxUsers: 15,
+          activatedAt: new Date('2024-06-01'),
+          expiresAt: new Date('2026-06-01'),
+          notes: 'Main professional license for ApexFlow Energy Corp',
+        },
+      }),
+      db.serialKey.create({
+        data: {
+          key: 'FF-ENTR-G7H8-I9J0-K1L2',
+          tenantId: tenant.id,
+          status: 'active',
+          plan: 'enterprise',
+          maxStations: 50,
+          maxDispensers: 500,
+          maxUsers: 100,
+          activatedAt: new Date('2024-01-15'),
+          expiresAt: new Date('2027-01-15'),
+          notes: 'Enterprise license - all features unlocked',
+        },
+      }),
+      db.serialKey.create({
+        data: {
+          key: 'FF-STAR-M3N4-O5P6-Q7R8',
+          status: 'inactive',
+          plan: 'starter',
+          maxStations: 1,
+          maxDispensers: 8,
+          maxUsers: 5,
+          expiresAt: new Date('2026-12-31'),
+          notes: 'Starter plan - ready for activation',
+        },
+      }),
+      db.serialKey.create({
+        data: {
+          key: 'FF-PROF-S9T0-U1V2-W3X4',
+          status: 'inactive',
+          plan: 'professional',
+          maxStations: 5,
+          maxDispensers: 40,
+          maxUsers: 20,
+          expiresAt: new Date('2027-06-30'),
+          notes: 'Professional plan - ready for activation',
+        },
+      }),
+      db.serialKey.create({
+        data: {
+          key: 'FF-EXP-Y5Z6-A7B8-C9D0',
+          status: 'expired',
+          plan: 'starter',
+          maxStations: 1,
+          maxDispensers: 4,
+          maxUsers: 3,
+          activatedAt: new Date('2023-01-01'),
+          expiresAt: new Date('2024-01-01'),
+          notes: 'Expired starter license',
+        },
+      }),
     ])
 
     // =====================================================
@@ -1016,7 +1163,56 @@ export async function GET() {
     }
 
     // =====================================================
-    // 29. NOTIFICATIONS (6)
+    // 29. AI FORECASTS (14 days × 3 types × 3 fuels = 126)
+    // =====================================================
+    const forecastTypes = ['demand', 'revenue', 'inventory']
+    const aiForecastFuelTypes = ['petrol', 'diesel', 'premium']
+
+    for (let dayOffset = -7; dayOffset <= 7; dayOffset++) {
+      const periodStart = new Date()
+      periodStart.setDate(periodStart.getDate() + dayOffset)
+      periodStart.setHours(0, 0, 0, 0)
+
+      const periodEnd = new Date(periodStart)
+      periodEnd.setHours(23, 59, 59, 999)
+
+      for (const forecastType of forecastTypes) {
+        for (const fuelType of aiForecastFuelTypes) {
+          let predictedValue: number
+          if (forecastType === 'demand') {
+            // Demand in liters: 5000-25000
+            predictedValue = 5000 + Math.random() * 20000
+          } else if (forecastType === 'revenue') {
+            // Revenue in PKR: 150000-800000
+            predictedValue = 150000 + Math.random() * 650000
+          } else {
+            // Inventory in liters: 10000-50000
+            predictedValue = 10000 + Math.random() * 40000
+          }
+
+          // Confidence: 0.65-0.95, slightly higher for past dates (already observed)
+          const baseConfidence = dayOffset <= 0 ? 0.80 : 0.65
+          const confidenceRange = dayOffset <= 0 ? 0.15 : 0.20
+          const confidence = baseConfidence + Math.random() * confidenceRange
+
+          await db.aIForecast.create({
+            data: {
+              tenantId: tenant.id,
+              stationId: mainStation.id,
+              forecastType,
+              fuelType,
+              predictedValue: Math.round(predictedValue * 100) / 100,
+              confidence: Math.round(confidence * 1000) / 1000,
+              periodStart,
+              periodEnd,
+            }
+          })
+        }
+      }
+    }
+
+    // =====================================================
+    // 30. NOTIFICATIONS (6)
     // =====================================================
     const notificationData = [
       { title: 'Shift 3 Opened', message: 'Shift #3 has been opened by Farhan Raza at 14:00', type: 'shift', priority: 'normal' },
@@ -1042,7 +1238,7 @@ export async function GET() {
     }
 
     // =====================================================
-    // 30. CUSTOMERS with loyalty data (10)
+    // 31. CUSTOMERS with loyalty data (10)
     // =====================================================
     const customerNames = [
       'Asad Mahmood', 'Bushra Khan', 'Chaudhry Naveed', 'Dr. Saeed Ahmad', 'Erum Fatima',
@@ -1068,7 +1264,7 @@ export async function GET() {
     }
 
     // =====================================================
-    // 31. LOYALTY RULES (2)
+    // 32. LOYALTY RULES (2)
     // =====================================================
     await db.loyaltyRule.createMany({
       data: [
@@ -1078,7 +1274,7 @@ export async function GET() {
     })
 
     // =====================================================
-    // 32. PROMOTIONS with usage (2)
+    // 33. PROMOTIONS with usage (2)
     // =====================================================
     const promo1 = await db.promotion.create({
       data: {
@@ -1122,7 +1318,7 @@ export async function GET() {
     })
 
     // =====================================================
-    // 33. ENVIRONMENTAL ALERTS (3)
+    // 34. ENVIRONMENTAL ALERTS (3)
     // =====================================================
     await db.environmentalAlert.createMany({
       data: [
@@ -1133,7 +1329,7 @@ export async function GET() {
     })
 
     // =====================================================
-    // 34. VAPOR RECOVERY READINGS (2)
+    // 35. VAPOR RECOVERY READINGS (2)
     // =====================================================
     await db.vaporRecoveryReading.createMany({
       data: [
@@ -1143,7 +1339,7 @@ export async function GET() {
     })
 
     // =====================================================
-    // 35. DAILY REPORTS (last 7 days)
+    // 36. DAILY REPORTS (last 7 days)
     // =====================================================
     for (let i = 1; i <= 7; i++) {
       const reportDate = new Date(now)
@@ -1174,7 +1370,7 @@ export async function GET() {
     }
 
     // =====================================================
-    // 36. AUDIT LOGS (20+)
+    // 37. AUDIT LOGS (20+)
     // =====================================================
     const auditActions = [
       { action: 'LOGIN', entity: 'User', details: 'Superadmin logged in from 192.168.1.10' },
@@ -1217,7 +1413,7 @@ export async function GET() {
     }
 
     // =====================================================
-    // 37. EV CHARGERS + CNG DISPENSERS
+    // 38. EV CHARGERS + CNG DISPENSERS
     // =====================================================
     await db.eVCharger.createMany({
       data: [
@@ -1254,7 +1450,7 @@ export async function GET() {
     })
 
     // =====================================================
-    // 38. RFID READERS + ANPR CAMERAS
+    // 39. RFID READERS + ANPR CAMERAS
     // =====================================================
     await db.rFIDReader.createMany({
       data: [
@@ -1271,7 +1467,7 @@ export async function GET() {
     })
 
     // =====================================================
-    // 39. FINANCIAL TRANSACTIONS (income + expenses)
+    // 40. FINANCIAL TRANSACTIONS (income + expenses)
     // =====================================================
     const today = new Date()
     for (let i = 0; i < 15; i++) {
@@ -1311,7 +1507,7 @@ export async function GET() {
     }
 
     // =====================================================
-    // 40. MAINTENANCE RECORDS
+    // 41. MAINTENANCE RECORDS
     // =====================================================
     await db.maintenanceRecord.createMany({
       data: [
@@ -1320,9 +1516,1181 @@ export async function GET() {
       ]
     })
 
+    // =====================================================
+    // 42. DEVICE INTEGRATION - FORECOURT CONTROLLERS (2)
+    // =====================================================
+    const ptsController = await db.forecourtController.create({
+      data: {
+        stationId: mainStation.id,
+        name: 'PTS-FC-01',
+        code: 'PTS-01',
+        controllerType: 'pts',
+        manufacturer: 'Petroinnovations',
+        model: 'PTS-2000',
+        serialNumber: 'PTS-SN-2024-001',
+        firmwareVersion: '4.2.1',
+        communicationType: 'tcpip',
+        ipAddress: '192.168.1.100',
+        port: 5000,
+        protocol: 'ifsf',
+        pollingInterval: 1000,
+        timeout: 5000,
+        maxDispensers: 32,
+        connectedDispensers: 8,
+        status: 'online',
+        lastHeartbeat: new Date(),
+        lastCommunication: new Date(),
+        isActive: true,
+      }
+    })
+
+    const fusionController = await db.forecourtController.create({
+      data: {
+        stationId: mainStation.id,
+        name: 'FUSION-FC-02',
+        code: 'FUS-02',
+        controllerType: 'fusion',
+        manufacturer: 'Gilbarco Veeder-Root',
+        model: 'Fusion 3.0',
+        serialNumber: 'GVR-FSN-2024-002',
+        firmwareVersion: '3.5.0',
+        communicationType: 'tcpip',
+        ipAddress: '192.168.1.101',
+        port: 5010,
+        protocol: 'gilbarco-g-site',
+        pollingInterval: 2000,
+        timeout: 5000,
+        maxDispensers: 16,
+        connectedDispensers: 4,
+        status: 'online',
+        lastHeartbeat: new Date(),
+        lastCommunication: new Date(),
+        isActive: true,
+      }
+    })
+
+    // =====================================================
+    // 43. DEVICE INTEGRATION - PAYMENT TERMINALS (3)
+    // =====================================================
+    const posTerminal = await db.paymentTerminal.create({
+      data: {
+        stationId: mainStation.id,
+        name: 'POS-T1',
+        code: 'POS-T1',
+        terminalType: 'pos',
+        manufacturer: 'Ingenico',
+        model: 'iCT250',
+        serialNumber: 'ING-250-001',
+        communicationType: 'tcpip',
+        ipAddress: '192.168.1.110',
+        port: 8000,
+        protocol: 'iso8583',
+        merchantId: 'MERCH-001-PK',
+        terminalId: 'TERM-001-PK',
+        supportedCards: '["visa","mastercard","unionpay"]',
+        supportedMethods: '["emv","contactless","nfc"]',
+        status: 'online',
+        transactionCount: 156,
+        lastTransaction: new Date(Date.now() - 3600000),
+        isActive: true,
+      }
+    })
+
+    const eftposTerminal = await db.paymentTerminal.create({
+      data: {
+        stationId: mainStation.id,
+        name: 'EFTPOS-T2',
+        code: 'EFT-T2',
+        terminalType: 'eftpos',
+        manufacturer: 'Verifone',
+        model: 'Vx520',
+        serialNumber: 'VF-520-002',
+        communicationType: 'tcpip',
+        ipAddress: '192.168.1.111',
+        port: 8001,
+        protocol: 'nac',
+        merchantId: 'MERCH-001-PK',
+        terminalId: 'TERM-002-PK',
+        supportedCards: '["visa","mastercard"]',
+        supportedMethods: '["emv","contactless"]',
+        status: 'online',
+        transactionCount: 89,
+        lastTransaction: new Date(Date.now() - 1800000),
+        isActive: true,
+      }
+    })
+
+    const papTerminal = await db.paymentTerminal.create({
+      data: {
+        stationId: mainStation.id,
+        name: 'PAP-T3',
+        code: 'PAP-T3',
+        terminalType: 'pay_at_pump',
+        manufacturer: 'PAX',
+        model: 'S920',
+        serialNumber: 'PAX-S920-003',
+        communicationType: 'tcpip',
+        ipAddress: '192.168.1.112',
+        port: 8002,
+        protocol: 'ompi',
+        merchantId: 'MERCH-001-PK',
+        terminalId: 'TERM-003-PK',
+        supportedCards: '["visa","mastercard","unionpay"]',
+        supportedMethods: '["emv","contactless","nfc","qr"]',
+        status: 'busy',
+        transactionCount: 234,
+        lastTransaction: new Date(Date.now() - 300000),
+        isActive: true,
+      }
+    })
+
+    // =====================================================
+    // 44. DEVICE INTEGRATION - GENERATOR (1)
+    // =====================================================
+    const generator = await db.generator.create({
+      data: {
+        stationId: mainStation.id,
+        name: 'GEN-MAIN-01',
+        code: 'GEN-01',
+        manufacturer: 'Cummins',
+        model: 'C330 D5',
+        serialNumber: 'CUM-330-2024',
+        fuelType: 'diesel',
+        capacityKva: 330,
+        currentLoadKva: 0,
+        fuelLevel: 85,
+        runHours: 1250.5,
+        voltage: 220,
+        frequency: 50,
+        oilPressure: 55,
+        coolantTemp: 72,
+        communicationType: 'tcpip',
+        ipAddress: '192.168.1.120',
+        port: 502,
+        protocol: 'modbus',
+        autoStart: true,
+        autoTransfer: true,
+        status: 'standby',
+        lastStartedAt: new Date(Date.now() - 2 * 86400000),
+        nextServiceDate: new Date(Date.now() + 30 * 86400000),
+        isActive: true,
+      }
+    })
+
+    // =====================================================
+    // 45. DEVICE INTEGRATION - SURVEILLANCE CAMERAS (5)
+    // =====================================================
+    const cameraForecourt = await db.surveillanceCamera.create({
+      data: {
+        stationId: mainStation.id,
+        name: 'CAM-FORE-01',
+        code: 'CAM-01',
+        cameraType: 'dome',
+        manufacturer: 'Hikvision',
+        model: 'DS-2DE4425IW',
+        serialNumber: 'HKV-DS-001',
+        resolution: '4k',
+        location: 'forecourt',
+        ipAddress: '192.168.1.130',
+        port: 554,
+        rtspUrl: 'rtsp://192.168.1.130:554/stream1',
+        httpUrl: 'http://192.168.1.130:80',
+        onvifSupported: true,
+        ptzEnabled: true,
+        nightVision: true,
+        recordingEnabled: true,
+        analyticsEnabled: true,
+        analyticsType: 'motion',
+        status: 'recording',
+        lastRecordingAt: new Date(),
+        isActive: true,
+      }
+    })
+
+    const cameraEntrance = await db.surveillanceCamera.create({
+      data: {
+        stationId: mainStation.id,
+        name: 'CAM-ENTRY-02',
+        code: 'CAM-02',
+        cameraType: 'bullet',
+        manufacturer: 'Dahua',
+        model: 'IPC-HFW5442T',
+        serialNumber: 'DH-IPC-002',
+        resolution: '5mp',
+        location: 'entrance',
+        ipAddress: '192.168.1.131',
+        onvifSupported: true,
+        nightVision: true,
+        recordingEnabled: true,
+        status: 'recording',
+        isActive: true,
+      }
+    })
+
+    const cameraExit = await db.surveillanceCamera.create({
+      data: {
+        stationId: mainStation.id,
+        name: 'CAM-EXIT-03',
+        code: 'CAM-03',
+        cameraType: 'ptz',
+        manufacturer: 'Axis',
+        model: 'Q6135-LE',
+        serialNumber: 'AX-Q61-003',
+        resolution: '1080p',
+        location: 'exit',
+        ipAddress: '192.168.1.132',
+        ptzEnabled: true,
+        onvifSupported: true,
+        nightVision: true,
+        analyticsEnabled: true,
+        analyticsType: 'plate',
+        status: 'recording',
+        isActive: true,
+      }
+    })
+
+    const cameraStore = await db.surveillanceCamera.create({
+      data: {
+        stationId: mainStation.id,
+        name: 'CAM-STORE-04',
+        code: 'CAM-04',
+        cameraType: 'dome',
+        manufacturer: 'Hikvision',
+        model: 'DS-2CD2143G2',
+        serialNumber: 'HKV-DS-004',
+        resolution: '4k',
+        location: 'store',
+        ipAddress: '192.168.1.133',
+        nightVision: true,
+        recordingEnabled: true,
+        status: 'recording',
+        isActive: true,
+      }
+    })
+
+    const cameraTankFarm = await db.surveillanceCamera.create({
+      data: {
+        stationId: mainStation.id,
+        name: 'CAM-TANK-05',
+        code: 'CAM-05',
+        cameraType: 'thermal',
+        manufacturer: 'Axis',
+        model: 'Q1942-E',
+        serialNumber: 'AX-Q19-005',
+        resolution: '1080p',
+        location: 'tank_farm',
+        ipAddress: '192.168.1.134',
+        nightVision: true,
+        analyticsEnabled: true,
+        analyticsType: 'intrusion',
+        status: 'recording',
+        isActive: true,
+      }
+    })
+
+    // =====================================================
+    // 46. DEVICE INTEGRATION - FIRE ALARM SYSTEM (1)
+    // =====================================================
+    const fireAlarm = await db.fireAlarmSystem.create({
+      data: {
+        stationId: mainStation.id,
+        name: 'FAS-MAIN-01',
+        code: 'FAS-01',
+        systemType: 'addressable',
+        manufacturer: 'Honeywell',
+        model: 'XLS100',
+        serialNumber: 'HW-XLS-001',
+        firmwareVersion: '2.1.0',
+        zoneCount: 12,
+        detectorCount: 48,
+        communicationType: 'tcpip',
+        ipAddress: '192.168.1.140',
+        port: 502,
+        protocol: 'modbus',
+        suppressionType: 'foam',
+        autoSuppress: false,
+        linkedToDispensers: true,
+        linkedToTanks: true,
+        status: 'normal',
+        lastTestDate: new Date(Date.now() - 30 * 86400000),
+        nextTestDate: new Date(Date.now() + 60 * 86400000),
+        isActive: true,
+      }
+    })
+
+    // =====================================================
+    // 47. DEVICE INTEGRATION - UTILITY METERS (3)
+    // =====================================================
+    const electricityMeter = await db.utilityMeter.create({
+      data: {
+        stationId: mainStation.id,
+        name: 'ELEC-MTR-01',
+        code: 'ELC-01',
+        meterType: 'electricity',
+        manufacturer: 'ABB',
+        model: 'ABB B23',
+        serialNumber: 'ABB-B23-001',
+        meterNumber: 'IESCO-EL-001234',
+        communicationType: 'tcpip',
+        ipAddress: '192.168.1.150',
+        port: 502,
+        protocol: 'modbus',
+        currentReading: 45678.5,
+        previousReading: 45000,
+        consumption: 678.5,
+        unit: 'kwh',
+        peakDemand: 85.2,
+        powerFactor: 0.92,
+        tariffRate: 25.5,
+        status: 'online',
+        lastReading: new Date(Date.now() - 900000),
+        isActive: true,
+      }
+    })
+
+    const waterMeter = await db.utilityMeter.create({
+      data: {
+        stationId: mainStation.id,
+        name: 'WATER-MTR-01',
+        code: 'WTR-01',
+        meterType: 'water',
+        manufacturer: 'Siemens',
+        model: 'SITRANS F M',
+        serialNumber: 'SIE-FM-001',
+        meterNumber: 'CDA-WTR-005678',
+        communicationType: 'tcpip',
+        ipAddress: '192.168.1.151',
+        protocol: 'modbus',
+        currentReading: 12345.0,
+        previousReading: 12200.0,
+        consumption: 145.0,
+        unit: 'cubic_meters',
+        tariffRate: 45.0,
+        status: 'online',
+        lastReading: new Date(Date.now() - 900000),
+        isActive: true,
+      }
+    })
+
+    const gasMeter = await db.utilityMeter.create({
+      data: {
+        stationId: mainStation.id,
+        name: 'GAS-MTR-01',
+        code: 'GAS-01',
+        meterType: 'gas',
+        manufacturer: 'Landis+Gyr',
+        model: 'G470',
+        serialNumber: 'LG-G470-001',
+        meterNumber: 'SNGPL-GAS-009012',
+        communicationType: 'tcpip',
+        ipAddress: '192.168.1.152',
+        protocol: 'dlms',
+        currentReading: 8900.5,
+        previousReading: 8850.0,
+        consumption: 50.5,
+        unit: 'cubic_meters',
+        tariffRate: 120.0,
+        status: 'online',
+        lastReading: new Date(Date.now() - 1800000),
+        isActive: true,
+      }
+    })
+
+    // =====================================================
+    // 48. DEVICE INTEGRATION - WEATHER STATION (1)
+    // =====================================================
+    const weatherStation = await db.weatherStation.create({
+      data: {
+        stationId: mainStation.id,
+        name: 'WX-STN-01',
+        code: 'WX-01',
+        manufacturer: 'Davis',
+        model: 'Vantage Pro2',
+        serialNumber: 'DVP-VP2-001',
+        communicationType: 'tcpip',
+        ipAddress: '192.168.1.160',
+        port: 80,
+        protocol: 'http',
+        temperature: 32.5,
+        humidity: 45,
+        windSpeed: 8.5,
+        windDirection: 'SW',
+        pressure: 1013.2,
+        rainfall: 0,
+        uvIndex: 7,
+        visibility: 10.0,
+        dewPoint: 18.5,
+        status: 'online',
+        lastReading: new Date(Date.now() - 300000),
+        isActive: true,
+      }
+    })
+
+    // =====================================================
+    // 49. DEVICE INTEGRATION - TANKER TRACKERS (2)
+    // =====================================================
+    const tanker1 = await db.tankerTracker.create({
+      data: {
+        stationId: mainStation.id,
+        name: 'TANKER-TK-01',
+        code: 'TK-01',
+        trackerType: 'gps_gsm',
+        manufacturer: 'Teltonika',
+        model: 'FM5300',
+        serialNumber: 'TLT-FM5-001',
+        simCardNumber: '+923001234567',
+        imei: '356938035642801',
+        communicationType: 'gsm',
+        ipAddress: '0.0.0.0',
+        port: 5027,
+        protocol: 'h02',
+        latitude: 33.6844,
+        longitude: 73.0479,
+        speed: 0,
+        heading: 0,
+        altitude: 540,
+        odometer: 45000,
+        fuelLevel: 75,
+        ignitionStatus: false,
+        doorStatus: false,
+        geofenceEnabled: true,
+        geofenceRadius: 500,
+        status: 'parked',
+        lastLocationAt: new Date(Date.now() - 600000),
+        isActive: true,
+      }
+    })
+
+    const tanker2 = await db.tankerTracker.create({
+      data: {
+        stationId: mainStation.id,
+        name: 'TANKER-TK-02',
+        code: 'TK-02',
+        trackerType: 'gps_gsm',
+        manufacturer: 'Queclink',
+        model: 'GV300W',
+        serialNumber: 'QL-GV3-002',
+        simCardNumber: '+923009876543',
+        imei: '867584020053402',
+        communicationType: 'gsm',
+        protocol: 'gt06',
+        latitude: 33.7294,
+        longitude: 73.0931,
+        speed: 45,
+        heading: 90,
+        altitude: 520,
+        odometer: 32000,
+        fuelLevel: 60,
+        ignitionStatus: true,
+        doorStatus: true,
+        geofenceEnabled: true,
+        geofenceRadius: 500,
+        status: 'moving',
+        lastLocationAt: new Date(Date.now() - 120000),
+        isActive: true,
+      }
+    })
+
+    // =====================================================
+    // 50. DEVICE INTEGRATION - CAR WASH SYSTEM (1)
+    // =====================================================
+    const carWashSystem = await db.carWashSystem.create({
+      data: {
+        stationId: mainStation.id,
+        name: 'CW-SYS-01',
+        code: 'CW-01',
+        systemType: 'automatic',
+        manufacturer: 'Ryko',
+        model: 'CarWash Pro',
+        serialNumber: 'RYK-CWP-001',
+        firmwareVersion: '3.0.1',
+        communicationType: 'tcpip',
+        ipAddress: '192.168.1.170',
+        port: 502,
+        protocol: 'modbus',
+        bayCount: 1,
+        currentBay: 1,
+        waterPressure: 120,
+        waterTemp: 38,
+        chemicalLevel: 72,
+        waxLevel: 55,
+        dailyCount: 12,
+        monthlyCount: 345,
+        revenueToday: 3600,
+        status: 'idle',
+        lastWashAt: new Date(Date.now() - 1800000),
+        nextServiceDate: new Date(Date.now() + 15 * 86400000),
+        isActive: true,
+      }
+    })
+
+    // =====================================================
+    // 51. DEVICE INTEGRATION - AIR COMPRESSOR (1)
+    // =====================================================
+    const airCompressor = await db.airCompressor.create({
+      data: {
+        stationId: mainStation.id,
+        name: 'AIR-CMP-01',
+        code: 'AIR-01',
+        manufacturer: 'Atlas Copco',
+        model: 'GA 15+',
+        serialNumber: 'AC-GA15-001',
+        communicationType: 'tcpip',
+        ipAddress: '192.168.1.180',
+        port: 502,
+        protocol: 'modbus',
+        pressure: 145,
+        maxPressure: 150,
+        tankCapacity: 200,
+        motorStatus: 'on',
+        runHours: 850,
+        coinOperated: true,
+        pricePerUse: 20,
+        dailyUsage: 23,
+        revenueToday: 460,
+        status: 'running',
+        lastUsedAt: new Date(Date.now() - 300000),
+        isActive: true,
+      }
+    })
+
+    // =====================================================
+    // 52. DEVICE INTEGRATION - VACUUM STATIONS (2)
+    // =====================================================
+    const vacuum1 = await db.vacuumStation.create({
+      data: {
+        stationId: mainStation.id,
+        name: 'VAC-01',
+        code: 'VAC-01',
+        manufacturer: 'Jim Coleman',
+        model: 'Vac Pro',
+        serialNumber: 'JC-VP-001',
+        communicationType: 'tcpip',
+        ipAddress: '192.168.1.190',
+        protocol: 'modbus',
+        motorStatus: 'off',
+        suctionPower: 95,
+        coinOperated: true,
+        pricePerUse: 30,
+        dailyUsage: 15,
+        revenueToday: 450,
+        runHours: 320,
+        status: 'idle',
+        lastUsedAt: new Date(Date.now() - 1200000),
+        isActive: true,
+      }
+    })
+
+    const vacuum2 = await db.vacuumStation.create({
+      data: {
+        stationId: mainStation.id,
+        name: 'VAC-02',
+        code: 'VAC-02',
+        manufacturer: 'Jim Coleman',
+        model: 'Vac Pro',
+        serialNumber: 'JC-VP-002',
+        communicationType: 'tcpip',
+        ipAddress: '192.168.1.191',
+        protocol: 'modbus',
+        motorStatus: 'off',
+        suctionPower: 92,
+        coinOperated: true,
+        pricePerUse: 30,
+        dailyUsage: 11,
+        revenueToday: 330,
+        runHours: 280,
+        status: 'idle',
+        lastUsedAt: new Date(Date.now() - 2700000),
+        isActive: true,
+      }
+    })
+
+    // =====================================================
+    // 53. DEVICE CONFIG ENTRIES
+    // NOTE: Polymorphic FK constraints — PostgreSQL handles FK constraints differently
+    // =====================================================
+
+    await db.deviceConfig.createMany({
+      data: [
+        { deviceType: 'forecourt_controller', deviceId: ptsController.id, configKey: 'polling_mode', configValue: 'continuous', dataType: 'string', description: 'Dispenser polling mode' },
+        { deviceType: 'forecourt_controller', deviceId: ptsController.id, configKey: 'auto_authorize', configValue: 'true', dataType: 'boolean', description: 'Auto-authorize fueling' },
+        { deviceType: 'forecourt_controller', deviceId: ptsController.id, configKey: 'max_flow_rate', configValue: '50', dataType: 'number', description: 'Max flow rate in L/min' },
+        { deviceType: 'payment_terminal', deviceId: posTerminal.id, configKey: 'settlement_time', configValue: '23:00', dataType: 'string', description: 'Daily settlement time' },
+        { deviceType: 'payment_terminal', deviceId: posTerminal.id, configKey: 'tip_enabled', configValue: 'false', dataType: 'boolean', description: 'Enable tip on POS' },
+      ]
+    })
+
+    // =====================================================
+    // 54. DEVICE EVENT LOG ENTRIES (12)
+    // =====================================================
+    await db.deviceEventLog.createMany({
+      data: [
+        { stationId: mainStation.id, deviceType: 'forecourt_controller', deviceId: ptsController.id, eventType: 'heartbeat', severity: 'info', message: 'Heartbeat received from PTS Controller', dataJson: JSON.stringify({ responseTime: '45ms' }), createdAt: new Date(Date.now() - 60000) },
+        { stationId: mainStation.id, deviceType: 'forecourt_controller', deviceId: ptsController.id, eventType: 'status_change', severity: 'info', message: 'Status changed to online', dataJson: JSON.stringify({ previousStatus: 'offline' }), createdAt: new Date(Date.now() - 3600000) },
+        { stationId: mainStation.id, deviceType: 'forecourt_controller', deviceId: fusionController.id, eventType: 'heartbeat', severity: 'info', message: 'Heartbeat received from Fusion Controller', dataJson: JSON.stringify({ responseTime: '62ms' }), createdAt: new Date(Date.now() - 120000) },
+        { stationId: mainStation.id, deviceType: 'payment_terminal', deviceId: posTerminal.id, eventType: 'command', severity: 'info', message: 'Command acknowledged - settlement initiated', dataJson: JSON.stringify({ command: 'settle', resultCode: '00' }), createdAt: new Date(Date.now() - 1800000) },
+        { stationId: mainStation.id, deviceType: 'payment_terminal', deviceId: papTerminal.id, eventType: 'status_change', severity: 'info', message: 'Status changed to busy', dataJson: JSON.stringify({ previousStatus: 'online' }), createdAt: new Date(Date.now() - 300000) },
+        { stationId: mainStation.id, deviceType: 'utility_meter', deviceId: electricityMeter.id, eventType: 'reading', severity: 'info', message: 'Tank reading updated - 45678.5 kWh', dataJson: JSON.stringify({ reading: 45678.5, unit: 'kwh' }), createdAt: new Date(Date.now() - 900000) },
+        { stationId: mainStation.id, deviceType: 'generator', deviceId: generator.id, eventType: 'status_change', severity: 'info', message: 'Generator on standby - utility power stable', dataJson: JSON.stringify({ utilityVoltage: 220, utilityFreq: 50 }), createdAt: new Date(Date.now() - 7200000) },
+        { stationId: mainStation.id, deviceType: 'surveillance_camera', deviceId: cameraForecourt.id, eventType: 'alarm', severity: 'warning', message: 'Motion detected on forecourt camera', dataJson: JSON.stringify({ zone: 'pump_area_3', confidence: 0.95 }), createdAt: new Date(Date.now() - 420000) },
+        { stationId: mainStation.id, deviceType: 'surveillance_camera', deviceId: cameraExit.id, eventType: 'reading', severity: 'info', message: 'License plate captured - LEA-4521', dataJson: JSON.stringify({ plate: 'LEA-4521', confidence: 0.98 }), createdAt: new Date(Date.now() - 600000) },
+        { stationId: mainStation.id, deviceType: 'fire_alarm', deviceId: fireAlarm.id, eventType: 'heartbeat', severity: 'info', message: 'Fire alarm system health check - all zones normal', dataJson: JSON.stringify({ zones: 12, activeDetectors: 48 }), createdAt: new Date(Date.now() - 5400000) },
+        { stationId: mainStation.id, deviceType: 'weather_station', deviceId: weatherStation.id, eventType: 'reading', severity: 'info', message: 'Weather data updated - 32.5C, SW wind 8.5km/h', dataJson: JSON.stringify({ temp: 32.5, wind: 8.5, dir: 'SW' }), createdAt: new Date(Date.now() - 300000) },
+        { stationId: mainStation.id, deviceType: 'tanker_tracker', deviceId: tanker2.id, eventType: 'status_change', severity: 'info', message: 'Tanker TK-02 entered geofence zone', dataJson: JSON.stringify({ geofence: 'station_perimeter', distance: 450 }), createdAt: new Date(Date.now() - 180000) },
+      ]
+    })
+
+    // =====================================================
+    // 55. DEVICE COMMAND QUEUE ENTRIES (4)
+    // =====================================================
+    await db.deviceCommandQueue.createMany({
+      data: [
+        { stationId: mainStation.id, deviceType: 'forecourt_controller', deviceId: ptsController.id, command: 'authorize_dispenser', parameters: JSON.stringify({ dispenserId: dispensers[0].id, nozzleNumber: 1, volume: 50, fuelType: 'petrol' }), priority: 'high', status: 'queued', createdBy: users[0].id },
+        { stationId: mainStation.id, deviceType: 'forecourt_controller', deviceId: ptsController.id, command: 'update_price', parameters: JSON.stringify({ fuelType: 'petrol', newPrice: 272.50 }), priority: 'normal', status: 'sent', sentAt: new Date(Date.now() - 30000), createdBy: users[1].id },
+        { stationId: mainStation.id, deviceType: 'payment_terminal', deviceId: posTerminal.id, command: 'reboot_terminal', parameters: JSON.stringify({ reason: 'Scheduled maintenance reboot' }), priority: 'low', status: 'queued', createdBy: users[0].id },
+        { stationId: mainStation.id, deviceType: 'surveillance_camera', deviceId: cameraForecourt.id, command: 'ptz_move', parameters: JSON.stringify({ pan: 45, tilt: 30, zoom: 2 }), priority: 'normal', status: 'acknowledged', sentAt: new Date(Date.now() - 60000), acknowledgedAt: new Date(Date.now() - 45000), createdBy: users[1].id },
+      ]
+    })
+
+    // PostgreSQL: FK constraints re-enabled automatically after transaction
+
+    // =====================================================
+    // 56. OMS CLIENT
+    // =====================================================
+    const omsClient = await db.oMSClient.create({
+      data: {
+        tenantId: tenant.id,
+        omsClientId: 'APEX-CLI-001',
+        companyName: 'ApexFuel Pakistan',
+        subscriptionPlan: 'enterprise',
+        licenseKey: 'APEX-LIC-2024-ENT-001',
+        licenseStatus: 'active',
+        licensedModules: '["forecourt","tanks","sales","fleet","pricing","retail","employees","finance","multisite","ai_suite","ev_cng","devices","security","comms","reports"]',
+        maxStations: 50,
+        maxUsers: 100,
+        maxDevices: 200,
+        currentStations: 4,
+        currentUsers: 12,
+        currentDevices: 35,
+        billingCycle: 'monthly',
+        basePrice: 25000,
+        perStationPrice: 5000,
+        perUserPrice: 500,
+        totalMonthly: 81000,
+        lastSyncAt: new Date(),
+        syncStatus: 'synced',
+        isActive: true,
+      }
+    })
+
+    // =====================================================
+    // 57. OMS PACKAGES (3)
+    // =====================================================
+    await db.oMSPackage.createMany({
+      data: [
+        { omsClientId: omsClient.id, packageName: 'Starter', description: 'Basic fuel station management for single station operators', modules: '["forecourt","tanks","sales","pricing"]', stationLimit: 1, userLimit: 5, deviceLimit: 10, price: 15000, currency: 'PKR', billingCycle: 'monthly', isCustom: false, isActive: true },
+        { omsClientId: omsClient.id, packageName: 'Professional', description: 'Complete station management with all modules for growing businesses', modules: '["forecourt","tanks","sales","fleet","pricing","retail","employees","finance","multisite","ai_suite","ev_cng","devices","security","comms","reports"]', stationLimit: 5, userLimit: 25, deviceLimit: 50, price: 45000, currency: 'PKR', billingCycle: 'monthly', isCustom: false, isActive: true },
+        { omsClientId: omsClient.id, packageName: 'Enterprise', description: 'Full-featured OMS with white-label support for large operators', modules: '["forecourt","tanks","sales","fleet","pricing","retail","employees","finance","multisite","ai_suite","ev_cng","devices","security","comms","reports","white_label","custom_integration"]', stationLimit: 50, userLimit: 100, deviceLimit: 200, price: 81000, currency: 'PKR', billingCycle: 'monthly', isCustom: false, isActive: true },
+      ]
+    })
+
+    // =====================================================
+    // 58. OMS INVOICES (3)
+    // =====================================================
+    await db.oMSInvoice.createMany({
+      data: [
+        { omsClientId: omsClient.id, invoiceNumber: 'OMS-INV-2025-001', invoiceDate: new Date('2025-02-01'), dueDate: new Date('2025-02-28'), subtotal: 81000, taxAmount: 14580, totalAmount: 95580, status: 'paid', paidAmount: 95580, paidDate: new Date('2025-02-15'), items: '[{"description":"Enterprise Monthly Subscription - 4 Stations","quantity":1,"unitPrice":81000,"amount":81000}]', notes: 'February 2025 subscription' },
+        { omsClientId: omsClient.id, invoiceNumber: 'OMS-INV-2025-002', invoiceDate: new Date('2025-03-01'), dueDate: new Date('2025-03-31'), subtotal: 81000, taxAmount: 14580, totalAmount: 95580, status: 'pending', paidAmount: 0, items: '[{"description":"Enterprise Monthly Subscription - 4 Stations","quantity":1,"unitPrice":81000,"amount":81000}]', notes: 'March 2025 subscription' },
+        { omsClientId: omsClient.id, invoiceNumber: 'OMS-INV-2025-003', invoiceDate: new Date('2025-01-01'), dueDate: new Date('2025-01-15'), subtotal: 81000, taxAmount: 14580, totalAmount: 95580, status: 'overdue', paidAmount: 0, items: '[{"description":"Enterprise Monthly Subscription - 4 Stations","quantity":1,"unitPrice":81000,"amount":81000}]', notes: 'January 2025 subscription - overdue' },
+      ]
+    })
+
+    // =====================================================
+    // 59. OMS PAYMENTS (2)
+    // =====================================================
+    await db.oMSPayment.createMany({
+      data: [
+        { omsClientId: omsClient.id, invoiceId: undefined, amount: 95580, paymentMethod: 'bank_transfer', referenceNumber: 'BNK-TXN-2025-001', transactionId: 'HBL-20250215-001', status: 'completed', paymentDate: new Date('2025-02-15'), notes: 'February subscription payment via HBL' },
+        { omsClientId: omsClient.id, invoiceId: undefined, amount: 95580, paymentMethod: 'online', referenceNumber: 'ONLINE-TXN-2025-002', transactionId: 'JAZZCASH-20250301-001', status: 'completed', paymentDate: new Date('2025-03-01'), notes: 'March subscription - JazzCash online payment' },
+      ]
+    })
+
+    // =====================================================
+    // 60. OMS SYNC LOGS (5)
+    // =====================================================
+    await db.oMSSyncLog.createMany({
+      data: [
+        { omsClientId: omsClient.id, syncType: 'client_registration', direction: 'outbound', status: 'success', payload: '{"action":"register","client":"APEX-CLI-001"}', response: '{"status":"ok","clientId":"APEX-CLI-001"}', errorMessage: null, syncedAt: new Date(Date.now() - 5 * 86400000) },
+        { omsClientId: omsClient.id, syncType: 'subscription', direction: 'outbound', status: 'success', payload: '{"plan":"enterprise","stations":4}', response: '{"status":"ok","subscriptionUpdated":true}', errorMessage: null, syncedAt: new Date(Date.now() - 4 * 86400000) },
+        { omsClientId: omsClient.id, syncType: 'license', direction: 'inbound', status: 'success', payload: '{"licenseKey":"APEX-LIC-2024-ENT-001"}', response: '{"status":"valid","modules":15}', errorMessage: null, syncedAt: new Date(Date.now() - 3 * 86400000) },
+        { omsClientId: omsClient.id, syncType: 'invoice', direction: 'outbound', status: 'success', payload: '{"invoiceNumber":"OMS-INV-2025-002"}', response: '{"status":"ok","invoiceCreated":true}', errorMessage: null, syncedAt: new Date(Date.now() - 2 * 86400000) },
+        { omsClientId: omsClient.id, syncType: 'module_control', direction: 'inbound', status: 'error', payload: '{"module":"ai_suite","action":"enable"}', response: null, errorMessage: 'Module activation requires license upgrade - contact support', syncedAt: new Date(Date.now() - 86400000) },
+      ]
+    })
+
+    // =====================================================
+    // 61. OMS LICENSES (5)
+    // =====================================================
+    await db.oMSLicense.createMany({
+      data: [
+        { omsClientId: omsClient.id, licenseKey: 'APEX-FORCOURT-001', moduleKey: 'forecourt', moduleName: 'Forecourt Management', is_enabled: true, validFrom: new Date('2025-01-01'), validTo: new Date('2025-12-31'), maxUsage: 50, currentUsage: 8, status: 'active' },
+        { omsClientId: omsClient.id, licenseKey: 'APEX-TANKS-001', moduleKey: 'tanks', moduleName: 'Tank & ATG Monitoring', is_enabled: true, validFrom: new Date('2025-01-01'), validTo: new Date('2025-12-31'), maxUsage: 50, currentUsage: 4, status: 'active' },
+        { omsClientId: omsClient.id, licenseKey: 'APEX-SALES-001', moduleKey: 'sales', moduleName: 'Sales & Transactions', is_enabled: true, validFrom: new Date('2025-01-01'), validTo: new Date('2025-12-31'), maxUsage: null, currentUsage: 0, status: 'active' },
+        { omsClientId: omsClient.id, licenseKey: 'APEX-FLEET-001', moduleKey: 'fleet', moduleName: 'Fleet Management', is_enabled: true, validFrom: new Date('2025-01-01'), validTo: new Date('2025-12-31'), maxUsage: 500, currentUsage: 60, status: 'active' },
+        { omsClientId: omsClient.id, licenseKey: 'APEX-AI-001', moduleKey: 'ai_suite', moduleName: 'AI Analytics Suite', is_enabled: true, validFrom: new Date('2025-03-01'), validTo: new Date('2025-12-31'), maxUsage: null, currentUsage: 0, status: 'active' },
+      ]
+    })
+
+    // =====================================================
+    // 62. SECURITY SESSIONS (3)
+    // =====================================================
+    await db.securitySession.createMany({
+      data: [
+        { userId: users[0].id, tenantId: tenant.id, tokenHash: 'sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2', ipAddress: '192.168.1.10', userAgent: 'Mozilla/5.0 Chrome/122.0 FuelFlow-OS/1.0', deviceInfo: 'Desktop - Windows 11 - Chrome', loginAt: new Date(Date.now() - 2 * 3600000), lastActivityAt: new Date(), logoutAt: null, status: 'active', expiresAt: new Date(Date.now() + 22 * 3600000) },
+        { userId: users[1].id, tenantId: tenant.id, tokenHash: 'sha256:b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3', ipAddress: '192.168.1.11', userAgent: 'Mozilla/5.0 Safari/17.0 FuelFlow-OS/1.0', deviceInfo: 'Desktop - macOS - Safari', loginAt: new Date(Date.now() - 48 * 3600000), lastActivityAt: new Date(Date.now() - 24 * 3600000), logoutAt: new Date(Date.now() - 24 * 3600000), status: 'expired', expiresAt: new Date(Date.now() - 24 * 3600000) },
+        { userId: users[2].id, tenantId: tenant.id, tokenHash: 'sha256:c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4', ipAddress: '203.101.55.78', userAgent: 'Mozilla/5.0 Firefox/123.0', deviceInfo: 'Unknown - Suspicious origin', loginAt: new Date(Date.now() - 72 * 3600000), lastActivityAt: new Date(Date.now() - 72 * 3600000), logoutAt: new Date(Date.now() - 71.5 * 3600000), status: 'revoked', expiresAt: null },
+      ]
+    })
+
+    // =====================================================
+    // 63. RBAC PERMISSIONS (25)
+    // =====================================================
+    const rbacRoles = ['admin', 'manager', 'cashier', 'attendant', 'viewer']
+    const rbacModules = ['forecourt', 'tanks', 'sales', 'fleet', 'finance']
+    const rbacActions = ['read', 'write', 'delete', 'approve']
+
+    const rbacData: { role: string; module: string; action: string; isAllowed: boolean }[] = []
+    for (const role of rbacRoles) {
+      for (const mod of rbacModules) {
+        for (const action of rbacActions) {
+          let isAllowed = false
+          if (role === 'admin') isAllowed = true
+          else if (role === 'manager') isAllowed = action !== 'delete' || mod === 'sales'
+          else if (role === 'cashier') isAllowed = (mod === 'sales' || mod === 'forecourt') && (action === 'read' || action === 'write')
+          else if (role === 'attendant') isAllowed = mod === 'forecourt' && action === 'read'
+          else if (role === 'viewer') isAllowed = action === 'read'
+          rbacData.push({ role, module: mod, action, isAllowed })
+        }
+      }
+    }
+
+    await db.rBACPermission.createMany({
+      data: rbacData.map(p => ({
+        tenantId: tenant.id,
+        role: p.role,
+        module: p.module,
+        action: p.action,
+        isAllowed: p.isAllowed,
+      }))
+    })
+
+    // =====================================================
+    // 64. SECURITY ALERTS (3)
+    // =====================================================
+    await db.securityAlert.createMany({
+      data: [
+        { tenantId: tenant.id, stationId: mainStation.id, alertType: 'unauthorized_access', severity: 'critical', title: 'Unauthorized Login Attempt Detected', description: 'Multiple failed login attempts from IP 203.101.55.78 targeting admin account. 5 attempts in 3 minutes.', sourceIp: '203.101.55.78', targetEntity: 'User', targetEntityId: users[0].id, isResolved: false },
+        { tenantId: tenant.id, stationId: mainStation.id, alertType: 'suspicious_activity', severity: 'warning', title: 'After-Hours Access to Billing Module', description: 'User Hassan Rizvi accessed billing module outside normal operating hours at 02:30 AM.', sourceIp: '192.168.1.15', targetEntity: 'OMSBilling', targetEntityId: null, isResolved: false },
+        { tenantId: tenant.id, stationId: null, alertType: 'data_breach', severity: 'info', title: 'API Rate Limit Approaching Threshold', description: 'API key APEX-API-001 has reached 80% of hourly rate limit (800/1000 requests). Normal monitoring traffic pattern.', sourceIp: null, targetEntity: 'APIKey', targetEntityId: null, isResolved: true, resolvedAt: new Date(Date.now() - 3600000), resolvedBy: users[0].id },
+      ]
+    })
+
+    // =====================================================
+    // 65. BACKUP RECORDS (3)
+    // =====================================================
+    await db.backupRecord.createMany({
+      data: [
+        { tenantId: tenant.id, stationId: mainStation.id, backupType: 'full', status: 'completed', fileSize: 256.4, fileKey: 'backups/2025/03/full-20250304.tar.gz', startedAt: new Date(Date.now() - 2 * 86400000), completedAt: new Date(Date.now() - 2 * 86400000 + 1800), duration: 1800, checksum: 'sha256:abc123def456', isRestorable: true, notes: 'Daily full backup completed successfully' },
+        { tenantId: tenant.id, stationId: mainStation.id, backupType: 'incremental', status: 'completed', fileSize: 45.2, fileKey: 'backups/2025/03/incr-20250305.tar.gz', startedAt: new Date(Date.now() - 86400000), completedAt: new Date(Date.now() - 86400000 + 420), duration: 420, checksum: 'sha256:789ghi012jkl', isRestorable: true, notes: 'Daily incremental backup' },
+        { tenantId: tenant.id, stationId: mainStation.id, backupType: 'full', status: 'failed', fileSize: null, fileKey: null, startedAt: new Date(Date.now() - 3600000), completedAt: null, duration: null, checksum: null, isRestorable: false, notes: 'Backup failed - insufficient disk space on target volume. Retry scheduled.' },
+      ]
+    })
+
+    // =====================================================
+    // 66. ENCRYPTION KEYS (2)
+    // =====================================================
+    await db.encryptionKey.createMany({
+      data: [
+        { tenantId: tenant.id, keyType: 'aes256', keyReference: 'APEX-AES256-2025-PRIMARY', isActive: true, rotatedAt: null, expiresAt: new Date('2025-12-31') },
+        { tenantId: tenant.id, keyType: 'rsa2048', keyReference: 'APEX-RSA2048-2024-ARCHIVE', isActive: false, rotatedAt: new Date('2025-01-15'), expiresAt: null },
+      ]
+    })
+
+    // =====================================================
+    // 67. COMM PROTOCOLS (4)
+    // =====================================================
+    const commProtocols = await Promise.all([
+      db.commProtocol.create({
+        data: {
+          stationId: mainStation.id, name: 'IFSF over TCP/IP', protocolType: 'ifsf', version: '3.2', transportType: 'tcp', hostOrPort: '192.168.1.100:5000', heartbeatInterval: 30, timeout: 5, retryCount: 3, pollInterval: 1000, isActive: true,
+        }
+      }),
+      db.commProtocol.create({
+        data: {
+          stationId: mainStation.id, name: 'Modbus RTU over RS485', protocolType: 'modbus', version: 'RTU', transportType: 'rs485', hostOrPort: 'COM1', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none', heartbeatInterval: 60, timeout: 3, retryCount: 3, pollInterval: 2000, isActive: true,
+        }
+      }),
+      db.commProtocol.create({
+        data: {
+          stationId: mainStation.id, name: 'MQTT for IoT Devices', protocolType: 'mqtt', version: '5.0', transportType: 'mqtt', hostOrPort: 'mqtt.apexflow.pk:1883', heartbeatInterval: 15, timeout: 10, retryCount: 5, pollInterval: 500, configJson: '{"topicPrefix":"apexflow/isb001/","qos":1,"retain":true}', isActive: true,
+        }
+      }),
+      db.commProtocol.create({
+        data: {
+          stationId: mainStation.id, name: 'ISO 8583 for Payment', protocolType: 'iso8583', version: '1987', transportType: 'tcp', hostOrPort: '192.168.1.110:8000', heartbeatInterval: 60, timeout: 30, retryCount: 2, pollInterval: 0, configJson: '{"messageType":"0800","responseType":"0810"}', isActive: true,
+        }
+      }),
+    ])
+
+    // =====================================================
+    // 68. COMM CONNECTIONS (6)
+    // =====================================================
+    await db.commConnection.createMany({
+      data: [
+        { stationId: mainStation.id, protocolId: commProtocols[0].id, name: 'PTS Controller Link', deviceType: 'controller', deviceId: ptsController.id, connectionState: 'connected', lastConnectedAt: new Date(), lastMessageAt: new Date(), messagesSent: 15420, messagesReceived: 15380, errors: 3, latencyMs: 45, isActive: true },
+        { stationId: mainStation.id, protocolId: commProtocols[0].id, name: 'Pump 1-4 IFSF Link', deviceType: 'dispenser', deviceId: dispensers[0].id, connectionState: 'connected', lastConnectedAt: new Date(), lastMessageAt: new Date(Date.now() - 500), messagesSent: 8932, messagesReceived: 8930, errors: 1, latencyMs: 32, isActive: true },
+        { stationId: mainStation.id, protocolId: commProtocols[1].id, name: 'ATG Tank Farm Link', deviceType: 'tank_atg', deviceId: tanks[0].id, connectionState: 'connected', lastConnectedAt: new Date(), lastMessageAt: new Date(Date.now() - 2000), messagesSent: 4520, messagesReceived: 4520, errors: 0, latencyMs: 78, isActive: true },
+        { stationId: mainStation.id, protocolId: commProtocols[2].id, name: 'IoT Sensor Bridge', deviceType: 'controller', deviceId: null, connectionState: 'connected', lastConnectedAt: new Date(), lastMessageAt: new Date(Date.now() - 1000), messagesSent: 22100, messagesReceived: 22100, errors: 5, latencyMs: 15, isActive: true },
+        { stationId: mainStation.id, protocolId: commProtocols[3].id, name: 'POS Terminal Link', deviceType: 'payment_terminal', deviceId: posTerminal.id, connectionState: 'connected', lastConnectedAt: new Date(), lastMessageAt: new Date(Date.now() - 300000), messagesSent: 3120, messagesReceived: 3118, errors: 2, latencyMs: 120, isActive: true },
+        { stationId: mainStation.id, protocolId: commProtocols[1].id, name: 'Generator Modbus Link', deviceType: 'controller', deviceId: generator.id, connectionState: 'disconnected', lastConnectedAt: new Date(Date.now() - 3600000), lastMessageAt: new Date(Date.now() - 3600000), messagesSent: 890, messagesReceived: 888, errors: 12, latencyMs: null, isActive: true },
+      ]
+    })
+
+    // =====================================================
+    // 69. COMM LOGS (10)
+    // =====================================================
+    const commConnections = await db.commConnection.findMany({ where: { stationId: mainStation.id } })
+    await db.commLog.createMany({
+      data: [
+        { stationId: mainStation.id, connectionId: commConnections[0]?.id || null, protocolId: commProtocols[0].id, direction: 'outbound', messageType: 'heartbeat', rawData: '1F0023000100', parsedData: '{"type":"heartbeat","seq":15420}', deviceType: 'controller', isSuccess: true, durationMs: 45, createdAt: new Date(Date.now() - 60000) },
+        { stationId: mainStation.id, connectionId: commConnections[1]?.id || null, protocolId: commProtocols[0].id, direction: 'inbound', messageType: 'response', rawData: '1F00230002AA', parsedData: '{"type":"status","pump":"P-01","state":"idle","volume":0}', deviceType: 'dispenser', isSuccess: true, durationMs: 32, createdAt: new Date(Date.now() - 55000) },
+        { stationId: mainStation.id, connectionId: commConnections[1]?.id || null, protocolId: commProtocols[0].id, direction: 'outbound', messageType: 'command', rawData: '1F00460003FF', parsedData: '{"type":"authorize","pump":"P-01","nozzle":1,"volume":50}', deviceType: 'dispenser', isSuccess: true, durationMs: 28, createdAt: new Date(Date.now() - 50000) },
+        { stationId: mainStation.id, connectionId: commConnections[2]?.id || null, protocolId: commProtocols[1].id, direction: 'inbound', messageType: 'event', rawData: '010300000001A8', parsedData: '{"type":"tank_reading","tank":"TANK-A","level":8500,"temp":27.2,"water":12}', deviceType: 'tank_atg', isSuccess: true, durationMs: 78, createdAt: new Date(Date.now() - 45000) },
+        { stationId: mainStation.id, connectionId: commConnections[3]?.id || null, protocolId: commProtocols[2].id, direction: 'inbound', messageType: 'event', rawData: null, parsedData: '{"topic":"apexflow/isb001/sensor/temp","payload":32.5}', deviceType: 'controller', isSuccess: true, durationMs: 15, createdAt: new Date(Date.now() - 40000) },
+        { stationId: mainStation.id, connectionId: commConnections[4]?.id || null, protocolId: commProtocols[3].id, direction: 'outbound', messageType: 'command', rawData: '0800200000000000000000000000', parsedData: '{"type":"financial_msg","mti":"0800","stan":"000001"}', deviceType: 'payment_terminal', isSuccess: true, durationMs: 120, createdAt: new Date(Date.now() - 300000) },
+        { stationId: mainStation.id, connectionId: commConnections[4]?.id || null, protocolId: commProtocols[3].id, direction: 'inbound', messageType: 'response', rawData: '0810200000000000000000000000', parsedData: '{"type":"financial_response","mti":"0810","responseCode":"00"}', deviceType: 'payment_terminal', isSuccess: true, durationMs: 85, createdAt: new Date(Date.now() - 299000) },
+        { stationId: mainStation.id, connectionId: commConnections[0]?.id || null, protocolId: commProtocols[0].id, direction: 'outbound', messageType: 'command', rawData: '1F00460005BB', parsedData: '{"type":"stop_pump","pump":"P-03"}', deviceType: 'dispenser', isSuccess: false, errorMessage: 'Timeout waiting for ACK from pump P-03', durationMs: 5002, createdAt: new Date(Date.now() - 20000) },
+        { stationId: mainStation.id, connectionId: commConnections[5]?.id || null, protocolId: commProtocols[1].id, direction: 'outbound', messageType: 'heartbeat', rawData: null, parsedData: null, deviceType: 'controller', isSuccess: false, errorMessage: 'Connection refused - generator offline', durationMs: null, createdAt: new Date(Date.now() - 3600000) },
+        { stationId: mainStation.id, connectionId: commConnections[2]?.id || null, protocolId: commProtocols[1].id, direction: 'inbound', messageType: 'event', rawData: '010300000002B4', parsedData: '{"type":"tank_reading","tank":"TANK-B","level":6200,"temp":25.8,"water":5}', deviceType: 'tank_atg', isSuccess: true, durationMs: 72, createdAt: new Date(Date.now() - 10000) },
+      ]
+    })
+
+    // =====================================================
+    // 70. DISPENSER PROFILES (8)
+    // =====================================================
+    await db.dispenserProfile.createMany({
+      data: [
+        { tenantId: tenant.id, manufacturer: 'tatsuno', modelName: 'Tatsuno M-1000', pumpTypes: '["dual_hose","multi_product"]', supportedFuels: '["petrol","diesel","premium"]', maxNozzles: 4, flowRate: 50, protocol: 'ifsf', communicationTypes: '["tcpip","rs485"]', defaultPort: 5000, defaultBaudRate: 9600, defaultPolling: 1000, notes: 'Japanese quality, widely used in Pakistan', isActive: true },
+        { tenantId: tenant.id, manufacturer: 'tatsuno_sunny', modelName: 'Tatsuno Sunny A-250', pumpTypes: '["single_hose","dual_hose"]', supportedFuels: '["petrol","diesel"]', maxNozzles: 2, flowRate: 40, protocol: 'ifsf', communicationTypes: '["tcpip","rs232"]', defaultPort: 5001, defaultBaudRate: 9600, defaultPolling: 1000, notes: 'Budget-friendly Tatsuno variant for emerging markets', isActive: true },
+        { tenantId: tenant.id, manufacturer: 'gilbarco', modelName: 'Gilbarco Veeder-Root Encore 700', pumpTypes: '["multi_product","high_flow"]', supportedFuels: '["petrol","diesel","premium","hsd"]', maxNozzles: 6, flowRate: 60, protocol: 'gilbarco_gsite', communicationTypes: '["tcpip","ethernet"]', defaultPort: 5010, defaultBaudRate: null, defaultPolling: 2000, notes: 'Premium dispenser with media display, global standard', isActive: true },
+        { tenantId: tenant.id, manufacturer: 'wayne', modelName: 'Wayne iX 500', pumpTypes: '["dual_hose","multi_product"]', supportedFuels: '["petrol","diesel","premium"]', maxNozzles: 4, flowRate: 55, protocol: 'wayne_dart', communicationTypes: '["tcpip","rs485"]', defaultPort: 5020, defaultBaudRate: 19200, defaultPolling: 1500, notes: 'Wayne flagship model with payment-at-pump support', isActive: true },
+        { tenantId: tenant.id, manufacturer: 'tokheim', modelName: 'Tokheim Quantium 410', pumpTypes: '["dual_hose","multi_product"]', supportedFuels: '["petrol","diesel","hsd"]', maxNozzles: 4, flowRate: 50, protocol: 'dfs', communicationTypes: '["tcpip","ethernet"]', defaultPort: 5030, defaultBaudRate: null, defaultPolling: 2000, notes: 'European design, commonly found in CNG/fuel hybrid stations', isActive: true },
+        { tenantId: tenant.id, manufacturer: 'bennett', modelName: 'Bennett 3000 Series', pumpTypes: '["single_hose","dual_hose"]', supportedFuels: '["petrol","diesel"]', maxNozzles: 2, flowRate: 45, protocol: 'patrius', communicationTypes: '["rs485","tcpip"]', defaultPort: 5040, defaultBaudRate: 9600, defaultPolling: 1000, notes: 'Reliable workhorse for smaller stations', isActive: true },
+        { tenantId: tenant.id, manufacturer: 'censtar', modelName: 'Censtar CS32', pumpTypes: '["dual_hose","multi_product"]', supportedFuels: '["petrol","diesel","premium"]', maxNozzles: 4, flowRate: 50, protocol: 'ifsf', communicationTypes: '["tcpip","rs485"]', defaultPort: 5050, defaultBaudRate: 9600, defaultPolling: 1000, notes: 'Chinese manufacturer, cost-effective option for Pakistani market', isActive: true },
+        { tenantId: tenant.id, manufacturer: 'eaglestar', modelName: 'Eaglestar ETP-200', pumpTypes: '["single_hose","dual_hose"]', supportedFuels: '["petrol","diesel"]', maxNozzles: 2, flowRate: 40, protocol: 'proprietary', communicationTypes: '["rs485","tcpip"]', defaultPort: 5060, defaultBaudRate: 9600, defaultPolling: 1500, notes: 'Budget Chinese option, growing presence in KPK region', isActive: true },
+      ]
+    })
+
+    // =====================================================
+    // 71. ATG PROFILES (4)
+    // =====================================================
+    await db.aTGProfile.createMany({
+      data: [
+        { tenantId: tenant.id, manufacturer: 'veeder_root', modelName: 'TLS-350 Plus', atgType: 'magnetostrictive', probeTypes: '["magnetostrictive","capacitive"]', maxProbes: 8, communicationTypes: '["tcpip","rs232","rs485"]', protocol: 'ifsf', defaultPort: 10001, defaultBaudRate: 9600, features: '["leak_detection","overfill","water_detection","temperature","density","vapor_pressure"]', configTemplate: '{"pollingInterval":5000,"leakTestInterval":3600000}', notes: 'Industry standard ATG in Pakistan, most widely deployed', isActive: true },
+        { tenantId: tenant.id, manufacturer: 'opw', modelName: 'SiteSentinel iSite', atgType: 'capacitive', probeTypes: '["capacitive","ultrasonic"]', maxProbes: 16, communicationTypes: '["tcpip","ethernet"]', protocol: 'modbus', defaultPort: 502, defaultBaudRate: null, features: '["leak_detection","overfill","water_detection","temperature","inventory_management"]', configTemplate: '{"pollingInterval":3000,"reportInterval":300000}', notes: 'Modern cloud-connected ATG with remote monitoring', isActive: true },
+        { tenantId: tenant.id, manufacturer: 'franklin', modelName: 'TS-550', atgType: 'magnetostrictive', probeTypes: '["magnetostrictive"]', maxProbes: 6, communicationTypes: '["tcpip","rs232"]', protocol: 'ifsf', defaultPort: 10002, defaultBaudRate: 19200, features: '["leak_detection","overfill","water_detection","temperature"]', configTemplate: '{"pollingInterval":5000,"alarmThreshold":{"waterLevel":50,"tempDelta":5}}', notes: 'Reliable mid-range ATG, popular in Middle East and South Asia', isActive: true },
+        { tenantId: tenant.id, manufacturer: 'hectronic', modelName: 'Hectronic ATG 200', atgType: 'ultrasonic', probeTypes: '["ultrasonic","capacitive"]', maxProbes: 10, communicationTypes: '["tcpip","rs485"]', protocol: 'modbus', defaultPort: 502, defaultBaudRate: 9600, features: '["leak_detection","water_detection","temperature","density","vapor_pressure","remote_diagnostics"]', configTemplate: '{"pollingInterval":2000,"ultrasonicMode":"continuous"}', notes: 'German engineering, premium ATG with advanced diagnostics', isActive: true },
+      ]
+    })
+
+    // =====================================================
+    // 72. FUEL TRANSFERS (2)
+    // =====================================================
+    await db.fuelTransfer.createMany({
+      data: [
+        { stationId: mainStation.id, fromTankId: tanks[0].id, toTankId: tanks[2].id, fuelType: 'petrol', volume: 2000, reason: 'stock_rebalance', status: 'completed', approvedBy: users[1].id, startedAt: new Date(Date.now() - 2 * 86400000), completedAt: new Date(Date.now() - 2 * 86400000 + 3600000), variance: -3, notes: 'Tank A over capacity, transferred surplus to Tank C' },
+        { stationId: mainStation.id, fromTankId: tanks[1].id, toTankId: tanks[3].id, fuelType: 'diesel', volume: 5000, reason: 'tank_maintenance', status: 'pending', approvedBy: null, startedAt: null, completedAt: null, variance: null, notes: 'Scheduled transfer prior to Tank B maintenance inspection' },
+      ]
+    })
+
+    // =====================================================
+    // 73. THEFT ALERTS (2)
+    // =====================================================
+    await db.theftAlert.createMany({
+      data: [
+        { stationId: mainStation.id, tankId: tanks[1].id, dispenserId: dispensers[2].id, nozzleId: allNozzles.find(n => n.dispenserId === dispensers[2].id)?.id || null, detectionType: 'meter_manipulation', severity: 'critical', estimatedVolume: 142, estimatedLoss: 38964, evidence: '{"meterStart":125400,"meterEnd":125400,"dispensedVolume":142,"paidVolume":0,"timeWindow":"02:15-02:45","cameras":["CAM-FORE-01"]}', isInvestigated: false },
+        { stationId: mainStation.id, tankId: tanks[0].id, dispenserId: dispensers[0].id, nozzleId: allNozzles.find(n => n.dispenserId === dispensers[0].id)?.id || null, detectionType: 'after_hours', severity: 'warning', estimatedVolume: 45, estimatedLoss: 12263, evidence: '{"time":"23:45","authorizedBy":null,"nozzleUpEvent":true,"noPayment":true,"cameras":["CAM-FORE-01","CAM-ENTRY-02"]}', isInvestigated: false },
+      ]
+    })
+
+    // =====================================================
+    // 74. SHRINKAGE RECORDS (2)
+    // =====================================================
+    await db.shrinkageRecord.createMany({
+      data: [
+        { stationId: mainStation.id, tankId: tanks[0].id, periodStart: new Date('2025-02-01'), periodEnd: new Date('2025-02-28'), openingStock: 18000, deliveries: 40000, salesVolume: 55200, expectedClosing: 2800, actualClosing: 2710, shrinkage: 90, shrinkagePercent: 0.16, temperatureVariance: 2.3, densityVariance: 0.002, cause: 'temperature', isReviewed: true, reviewedBy: users[1].id, notes: 'Normal thermal shrinkage - within acceptable 0.3% threshold' },
+        { stationId: mainStation.id, tankId: tanks[1].id, periodStart: new Date('2025-02-01'), periodEnd: new Date('2025-02-28'), openingStock: 22000, deliveries: 35000, salesVolume: 50800, expectedClosing: 6200, actualClosing: 5970, shrinkage: 230, shrinkagePercent: 0.37, temperatureVariance: 1.8, densityVariance: 0.005, cause: 'unknown', isReviewed: false, reviewedBy: null, notes: 'Shrinkage exceeds 0.3% threshold - investigation pending. Possible measurement error or leak.' },
+      ]
+    })
+
+    // =====================================================
+    // 75. GL ACCOUNTS (10)
+    // =====================================================
+    const glAccounts = await Promise.all([
+      db.gLAccount.create({ data: { tenantId: tenant.id, accountCode: '1000', accountName: 'Cash', accountType: 'asset', subType: 'current_asset', balance: 1250000, isActive: true } }),
+      db.gLAccount.create({ data: { tenantId: tenant.id, accountCode: '1100', accountName: 'Accounts Receivable', accountType: 'asset', subType: 'current_asset', balance: 3200000, isActive: true } }),
+      db.gLAccount.create({ data: { tenantId: tenant.id, accountCode: '1200', accountName: 'Inventory', accountType: 'asset', subType: 'current_asset', balance: 8500000, isActive: true } }),
+      db.gLAccount.create({ data: { tenantId: tenant.id, accountCode: '2000', accountName: 'Accounts Payable', accountType: 'liability', subType: 'current_liability', balance: 4500000, isActive: true } }),
+      db.gLAccount.create({ data: { tenantId: tenant.id, accountCode: '2100', accountName: 'Tax Payable', accountType: 'liability', subType: 'current_liability', balance: 780000, isActive: true } }),
+      db.gLAccount.create({ data: { tenantId: tenant.id, accountCode: '3000', accountName: 'Owner Equity', accountType: 'equity', subType: null, balance: 15000000, isActive: true } }),
+      db.gLAccount.create({ data: { tenantId: tenant.id, accountCode: '4000', accountName: 'Fuel Revenue', accountType: 'revenue', subType: 'operating_revenue', balance: 12500000, isActive: true } }),
+      db.gLAccount.create({ data: { tenantId: tenant.id, accountCode: '4100', accountName: 'Retail Revenue', accountType: 'revenue', subType: 'operating_revenue', balance: 1800000, isActive: true } }),
+      db.gLAccount.create({ data: { tenantId: tenant.id, accountCode: '5000', accountName: 'Cost of Goods Sold', accountType: 'expense', subType: 'cost_of_sales', balance: 9800000, isActive: true } }),
+      db.gLAccount.create({ data: { tenantId: tenant.id, accountCode: '5100', accountName: 'Operating Expenses', accountType: 'expense', subType: 'operating_expense', balance: 2100000, isActive: true } }),
+    ])
+
+    // =====================================================
+    // 76. JOURNAL ENTRIES (3) with Journal Lines
+    // =====================================================
+    const journalEntry1 = await db.journalEntry.create({
+      data: {
+        tenantId: tenant.id, stationId: mainStation.id, entryNumber: 'JE-2025-001', entryDate: new Date('2025-03-01'), description: 'Daily fuel sales - March 1, 2025', referenceType: 'fueling', totalDebit: 485000, totalCredit: 485000, status: 'posted', postedAt: new Date('2025-03-01'), postedBy: users[1].id,
+      }
+    })
+    await db.journalLine.createMany({
+      data: [
+        { journalEntryId: journalEntry1.id, glAccountId: glAccounts[0].id, debit: 485000, credit: 0, description: 'Cash received from fuel sales' },
+        { journalEntryId: journalEntry1.id, glAccountId: glAccounts[6].id, debit: 0, credit: 485000, description: 'Fuel revenue for March 1' },
+      ]
+    })
+
+    const journalEntry2 = await db.journalEntry.create({
+      data: {
+        tenantId: tenant.id, stationId: mainStation.id, entryNumber: 'JE-2025-002', entryDate: new Date('2025-03-02'), description: 'Fuel purchase from PSO - February settlement', referenceType: 'delivery', totalDebit: 2500000, totalCredit: 2500000, status: 'posted', postedAt: new Date('2025-03-02'), postedBy: users[1].id,
+      }
+    })
+    await db.journalLine.createMany({
+      data: [
+        { journalEntryId: journalEntry2.id, glAccountId: glAccounts[2].id, debit: 2500000, credit: 0, description: 'Fuel inventory increase - PSO delivery' },
+        { journalEntryId: journalEntry2.id, glAccountId: glAccounts[3].id, debit: 0, credit: 2500000, description: 'Accounts payable to PSO' },
+      ]
+    })
+
+    const journalEntry3 = await db.journalEntry.create({
+      data: {
+        tenantId: tenant.id, stationId: mainStation.id, entryNumber: 'JE-2025-003', entryDate: new Date('2025-03-03'), description: 'Monthly operating expenses - utilities and maintenance', referenceType: 'expense', totalDebit: 0, totalCredit: 0, status: 'draft',
+      }
+    })
+    await db.journalLine.createMany({
+      data: [
+        { journalEntryId: journalEntry3.id, glAccountId: glAccounts[9].id, debit: 185000, credit: 0, description: 'WAPDA electricity bill' },
+        { journalEntryId: journalEntry3.id, glAccountId: glAccounts[9].id, debit: 45000, credit: 0, description: 'SNGPL gas bill' },
+        { journalEntryId: journalEntry3.id, glAccountId: glAccounts[0].id, debit: 0, credit: 230000, description: 'Cash paid for utilities' },
+      ]
+    })
+    // Update journal entry 3 totals
+    await db.journalEntry.update({ where: { id: journalEntry3.id }, data: { totalDebit: 230000, totalCredit: 230000 } })
+
+    // =====================================================
+    // 77. ACCOUNTS RECEIVABLE (3)
+    // =====================================================
+    await db.accountReceivable.createMany({
+      data: [
+        { tenantId: tenant.id, stationId: mainStation.id, customerId: fleetAccounts[0].id, invoiceNumber: 'AR-2025-001', amount: 1200000, paidAmount: 0, balance: 1200000, dueDate: new Date(Date.now() + 15 * 86400000), status: 'open', agingDays: 0, notes: 'Pakistan Post Fleet - March 2025 billing' },
+        { tenantId: tenant.id, stationId: mainStation.id, customerId: fleetAccounts[1].id, invoiceNumber: 'AR-2025-002', amount: 2500000, paidAmount: 1500000, balance: 1000000, dueDate: new Date(Date.now() + 10 * 86400000), status: 'partial', agingDays: 5, notes: 'Daewoo Express - partial payment received, balance pending' },
+        { tenantId: tenant.id, stationId: mainStation.id, customerId: fleetAccounts[2].id, invoiceNumber: 'AR-2025-003', amount: 800000, paidAmount: 0, balance: 800000, dueDate: new Date(Date.now() - 5 * 86400000), status: 'overdue', agingDays: 35, notes: 'NLC Logistics - overdue account, follow-up required' },
+      ]
+    })
+
+    // =====================================================
+    // 78. ACCOUNTS PAYABLE (2)
+    // =====================================================
+    await db.accountPayable.createMany({
+      data: [
+        { tenantId: tenant.id, stationId: mainStation.id, supplierId: suppliers[0].id, invoiceNumber: 'AP-PSO-2025-001', amount: 2500000, paidAmount: 0, balance: 2500000, dueDate: new Date(Date.now() + 20 * 86400000), status: 'open', agingDays: 0, notes: 'PSO fuel supply invoice - March 2025' },
+        { tenantId: tenant.id, stationId: mainStation.id, supplierId: suppliers[1].id, invoiceNumber: 'AP-SHELL-2025-001', amount: 1800000, paidAmount: 0, balance: 1800000, dueDate: new Date(Date.now() + 5 * 86400000), status: 'open', agingDays: 10, notes: 'Shell diesel supply - pending approval for payment' },
+      ]
+    })
+
+    // =====================================================
+    // 79. TAX CONFIGURATIONS (3)
+    // =====================================================
+    await db.taxConfig.createMany({
+      data: [
+        { tenantId: tenant.id, taxName: 'Sales Tax', taxType: 'sales_tax', rate: 17, applicableTo: 'all', fuelType: null, isCompound: false, isActive: true, effectiveFrom: new Date('2025-01-01'), effectiveTo: null },
+        { tenantId: tenant.id, taxName: 'Fuel Levy', taxType: 'fuel_levy', rate: 5, applicableTo: 'fuel', fuelType: null, isCompound: false, isActive: true, effectiveFrom: new Date('2025-01-01'), effectiveTo: null },
+        { tenantId: tenant.id, taxName: 'GST', taxType: 'gst', rate: 17, applicableTo: 'all', fuelType: null, isCompound: true, isActive: true, effectiveFrom: new Date('2025-07-01'), effectiveTo: null },
+      ]
+    })
+
+    // =====================================================
+    // 80. CASH DRAWERS (2)
+    // =====================================================
+    const cashDrawers = await Promise.all([
+      db.cashDrawer.create({
+        data: { stationId: mainStation.id, shiftId: openShift.id, drawerNumber: 'DRW-01', openingBalance: 50000, cashSales: 86000, cardSales: 58000, otherReceipts: 2500, safeDrops: 30000, cashPayments: 5000, closingBalance: null, variance: null, status: 'open', lastCountedAt: new Date(Date.now() - 1800000) }
+      }),
+      db.cashDrawer.create({
+        data: { stationId: mainStation.id, shiftId: closedShift2.id, drawerNumber: 'DRW-02', openingBalance: 60000, cashSales: 130000, cardSales: 58000, otherReceipts: 1200, safeDrops: 50000, cashPayments: 8000, closingBalance: 135200, variance: -3000, status: 'closed', lastCountedAt: new Date(Date.now() - 86400000) }
+      }),
+    ])
+
+    // =====================================================
+    // 81. SAFE DROPS (2)
+    // =====================================================
+    await db.safeDrop.createMany({
+      data: [
+        { stationId: mainStation.id, shiftId: openShift.id, drawerId: cashDrawers[0].id, amount: 30000, reason: 'Cash limit exceeded - excess moved to safe', performedBy: employees[4].id, witnessedBy: employees[0].id, createdAt: new Date(Date.now() - 7200000) },
+        { stationId: mainStation.id, shiftId: closedShift2.id, drawerId: cashDrawers[1].id, amount: 50000, reason: 'End of shift safe drop', performedBy: employees[3].id, witnessedBy: employees[1].id, createdAt: new Date(Date.now() - 86400000) },
+      ]
+    })
+
+    // =====================================================
+    // 82. LOYALTY TRANSACTIONS (5)
+    // =====================================================
+    const loyaltyCustomers = await db.customer.findMany({ where: { tenantId: tenant.id }, take: 5 })
+    if (loyaltyCustomers.length >= 5) {
+      await db.loyaltyTransaction.createMany({
+        data: [
+          { tenantId: tenant.id, customerId: loyaltyCustomers[0].id, stationId: mainStation.id, pointsEarned: 500, pointsRedeemed: 0, balanceAfter: 5500, transactionType: 'earn', referenceType: 'fueling', description: 'Points earned on fuel purchase PKR 5,000' },
+          { tenantId: tenant.id, customerId: loyaltyCustomers[1].id, stationId: mainStation.id, pointsEarned: 0, pointsRedeemed: 2000, balanceAfter: 1500, transactionType: 'redeem', referenceType: 'fueling', description: 'Points redeemed for PKR 500 fuel discount' },
+          { tenantId: tenant.id, customerId: loyaltyCustomers[0].id, stationId: mainStation.id, pointsEarned: 1000, pointsRedeemed: 0, balanceAfter: 6500, transactionType: 'bonus', referenceType: 'promotion', description: 'Platinum member bonus - double points weekend' },
+          { tenantId: tenant.id, customerId: loyaltyCustomers[3].id, stationId: mainStation.id, pointsEarned: 0, pointsRedeemed: 0, balanceAfter: 0, transactionType: 'expiry', description: 'Points expired - no activity for 12 months' },
+          { tenantId: tenant.id, customerId: loyaltyCustomers[2].id, stationId: mainStation.id, pointsEarned: 200, pointsRedeemed: 0, balanceAfter: 1700, transactionType: 'adjustment', referenceType: 'manual', description: 'Manager adjustment - points credited for service complaint' },
+        ]
+      })
+    }
+
+    // =====================================================
+    // 83. GIFT CARDS (3)
+    // =====================================================
+    await db.giftCard.createMany({
+      data: [
+        { tenantId: tenant.id, cardNumber: 'GFT-2025-0001', initialBalance: 5000, currentBalance: 3200, currency: 'PKR', purchaserName: 'Ahmed Raza', recipientName: 'Sara Raza', isActivated: true, activatedAt: new Date('2025-02-14'), expiryDate: new Date('2026-02-14'), lastUsedAt: new Date(Date.now() - 3 * 86400000), isActive: true },
+        { tenantId: tenant.id, cardNumber: 'GFT-2025-0002', initialBalance: 10000, currentBalance: 10000, currency: 'PKR', purchaserName: 'Kamran Sheikh', recipientName: null, isActivated: false, activatedAt: null, expiryDate: new Date('2026-06-30'), lastUsedAt: null, isActive: true },
+        { tenantId: tenant.id, cardNumber: 'GFT-2024-0015', initialBalance: 3000, currentBalance: 0, currency: 'PKR', purchaserName: 'Nadia Ashraf', recipientName: 'Ali Ashraf', isActivated: true, activatedAt: new Date('2024-01-15'), expiryDate: new Date('2025-01-15'), lastUsedAt: new Date('2025-01-10'), isActive: false },
+      ]
+    })
+
+    // =====================================================
+    // 84. CUSTOMER COMPLAINTS (3)
+    // =====================================================
+    await db.customerComplaint.createMany({
+      data: [
+        { tenantId: tenant.id, stationId: mainStation.id, customerId: null, complainantName: 'Rashid Minhas', complainantPhone: '+92-300-5551234', category: 'fuel_quality', priority: 'high', description: 'Vehicle engine knocking after refueling petrol from Pump 3. Suspect contaminated fuel.', status: 'open', assignedTo: users[2].id, resolution: null, resolvedAt: null, followUpDate: new Date(Date.now() + 2 * 86400000) },
+        { tenantId: tenant.id, stationId: mainStation.id, customerId: null, complainantName: 'Farhan Ali', complainantPhone: '+92-321-9876543', category: 'billing', priority: 'normal', description: 'Double charged on credit card for fuel purchase of PKR 5,450 on Feb 28. POS terminal showed error but charge went through.', status: 'investigating', assignedTo: users[1].id, resolution: null, resolvedAt: null, followUpDate: new Date(Date.now() + 3 * 86400000) },
+        { tenantId: tenant.id, stationId: mainStation.id, customerId: null, complainantName: 'Samina Begum', complainantPhone: '+92-333-1112233', category: 'service', priority: 'low', description: 'Attendant was rude and refused to check oil level after fueling.', status: 'resolved', assignedTo: users[2].id, resolution: 'Attendant counseled and given warning. Customer offered complimentary car wash.', resolvedAt: new Date(Date.now() - 86400000), followUpDate: null },
+      ]
+    })
+
+    // =====================================================
+    // 85. CNG COMPRESSOR (1) - for CNG/hybrid station
+    // =====================================================
+    const cngStation = stations.find(s => s.stationType === 'cng' || s.stationType === 'hybrid') || mainStation
+    await db.cNGCompressor.create({
+      data: {
+        stationId: cngStation.id, name: 'CNG-COMP-01', code: 'CNG-C-01', manufacturer: 'Ariel', model: 'JGK/4', serialNumber: 'ARL-JG4-2024', communicationType: 'tcpip', ipAddress: '192.168.1.200', port: 502, protocol: 'modbus', stages: 4, inputPressure: 5, outputPressure: 220, currentPressure: 205, temperature: 85, motorStatus: 'on', runHours: 3450.5, gasConsumption: 1200, isActive: true, status: 'compressing', lastServiceDate: new Date(Date.now() - 45 * 86400000), nextServiceDate: new Date(Date.now() + 15 * 86400000),
+      }
+    })
+
+    // =====================================================
+    // 86. CNG STORAGE (1)
+    // =====================================================
+    await db.cNGStorage.create({
+      data: {
+        stationId: cngStation.id, name: 'CNG-CASCADE-01', code: 'CNG-CS-01', storageType: 'cascade', capacity: 3000, currentLevel: 2100, pressure: 200, maxPressure: 250, temperature: 35, status: 'normal', isActive: true,
+      }
+    })
+
+    // =====================================================
+    // 87. NOZZLE EVENTS (8)
+    // =====================================================
+    await db.nozzleEvent.createMany({
+      data: [
+        { stationId: mainStation.id, nozzleId: allNozzles[0].id, eventType: 'nozzle_up', volume: null, meterReading: allNozzles[0].meterReading, fuelType: 'petrol', attendantId: employees[4].id, vehiclePlate: 'ISB-4521', rfidTag: null, isAuthorized: true, dataJson: '{"authorizedBy":"system","presetVolume":50}', createdAt: new Date(Date.now() - 1800000) },
+        { stationId: mainStation.id, nozzleId: allNozzles[0].id, eventType: 'fueling_start', volume: null, meterReading: allNozzles[0].meterReading, fuelType: 'petrol', attendantId: employees[4].id, vehiclePlate: 'ISB-4521', rfidTag: null, isAuthorized: true, dataJson: '{"presetVolume":50,"pricePerUnit":272.50}', createdAt: new Date(Date.now() - 1790000) },
+        { stationId: mainStation.id, nozzleId: allNozzles[0].id, eventType: 'fueling_end', volume: 50, meterReading: allNozzles[0].meterReading + 50, fuelType: 'petrol', attendantId: employees[4].id, vehiclePlate: 'ISB-4521', rfidTag: null, isAuthorized: true, dataJson: '{"dispensedVolume":50,"totalAmount":13625}', createdAt: new Date(Date.now() - 1700000) },
+        { stationId: mainStation.id, nozzleId: allNozzles[0].id, eventType: 'nozzle_down', volume: 50, meterReading: allNozzles[0].meterReading + 50, fuelType: 'petrol', attendantId: employees[4].id, vehiclePlate: 'ISB-4521', rfidTag: null, isAuthorized: true, dataJson: null, createdAt: new Date(Date.now() - 1695000) },
+        { stationId: mainStation.id, nozzleId: allNozzles[2].id, eventType: 'unauthorized', volume: 12, meterReading: allNozzles[2].meterReading + 12, fuelType: 'petrol', attendantId: null, vehiclePlate: null, rfidTag: null, isAuthorized: false, dataJson: '{"reason":"no_preset","alertTriggered":true}', createdAt: new Date(Date.now() - 900000) },
+        { stationId: mainStation.id, nozzleId: allNozzles[4].id, eventType: 'nozzle_up', volume: null, meterReading: allNozzles[4].meterReading, fuelType: 'diesel', attendantId: employees[5].id, vehiclePlate: 'LEA-7890', rfidTag: 'RFID-FC-001', isAuthorized: true, dataJson: '{"fleetAccount":"Pakistan Post Fleet","authorizedBy":"rfid"}', createdAt: new Date(Date.now() - 600000) },
+        { stationId: mainStation.id, nozzleId: allNozzles[6].id, eventType: 'error', volume: null, meterReading: allNozzles[6].meterReading, fuelType: 'premium', attendantId: null, vehiclePlate: null, rfidTag: null, isAuthorized: false, dataJson: '{"errorCode":"FLOW_METER_FAULT","message":"Pump 4 Nozzle 1 flow meter reading unstable"}', createdAt: new Date(Date.now() - 3600000) },
+        { stationId: mainStation.id, nozzleId: allNozzles[8].id, eventType: 'lock', volume: null, meterReading: allNozzles[8].meterReading, fuelType: 'petrol', attendantId: null, vehiclePlate: null, rfidTag: null, isAuthorized: false, dataJson: '{"reason":"maintenance_scheduled","lockedBy":"system"}', createdAt: new Date(Date.now() - 7200000) },
+      ]
+    })
+
+    // =====================================================
+    // 88. SHIFT HANDOVER (1)
+    // =====================================================
+    await db.shiftHandover.create({
+      data: {
+        stationId: mainStation.id, fromShiftId: closedShift2.id, toShiftId: openShift.id, fromAttendantId: employees[3].id, toAttendantId: employees[4].id, cashHandedOver: 135200, cashExpected: 138000, cashVariance: -2800, pumpReadings: JSON.stringify(allNozzles.slice(0, 8).map((n, i) => ({ nozzle: `Pump ${Math.floor(i/2)+1} Nozzle ${(i%2)+1}`, reading: n.meterReading }))), openIssues: '["Pump 5 under maintenance","Tank C overfill sensor needs replacement"]', notes: 'Shift handover completed. Cash variance of PKR 2,800 under investigation. Pump 5 still under maintenance.', status: 'accepted', acceptedAt: new Date(Date.now() - 6 * 3600000),
+      }
+    })
+
+    // =====================================================
+    // 89. REPORT TEMPLATES (4)
+    // =====================================================
+    const reportTemplates = await Promise.all([
+      db.reportTemplate.create({
+        data: { tenantId: tenant.id, name: 'Daily Sales Report', description: 'Comprehensive daily sales breakdown by fuel type, payment method, and shift', reportType: 'daily_sales', category: 'operations', dataSource: '{"tables":["Fueling","RetailTransaction","Shift"],"joins":["station","nozzle"]}', columns: '[{"key":"date","label":"Date"},{"key":"fuelType","label":"Fuel Type"},{"key":"volume","label":"Volume (L)"},{"key":"amount","label":"Amount (PKR)"},{"key":"paymentMethod","label":"Payment Method"}]', filters: '{"dateRange":true,"fuelType":true,"paymentMethod":true}', groupBy: '["fuelType","paymentMethod"]', sortBy: '{"field":"amount","order":"desc"}', chartType: 'bar', isSystem: true, isPublic: false, createdBy: users[0].id }
+      }),
+      db.reportTemplate.create({
+        data: { tenantId: tenant.id, name: 'Shift Summary', description: 'Shift-level summary with attendant performance and cash reconciliation', reportType: 'shift_summary', category: 'operations', dataSource: '{"tables":["Shift","Fueling","MeterRecord"],"joins":["employee","station"]}', columns: '[{"key":"shiftNumber","label":"Shift"},{"key":"attendant","label":"Attendant"},{"key":"openedAt","label":"Start"},{"key":"closedAt","label":"End"},{"key":"totalSales","label":"Total Sales"},{"key":"cashVariance","label":"Cash Variance"}]', filters: '{"dateRange":true,"shiftNumber":true,"attendant":true}', groupBy: '["shiftNumber"]', sortBy: '{"field":"openedAt","order":"desc"}', chartType: 'table', isSystem: true, isPublic: false, createdBy: users[0].id }
+      }),
+      db.reportTemplate.create({
+        data: { tenantId: tenant.id, name: 'Fuel Variance Report', description: 'Tank-level variance analysis with shrinkage tracking and theft alert correlation', reportType: 'fuel_variance', category: 'compliance', dataSource: '{"tables":["Reconciliation","ShrinkageRecord","TheftAlert"],"joins":["tank","station"]}', columns: '[{"key":"tank","label":"Tank"},{"key":"date","label":"Date"},{"key":"bookStock","label":"Book Stock"},{"key":"actualStock","label":"Actual Stock"},{"key":"variance","label":"Variance (L)"},{"key":"variancePercent","label":"Variance %"}]', filters: '{"dateRange":true,"tank":true,"fuelType":true}', groupBy: '["tank","date"]', sortBy: '{"field":"variancePercent","order":"desc"}', chartType: 'line', isSystem: true, isPublic: false, createdBy: users[0].id }
+      }),
+      db.reportTemplate.create({
+        data: { tenantId: tenant.id, name: 'Financial Summary', description: 'GL-level financial summary with revenue, expenses, and profitability analysis', reportType: 'financial', category: 'finance', dataSource: '{"tables":["GLAccount","JournalEntry","JournalLine"],"joins":[]}', columns: '[{"key":"accountCode","label":"Account Code"},{"key":"accountName","label":"Account Name"},{"key":"accountType","label":"Type"},{"key":"debit","label":"Debit"},{"key":"credit","label":"Credit"},{"key":"balance","label":"Balance"}]', filters: '{"dateRange":true,"accountType":true,"station":true}', groupBy: '["accountType","accountCode"]', sortBy: '{"field":"accountCode","order":"asc"}', chartType: 'bar', isSystem: true, isPublic: false, createdBy: users[0].id }
+      }),
+    ])
+
+    // =====================================================
+    // 90. SCHEDULED REPORTS (2)
+    // =====================================================
+    await db.scheduledReport.createMany({
+      data: [
+        { tenantId: tenant.id, reportTemplateId: reportTemplates[0].id, scheduleType: 'daily', scheduleTime: '09:00', scheduleDay: null, recipients: '["ops@apexflow.pk","manager1@apexflow.pk"]', format: 'pdf', lastRunAt: new Date(Date.now() - 86400000), nextRunAt: new Date(Date.now() + 15 * 3600000), isActive: true },
+        { tenantId: tenant.id, reportTemplateId: reportTemplates[3].id, scheduleType: 'monthly', scheduleTime: '08:00', scheduleDay: 1, recipients: '["finance@apexflow.pk","admin@apexflow.pk"]', format: 'excel', lastRunAt: new Date('2025-02-01T08:00:00'), nextRunAt: new Date('2025-04-01T08:00:00'), isActive: true },
+      ]
+    })
+
+    // =====================================================
+    // 91. API KEYS (2)
+    // =====================================================
+    await db.aPIKey.createMany({
+      data: [
+        { tenantId: tenant.id, keyHash: 'sha256:f1e2d3c4b5a6978869504132475869a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6', keyPrefix: 'apex_pk_a1', name: 'Production API Key', permissions: '["forecourt:read","tanks:read","sales:read","sales:write","fleet:read","pricing:read"]', allowedIPs: '["203.101.55.0/24","192.168.1.0/24"]', rateLimit: 1000, usageCount: 8450, lastUsedAt: new Date(Date.now() - 300000), expiresAt: new Date('2026-03-04'), isActive: true, createdBy: users[0].id },
+        { tenantId: tenant.id, keyHash: 'sha256:a1b2c3d4e5f67890abcdef1234567890abcdef1234567890abcdef1234567890', keyPrefix: 'apex_pk_b2', name: 'Webhook Integration Key', permissions: '["sales:read","fleet:read","reports:read"]', allowedIPs: null, rateLimit: 500, usageCount: 2320, lastUsedAt: new Date(Date.now() - 1800000), expiresAt: new Date('2025-12-31'), isActive: true, createdBy: users[1].id },
+      ]
+    })
+
+    // =====================================================
+    // 92. WEBHOOK ENDPOINTS (2)
+    // =====================================================
+    const webhookEndpoints = await Promise.all([
+      db.webhookEndpoint.create({
+        data: { tenantId: tenant.id, url: 'https://erp.apexflow.pk/webhooks/fuelflow', name: 'ERP Integration', events: '["sale.completed","delivery.completed","shift.closed"]', secret: 'whsec_abc123def456ghi789', isActive: true, lastTriggeredAt: new Date(Date.now() - 3600000), successCount: 845, failureCount: 12 }
+      }),
+      db.webhookEndpoint.create({
+        data: { tenantId: tenant.id, url: 'https://fleet.apexflow.pk/api/notifications', name: 'Fleet Management System', events: '["fleet.transaction","fleet.alert","fuel.price_update"]', secret: 'whsec_xyz789uvw012rst345', isActive: true, lastTriggeredAt: new Date(Date.now() - 7200000), successCount: 312, failureCount: 3 }
+      }),
+    ])
+
+    // =====================================================
+    // 93. WEBHOOK DELIVERIES (3)
+    // =====================================================
+    await db.webhookDelivery.createMany({
+      data: [
+        { webhookId: webhookEndpoints[0].id, event: 'sale.completed', payload: '{"transactionId":"TXN-00451","amount":13625,"fuelType":"petrol","volume":50,"station":"ISB-001","paymentMethod":"cash"}', statusCode: 200, response: '{"status":"ok","processed":true}', isSuccess: true, retryCount: 0, deliveredAt: new Date(Date.now() - 3600000) },
+        { webhookId: webhookEndpoints[0].id, event: 'delivery.completed', payload: '{"deliveryId":"DLV-00089","tankId":"TANK-A","volume":10000,"supplier":"PSO","station":"ISB-001"}', statusCode: 500, response: '{"error":"Internal server error","message":"Database connection timeout"}', isSuccess: false, retryCount: 2, deliveredAt: new Date(Date.now() - 7200000) },
+        { webhookId: webhookEndpoints[1].id, event: 'fleet.transaction', payload: '{"fleetAccount":"Pakistan Post Fleet","vehiclePlate":"LEA-4521","amount":8175,"fuelType":"diesel","volume":30.5}', statusCode: 200, response: '{"status":"accepted","transactionRef":"FLEET-TXN-98765"}', isSuccess: true, retryCount: 0, deliveredAt: new Date(Date.now() - 5400000) },
+      ]
+    })
+
     return NextResponse.json({
       success: true,
-      message: 'Database seeded successfully with comprehensive data',
+      message: 'Database seeded successfully with comprehensive data including all new models',
       summary: {
         tenant: tenant.name,
         stations: stations.length,
@@ -1347,6 +2715,59 @@ export async function GET() {
         customers: customerNames.length,
         auditLogs: auditActions.length,
         dailyReports: 7,
+        forecourtControllers: 2,
+        paymentTerminals: 3,
+        generators: 1,
+        surveillanceCameras: 5,
+        fireAlarmSystems: 1,
+        utilityMeters: 3,
+        weatherStations: 1,
+        tankerTrackers: 2,
+        carWashSystems: 1,
+        airCompressors: 1,
+        vacuumStations: 2,
+        deviceConfigs: 5,
+        deviceEventLogs: 12,
+        deviceCommandQueue: 4,
+        // New models
+        omsClient: 1,
+        omsPackages: 3,
+        omsInvoices: 3,
+        omsPayments: 2,
+        omsSyncLogs: 5,
+        omsLicenses: 5,
+        securitySessions: 3,
+        rbacPermissions: rbacData.length,
+        securityAlerts: 3,
+        backupRecords: 3,
+        encryptionKeys: 2,
+        commProtocols: 4,
+        commConnections: 6,
+        commLogs: 10,
+        dispenserProfiles: 8,
+        atgProfiles: 4,
+        fuelTransfers: 2,
+        theftAlerts: 2,
+        shrinkageRecords: 2,
+        glAccounts: 10,
+        journalEntries: 3,
+        accountsReceivable: 3,
+        accountsPayable: 2,
+        taxConfigs: 3,
+        cashDrawers: 2,
+        safeDrops: 2,
+        loyaltyTransactions: 5,
+        giftCards: 3,
+        customerComplaints: 3,
+        cngCompressors: 1,
+        cngStorages: 1,
+        nozzleEvents: 8,
+        shiftHandovers: 1,
+        reportTemplates: 4,
+        scheduledReports: 2,
+        apiKeys: 2,
+        webhookEndpoints: 2,
+        webhookDeliveries: 3,
       }
     })
   } catch (error) {

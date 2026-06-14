@@ -1,0 +1,2002 @@
+     1→     1→generator client {
+     2→     2→  provider = "prisma-client-js"
+     3→     3→}
+     4→     4→
+     5→     5→datasource db {
+     6→     6→  provider = "sqlite"
+     7→     7→  url      = env("DATABASE_URL")
+     8→     8→}
+     9→     9→
+    10→    10→// =====================================================
+    11→    11→// TENANT & ORGANIZATION
+    12→    12→// =====================================================
+    13→    13→
+    14→    14→model Tenant {
+    15→    15→  id            String   @id @default(cuid())
+    16→    16→  name          String
+    17→    17→  slug          String   @unique
+    18→    18→  logo          String?
+    19→    19→  primaryColor  String   @default("#f59e0b")
+    20→    20→  address       String?
+    21→    21→  city          String?
+    22→    22→  country       String?
+    23→    23→  phone         String?
+    24→    24→  email         String?
+    25→    25→  subscription  String   @default("starter")
+    26→    26→  taxId         String?
+    27→    27→  registrationNumber String?
+    28→    28→  isActive      Boolean  @default(true)
+    29→    29→  createdAt     DateTime @default(now())
+    30→    30→  updatedAt     DateTime @updatedAt
+    31→    31→
+    32→    32→  stations       Station[]
+    33→    33→  users          User[]
+    34→    34→  fleetAccounts  FleetAccount[]
+    35→    35→  customers      Customer[]
+    36→    36→  fuelCards      FuelCard[]
+    37→    37→  suppliers      Supplier[]
+    38→    38→  notifications  Notification[]
+    39→    39→  promotions     Promotion[]
+    40→    40→  loyaltyRules   LoyaltyRule[]
+    41→    41→  omsClient      OMSClient?
+    42→    42→  glAccounts     GLAccount[]
+    43→    43→  journalEntries JournalEntry[]
+    44→    44→  accountsReceivable AccountReceivable[]
+    45→    45→  accountsPayable AccountPayable[]
+    46→    46→  taxConfigs     TaxConfig[]
+    47→    47→  loyaltyTransactions LoyaltyTransaction[]
+    48→    48→  giftCards      GiftCard[]
+    49→    49→  customerComplaints CustomerComplaint[]
+    50→    50→  reportTemplates ReportTemplate[]
+    51→    51→  scheduledReports ScheduledReport[]
+    52→    52→  apiKeys        APIKey[]
+    53→    53→  webhookEndpoints WebhookEndpoint[]
+    54→    54→  dispenserProfiles DispenserProfile[]
+    55→    55→  atgProfiles    ATGProfile[]
+    56→    56→  controllerProfiles ControllerProfile[]
+    57→    57→  hardwareCatalog HardwareCatalog[]
+    58→    58→  securityAlerts SecurityAlert[]
+    59→    59→  backupRecords  BackupRecord[]
+    60→    60→  encryptionKeys EncryptionKey[]
+    61→    61→  rbacPermissions RBACPermission[]
+    62→    62→}
+    63→    63→
+    64→    64→model Station {
+    65→    65→  id            String   @id @default(cuid())
+    66→    66→  tenantId      String
+    67→    67→  name          String
+    68→    68→  code          String
+    69→    69→  address       String?
+    70→    70→  city          String?
+    71→    71→  region        String?
+    72→    72→  country       String?
+    73→    73→  phone         String?
+    74→    74→  email         String?
+    75→    75→  latitude      Float?
+    76→    76→  longitude     Float?
+    77→    77→  isActive      Boolean  @default(true)
+    78→    78→  stationType   String   @default("fuel") // fuel, cng, ev, hybrid
+    79→    79→  operatingHours String?
+    80→    80→  timezone      String   @default("Asia/Karachi")
+    81→    81→  currency      String   @default("PKR")
+    82→    82→  taxRate       Float    @default(0)
+    83→    83→  createdAt     DateTime @default(now())
+    84→    84→  updatedAt     DateTime @updatedAt
+    85→    85→
+    86→    86→  tenant             Tenant             @relation(fields: [tenantId], references: [id])
+    87→    87→  tanks              Tank[]
+    88→    88→  dispensers         Dispenser[]
+    89→    89→  shifts             Shift[]
+    90→    90→  employees          Employee[]
+    91→    91→  priceBoards        PriceBoard[]
+    92→    92→  deliveries         FuelDelivery[]
+    93→    93→  retailProducts     RetailProduct[]
+    94→    94→  lubricantProducts  LubricantProduct[]
+    95→    95→  evChargers         EVCharger[]
+    96→    96→  cngDispensers      CNGDispenser[]
+    97→    97→  anprCameras        ANPRCamera[]
+    98→    98→  rfidReaders        RFIDReader[]
+    99→    99→  retailTransactions RetailTransaction[]
+   100→   100→  transactions       Transaction[]
+   101→   101→  expenses           Expense[]
+   102→   102→  maintenanceRecords MaintenanceRecord[]
+   103→   103→  aiAlerts           AIAlert[]
+   104→   104→  chargingSessions   ChargingSession[]
+   105→   105→  carWashSessions    CarWashSession[]
+   106→   106→  environmentalAlerts EnvironmentalAlert[]
+   107→   107→  dailyReports       DailyReport[]
+   108→   108→  meterRecords       MeterRecord[]
+   109→   109→  supplierInvoices   SupplierInvoice[]
+   110→   110→  purchaseOrders     PurchaseOrder[]
+   111→   111→  tankCalibrations   TankCalibration[]
+   112→   112→  lotterySales       LotterySale[]
+   113→   113→  promotions         PromotionUsage[]
+   114→   114→  payrollRecords     PayrollRecord[]
+   115→   115→  leaveRequests      LeaveRequest[]
+   116→   116→  vaporRecoveryReadings VaporRecoveryReading[]
+   117→   117→  forecourtControllers  ForecourtController[]
+   118→   118→  paymentTerminals      PaymentTerminal[]
+   119→   119→  generators            Generator[]
+   120→   120→  surveillanceCameras   SurveillanceCamera[]
+   121→   121→  fireAlarmSystems      FireAlarmSystem[]
+   122→   122→  utilityMeters         UtilityMeter[]
+   123→   123→  weatherStations       WeatherStation[]
+   124→   124→  tankerTrackers        TankerTracker[]
+   125→   125→  carWashSystems        CarWashSystem[]
+   126→   126→  airCompressors        AirCompressor[]
+   127→   127→  vacuumStations        VacuumStation[]
+   128→   128→  deviceEventLogs       DeviceEventLog[]
+   129→   129→  deviceCommandQueues   DeviceCommandQueue[]
+   130→   130→  fuelTransfers         FuelTransfer[]
+   131→   131→  theftAlerts           TheftAlert[]
+   132→   132→  shrinkageRecords      ShrinkageRecord[]
+   133→   133→  cashDrawers           CashDrawer[]
+   134→   134→  safeDrops             SafeDrop[]
+   135→   135→  cngCompressors        CNGCompressor[]
+   136→   136→  cngStorages           CNGStorage[]
+   137→   137→  nozzleEvents          NozzleEvent[]
+   138→   138→  shiftHandovers        ShiftHandover[]
+   139→   139→  commProtocols         CommProtocol[]
+   140→   140→  commLogs              CommLog[]
+   141→   141→  journalEntries        JournalEntry[]
+   142→   142→}
+   143→   143→
+   144→   144→model User {
+   145→   145→  id          String   @id @default(cuid())
+   146→   146→  tenantId    String
+   147→   147→  email       String   @unique
+   148→   148→  name        String
+   149→   149→  role        String   @default("viewer") // superadmin, admin, manager, operator, cashier, attendant, viewer
+   150→   150→  avatar      String?
+   151→   151→  isActive    Boolean  @default(true)
+   152→   152→  lastLogin   DateTime?
+   153→   153→  createdAt   DateTime @default(now())
+   154→   154→  updatedAt   DateTime @updatedAt
+   155→   155→
+   156→   156→  tenant     Tenant     @relation(fields: [tenantId], references: [id])
+   157→   157→  auditLogs      AuditLog[]
+   158→   158→  sessions       SecuritySession[]
+   159→   159→}
+   160→   160→
+   161→   161→// =====================================================
+   162→   162→// FORECOURT - DISPENSERS, NOZZLES, PUMPS
+   163→   163→// =====================================================
+   164→   164→
+   165→   165→model Dispenser {
+   166→   166→  id                     String   @id @default(cuid())
+   167→   167→  stationId              String
+   168→   168→  name                   String
+   169→   169→  code                   String
+   170→   170→  manufacturer           String?  // tatsuno, gilbarco, wayne, tokheim, bennett, petrotec, scheidt_bachmann, etc.
+   171→   171→  model                  String?
+   172→   172→  serialNumber           String?
+   173→   173→  controllerType         String?  // pts, fusion, doms, hectronic, etc.
+   174→   174→  forecourtControllerId  String?  // Links to ForecourtController - ERP never talks directly to pump
+   175→   175→  communicationType      String?  // tcpip, rs232, rs485, serial, ethernet
+   176→   176→  ipAddress              String?
+   177→   177→  port                   Int?
+   178→   178→  pumpLane               Int      @default(1)
+   179→   179→  pumpAddress            Int?     // Logical address on the controller bus (1-32)
+   180→   180→  protocol               String?  // ifsf, patrius, dfs, wayne-dart, gilbarco-g-site, proprietary
+   181→   181→  nozzleCount            Int      @default(2)
+   182→   182→  flowRate               Float?   // L/min max flow rate
+   183→   183→  supportedFuels         String?  // JSON: ["petrol", "diesel", "premium", "hsd"]
+   184→   184→  firmwareVersion        String?
+   185→   185→  lastMeterReading       Float    @default(0)
+   186→   186→  status                 String   @default("idle") // idle, fueling, stopped, error, locked, maintenance, offline, authorized
+   187→   187→  isActive               Boolean  @default(true)
+   188→   188→  lastCommunication      DateTime?
+   189→   189→  installedDate          DateTime?
+   190→   190→  warrantyExpiry         DateTime?
+   191→   191→  configJson             String?  // Extended vendor-specific config
+   192→   192→  createdAt              DateTime @default(now())
+   193→   193→  updatedAt              DateTime @updatedAt
+   194→   194→
+   195→   195→  station              Station              @relation(fields: [stationId], references: [id])
+   196→   196→  forecourtController  ForecourtController? @relation(fields: [forecourtControllerId], references: [id])
+   197→   197→  nozzles              Nozzle[]
+   198→   198→  fuelings              Fueling[]
+   199→   199→}
+   200→   200→
+   201→   201→model Nozzle {
+   202→   202→  id              String   @id @default(cuid())
+   203→   203→  dispenserId     String
+   204→   204→  nozzleNumber    Int
+   205→   205→  fuelType        String
+   206→   206→  fuelGrade       String?
+   207→   207→  meterReading    Float    @default(0)
+   208→   208→  previousReading Float    @default(0)
+   209→   209→  totalizer       Float    @default(0)
+   210→   210→  calibrationDate DateTime?
+   211→   211→  calibrationFactor Float  @default(1.0)
+   212→   212→  status          String   @default("idle")
+   213→   213→  isActive        Boolean  @default(true)
+   214→   214→  lastCalibration DateTime?
+   215→   215→  createdAt       DateTime @default(now())
+   216→   216→  updatedAt       DateTime @updatedAt
+   217→   217→
+   218→   218→  dispenser        Dispenser         @relation(fields: [dispenserId], references: [id])
+   219→   219→  fuelings         Fueling[]
+   220→   220→  maintenanceRecords MaintenanceRecord[]
+   221→   221→  meterRecords     MeterRecord[]
+   222→   222→  nozzleEvents     NozzleEvent[]
+   223→   223→}
+   224→   224→
+   225→   225→// =====================================================
+   226→   226→// TANK & WET STOCK MANAGEMENT
+   227→   227→// =====================================================
+   228→   228→
+   229→   229→model Tank {
+   230→   230→  id              String   @id @default(cuid())
+   231→   231→  stationId       String
+   232→   232→  name            String
+   233→   233→  code            String
+   234→   234→  capacity        Float
+   235→   235→  currentLevel    Float    @default(0)
+   236→   236→  waterLevel      Float    @default(0)
+   237→   237→  temperature     Float    @default(0)
+   238→   238→  density         Float?
+   239→   239→  fuelType        String
+   240→   240→  atgType         String?
+   241→   241→  atgIpAddress    String?
+   242→   242→  atgPort         Int?
+   243→   243→  status          String   @default("normal")
+   244→   244→  lastReading     DateTime?
+   245→   245→  createdAt       DateTime @default(now())
+   246→   246→  updatedAt       DateTime @updatedAt
+   247→   247→
+   248→   248→  station          Station           @relation(fields: [stationId], references: [id])
+   249→   249→  deliveries       FuelDelivery[]
+   250→   250→  tankReadings     TankReading[]
+   251→   251→  reconciliations  Reconciliation[]
+   252→   252→  calibrations     TankCalibration[]
+   253→   253→  transfersFrom    FuelTransfer[]  @relation("TransferFrom")
+   254→   254→  transfersTo      FuelTransfer[]  @relation("TransferTo")
+   255→   255→  shrinkageRecords ShrinkageRecord[]
+   256→   256→}
+   257→   257→
+   258→   258→model TankReading {
+   259→   259→  id          String   @id @default(cuid())
+   260→   260→  tankId      String
+   261→   261→  level       Float
+   262→   262→  volume      Float
+   263→   263→  waterLevel  Float
+   264→   264→  temperature Float
+   265→   265→  density     Float?
+   266→   266→  readingType String   @default("automatic")
+   267→   267→  readingAt   DateTime @default(now())
+   268→   268→  createdAt   DateTime @default(now())
+   269→   269→
+   270→   270→  tank        Tank     @relation(fields: [tankId], references: [id])
+   271→   271→}
+   272→   272→
+   273→   273→model FuelDelivery {
+   274→   274→  id              String   @id @default(cuid())
+   275→   275→  stationId       String
+   276→   276→  tankId          String
+   277→   277→  supplierId      String?
+   278→   278→  supplierName    String
+   279→   279→  tankerNumber    String?
+   280→   280→  driverName      String?
+   281→   281→  expectedVolume  Float
+   282→   282→  actualVolume    Float    @default(0)
+   283→   283→  density         Float?
+   284→   284→  temperature     Float?
+   285→   285→  productType     String
+   286→   286→  status          String   @default("pending") // pending, arriving, unloading, completed, discrepancy
+   287→   287→  deliveryDate    DateTime
+   288→   288→  completedAt     DateTime?
+   289→   289→  notes           String?
+   290→   290→  variance        Float?
+   291→   291→  invoiceNumber   String?
+   292→   292→  costPerUnit     Float?
+   293→   293→  totalCost       Float?
+   294→   294→  createdAt       DateTime @default(now())
+   295→   295→  updatedAt       DateTime @updatedAt
+   296→   296→
+   297→   297→  station     Station          @relation(fields: [stationId], references: [id])
+   298→   298→  tank        Tank             @relation(fields: [tankId], references: [id])
+   299→   299→  supplier    Supplier?        @relation(fields: [supplierId], references: [id])
+   300→   300→}
+   301→   301→
+   302→   302→model Reconciliation {
+   303→   303→  id                  String   @id @default(cuid())
+   304→   304→  tankId              String
+   305→   305→  stationId           String
+   306→   306→  date                DateTime
+   307→   307→  openingStock        Float
+   308→   308→  deliveries          Float    @default(0)
+   309→   309→  sales               Float    @default(0)
+   310→   310→  closingStock        Float
+   311→   311→  bookStock           Float
+   312→   312→  actualStock         Float
+   313→   313→  variance            Float
+   314→   314→  variancePercentage  Float
+   315→   315→  status              String   @default("pending") // pending, reviewed, approved
+   316→   316→  reviewedBy          String?
+   317→   317→  notes               String?
+   318→   318→  createdAt           DateTime @default(now())
+   319→   319→  updatedAt           DateTime @updatedAt
+   320→   320→
+   321→   321→  tank        Tank     @relation(fields: [tankId], references: [id])
+   322→   322→}
+   323→   323→
+   324→   324→model TankCalibration {
+   325→   325→  id              String   @id @default(cuid())
+   326→   326→  stationId       String
+   327→   327→  tankId          String
+   328→   328→  calibrationDate DateTime
+   329→   329→  calibratedBy    String?
+   330→   330→  certificateNumber String?
+   331→   331→  volumeTable     String   // JSON string of height->volume mapping
+   332→   332→  notes           String?
+   333→   333→  createdAt       DateTime @default(now())
+   334→   334→
+   335→   335→  station        Station   @relation(fields: [stationId], references: [id])
+   336→   336→  tank           Tank      @relation(fields: [tankId], references: [id])
+   337→   337→}
+   338→   338→
+   339→   339→model MeterRecord {
+   340→   340→  id              String   @id @default(cuid())
+   341→   341→  stationId       String
+   342→   342→  nozzleId        String
+   343→   343→  shiftId         String?
+   344→   344→  readingStart    Float
+   345→   345→  readingEnd      Float?
+   346→   346→  volumeDispensed Float?
+   347→   347→  recordedAt      DateTime @default(now())
+   348→   348→  createdAt       DateTime @default(now())
+   349→   349→
+   350→   350→  station         Station  @relation(fields: [stationId], references: [id])
+   351→   351→  nozzle          Nozzle   @relation(fields: [nozzleId], references: [id])
+   352→   352→}
+   353→   353→
+   354→   354→// =====================================================
+   355→   355→// FUEL SALES & SHIFT MANAGEMENT
+   356→   356→// =====================================================
+   357→   357→
+   358→   358→model Fueling {
+   359→   359→  id              String   @id @default(cuid())
+   360→   360→  stationId       String
+   361→   361→  dispenserId     String
+   362→   362→  nozzleId        String
+   363→   363→  shiftId         String?
+   364→   364→  fuelType        String
+   365→   365→  volume          Float
+   366→   366→  pricePerUnit    Float
+   367→   367→  totalAmount     Float
+   368→   368→  paymentMethod   String   @default("cash")
+   369→   369→  meterStart      Float
+   370→   370→  meterEnd        Float
+   371→   371→  attendantId     String?
+   372→   372→  vehiclePlate    String?
+   373→   373→  rfidTag         String?
+   374→   374→  fleetAccountId  String?
+   375→   375→  customerId      String?
+   376→   376→  loyaltyPoints   Int      @default(0)
+   377→   377→  status          String   @default("completed")
+   378→   378→  startedAt       DateTime
+   379→   379→  completedAt     DateTime?
+   380→   380→  createdAt       DateTime @default(now())
+   381→   381→
+   382→   382→  dispenser     Dispenser     @relation(fields: [dispenserId], references: [id])
+   383→   383→  nozzle       Nozzle        @relation(fields: [nozzleId], references: [id])
+   384→   384→  shift        Shift?        @relation(fields: [shiftId], references: [id])
+   385→   385→  attendant    Employee?     @relation(fields: [attendantId], references: [id])
+   386→   386→  fleetAccount FleetAccount? @relation(fields: [fleetAccountId], references: [id])
+   387→   387→  customer     Customer?     @relation(fields: [customerId], references: [id])
+   388→   388→}
+   389→   389→
+   390→   390→model Shift {
+   391→   391→  id              String   @id @default(cuid())
+   392→   392→  stationId       String
+   393→   393→  shiftNumber     Int
+   394→   394→  attendantId     String?
+   395→   395→  supervisorId    String?
+   396→   396→  openedAt        DateTime
+   397→   397→  closedAt        DateTime?
+   398→   398→  openingCash     Float    @default(0)
+   399→   399→  closingCash     Float?
+   400→   400→  expectedCash    Float?
+   401→   401→  cashVariance    Float?
+   402→   402→  totalSales      Float    @default(0)
+   403→   403→  totalVolume     Float    @default(0)
+   404→   404→  fuelSales       Float    @default(0)
+   405→   405→  retailSales     Float    @default(0)
+   406→   406→  cardSales       Float    @default(0)
+   407→   407→  fleetSales      Float    @default(0)
+   408→   408→  creditSales     Float    @default(0)
+   409→   409→  cashSales       Float    @default(0)
+   410→   410→  transactionCount Int     @default(0)
+   411→   411→  status          String   @default("open") // open, closed, reconciled
+   412→   412→  notes           String?
+   413→   413→  createdAt       DateTime @default(now())
+   414→   414→  updatedAt       DateTime @updatedAt
+   415→   415→
+   416→   416→  station            Station            @relation(fields: [stationId], references: [id])
+   417→   417→  fuelings           Fueling[]
+   418→   418→  attendant          Employee?          @relation("ShiftAttendant", fields: [attendantId], references: [id])
+   419→   419→  supervisor         Employee?          @relation("ShiftSupervisor", fields: [supervisorId], references: [id])
+   420→   420→  retailTransactions RetailTransaction[]
+   421→   421→}
+   422→   422→
+   423→   423→// =====================================================
+   424→   424→// FLEET & RFID
+   425→   425→// =====================================================
+   426→   426→
+   427→   427→model FleetAccount {
+   428→   428→  id              String   @id @default(cuid())
+   429→   429→  tenantId        String
+   430→   430→  companyName     String
+   431→   431→  contactPerson   String?
+   432→   432→  phone           String?
+   433→   433→  email           String?
+   434→   434→  address         String?
+   435→   435→  creditLimit     Float    @default(0)
+   436→   436→  currentBalance  Float    @default(0)
+   437→   437→  dailyLimit      Float?
+   438→   438→  monthlyLimit    Float?
+   439→   439→  fuelTypes       String?
+   440→   440→  status          String   @default("active")
+   441→   441→  paymentTerms    String?  // net15, net30, cod, prepaid
+   442→   442→  taxExempt       Boolean  @default(false)
+   443→   443→  createdAt       DateTime @default(now())
+   444→   444→  updatedAt       DateTime @updatedAt
+   445→   445→
+   446→   446→  tenant       Tenant      @relation(fields: [tenantId], references: [id])
+   447→   447→  vehicles     Vehicle[]
+   448→   448→  drivers      Driver[]
+   449→   449→  fuelCards    FuelCard[]
+   450→   450→  fuelings     Fueling[]
+   451→   451→}
+   452→   452→
+   453→   453→model Vehicle {
+   454→   454→  id              String   @id @default(cuid())
+   455→   455→  fleetAccountId  String
+   456→   456→  plateNumber     String
+   457→   457→  make            String?
+   458→   458→  model           String?
+   459→   459→  year            Int?
+   460→   460→  vehicleType     String?
+   461→   461→  rfidTag         String?
+   462→   462→  fuelType        String?
+   463→   463→  tankCapacity    Float?
+   464→   464→  dailyLimit      Float?
+   465→   465→  odometer        Float?
+   466→   466→  isActive        Boolean  @default(true)
+   467→   467→  createdAt       DateTime @default(now())
+   468→   468→  updatedAt       DateTime @updatedAt
+   469→   469→
+   470→   470→  fleetAccount    FleetAccount @relation(fields: [fleetAccountId], references: [id])
+   471→   471→}
+   472→   472→
+   473→   473→model Driver {
+   474→   474→  id              String   @id @default(cuid())
+   475→   475→  fleetAccountId  String
+   476→   476→  name            String
+   477→   477→  licenseNumber   String?
+   478→   478→  phone           String?
+   479→   479→  rfidCard        String?
+   480→   480→  isActive        Boolean  @default(true)
+   481→   481→  createdAt       DateTime @default(now())
+   482→   482→  updatedAt       DateTime @updatedAt
+   483→   483→
+   484→   484→  fleetAccount    FleetAccount @relation(fields: [fleetAccountId], references: [id])
+   485→   485→}
+   486→   486→
+   487→   487→model FuelCard {
+   488→   488→  id              String   @id @default(cuid())
+   489→   489→  tenantId        String
+   490→   490→  cardNumber      String   @unique
+   491→   491→  fleetAccountId  String?
+   492→   492→  cardType        String   @default("fleet")
+   493→   493→  rfidTag         String?
+   494→   494→  pin             String?
+   495→   495→  dailyLimit      Float?
+   496→   496→  monthlyLimit    Float?
+   497→   497→  balance         Float    @default(0)
+   498→   498→  isActive        Boolean  @default(true)
+   499→   499→  expiryDate      DateTime?
+   500→   500→  createdAt       DateTime @default(now())
+   501→   501→  updatedAt       DateTime @updatedAt
+   502→   502→
+   503→   503→  tenant       Tenant      @relation(fields: [tenantId], references: [id])
+   504→   504→  fleetAccount FleetAccount? @relation(fields: [fleetAccountId], references: [id])
+   505→   505→}
+   506→   506→
+   507→   507→model RFIDReader {
+   508→   508→  id          String   @id @default(cuid())
+   509→   509→  stationId   String
+   510→   510→  name        String
+   511→   511→  code        String
+   512→   512→  readerType  String   @default("vehicle")
+   513→   513→  ipAddress   String?
+   514→   514→  port        Int?
+   515→   515→  status      String   @default("online")
+   516→   516→  isActive    Boolean  @default(true)
+   517→   517→  createdAt   DateTime @default(now())
+   518→   518→  updatedAt   DateTime @updatedAt
+   519→   519→
+   520→   520→  station     Station   @relation(fields: [stationId], references: [id])
+   521→   521→}
+   522→   522→
+   523→   523→model ANPRCamera {
+   524→   524→  id          String   @id @default(cuid())
+   525→   525→  stationId   String
+   526→   526→  name        String
+   527→   527→  code        String
+   528→   528→  ipAddress   String?
+   529→   529→  port        Int?
+   530→   530→  location    String?
+   531→   531→  status      String   @default("online")
+   532→   532→  isActive    Boolean  @default(true)
+   533→   533→  createdAt   DateTime @default(now())
+   534→   534→  updatedAt   DateTime @updatedAt
+   535→   535→
+   536→   536→  station     Station   @relation(fields: [stationId], references: [id])
+   537→   537→}
+   538→   538→
+   539→   539→// =====================================================
+   540→   540→// PRICE MANAGEMENT
+   541→   541→// =====================================================
+   542→   542→
+   543→   543→model FuelPrice {
+   544→   544→  id            String   @id @default(cuid())
+   545→   545→  tenantId      String
+   546→   546→  stationId     String?
+   547→   547→  fuelType      String
+   548→   548→  fuelGrade     String?
+   549→   549→  pricePerUnit  Float
+   550→   550→  previousPrice Float?
+   551→   551→  currency      String   @default("PKR")
+   552→   552→  effectiveFrom DateTime
+   553→   553→  effectiveTo   DateTime?
+   554→   554→  status        String   @default("active")
+   555→   555→  updatedBy     String?
+   556→   556→  isGovernment  Boolean  @default(false)
+   557→   557→  scheduledAt   DateTime?
+   558→   558→  createdAt     DateTime @default(now())
+   559→   559→  updatedAt     DateTime @updatedAt
+   560→   560→}
+   561→   561→
+   562→   562→model PriceBoard {
+   563→   563→  id          String   @id @default(cuid())
+   564→   564→  stationId   String
+   565→   565→  name        String
+   566→   566→  boardType   String   @default("led")
+   567→   567→  ipAddress   String?
+   568→   568→  port        Int?
+   569→   569→  status      String   @default("online")
+   570→   570→  isActive    Boolean  @default(true)
+   571→   571→  lastUpdate  DateTime?
+   572→   572→  createdAt   DateTime @default(now())
+   573→   573→  updatedAt   DateTime @updatedAt
+   574→   574→
+   575→   575→  station     Station   @relation(fields: [stationId], references: [id])
+   576→   576→}
+   577→   577→
+   578→   578→// =====================================================
+   579→   579→// RETAIL STORE & SERVICES
+   580→   580→// =====================================================
+   581→   581→
+   582→   582→model RetailProduct {
+   583→   583→  id          String   @id @default(cuid())
+   584→   584→  stationId   String
+   585→   585→  name        String
+   586→   586→  sku         String?
+   587→   587→  category    String?
+   588→   588→  barcode     String?
+   589→   589→  price       Float
+   590→   590→  costPrice   Float?
+   591→   591→  stockQty    Int      @default(0)
+   592→   592→  minStock    Int      @default(5)
+   593→   593→  maxStock    Int      @default(100)
+   594→   594→  unit        String   @default("piece")
+   595→   595→  supplierId  String?
+   596→   596→  reorderPoint Int     @default(10)
+   597→   597→  isActive    Boolean  @default(true)
+   598→   598→  createdAt   DateTime @default(now())
+   599→   599→  updatedAt   DateTime @updatedAt
+   600→   600→
+   601→   601→  station     Station   @relation(fields: [stationId], references: [id])
+   602→   602→}
+   603→   603→
+   604→   604→model RetailTransaction {
+   605→   605→  id             String   @id @default(cuid())
+   606→   606→  stationId      String
+   607→   607→  shiftId        String?
+   608→   608→  totalAmount    Float
+   609→   609→  paymentMethod  String   @default("cash")
+   610→   610→  items          String   // JSON string of items
+   611→   611→  posTerminal    String?
+   612→   612→  discountAmount Float    @default(0)
+   613→   613→  loyaltyPointsUsed Int   @default(0)
+   614→   614→  status         String   @default("completed")
+   615→   615→  createdAt      DateTime @default(now())
+   616→   616→
+   617→   617→  station        Station  @relation(fields: [stationId], references: [id])
+   618→   618→  shift          Shift?   @relation(fields: [shiftId], references: [id])
+   619→   619→}
+   620→   620→
+   621→   621→model LubricantProduct {
+   622→   622→  id          String   @id @default(cuid())
+   623→   623→  stationId   String
+   624→   624→  name        String
+   625→   625→  brand       String?
+   626→   626→  viscosity   String?
+   627→   627→  category    String?
+   628→   628→  price       Float
+   629→   629→  costPrice   Float?
+   630→   630→  stockQty    Int      @default(0)
+   631→   631→  minStock    Int      @default(5)
+   632→   632→  isActive    Boolean  @default(true)
+   633→   633→  createdAt   DateTime @default(now())
+   634→   634→  updatedAt   DateTime @updatedAt
+   635→   635→
+   636→   636→  station     Station   @relation(fields: [stationId], references: [id])
+   637→   637→}
+   638→   638→
+   639→   639→model CarWashSession {
+   640→   640→  id          String   @id @default(cuid())
+   641→   641→  stationId   String
+   642→   642→  shiftId     String?
+   643→   643→  vehiclePlate String?
+   644→   644→  washType    String   // basic, premium, deluxe
+   645→   645→  amount      Float
+   646→   646→  paymentMethod String @default("cash")
+   647→   647→  status      String   @default("completed")
+   648→   648→  startedAt   DateTime @default(now())
+   649→   649→  completedAt DateTime?
+   650→   650→  createdAt   DateTime @default(now())
+   651→   651→
+   652→   652→  station     Station   @relation(fields: [stationId], references: [id])
+   653→   653→}
+   654→   654→
+   655→   655→model LotterySale {
+   656→   656→  id          String   @id @default(cuid())
+   657→   657→  stationId   String
+   658→   658→  shiftId     String?
+   659→   659→  gameType    String   // scratch, draw, online
+   660→   660→  ticketCount Int      @default(1)
+   661→   661→  saleAmount  Float
+   662→   662→  commission  Float    @default(0)
+   663→   663→  status      String   @default("completed")
+   664→   664→  createdAt   DateTime @default(now())
+   665→   665→
+   666→   666→  station     Station   @relation(fields: [stationId], references: [id])
+   667→   667→}
+   668→   668→
+   669→   669→// =====================================================
+   670→   670→// SUPPLIER & PROCUREMENT
+   671→   671→// =====================================================
+   672→   672→
+   673→   673→model Supplier {
+   674→   674→  id              String   @id @default(cuid())
+   675→   675→  tenantId        String
+   676→   676→  name            String
+   677→   677→  code            String?
+   678→   678→  contactPerson   String?
+   679→   679→  phone           String?
+   680→   680→  email           String?
+   681→   681→  address         String?
+   682→   682→  city            String?
+   683→   683→  category        String   // fuel, lubricant, retail, maintenance, other
+   684→   684→  paymentTerms    String?
+   685→   685→  taxId           String?
+   686→   686→  isActive        Boolean  @default(true)
+   687→   687→  createdAt       DateTime @default(now())
+   688→   688→  updatedAt       DateTime @updatedAt
+   689→   689→
+   690→   690→  tenant          Tenant          @relation(fields: [tenantId], references: [id])
+   691→   691→  deliveries      FuelDelivery[]
+   692→   692→  invoices        SupplierInvoice[]
+   693→   693→  purchaseOrders  PurchaseOrder[]
+   694→   694→}
+   695→   695→
+   696→   696→model SupplierInvoice {
+   697→   697→  id              String   @id @default(cuid())
+   698→   698→  stationId       String
+   699→   699→  supplierId      String
+   700→   700→  invoiceNumber   String
+   701→   701→  invoiceDate     DateTime
+   702→   702→  dueDate         DateTime?
+   703→   703→  totalAmount     Float
+   704→   704→  taxAmount       Float    @default(0)
+   705→   705→  netAmount       Float
+   706→   706→  status          String   @default("pending") // pending, approved, paid, overdue, cancelled
+   707→   707→  paidAmount      Float    @default(0)
+   708→   708→  paidDate        DateTime?
+   709→   709→  notes           String?
+   710→   710→  createdAt       DateTime @default(now())
+   711→   711→  updatedAt       DateTime @updatedAt
+   712→   712→
+   713→   713→  station         Station   @relation(fields: [stationId], references: [id])
+   714→   714→  supplier        Supplier  @relation(fields: [supplierId], references: [id])
+   715→   715→}
+   716→   716→
+   717→   717→model PurchaseOrder {
+   718→   718→  id              String   @id @default(cuid())
+   719→   719→  stationId       String
+   720→   720→  supplierId      String
+   721→   721→  poNumber        String
+   722→   722→  orderDate       DateTime
+   723→   723→  expectedDate    DateTime?
+   724→   724→  items           String   // JSON string of line items
+   725→   725→  totalAmount     Float
+   726→   726→  status          String   @default("draft") // draft, submitted, approved, received, cancelled
+   727→   727→  approvedBy      String?
+   728→   728→  notes           String?
+   729→   729→  createdAt       DateTime @default(now())
+   730→   730→  updatedAt       DateTime @updatedAt
+   731→   731→
+   732→   732→  station         Station   @relation(fields: [stationId], references: [id])
+   733→   733→  supplier        Supplier  @relation(fields: [supplierId], references: [id])
+   734→   734→}
+   735→   735→
+   736→   736→// =====================================================
+   737→   737→// EV & CNG
+   738→   738→// =====================================================
+   739→   739→
+   740→   740→model EVCharger {
+   741→   741→  id              String   @id @default(cuid())
+   742→   742→  stationId       String
+   743→   743→  name            String
+   744→   744→  code            String
+   745→   745→  connectorType   String   @default("type2")
+   746→   746→  maxPowerKw      Float    @default(50)
+   747→   747→  status          String   @default("available")
+   748→   748→  currentSession  String?
+   749→   749→  isActive        Boolean  @default(true)
+   750→   750→  createdAt       DateTime @default(now())
+   751→   751→  updatedAt       DateTime @updatedAt
+   752→   752→
+   753→   753→  station     Station      @relation(fields: [stationId], references: [id])
+   754→   754→  sessions    ChargingSession[]
+   755→   755→}
+   756→   756→
+   757→   757→model ChargingSession {
+   758→   758→  id              String   @id @default(cuid())
+   759→   759→  chargerId       String
+   760→   760→  stationId       String
+   761→   761→
+   762→   762→  station         Station  @relation(fields: [stationId], references: [id])
+   763→   763→  vehiclePlate    String?
+   764→   764→  energyKwh       Float    @default(0)
+   765→   765→  durationMinutes Int      @default(0)
+   766→   766→  pricePerKwh     Float
+   767→   767→  totalAmount     Float    @default(0)
+   768→   768→  paymentMethod   String   @default("cash")
+   769→   769→  status          String   @default("active")
+   770→   770→  startedAt       DateTime
+   771→   771→  completedAt     DateTime?
+   772→   772→  createdAt       DateTime @default(now())
+   773→   773→
+   774→   774→  evCharger   EVCharger @relation(fields: [chargerId], references: [id])
+   775→   775→}
+   776→   776→
+   777→   777→model CNGDispenser {
+   778→   778→  id              String   @id @default(cuid())
+   779→   779→  stationId       String
+   780→   780→  name            String
+   781→   781→  code            String
+   782→   782→  pressure        Float?
+   783→   783→  status          String   @default("idle")
+   784→   784→  isActive        Boolean  @default(true)
+   785→   785→  createdAt       DateTime @default(now())
+   786→   786→  updatedAt       DateTime @updatedAt
+   787→   787→
+   788→   788→  station     Station   @relation(fields: [stationId], references: [id])
+   789→   789→}
+   790→   790→
+   791→   791→// =====================================================
+   792→   792→// EMPLOYEE MANAGEMENT
+   793→   793→// =====================================================
+   794→   794→
+   795→   795→model Employee {
+   796→   796→  id              String   @id @default(cuid())
+   797→   797→  stationId       String
+   798→   798→  name            String
+   799→   799→  employeeId      String?
+   800→   800→  role            String   @default("attendant")
+   801→   801→  phone           String?
+   802→   802→  email           String?
+   803→   803→  hireDate        DateTime?
+   804→   804→  salary          Float?
+   805→   805→  commissionRate  Float    @default(0)
+   806→   806→  status          String   @default("active")
+   807→   807→  avatar          String?
+   808→   808→  createdAt       DateTime @default(now())
+   809→   809→  updatedAt       DateTime @updatedAt
+   810→   810→
+   811→   811→  station        Station         @relation(fields: [stationId], references: [id])
+   812→   812→  shifts         Shift[]              @relation("ShiftAttendant")
+   813→   813→  supervisedShifts Shift[]              @relation("ShiftSupervisor")
+   814→   814→  fuelings       Fueling[]
+   815→   815→  attendance     Attendance[]
+   816→   816→  payrollRecords PayrollRecord[]
+   817→   817→  leaveRequests  LeaveRequest[]
+   818→   818→}
+   819→   819→
+   820→   820→model Attendance {
+   821→   821→  id          String   @id @default(cuid())
+   822→   822→  employeeId  String
+   823→   823→  stationId   String
+   824→   824→  checkIn     DateTime
+   825→   825→  checkOut    DateTime?
+   826→   826→  status      String   @default("present") // present, absent, late, half_day
+   827→   827→  hoursWorked Float?
+   828→   828→  notes       String?
+   829→   829→  createdAt   DateTime @default(now())
+   830→   830→
+   831→   831→  employee    Employee  @relation(fields: [employeeId], references: [id])
+   832→   832→}
+   833→   833→
+   834→   834→model PayrollRecord {
+   835→   835→  id              String   @id @default(cuid())
+   836→   836→  stationId       String
+   837→   837→  employeeId      String
+   838→   838→  periodStart     DateTime
+   839→   839→  periodEnd       DateTime
+   840→   840→  baseSalary      Float
+   841→   841→  overtimeHours   Float    @default(0)
+   842→   842→  overtimePay     Float    @default(0)
+   843→   843→  commissions     Float    @default(0)
+   844→   844→  deductions      Float    @default(0)
+   845→   845→  taxDeductions   Float    @default(0)
+   846→   846→  netPay          Float
+   847→   847→  status          String   @default("pending") // pending, approved, paid
+   848→   848→  paidDate        DateTime?
+   849→   849→  createdAt       DateTime @default(now())
+   850→   850→  updatedAt       DateTime @updatedAt
+   851→   851→
+   852→   852→  station         Station   @relation(fields: [stationId], references: [id])
+   853→   853→  employee        Employee  @relation(fields: [employeeId], references: [id])
+   854→   854→}
+   855→   855→
+   856→   856→model LeaveRequest {
+   857→   857→  id              String   @id @default(cuid())
+   858→   858→  stationId       String
+   859→   859→  employeeId      String
+   860→   860→  leaveType       String   // annual, sick, personal, unpaid
+   861→   861→  startDate       DateTime
+   862→   862→  endDate         DateTime
+   863→   863→  reason          String?
+   864→   864→  status          String   @default("pending") // pending, approved, rejected
+   865→   865→  approvedBy      String?
+   866→   866→  createdAt       DateTime @default(now())
+   867→   867→  updatedAt       DateTime @updatedAt
+   868→   868→
+   869→   869→  station         Station   @relation(fields: [stationId], references: [id])
+   870→   870→  employee        Employee  @relation(fields: [employeeId], references: [id])
+   871→   871→}
+   872→   872→
+   873→   873→// =====================================================
+   874→   874→// CRM & LOYALTY
+   875→   875→// =====================================================
+   876→   876→
+   877→   877→model Customer {
+   878→   878→  id              String   @id @default(cuid())
+   879→   879→  tenantId        String
+   880→   880→  name            String
+   881→   881→  phone           String?
+   882→   882→  email           String?
+   883→   883→  loyaltyPoints   Int      @default(0)
+   884→   884→  membershipTier  String   @default("basic")
+   885→   885→  totalSpent      Float    @default(0)
+   886→   886→  totalVisits     Int      @default(0)
+   887→   887→  lastVisit       DateTime?
+   888→   888→  isActive        Boolean  @default(true)
+   889→   889→  createdAt       DateTime @default(now())
+   890→   890→  updatedAt       DateTime @updatedAt
+   891→   891→
+   892→   892→  tenant       Tenant     @relation(fields: [tenantId], references: [id])
+   893→   893→  fuelings     Fueling[]
+   894→   894→}
+   895→   895→
+   896→   896→model LoyaltyRule {
+   897→   897→  id              String   @id @default(cuid())
+   898→   898→  tenantId        String
+   899→   899→  name            String
+   900→   900→  pointsPerUnit   Float    @default(1)
+   901→   901→  fuelType        String?  // null = all fuel types
+   902→   902→  minimumPurchase Float?
+   903→   903→  bonusMultiplier Float    @default(1)
+   904→   904→  isActive        Boolean  @default(true)
+   905→   905→  validFrom       DateTime?
+   906→   906→  validTo         DateTime?
+   907→   907→  createdAt       DateTime @default(now())
+   908→   908→  updatedAt       DateTime @updatedAt
+   909→   909→
+   910→   910→  tenant       Tenant     @relation(fields: [tenantId], references: [id])
+   911→   911→}
+   912→   912→
+   913→   913→model Promotion {
+   914→   914→  id              String   @id @default(cuid())
+   915→   915→  tenantId        String
+   916→   916→  name            String
+   917→   917→  description     String?
+   918→   918→  discountType    String   // percentage, fixed, bogo
+   919→   919→  discountValue   Float
+   920→   920→  applicableTo    String   // fuel, retail, car_wash, all
+   921→   921→  fuelType        String?
+   922→   922→  minimumPurchase Float?
+   923→   923→  validFrom       DateTime
+   924→   924→  validTo         DateTime
+   925→   925→  isActive        Boolean  @default(true)
+   926→   926→  createdAt       DateTime @default(now())
+   927→   927→  updatedAt       DateTime @updatedAt
+   928→   928→
+   929→   929→  tenant         Tenant           @relation(fields: [tenantId], references: [id])
+   930→   930→  usage          PromotionUsage[]
+   931→   931→}
+   932→   932→
+   933→   933→model PromotionUsage {
+   934→   934→  id              String   @id @default(cuid())
+   935→   935→  stationId       String
+   936→   936→  promotionId     String
+   937→   937→  customerName    String?
+   938→   938→  discountAmount  Float
+   939→   939→  createdAt       DateTime @default(now())
+   940→   940→
+   941→   941→  station         Station    @relation(fields: [stationId], references: [id])
+   942→   942→  promotion       Promotion  @relation(fields: [promotionId], references: [id])
+   943→   943→}
+   944→   944→
+   945→   945→// =====================================================
+   946→   946→// FINANCE & ACCOUNTING
+   947→   947→// =====================================================
+   948→   948→
+   949→   949→model Transaction {
+   950→   950→  id              String   @id @default(cuid())
+   951→   951→  stationId       String
+   952→   952→  tenantId        String
+   953→   953→
+   954→   954→  station         Station  @relation(fields: [stationId], references: [id])
+   955→   955→  type            String
+   956→   956→  category        String
+   957→   957→  amount          Float
+   958→   958→  description     String?
+   959→   959→  referenceNumber String?
+   960→   960→  paymentMethod   String   @default("cash")
+   961→   961→  status          String   @default("completed")
+   962→   962→  date            DateTime
+   963→   963→  createdAt       DateTime @default(now())
+   964→   964→  updatedAt       DateTime @updatedAt
+   965→   965→}
+   966→   966→
+   967→   967→model Expense {
+   968→   968→  id              String   @id @default(cuid())
+   969→   969→  stationId       String
+   970→   970→
+   971→   971→  station         Station  @relation(fields: [stationId], references: [id])
+   972→   972→  category        String
+   973→   973→  amount          Float
+   974→   974→  description     String?
+   975→   975→  vendor          String?
+   976→   976→  receiptNumber   String?
+   977→   977→  date            DateTime
+   978→   978→  approvedBy      String?
+   979→   979→  status          String   @default("pending")
+   980→   980→  createdAt       DateTime @default(now())
+   981→   981→  updatedAt       DateTime @updatedAt
+   982→   982→}
+   983→   983→
+   984→   984→// =====================================================
+   985→   985→// MAINTENANCE
+   986→   986→// =====================================================
+   987→   987→
+   988→   988→model MaintenanceRecord {
+   989→   989→  id              String   @id @default(cuid())
+   990→   990→  stationId       String
+   991→   991→  equipmentType   String
+   992→   992→  equipmentId     String
+   993→   993→  nozzleId        String?
+   994→   994→
+   995→   995→  station         Station  @relation(fields: [stationId], references: [id])
+   996→   996→  type            String
+   997→   997→  description     String
+   998→   998→  technician      String?
+   999→   999→  cost            Float    @default(0)
+  1000→  1000→  status          String   @default("scheduled")
+  1001→  1001→  scheduledDate   DateTime
+  1002→  1002→  completedDate   DateTime?
+  1003→  1003→  notes           String?
+  1004→  1004→  createdAt       DateTime @default(now())
+  1005→  1005→  updatedAt       DateTime @updatedAt
+  1006→  1006→
+  1007→  1007→  nozzle       Nozzle?   @relation(fields: [nozzleId], references: [id])
+  1008→  1008→}
+  1009→  1009→
+  1010→  1010→// =====================================================
+  1011→  1011→// ENVIRONMENTAL COMPLIANCE
+  1012→  1012→// =====================================================
+  1013→  1013→
+  1014→  1014→model EnvironmentalAlert {
+  1015→  1015→  id              String   @id @default(cuid())
+  1016→  1016→  stationId       String
+  1017→  1017→  alertType       String   // leak, spill, vapor, water_intrusion, overfill, epa_violation
+  1018→  1018→  severity        String   @default("warning")
+  1019→  1019→  tankId          String?
+  1020→  1020→  description     String
+  1021→  1021→  epaCode         String?
+  1022→  1022→  isReportable    Boolean  @default(false)
+  1023→  1023→  isResolved      Boolean  @default(false)
+  1024→  1024→  resolvedAt      DateTime?
+  1025→  1025→  reportedToAgency Boolean @default(false)
+  1026→  1026→  createdAt       DateTime @default(now())
+  1027→  1027→  updatedAt       DateTime @updatedAt
+  1028→  1028→
+  1029→  1029→  station         Station  @relation(fields: [stationId], references: [id])
+  1030→  1030→}
+  1031→  1031→
+  1032→  1032→model VaporRecoveryReading {
+  1033→  1033→  id              String   @id @default(cuid())
+  1034→  1034→  stationId       String
+  1035→  1035→  tankId          String?
+  1036→  1036→  vaporPressure   Float
+  1037→  1037→  recoveryRate    Float?
+  1038→  1038→  status          String   @default("normal") // normal, warning, violation
+  1039→  1039→  readingAt       DateTime @default(now())
+  1040→  1040→  createdAt       DateTime @default(now())
+  1041→  1041→
+  1042→  1042→  station         Station  @relation(fields: [stationId], references: [id])
+  1043→  1043→}
+  1044→  1044→
+  1045→  1045→// =====================================================
+  1046→  1046→// NOTIFICATIONS
+  1047→  1047→// =====================================================
+  1048→  1048→
+  1049→  1049→model Notification {
+  1050→  1050→  id          String   @id @default(cuid())
+  1051→  1051→  tenantId    String
+  1052→  1052→  stationId   String?
+  1053→  1053→  title       String
+  1054→  1054→  message     String
+  1055→  1055→  type        String   // alert, info, warning, system, shift, delivery
+  1056→  1056→  priority    String   @default("normal") // low, normal, high, urgent
+  1057→  1057→  isRead      Boolean  @default(false)
+  1058→  1058→  readAt      DateTime?
+  1059→  1059→  actionUrl   String?
+  1060→  1060→  createdAt   DateTime @default(now())
+  1061→  1061→
+  1062→  1062→  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  1063→  1063→}
+  1064→  1064→
+  1065→  1065→// =====================================================
+  1066→  1066→// DAILY REPORTS
+  1067→  1067→// =====================================================
+  1068→  1068→
+  1069→  1069→model DailyReport {
+  1070→  1070→  id              String   @id @default(cuid())
+  1071→  1071→  stationId       String
+  1072→  1072→  reportDate      DateTime
+  1073→  1073→  totalRevenue    Float    @default(0)
+  1074→  1074→  fuelRevenue     Float    @default(0)
+  1075→  1075→  retailRevenue   Float    @default(0)
+  1076→  1076→  totalVolume     Float    @default(0)
+  1077→  1077→  transactionCount Int     @default(0)
+  1078→  1078→  averageTicket   Float    @default(0)
+  1079→  1079→  cashVariance    Float    @default(0)
+  1080→  1080→  fuelVariance    Float    @default(0)
+  1081→  1081→  expenses        Float    @default(0)
+  1082→  1082→  netProfit       Float    @default(0)
+  1083→  1083→  createdAt       DateTime @default(now())
+  1084→  1084→
+  1085→  1085→  station         Station  @relation(fields: [stationId], references: [id])
+  1086→  1086→}
+  1087→  1087→
+  1088→  1088→// =====================================================
+  1089→  1089→// AUDIT & SECURITY
+  1090→  1090→// =====================================================
+  1091→  1091→
+  1092→  1092→model AuditLog {
+  1093→  1093→  id          String   @id @default(cuid())
+  1094→  1094→  userId      String?
+  1095→  1095→  tenantId    String?
+  1096→  1096→  action      String
+  1097→  1097→  entity      String
+  1098→  1098→  entityId    String?
+  1099→  1099→  details     String?
+  1100→  1100→  ipAddress   String?
+  1101→  1101→  userAgent   String?
+  1102→  1102→  createdAt   DateTime @default(now())
+  1103→  1103→
+  1104→  1104→  user        User?    @relation(fields: [userId], references: [id])
+  1105→  1105→}
+  1106→  1106→
+  1107→  1107→// =====================================================
+  1108→  1108→// DEVICE INTEGRATION & CONFIGURATION
+  1109→  1109→// =====================================================
+  1110→  1110→
+  1111→  1111→model ForecourtController {
+  1112→  1112→  id                String   @id @default(cuid())
+  1113→  1113→  stationId         String
+  1114→  1114→  name              String
+  1115→  1115→  code              String
+  1116→  1116→  controllerType    String   // pts, fusion, doms, hectronic, tokheim, wayne, gilbarco
+  1117→  1117→  manufacturer      String?
+  1118→  1118→  model             String?
+  1119→  1119→  serialNumber      String?
+  1120→  1120→  firmwareVersion   String?
+  1121→  1121→  communicationType String   @default("tcpip") // tcpip, rs232, rs485, serial, ethernet
+  1122→  1122→  ipAddress         String?
+  1123→  1123→  port              Int?
+  1124→  1124→  baudRate          Int?
+  1125→  1125→  comPort           String?  // for serial: COM1, /dev/ttyS0, etc.
+  1126→  1126→  protocol          String?  // ifsf, patrius, dfs, wayne-dart, gilbarco-g-site
+  1127→  1127→  pollingInterval   Int      @default(1000) // ms
+  1128→  1128→  timeout           Int      @default(5000) // ms
+  1129→  1129→  maxDispensers     Int      @default(32)
+  1130→  1130→  connectedDispensers Int    @default(0)
+  1131→  1131→  status            String   @default("offline") // online, offline, error, maintenance
+  1132→  1132→  lastHeartbeat     DateTime?
+  1133→  1133→  lastCommunication DateTime?
+  1134→  1134→  isActive          Boolean  @default(true)
+  1135→  1135→  configJson        String?  // JSON for vendor-specific config
+  1136→  1136→  createdAt         DateTime @default(now())
+  1137→  1137→  updatedAt         DateTime @updatedAt
+  1138→  1138→
+  1139→  1139→  station           Station  @relation(fields: [stationId], references: [id])
+  1140→  1140→  dispensers        Dispenser[]
+  1141→  1141→  eventLogs         DeviceEventLog[]
+  1142→  1142→  commandQueue      DeviceCommandQueue[]
+  1143→  1143→  configs           DeviceConfig[]
+  1144→  1144→}
+  1145→  1145→
+  1146→  1146→// =====================================================
+  1147→  1147→// CONTROLLER PROFILES - CATALOG OF SUPPORTED FORECOURT CONTROLLERS
+  1148→  1148→// =====================================================
+  1149→  1149→
+  1150→  1150→model ControllerProfile {
+  1151→  1151→  id                  String   @id @default(cuid())
+  1152→  1152→  tenantId            String?
+  1153→  1153→  manufacturer        String   // pts, doms, fusion, hectronic, tokheim, wayne, gilbarco, scheidt_bachmann, franklin, opw
+  1154→  1154→  modelName           String   // e.g. "PTS Over_Controller", "DOMS DC", "Fusion FCM-6"
+  1155→  1155→  controllerType      String   // pts, fusion, doms, hectronic, tokheim, wayne, gilbarco, site_controller, fcc
+  1156→  1156→  supportedProtocols  String?  // JSON: ["ifsf", "patrius", "dfs", "wayne-dart", "gilbarco-g-site"]
+  1157→  1157→  supportedDispensers String?  // JSON: list of dispenser manufacturers/brands this controller supports
+  1158→  1158→  maxDispensers       Int      @default(32)
+  1159→  1159→  maxNozzlesPerPump   Int      @default(4)
+  1160→  1160→  communicationTypes  String?  // JSON: ["tcpip", "rs232", "rs485", "serial", "ethernet", "mqtt"]
+  1161→  1161→  defaultPort         Int?
+  1162→  1162→  defaultBaudRate     Int?
+  1163→  1163→  defaultPollingMs    Int?
+  1164→  1164→  features            String?  // JSON: ["authorize", "stop", "nozzle_status", "sales_data", "meter_values", "price_change", "pump_errors", "tank_levels", "preset", "lock"]
+  1165→  1165→  atgSupport          Boolean  @default(false)
+  1166→  1166→  atgBrands           String?  // JSON: list of ATG brands supported
+  1167→  1167→  paymentIntegration  Boolean  @default(false)
+  1168→  1168→  mqttSupport         Boolean  @default(false)
+  1169→  1169→  firmwareUrl         String?
+  1170→  1170→  configTemplate      String?  // JSON config template
+  1171→  1171→  documentationUrl    String?
+  1172→  1172→  notes               String?
+  1173→  1173→  isActive            Boolean  @default(true)
+  1174→  1174→  createdAt           DateTime @default(now())
+  1175→  1175→  updatedAt           DateTime @updatedAt
+  1176→  1176→
+  1177→  1177→  tenant              Tenant?  @relation(fields: [tenantId], references: [id])
+  1178→  1178→}
+  1179→  1179→
+  1180→  1180→// =====================================================
+  1181→  1181→// HARDWARE CATALOG - UNIFIED SEARCHABLE HARDWARE DATABASE
+  1182→  1182→// =====================================================
+  1183→  1183→
+  1184→  1184→model HardwareCatalog {
+  1185→  1185→  id                String   @id @default(cuid())
+  1186→  1186→  tenantId          String?
+  1187→  1187→  category          String   // dispenser, controller, atg, payment_terminal, generator, camera, fire_alarm, utility_meter, weather_station, price_board, rfid, anpr
+  1188→  1188→  manufacturer      String
+  1189→  1189→  modelName         String
+  1190→  1190→  modelCode         String?  // Short code like "GSITE-EC"
+  1191→  1191→  hardwareType      String?  // Sub-type within category
+  1192→  1192→  description       String?
+  1193→  1193→  specifications    String?  // JSON: key spec pairs
+  1194→  1194→  supportedFuels    String?  // JSON (for dispensers): ["petrol", "diesel", "premium", "hsd"]
+  1195→  1195→  communicationTypes String? // JSON: ["tcpip", "rs232", "rs485", "mqtt"]
+  1196→  1196→  protocols         String?  // JSON: ["ifsf", "patrius", "iso8583"]
+  1197→  1197→  maxNozzles        Int?
+  1198→  1198→  flowRate          Float?   // L/min (for dispensers)
+  1199→  1199→  powerRequirement  String?  // e.g. "220V AC 50Hz"
+  1200→  1200→  operatingTemp     String?  // e.g. "-40°C to +60°C"
+  1201→  1201→  certification     String?  // e.g. "OIML R117, MID 2014/32/EU"
+  1202→  1202→  imageUrl          String?
+  1203→  1203→  documentationUrl  String?
+  1204→  1204→  firmwareUrl       String?
+  1205→  1205→  configTemplate    String?  // JSON config template for this hardware
+  1206→  1206→  compatibleControllers String? // JSON: list of controller types this dispenser works with
+  1207→  1207→  compatibleATGs    String?  // JSON: list of ATG brands
+  1208→  1208→  isVerified        Boolean  @default(false) // Verified by FuelFlow team
+  1209→  1209→  popularity        Int      @default(0) // Search ranking
+  1210→  1210→  isActive          Boolean  @default(true)
+  1211→  1211→  createdAt         DateTime @default(now())
+  1212→  1212→  updatedAt         DateTime @updatedAt
+  1213→  1213→
+  1214→  1214→  tenant            Tenant?  @relation(fields: [tenantId], references: [id])
+  1215→  1215→}
+  1216→  1216→
+  1217→  1217→model PaymentTerminal {
+  1218→  1218→  id              String   @id @default(cuid())
+  1219→  1219→  stationId       String
+  1220→  1220→  name            String
+  1221→  1221→  code            String
+  1222→  1222→  terminalType    String   // pos, eftpos, mpos, self_checkout, pay_at_pump
+  1223→  1223→  manufacturer    String?  // ingenico, verifone, pax, nexgo, castles
+  1224→  1224→  model           String?
+  1225→  1225→  serialNumber    String?
+  1226→  1226→  firmwareVersion String?
+  1227→  1227→  communicationType String @default("tcpip")
+  1228→  1228→  ipAddress       String?
+  1229→  1229→  port            Int?
+  1230→  1230→  comPort         String?
+  1231→  1231→  protocol        String?  // iso8583, nac, tms, ompi
+  1232→  1232→  merchantId      String?
+  1233→  1233→  terminalId      String?
+  1234→  1234→  supportedCards  String?  // JSON: visa, mastercard, unionpay, jcb
+  1235→  1235→  supportedMethods String? // JSON: emv, contactless, nfc, qr, mobile
+  1236→  1236→  shiftId         String?
+  1237→  1237→  status          String   @default("offline") // online, offline, error, busy, maintenance
+  1238→  1238→  lastTransaction DateTime?
+  1239→  1239→  transactionCount Int     @default(0)
+  1240→  1240→  isActive        Boolean  @default(true)
+  1241→  1241→  configJson      String?
+  1242→  1242→  createdAt       DateTime @default(now())
+  1243→  1243→  updatedAt       DateTime @updatedAt
+  1244→  1244→
+  1245→  1245→  station         Station  @relation(fields: [stationId], references: [id])
+  1246→  1246→  eventLogs       DeviceEventLog[]
+  1247→  1247→  commandQueue    DeviceCommandQueue[]
+  1248→  1248→  configs         DeviceConfig[]
+  1249→  1249→}
+  1250→  1250→
+  1251→  1251→model Generator {
+  1252→  1252→  id              String   @id @default(cuid())
+  1253→  1253→  stationId       String
+  1254→  1254→  name            String
+  1255→  1255→  code            String
+  1256→  1256→  manufacturer    String?  // cummins, caterpillar, perkins, honda, generac
+  1257→  1257→  model           String?
+  1258→  1258→  serialNumber    String?
+  1259→  1259→  fuelType        String   @default("diesel") // diesel, petrol, gas, dual_fuel
+  1260→  1260→  capacityKva     Float
+  1261→  1261→  currentLoadKva  Float    @default(0)
+  1262→  1262→  fuelLevel       Float    @default(100) // percentage
+  1263→  1263→  runHours        Float    @default(0)
+  1264→  1264→  voltage         Float?
+  1265→  1265→  frequency       Float?
+  1266→  1266→  oilPressure     Float?
+  1267→  1267→  coolantTemp     Float?
+  1268→  1268→  communicationType String @default("tcpip")
+  1269→  1269→  ipAddress       String?
+  1270→  1270→  port            Int?
+  1271→  1271→  comPort         String?
+  1272→  1272→  protocol        String?  // modbus, snmp, opcua
+  1273→  1273→  autoStart       Boolean  @default(true)
+  1274→  1274→  autoTransfer    Boolean  @default(true)
+  1275→  1275→  status          String   @default("standby") // running, standby, fault, maintenance, offline
+  1276→  1276→  lastStartedAt   DateTime?
+  1277→  1277→  lastStoppedAt   DateTime?
+  1278→  1278→  nextServiceDate DateTime?
+  1279→  1279→  isActive        Boolean  @default(true)
+  1280→  1280→  configJson      String?
+  1281→  1281→  createdAt       DateTime @default(now())
+  1282→  1282→  updatedAt       DateTime @updatedAt
+  1283→  1283→
+  1284→  1284→  station         Station  @relation(fields: [stationId], references: [id])
+  1285→  1285→  eventLogs       DeviceEventLog[]
+  1286→  1286→  commandQueue    DeviceCommandQueue[]
+  1287→  1287→  configs         DeviceConfig[]
+  1288→  1288→}
+  1289→  1289→
+  1290→  1290→model SurveillanceCamera {
+  1291→  1291→  id              String   @id @default(cuid())
+  1292→  1292→  stationId       String
+  1293→  1293→  name            String
+  1294→  1294→  code            String
+  1295→  1295→  cameraType      String   // dome, bullet, ptz, license_plate, thermal
+  1296→  1296→  manufacturer    String?  // hikvision, dahua, axis, bosch, hanwha
+  1297→  1297→  model           String?
+  1298→  1298→  serialNumber    String?
+  1299→  1299→  firmwareVersion String?
+  1300→  1300→  resolution      String?  // 1080p, 4k, 5mp, 8mp
+  1301→  1301→  location        String?  // forecourt, entrance, exit, store, office, tank_farm
+  1302→  1302→  ipAddress       String?
+  1303→  1303→  port            Int?
+  1304→  1304→  rtspUrl         String?
+  1305→  1305→  httpUrl         String?
+  1306→  1306→  onvifSupported  Boolean  @default(false)
+  1307→  1307→  ptzEnabled      Boolean  @default(false)
+  1308→  1308→  nightVision     Boolean  @default(false)
+  1309→  1309→  recordingEnabled Boolean @default(true)
+  1310→  1310→  storageDays     Int      @default(30)
+  1311→  1311→  analyticsEnabled Boolean @default(false)
+  1312→  1312→  analyticsType   String?  // motion, face, plate, crowd, intrusion
+  1313→  1313→  status          String   @default("offline") // online, offline, error, recording, idle
+  1314→  1314→  lastRecordingAt DateTime?
+  1315→  1315→  isActive        Boolean  @default(true)
+  1316→  1316→  configJson      String?
+  1317→  1317→  createdAt       DateTime @default(now())
+  1318→  1318→  updatedAt       DateTime @updatedAt
+  1319→  1319→
+  1320→  1320→  station         Station  @relation(fields: [stationId], references: [id])
+  1321→  1321→  eventLogs       DeviceEventLog[]
+  1322→  1322→  commandQueue    DeviceCommandQueue[]
+  1323→  1323→  configs         DeviceConfig[]
+  1324→  1324→}
+  1325→  1325→
+  1326→  1326→model FireAlarmSystem {
+  1327→  1327→  id              String   @id @default(cuid())
+  1328→  1328→  stationId       String
+  1329→  1329→  name            String
+  1330→  1330→  code            String
+  1331→  1331→  systemType      String   // conventional, addressable, analog_addressable, wireless
+  1332→  1332→  manufacturer    String?  // honeywell, siemens, notifier, morley, simplex
+  1333→  1333→  model           String?
+  1334→  1334→  serialNumber    String?
+  1335→  1335→  firmwareVersion String?
+  1336→  1336→  zoneCount       Int      @default(1)
+  1337→  1337→  detectorCount   Int      @default(0)
+  1338→  1338→  communicationType String @default("tcpip")
+  1339→  1339→  ipAddress       String?
+  1340→  1340→  port            Int?
+  1341→  1341→  comPort         String?
+  1342→  1342→  protocol        String?  // modbus, bacnet, proprietary
+  1343→  1343→  suppressionType String?  // foam, water, gas, dry_chemical
+  1344→  1344→  autoSuppress    Boolean  @default(false)
+  1345→  1345→  linkedToDispensers Boolean @default(true)
+  1346→  1346→  linkedToTanks   Boolean  @default(true)
+  1347→  1347→  status          String   @default("offline") // normal, alarm, fault, test, offline, suppressed
+  1348→  1348→  lastAlarmAt     DateTime?
+  1349→  1349→  lastTestDate    DateTime?
+  1350→  1350→  nextTestDate    DateTime?
+  1351→  1351→  isActive        Boolean  @default(true)
+  1352→  1352→  configJson      String?
+  1353→  1353→  createdAt       DateTime @default(now())
+  1354→  1354→  updatedAt       DateTime @updatedAt
+  1355→  1355→
+  1356→  1356→  station         Station  @relation(fields: [stationId], references: [id])
+  1357→  1357→  eventLogs       DeviceEventLog[]
+  1358→  1358→  commandQueue    DeviceCommandQueue[]
+  1359→  1359→  configs         DeviceConfig[]
+  1360→  1360→}
+  1361→  1361→
+  1362→  1362→model UtilityMeter {
+  1363→  1363→  id              String   @id @default(cuid())
+  1364→  1364→  stationId       String
+  1365→  1365→  name            String
+  1366→  1366→  code            String
+  1367→  1367→  meterType       String   // electricity, water, gas, solar
+  1368→  1368→  manufacturer    String?  // abb, siemens, schneider, landis_gyr, kamstrup
+  1369→  1369→  model           String?
+  1370→  1370→  serialNumber    String?
+  1371→  1371→  meterNumber     String?  // utility provider meter number
+  1372→  1372→  firmwareVersion String?
+  1373→  1373→  communicationType String @default("tcpip")
+  1374→  1374→  ipAddress       String?
+  1375→  1375→  port            Int?
+  1376→  1376→  comPort         String?
+  1377→  1377→  protocol        String?  // modbus, dnp3, dlms, mqtt
+  1378→  1378→  currentReading  Float    @default(0)
+  1379→  1379→  previousReading Float    @default(0)
+  1380→  1380→  consumption     Float    @default(0)
+  1381→  1381→  unit            String   @default("kwh") // kwh, gallons, cubic_meters, therms
+  1382→  1382→  peakDemand      Float?
+  1383→  1383→  powerFactor     Float?
+  1384→  1384→  billingCycle    String?
+  1385→  1385→  tariffRate      Float?
+  1386→  1386→  status          String   @default("offline") // online, offline, error, maintenance
+  1387→  1387→  lastReading     DateTime?
+  1388→  1388→  isActive        Boolean  @default(true)
+  1389→  1389→  configJson      String?
+  1390→  1390→  createdAt       DateTime @default(now())
+  1391→  1391→  updatedAt       DateTime @updatedAt
+  1392→  1392→
+  1393→  1393→  station         Station  @relation(fields: [stationId], references: [id])
+  1394→  1394→  eventLogs       DeviceEventLog[]
+  1395→  1395→  commandQueue    DeviceCommandQueue[]
+  1396→  1396→  configs         DeviceConfig[]
+  1397→  1397→}
+  1398→  1398→
+  1399→  1399→model WeatherStation {
+  1400→  1400→  id              String   @id @default(cuid())
+  1401→  1401→  stationId       String
+  1402→  1402→  name            String
+  1403→  1403→  code            String
+  1404→  1404→  manufacturer    String?  // davis, vaisala, campbell, oregon
+  1405→  1405→  model           String?
+  1406→  1406→  serialNumber    String?
+  1407→  1407→  firmwareVersion String?
+  1408→  1408→  communicationType String @default("tcpip")
+  1409→  1409→  ipAddress       String?
+  1410→  1410→  port            Int?
+  1411→  1411→  comPort         String?
+  1412→  1412→  protocol        String?  // modbus, mqtt, http
+  1413→  1413→  temperature     Float?
+  1414→  1414→  humidity        Float?
+  1415→  1415→  windSpeed       Float?
+  1416→  1416→  windDirection   String?
+  1417→  1417→  pressure        Float?
+  1418→  1418→  rainfall        Float?
+  1419→  1419→  uvIndex         Float?
+  1420→  1420→  visibility      Float?
+  1421→  1421→  dewPoint        Float?
+  1422→  1422→  status          String   @default("offline") // online, offline, error, maintenance
+  1423→  1423→  lastReading     DateTime?
+  1424→  1424→  isActive        Boolean  @default(true)
+  1425→  1425→  configJson      String?
+  1426→  1426→  createdAt       DateTime @default(now())
+  1427→  1427→  updatedAt       DateTime @updatedAt
+  1428→  1428→
+  1429→  1429→  station         Station  @relation(fields: [stationId], references: [id])
+  1430→  1430→  eventLogs       DeviceEventLog[]
+  1431→  1431→  commandQueue    DeviceCommandQueue[]
+  1432→  1432→  configs         DeviceConfig[]
+  1433→  1433→}
+  1434→  1434→
+  1435→  1435→model TankerTracker {
+  1436→  1436→  id              String   @id @default(cuid())
+  1437→  1437→  stationId       String
+  1438→  1438→  name            String
+  1439→  1439→  code            String
+  1440→  1440→  trackerType     String   // gps, gps_gsm, gps_satellite, beacons
+  1441→  1441→  manufacturer    String?  // teltonika, queclink, calamp, sierra_wireless
+  1442→  1442→  model           String?
+  1443→  1443→  serialNumber    String?
+  1444→  1444→  simCardNumber   String?
+  1445→  1445→  imei            String?
+  1446→  1446→  communicationType String @default("gsm")
+  1447→  1447→  ipAddress       String?
+  1448→  1448→  port            Int?
+  1449→  1449→  protocol        String?  // gt06, h02, t800, osmand
+  1450→  1450→  latitude        Float?
+  1451→  1451→  longitude       Float?
+  1452→  1452→  speed           Float?
+  1453→  1453→  heading         Float?
+  1454→  1454→  altitude        Float?
+  1455→  1455→  odometer        Float?
+  1456→  1456→  fuelLevel       Float?
+  1457→  1457→  ignitionStatus  Boolean  @default(false)
+  1458→  1458→  doorStatus      Boolean  @default(false)
+  1459→  1459→  geofenceEnabled Boolean  @default(true)
+  1460→  1460→  geofenceRadius  Float    @default(500) // meters
+  1461→  1461→  lastLocationAt  DateTime?
+  1462→  1462→  status          String   @default("offline") // online, offline, moving, parked, idle, sos
+  1463→  1463→  isActive        Boolean  @default(true)
+  1464→  1464→  configJson      String?
+  1465→  1465→  createdAt       DateTime @default(now())
+  1466→  1466→  updatedAt       DateTime @updatedAt
+  1467→  1467→
+  1468→  1468→  station         Station  @relation(fields: [stationId], references: [id])
+  1469→  1469→  eventLogs       DeviceEventLog[]
+  1470→  1470→  commandQueue    DeviceCommandQueue[]
+  1471→  1471→  configs         DeviceConfig[]
+  1472→  1472→}
+  1473→  1473→
+  1474→  1474→model CarWashSystem {
+  1475→  1475→  id              String   @id @default(cuid())
+  1476→  1476→  stationId       String
+  1477→  1477→  name            String
+  1478→  1478→  code            String
+  1479→  1479→  systemType      String   // automatic, self_serve, touchless, tunnel
+  1480→  1480→  manufacturer    String?  // washtec, otto christ, ryko, pdq, istobal
+  1481→  1481→  model           String?
+  1482→  1482→  serialNumber    String?
+  1483→  1483→  firmwareVersion String?
+  1484→  1484→  communicationType String @default("tcpip")
+  1485→  1485→  ipAddress       String?
+  1486→  1486→  port            Int?
+  1487→  1487→  comPort         String?
+  1488→  1488→  protocol        String?  // modbus, proprietary, ocpp
+  1489→  1489→  bayCount        Int      @default(1)
+  1490→  1490→  currentBay      Int      @default(1)
+  1491→  1491→  waterPressure   Float?
+  1492→  1492→  waterTemp       Float?
+  1493→  1493→  chemicalLevel   Float?
+  1494→  1494→  waxLevel        Float?
+  1495→  1495→  dailyCount      Int      @default(0)
+  1496→  1496→  monthlyCount    Int      @default(0)
+  1497→  1497→  revenueToday    Float    @default(0)
+  1498→  1498→  status          String   @default("idle") // idle, washing, drying, fault, maintenance, offline
+  1499→  1499→  lastWashAt      DateTime?
+  1500→  1500→  nextServiceDate DateTime?
+  1501→  1501→  isActive        Boolean  @default(true)
+  1502→  1502→  configJson      String?
+  1503→  1503→  createdAt       DateTime @default(now())
+  1504→  1504→  updatedAt       DateTime @updatedAt
+  1505→  1505→
+  1506→  1506→  station         Station  @relation(fields: [stationId], references: [id])
+  1507→  1507→  eventLogs       DeviceEventLog[]
+  1508→  1508→  commandQueue    DeviceCommandQueue[]
+  1509→  1509→  configs         DeviceConfig[]
+  1510→  1510→}
+  1511→  1511→
+  1512→  1512→model AirCompressor {
+  1513→  1513→  id              String   @id @default(cuid())
+  1514→  1514→  stationId       String
+  1515→  1515→  name            String
+  1516→  1516→  code            String
+  1517→  1517→  manufacturer    String?  // atlas_copco, ingersoll_rand, kaeser, sullair
+  1518→  1518→  model           String?
+  1519→  1519→  serialNumber    String?
+  1520→  1520→  communicationType String @default("tcpip")
+  1521→  1521→  ipAddress       String?
+  1522→  1522→  port            Int?
+  1523→  1523→  comPort         String?
+  1524→  1524→  protocol        String?  // modbus, mqtt
+  1525→  1525→  pressure        Float?   // PSI
+  1526→  1526→  maxPressure     Float    @default(150) // PSI
+  1527→  1527→  tankCapacity    Float?   // gallons
+  1528→  1528→  motorStatus     String   @default("off") // on, off, fault
+  1529→  1529→  runHours        Float    @default(0)
+  1530→  1530→  coinOperated    Boolean  @default(true)
+  1531→  1531→  pricePerUse     Float    @default(20)
+  1532→  1532→  dailyUsage      Int      @default(0)
+  1533→  1533→  revenueToday    Float    @default(0)
+  1534→  1534→  status          String   @default("idle") // idle, running, fault, maintenance, offline
+  1535→  1535→  lastUsedAt      DateTime?
+  1536→  1536→  isActive        Boolean  @default(true)
+  1537→  1537→  configJson      String?
+  1538→  1538→  createdAt       DateTime @default(now())
+  1539→  1539→  updatedAt       DateTime @updatedAt
+  1540→  1540→
+  1541→  1541→  station         Station  @relation(fields: [stationId], references: [id])
+  1542→  1542→  eventLogs       DeviceEventLog[]
+  1543→  1543→  commandQueue    DeviceCommandQueue[]
+  1544→  1544→  configs         DeviceConfig[]
+  1545→  1545→}
+  1546→  1546→
+  1547→  1547→model VacuumStation {
+  1548→  1548→  id              String   @id @default(cuid())
+  1549→  1549→  stationId       String
+  1550→  1550→  name            String
+  1551→  1551→  code            String
+  1552→  1552→  manufacturer    String?
+  1553→  1553→  model           String?
+  1554→  1554→  serialNumber    String?
+  1555→  1555→  communicationType String @default("tcpip")
+  1556→  1556→  ipAddress       String?
+  1557→  1557→  port            Int?
+  1558→  1558→  comPort         String?
+  1559→  1559→  protocol        String?  // modbus, mqtt
+  1560→  1560→  motorStatus     String   @default("off")
+  1561→  1561→  suctionPower    Float?
+  1562→  1562→  coinOperated    Boolean  @default(true)
+  1563→  1563→  pricePerUse     Float    @default(30)
+  1564→  1564→  dailyUsage      Int      @default(0)
+  1565→  1565→  revenueToday    Float    @default(0)
+  1566→  1566→  runHours        Float    @default(0)
+  1567→  1567→  status          String   @default("idle") // idle, running, fault, maintenance, offline
+  1568→  1568→  lastUsedAt      DateTime?
+  1569→  1569→  isActive        Boolean  @default(true)
+  1570→  1570→  configJson      String?
+  1571→  1571→  createdAt       DateTime @default(now())
+  1572→  1572→  updatedAt       DateTime @updatedAt
+  1573→  1573→
+  1574→  1574→  station         Station  @relation(fields: [stationId], references: [id])
+  1575→  1575→  eventLogs       DeviceEventLog[]
+  1576→  1576→  commandQueue    DeviceCommandQueue[]
+  1577→  1577→  configs         DeviceConfig[]
+  1578→  1578→}
+  1579→  1579→
+  1580→  1580→model DeviceConfig {
+  1581→  1581→  id          String   @id @default(cuid())
+  1582→  1582→  deviceType  String   // forecourt_controller, payment_terminal, generator, surveillance_camera, fire_alarm, utility_meter, weather_station, tanker_tracker, car_wash, air_compressor, vacuum_station, dispenser, tank, rfid_reader, anpr_camera, ev_charger, cng_dispenser, price_board
+  1583→  1583→  deviceId    String
+  1584→  1584→  configKey   String
+  1585→  1585→  configValue String
+  1586→  1586→  dataType    String   @default("string") // string, number, boolean, json
+  1587→  1587→  description String?
+  1588→  1588→  isEditable  Boolean  @default(true)
+  1589→  1589→  updatedBy   String?
+  1590→  1590→  updatedAt   DateTime @updatedAt
+  1591→  1591→  createdAt   DateTime @default(now())
+  1592→  1592→
+  1593→  1593→  // Polymorphic relations - only one will be used based on deviceType
+  1594→  1594→  forecourtController  ForecourtController?  @relation(fields: [deviceId], references: [id])
+  1595→  1595→  paymentTerminal      PaymentTerminal?      @relation(fields: [deviceId], references: [id])
+  1596→  1596→  generator            Generator?            @relation(fields: [deviceId], references: [id])
+  1597→  1597→  surveillanceCamera   SurveillanceCamera?   @relation(fields: [deviceId], references: [id])
+  1598→  1598→  fireAlarmSystem      FireAlarmSystem?      @relation(fields: [deviceId], references: [id])
+  1599→  1599→  utilityMeter         UtilityMeter?         @relation(fields: [deviceId], references: [id])
+  1600→  1600→  weatherStation       WeatherStation?       @relation(fields: [deviceId], references: [id])
+  1601→  1601→  tankerTracker        TankerTracker?        @relation(fields: [deviceId], references: [id])
+  1602→  1602→  carWashSystem        CarWashSystem?        @relation(fields: [deviceId], references: [id])
+  1603→  1603→  airCompressor        AirCompressor?        @relation(fields: [deviceId], references: [id])
+  1604→  1604→  vacuumStation        VacuumStation?        @relation(fields: [deviceId], references: [id])
+  1605→  1605→}
+  1606→  1606→
+  1607→  1607→model DeviceEventLog {
+  1608→  1608→  id          String   @id @default(cuid())
+  1609→  1609→  stationId   String
+  1610→  1610→  deviceType  String   // forecourt_controller, payment_terminal, generator, etc.
+  1611→  1611→  deviceId    String
+  1612→  1612→  eventType   String   // status_change, command, alarm, reading, error, heartbeat
+  1613→  1613→  severity    String   @default("info") // info, warning, error, critical
+  1614→  1614→  message     String
+  1615→  1615→  dataJson    String?  // JSON payload of the event
+  1616→  1616→  createdAt   DateTime @default(now())
+  1617→  1617→
+  1618→  1618→  station               Station               @relation(fields: [stationId], references: [id])
+  1619→  1619→  forecourtController   ForecourtController?  @relation(fields: [deviceId], references: [id])
+  1620→  1620→  paymentTerminal      PaymentTerminal?      @relation(fields: [deviceId], references: [id])
+  1621→  1621→  generator            Generator?            @relation(fields: [deviceId], references: [id])
+  1622→  1622→  surveillanceCamera   SurveillanceCamera?   @relation(fields: [deviceId], references: [id])
+  1623→  1623→  fireAlarmSystem      FireAlarmSystem?      @relation(fields: [deviceId], references: [id])
+  1624→  1624→  utilityMeter         UtilityMeter?         @relation(fields: [deviceId], references: [id])
+  1625→  1625→  weatherStation       WeatherStation?       @relation(fields: [deviceId], references: [id])
+  1626→  1626→  tankerTracker        TankerTracker?        @relation(fields: [deviceId], references: [id])
+  1627→  1627→  carWashSystem        CarWashSystem?        @relation(fields: [deviceId], references: [id])
+  1628→  1628→  airCompressor        AirCompressor?        @relation(fields: [deviceId], references: [id])
+  1629→  1629→  vacuumStation        VacuumStation?        @relation(fields: [deviceId], references: [id])
+  1630→  1630→}
+  1631→  1631→
+  1632→  1632→model DeviceCommandQueue {
+  1633→  1633→  id          String   @id @default(cuid())
+  1634→  1634→  stationId   String
+  1635→  1635→  deviceType  String
+  1636→  1636→  deviceId    String
+  1637→  1637→  command     String
+  1638→  1638→  parameters  String?  // JSON
+  1639→  1639→  priority    String   @default("normal") // low, normal, high, urgent
+  1640→  1640→  status      String   @default("queued") // queued, sent, acknowledged, failed, timeout
+  1641→  1641→  sentAt      DateTime?
+  1642→  1642→  acknowledgedAt DateTime?
+  1643→  1643→  responseJson String?
+  1644→  1644→  retryCount  Int      @default(0)
+  1645→  1645→  maxRetries  Int      @default(3)
+  1646→  1646→  createdBy   String?
+  1647→  1647→  createdAt   DateTime @default(now())
+  1648→  1648→  updatedAt   DateTime @updatedAt
+  1649→  1649→
+  1650→  1650→  station               Station               @relation(fields: [stationId], references: [id])
+  1651→  1651→  forecourtController   ForecourtController?  @relation(fields: [deviceId], references: [id])
+  1652→  1652→  paymentTerminal      PaymentTerminal?      @relation(fields: [deviceId], references: [id])
+  1653→  1653→  generator            Generator?            @relation(fields: [deviceId], references: [id])
+  1654→  1654→  surveillanceCamera   SurveillanceCamera?   @relation(fields: [deviceId], references: [id])
+  1655→  1655→  fireAlarmSystem      FireAlarmSystem?      @relation(fields: [deviceId], references: [id])
+  1656→  1656→  utilityMeter         UtilityMeter?         @relation(fields: [deviceId], references: [id])
+  1657→  1657→  weatherStation       WeatherStation?       @relation(fields: [deviceId], references: [id])
+  1658→  1658→  tankerTracker        TankerTracker?        @relation(fields: [deviceId], references: [id])
+  1659→  1659→  carWashSystem        CarWashSystem?        @relation(fields: [deviceId], references: [id])
+  1660→  1660→  airCompressor        AirCompressor?        @relation(fields: [deviceId], references: [id])
+  1661→  1661→  vacuumStation        VacuumStation?        @relation(fields: [deviceId], references: [id])
+  1662→  1662→}
+  1663→  1663→
+  1664→  1664→// =====================================================
+  1665→  1665→// APEXFLOW OMS INTEGRATION & SAAS ADMINISTRATION
+  1666→  1666→// =====================================================
+  1667→  1667→
+  1668→  1668→model OMSClient {
+  1669→  1669→  id              String   @id @default(cuid())
+  1670→  1670→  tenantId        String   @unique
+  1671→  1671→  omsClientId     String   @unique
+  1672→  1672→  companyName     String
+  1673→  1673→  registrationDate DateTime @default(now())
+  1674→  1674→  subscriptionPlan String  @default("starter") // starter, professional, enterprise, custom
+  1675→  1675→  licenseKey      String   @unique
+  1676→  1676→  licenseStatus   String   @default("active") // active, suspended, expired, cancelled
+  1677→  1677→  licensedModules String?  // JSON array of enabled module keys
+  1678→  1678→  maxStations     Int      @default(1)
+  1679→  1679→  maxUsers        Int      @default(5)
+  1680→  1680→  maxDevices      Int      @default(10)
+  1681→  1681→  currentStations Int      @default(0)
+  1682→  1682→  currentUsers    Int      @default(0)
+  1683→  1683→  currentDevices  Int      @default(0)
+  1684→  1684→  billingCycle    String   @default("monthly") // monthly, quarterly, annually
+  1685→  1685→  basePrice       Float    @default(0)
+  1686→  1686→  perStationPrice Float    @default(0)
+  1687→  1687→  perUserPrice    Float    @default(0)
+  1688→  1688→  totalMonthly    Float    @default(0)
+  1689→  1689→  currency        String   @default("PKR")
+  1690→  1690→  lastSyncAt      DateTime?
+  1691→  1691→  syncStatus      String   @default("pending") // pending, synced, error
+  1692→  1692→  syncErrors      String?
+  1693→  1693→  isActive        Boolean  @default(true)
+  1694→  1694→  createdAt       DateTime @default(now())
+  1695→  1695→  updatedAt       DateTime @updatedAt
+  1696→  1696→
+  1697→  1697→  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  1698→  1698→  packages        OMSPackage[]
+  1699→  1699→  invoices        OMSInvoice[]
+  1700→  1700→  payments        OMSPayment[]
+  1701→  1701→  syncLogs        OMSSyncLog[]
+  1702→  1702→  licenses        OMSLicense[]
+  1703→  1703→}
+  1704→  1704→
+  1705→  1705→model OMSPackage {
+  1706→  1706→  id              String   @id @default(cuid())
+  1707→  1707→  omsClientId     String
+  1708→  1708→  packageName     String
+  1709→  1709→  description     String?
+  1710→  1710→  modules         String   // JSON array
+  1711→  1711→  stationLimit    Int
+  1712→  1712→  userLimit       Int
+  1713→  1713→  deviceLimit     Int
+  1714→  1714→  price           Float
+  1715→  1715→  currency        String   @default("PKR")
+  1716→  1716→  billingCycle    String   @default("monthly")
+  1717→  1717→  isCustom        Boolean  @default(false)
+  1718→  1718→  isActive        Boolean  @default(true)
+  1719→  1719→  createdAt       DateTime @default(now())
+  1720→  1720→  updatedAt       DateTime @updatedAt
+  1721→  1721→
+  1722→  1722→  omsClient       OMSClient @relation(fields: [omsClientId], references: [id])
+  1723→  1723→}
+  1724→  1724→
+  1725→  1725→model OMSInvoice {
+  1726→  1726→  id              String   @id @default(cuid())
+  1727→  1727→  omsClientId     String
+  1728→  1728→  invoiceNumber   String   @unique
+  1729→  1729→  invoiceDate     DateTime
+  1730→  1730→  dueDate         DateTime
+  1731→  1731→  subtotal        Float
+  1732→  1732→  taxAmount       Float    @default(0)
+  1733→  1733→  totalAmount     Float
+  1734→  1734→  status          String   @default("pending") // pending, paid, overdue, cancelled
+  1735→  1735→  paidAmount      Float    @default(0)
+  1736→  1736→  paidDate        DateTime?
+  1737→  1737→  items           String   // JSON line items
+  1738→  1738→  notes           String?
+  1739→  1739→  omsSyncId       String?  // OMS invoice reference
+  1740→  1740→  createdAt       DateTime @default(now())
+  1741→  1741→  updatedAt       DateTime @updatedAt
+  1742→  1742→
+  1743→  1743→  omsClient       OMSClient @relation(fields: [omsClientId], references: [id])
+  1744→  1744→}
+  1745→  1745→
+  1746→  1746→model OMSPayment {
+  1747→  1747→  id              String   @id @default(cuid())
+  1748→  1748→  omsClientId     String
+  1749→  1749→  invoiceId       String?
+  1750→  1750→  amount          Float
+  1751→  1751→  paymentMethod   String   @default("bank_transfer") // bank_transfer, card, cheque, online, cash
+  1752→  1752→  referenceNumber String?
+  1753→  1753→  transactionId   String?
+  1754→  1754→  status          String   @default("completed") // pending, completed, failed, refunded
+  1755→  1755→  paymentDate     DateTime @default(now())
+  1756→  1756→  notes           String?
+  1757→  1757→  createdAt       DateTime @default(now())
+  1758→  1758→
+  1759→  1759→  omsClient       OMSClient @relation(fields: [omsClientId], references: [id])
+  1760→  1760→}
+  1761→  1761→
+  1762→  1762→model OMSSyncLog {
+  1763→  1763→  id              String   @id @default(cuid())
+  1764→  1764→  omsClientId     String
+  1765→  1765→  syncType        String   // client_registration, subscription, license, invoice, payment, module_control, user_sync
+  1766→  1766→  direction       String   @default("outbound") // inbound, outbound
+  1767→  1767→  status          String   @default("pending") // pending, success, error
+  1768→  1768→  payload         String?  // JSON
+  1769→  1769→  response        String?  // JSON
+  1770→  1770→  errorMessage    String?
+  1771→  1771→  syncedAt        DateTime @default(now())
+  1772→  1772→  createdAt       DateTime @default(now())
+  1773→  1773→
+  1774→  1774→  omsClient       OMSClient @relation(fields: [omsClientId], references: [id])
+  1775→  1775→}
+  1776→  1776→
+  1777→  1777→model OMSLicense {
+  1778→  1778→  id              String   @id @default(cuid())
+  1779→  1779→  omsClientId     String
+  1780→  1780→  licenseKey      String   @unique
+  1781→  1781→  moduleKey       String
+  1782→  1782→  moduleName      String
+  1783→  1783→  is_enabled      Boolean  @default(true)
+  1784→  1784→  validFrom       DateTime
+  1785→  1785→  validTo         DateTime?
+  1786→  1786→  maxUsage        Int?
+  1787→  1787→  currentUsage    Int      @default(0)
+  1788→  1788→  status          String   @default("active") // active, disabled, expired
+  1789→  1789→  createdAt       DateTime @default(now())
+  1790→  1790→  updatedAt       DateTime @updatedAt
+  1791→  1791→
+  1792→  1792→  omsClient       OMSClient @relation(fields: [omsClientId], references: [id])
+  1793→  1793→}
+  1794→  1794→
+  1795→  1795→// =====================================================
+  1796→  1796→// SECURITY CENTER
+  1797→  1797→// =====================================================
+  1798→  1798→
+  1799→  1799→model SecuritySession {
+  1800→  1800→  id              String   @id @default(cuid())
+  1801→  1801→  userId          String
+  1802→  1802→  tenantId        String?
+  1803→  1803→  tokenHash       String?
+  1804→  1804→  ipAddress       String?
+  1805→  1805→  userAgent       String?
+  1806→  1806→  deviceInfo      String?
+  1807→  1807→  loginAt         DateTime @default(now())
+  1808→  1808→  lastActivityAt  DateTime @default(now())
+  1809→  1809→  logoutAt        DateTime?
+  1810→  1810→  status          String   @default("active") // active, expired, revoked
+  1811→  1811→  expiresAt       DateTime?
+  1812→  1812→  createdAt       DateTime @default(now())
+  1813→  1813→
+  1814→  1814→  user            User     @relation(fields: [userId], references: [id])
+  1815→  1815→}
+  1816→  1816→
+  1817→  1817→model RBACPermission {
+  1818→  1818→  id              String   @id @default(cuid())
+  1819→  1819→  tenantId        String?
+  1820→  1820→  role            String   // superadmin, admin, manager, operator, cashier, attendant, viewer
+  1821→  1821→  module          String
+  1822→  1822→  action          String   // read, write, delete, approve, configure
+  1823→  1823→  isAllowed       Boolean  @default(false)
+  1824→  1824→  createdAt       DateTime @default(now())
+  1825→  1825→  updatedAt       DateTime @updatedAt
+  1826→  1826→
+  1827→  1827→  tenant          Tenant?  @relation(fields: [tenantId], references: [id])
+  1828→  1828→}
+  1829→  1829→
+  1830→  1830→model SecurityAlert {
+  1831→  1831→  id              String   @id @default(cuid())
+  1832→  1832→  tenantId        String?
+  1833→  1833→  stationId       String?
+  1834→  1834→  alertType       String   // unauthorized_access, brute_force, suspicious_activity, data_breach, permission_violation, device_tampering
+  1835→  1835→  severity        String   @default("warning") // info, warning, error, critical
+  1836→  1836→  title           String
+  1837→  1837→  description     String?
+  1838→  1838→  sourceIp        String?
+  1839→  1839→  targetEntity    String?
+  1840→  1840→  targetEntityId  String?
+  1841→  1841→  isResolved      Boolean  @default(false)
+  1842→  1842→  resolvedAt      DateTime?
+  1843→  1843→  resolvedBy      String?
+  1844→  1844→  createdAt       DateTime @default(now())
+  1845→  1845→  updatedAt       DateTime @updatedAt
+  1846→  1846→
+  1847→  1847→  tenant          Tenant?  @relation(fields: [tenantId], references: [id])
+  1848→  1848→}
+  1849→  1849→
+  1850→  1850→model BackupRecord {
+  1851→  1851→  id              String   @id @default(cuid())
+  1852→  1852→  tenantId        String?
+  1853→  1853→  stationId       String?
+  1854→  1854→  backupType      String   @default("full") // full, incremental, differential
+  1855→  1855→  status          String   @default("pending") // pending, in_progress, completed, failed
+  1856→  1856→  fileSize        Float?   // MB
+  1857→  1857→  fileKey         String?  // storage path/key
+  1858→  1858→  startedAt       DateTime?
+  1859→  1859→  completedAt     DateTime?
+  1860→  1860→  duration        Int?     // seconds
+  1861→  1861→  checksum        String?
+  1862→  1862→  isRestorable    Boolean  @default(true)
+  1863→  1863→  notes           String?
+  1864→  1864→  createdAt       DateTime @default(now())
+  1865→  1865→
+  1866→  1866→  tenant          Tenant?  @relation(fields: [tenantId], references: [id])
+  1867→  1867→}
+  1868→  1868→
+  1869→  1869→model EncryptionKey {
+  1870→  1870→  id              String   @id @default(cuid())
+  1871→  1871→  tenantId        String?
+  1872→  1872→  keyType         String   @default("aes256") // aes256, rsa2048, aes128
+  1873→  1873→  keyReference    String
+  1874→  1874→  isActive        Boolean  @default(true)
+  1875→  1875→  rotatedAt       DateTime?
+  1876→  1876→  expiresAt       DateTime?
+  1877→  1877→  createdAt       DateTime @default(now())
+  1878→  1878→
+  1879→  1879→  tenant          Tenant?  @relation(fields: [tenantId], references: [id])
+  1880→  1880→}
+  1881→  1881→
+  1882→  1882→// =====================================================
+  1883→  1883→// COMMUNICATION LAYER & PROTOCOLS
+  1884→  1884→// =====================================================
+  1885→  1885→
+  1886→  1886→model CommProtocol {
+  1887→  1887→  id              String   @id @default(cuid())
+  1888→  1888→  stationId       String
+  1889→  1889→  name            String
+  1890→  1890→  protocolType    String   // ifsf, patrius, dfs, wayne_dart, gilbarco_gsite, modbus, mqtt, ocpp, iso8583, nac, tms, ompi, dlms, dnp3, bacnet, snmp, opcua
+  1891→  1891→  version         String?
+  1892→  1892→  transportType   String   // tcp, udp, serial, rs232, rs485, ethernet, mqtt, http
+  1893→  1893→  hostOrPort      String?  // IP:port or COM port
+  1894→  1894→  baudRate        Int?
+  1895→  1895→  dataBits        Int?     @default(8)
+  1896→  1896→  stopBits        Int?     @default(1)
+  1897→  1897→  parity          String?  @default("none") // none, odd, even
+  1898→  1898→  heartbeatInterval Int?   @default(30) // seconds
+  1899→  1899→  timeout         Int?     @default(5) // seconds
+  1900→  1900→  retryCount      Int?     @default(3)
+  1901→  1901→  pollInterval    Int?     @default(1000) // ms
+  1902→  1902→  configJson      String?  // Protocol-specific config
+  1903→  1903→  isActive        Boolean  @default(true)
+  1904→  1904→  createdAt       DateTime @default(now())
+  1905→  1905→  updatedAt       DateTime @updatedAt
+  1906→  1906→
+  1907→  1907→  station         Station  @relation(fields: [stationId], references: [id])
+  1908→  1908→  connections     CommConnection[]
+  1909→  1909→}
+  1910→  1910→
+  1911→  1911→model CommConnection {
+  1912→  1912→  id              String   @id @default(cuid())
+  1913→  1913→  stationId       String
+  1914→  1914→  protocolId      String
+  1915→  1915→  name            String
+  1916→  1916→  deviceType      String   // dispenser, tank_atg, controller, pos, price_board, rfid, anpr, ev_charger, cng_dispenser, payment_terminal
+  1917→  1917→  deviceId        String?  // Reference to actual device
+  1918→  1918→  connectionState String   @default("disconnected") // connected, disconnected, error, timeout
+  1919→  1919→  lastConnectedAt DateTime?
+  1920→  1920→  lastMessageAt   DateTime?
+  1921→  1921→  messagesSent    Int      @default(0)
+  1922→  1922→  messagesReceived Int     @default(0)
+  1923→  1923→  errors          Int      @default(0)
+  1924→  1924→  latencyMs       Int?
+  1925→  1925→  isActive        Boolean  @default(true)
+  1926→  1926→  createdAt       DateTime @default(now())
+  1927→  1927→  updatedAt       DateTime @updatedAt
+  1928→  1928→
+  1929→  1929→  protocol        CommProtocol @relation(fields: [protocolId], references: [id])
+  1930→  1930→}
+  1931→  1931→
+  1932→  1932→model CommLog {
+  1933→  1933→  id              String   @id @default(cuid())
+  1934→  1934→  stationId       String
+  1935→  1935→  connectionId    String?
+  1936→  1936→  protocolId      String?
+  1937→  1937→  direction       String   // inbound, outbound
+  1938→  1938→  messageType     String   // request, response, event, heartbeat, error, command
+  1939→  1939→  rawData         String?  // Hex or raw bytes
+  1940→  1940→  parsedData      String?  // JSON parsed
+  1941→  1941→  deviceId        String?
+  1942→  1942→  deviceType      String?
+  1943→  1943→  isSuccess       Boolean  @default(true)
+  1944→  1944→  errorMessage    String?
+  1945→  1945→  durationMs      Int?
+  1946→  1946→  createdAt       DateTime @default(now())
+  1947→  1947→
+  1948→  1948→  station         Station  @relation(fields: [stationId], references: [id])
+  1949→  1949→}
+  1950→  1950→
+  1951→  1951→// =====================================================
+  1952→  1952→// DISPENSER MANUFACTURER PROFILES
+  1953→  1953→// =====================================================
+  1954→  1954→
+  1955→  1955→model DispenserProfile {
+  1956→  1956→  id              String   @id @default(cuid())
+  1957→  1957→  tenantId        String?
+  1958→  1958→  manufacturer    String   // tatsuno, tatsuno_sunny, tatsuno_benc, tatsuno_korea, gilbarco, wayne, tokheim, bennett, petrotec, censtar, sanki, zhejiang_datian, hectronic, scheidt_bachmann, hongyang, eaglestar
+  1959→  1959→  modelName       String
+  1960→  1960→  pumpTypes       String?  // JSON: single_hose, dual_hose, multi_product, high_flow
+  1961→  1961→  supportedFuels  String?  // JSON: petrol, diesel, premium, hsd
+  1962→  1962→  maxNozzles      Int      @default(2)
+  1963→  1963→  flowRate        Float?   // L/min
+  1964→  1964→  protocol        String?  // ifsf, patrius, proprietary
+  1965→  1965→  communicationTypes String? // JSON: tcpip, rs232, rs485
+  1966→  1966→  defaultPort     Int?
+  1967→  1967→  defaultBaudRate Int?
+  1968→  1968→  defaultPolling  Int?     // ms
+  1969→  1969→  firmwareUrl     String?
+  1970→  1970→  configTemplate  String?  // JSON config template
+  1971→  1971→  notes           String?
+  1972→  1972→  isActive        Boolean  @default(true)
+  1973→  1973→  createdAt       DateTime @default(now())
+  1974→  1974→  updatedAt       DateTime @updatedAt
+  1975→  1975→
+  1976→  1976→  tenant          Tenant?  @relation(fields: [tenantId], references: [id])
+  1977→  1977→}
+  1978→  1978→
+  1979→  1979→// =====================================================
+  1980→  1980→// ATG PROFILES
+  1981→  1981→// =====================================================
+  1982→  1982→
+  1983→  1983→model ATGProfile {
+  1984→  1984→  id              String   @id @default(cuid())
+  1985→  1985→  tenantId        String?
+  1986→  1986→  manufacturer    String   // veeder_root, opw, franklin, hectronic, gilbarco
+  1987→  1987→  modelName       String
+  1988→  1988→  atgType         String   // magnetostrictive, capacitive, ultrasonic, radar
+  1989→  1989→  probeTypes      String?  // JSON: magnetostrictive, capacitive
+  1990→  1990→  maxProbes       Int      @default(8)
+  1991→  1991→  communicationTypes String? // JSON
+  1992→  1992→  protocol        String?
+  1993→  1993→  defaultPort     Int?
+  1994→  1994→  defaultBaudRate Int?
+  1995→  1995→  features        String?  // JSON: leak_detection, overfill, water_detection, temperature
+  1996→  1996→  configTemplate  String?
+  1997→  1997→  notes           String?
+  1998→  1998→  isActive        Boolean  @default(true)
+  1999→  1999→  createdAt       DateTime @default(now())
+  2000→  2000→  updatedAt       DateTime @updatedAt
+
+[showing lines 1-2000 of 2002; use offset=2001 with limit to continue reading]

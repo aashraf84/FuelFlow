@@ -1,0 +1,772 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useCallback } from 'react'
+     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→import {
+     6→  Users,
+     7→  Clock,
+     8→  Wallet,
+     9→  Calendar,
+    10→  CheckCircle2,
+    11→  XCircle,
+    12→  UserPlus,
+    13→  TrendingUp,
+    14→  ArrowUpRight,
+    15→  Briefcase,
+    16→  Coffee,
+    17→  Shield,
+    18→  Wrench,
+    19→  Banknote,
+    20→  AlertCircle,
+    21→  RefreshCw,
+    22→  Loader2,
+    23→} from 'lucide-react'
+    24→import { useAppStore } from '@/stores/app-store'
+    25→
+    26→// ── Types ──────────────────────────────────────────────────
+    27→
+    28→interface EmployeeData {
+    29→  id: string
+    30→  stationId: string
+    31→  name: string
+    32→  employeeId: string | null
+    33→  role: string
+    34→  phone: string | null
+    35→  email: string | null
+    36→  hireDate: string | null
+    37→  salary: number | null
+    38→  commissionRate: number
+    39→  status: string
+    40→  avatar: string | null
+    41→  station: { id: string; name: string; code: string | null } | null
+    42→  shiftCount: number
+    43→  fuelingCount: number
+    44→  attendanceCount: number
+    45→  latestPayroll: { id: string; netPay: number; status: string; periodStart: string; periodEnd: string } | null
+    46→  pendingLeaveRequests: { id: string; leaveType: string; startDate: string; endDate: string; status: string }[]
+    47→  todayAttendance: { employeeId: string; checkIn: string; checkOut: string | null; status: string; hoursWorked: number | null } | null
+    48→}
+    49→
+    50→interface LeaveRequestData {
+    51→  id: string
+    52→  stationId: string
+    53→  employeeId: string
+    54→  leaveType: string
+    55→  startDate: string
+    56→  endDate: string
+    57→  reason: string | null
+    58→  status: string
+    59→  approvedBy: string | null
+    60→  createdAt: string
+    61→  employee: { id: string; name: string; role: string; employeeId: string | null }
+    62→  station: { id: string; name: string; code: string | null }
+    63→}
+    64→
+    65→interface PayrollSummary {
+    66→  totalRecords: number
+    67→  totalNetPay: number
+    68→  totalBaseSalary: number
+    69→  totalDeductions: number
+    70→  totalOvertime: number
+    71→  totalCommissions: number
+    72→  pendingCount: number
+    73→  paidCount: number
+    74→}
+    75→
+    76→// ── Helpers ───────────────────────────────────────────────
+    77→
+    78→const pkr = (n: number) => `PKR ${n.toLocaleString()}`
+    79→
+    80→const roleConfig: Record<string, { icon: React.ElementType; color: string; bg: string }> = {
+    81→  manager: { icon: Briefcase, color: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-500/10' },
+    82→  supervisor: { icon: Shield, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/10' },
+    83→  attendant: { icon: Users, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-500/10' },
+    84→  cashier: { icon: Banknote, color: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-500/10' },
+    85→  maintenance: { icon: Wrench, color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-500/10' },
+    86→}
+    87→
+    88→const statusConfig: Record<string, { dot: string; label: string; color: string }> = {
+    89→  active: { dot: 'macos-status-online', label: 'Active', color: 'text-emerald-600 dark:text-emerald-400' },
+    90→  'on-shift': { dot: 'macos-status-online', label: 'On Shift', color: 'text-emerald-600 dark:text-emerald-400' },
+    91→  'on-leave': { dot: 'macos-status-warning', label: 'On Leave', color: 'text-teal-500' },
+    92→  'off-duty': { dot: 'macos-status-offline', label: 'Off Duty', color: 'text-muted-foreground' },
+    93→  new: { dot: 'macos-status-online', label: 'New', color: 'text-emerald-600 dark:text-emerald-400' },
+    94→  inactive: { dot: 'macos-status-offline', label: 'Inactive', color: 'text-muted-foreground' },
+    95→}
+    96→
+    97→const leaveStatusConfig: Record<string, { icon: React.ElementType; color: string; label: string }> = {
+    98→  approved: { icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', label: 'Approved' },
+    99→  rejected: { icon: XCircle, color: 'text-red-500', label: 'Rejected' },
+   100→  pending: { icon: AlertCircle, color: 'text-teal-500', label: 'Pending' },
+   101→}
+   102→
+   103→type TabKey = 'employees' | 'attendance' | 'payroll' | 'leave'
+   104→
+   105→const tabs: { key: TabKey; label: string; icon: React.ElementType }[] = [
+   106→  { key: 'employees', label: 'Employees', icon: Users },
+   107→  { key: 'attendance', label: 'Attendance', icon: Clock },
+   108→  { key: 'payroll', label: 'Payroll', icon: Wallet },
+   109→  { key: 'leave', label: 'Leave Requests', icon: Calendar },
+   110→]
+   111→
+   112→// ── Skeleton ──────────────────────────────────────────────
+   113→
+   114→function SkeletonRow({ cols }: { cols: number }) {
+   115→  return (
+   116→    <tr>
+   117→      {Array.from({ length: cols }).map((_, i) => (
+   118→        <td key={i} className="py-3 px-4">
+   119→          <div className="h-3.5 rounded bg-muted/40 animate-pulse" style={{ width: `${60 + Math.random() * 40}%` }} />
+   120→        </td>
+   121→      ))}
+   122→    </tr>
+   123→  )
+   124→}
+   125→
+   126→function SkeletonCard() {
+   127→  return (
+   128→    <div className="macos-card p-4 animate-pulse">
+   129→      <div className="h-3 rounded bg-muted/40 w-20 mb-2" />
+   130→      <div className="h-6 rounded bg-muted/40 w-12" />
+   131→    </div>
+   132→  )
+   133→}
+   134→
+   135→// ── Component ─────────────────────────────────────────────
+   136→
+   137→export default function EmployeesModule() {
+   138→  const [activeTab, setActiveTab] = useState<TabKey>('employees')
+   139→  const [employees, setEmployees] = useState<EmployeeData[]>([])
+   140→  const [leaveRequests, setLeaveRequests] = useState<LeaveRequestData[]>([])
+   141→  const [payrollSummary, setPayrollSummary] = useState<PayrollSummary | null>(null)
+   142→  const [loading, setLoading] = useState(true)
+   143→  const [error, setError] = useState<string | null>(null)
+   144→  const { selectedStation } = useAppStore()
+   145→
+   146→  const fetchData = useCallback(async () => {
+   147→    setLoading(true)
+   148→    setError(null)
+   149→    try {
+   150→      const stationParam = selectedStation && selectedStation !== 'all' ? `?stationId=${selectedStation}` : ''
+   151→      const [empRes, leaveRes, payrollRes] = await Promise.all([
+   152→        fetch(`/api/employees${stationParam}`),
+   153→        fetch(`/api/leave${stationParam}`),
+   154→        fetch(`/api/payroll${stationParam}`),
+   155→      ])
+   156→
+   157→      if (!empRes.ok || !leaveRes.ok || !payrollRes.ok) {
+   158→        throw new Error('Failed to fetch employee data')
+   159→      }
+   160→
+   161→      const empData = await empRes.json()
+   162→      const leaveData = await leaveRes.json()
+   163→      const payrollData = await payrollRes.json()
+   164→
+   165→      setEmployees(empData.employees || [])
+   166→      setLeaveRequests(leaveData.requests || [])
+   167→      setPayrollSummary(payrollData.summary || null)
+   168→    } catch (err) {
+   169→      setError(err instanceof Error ? err.message : 'Unknown error')
+   170→    } finally {
+   171→      setLoading(false)
+   172→    }
+   173→  }, [selectedStation])
+   174→
+   175→  useEffect(() => {
+   176→    fetchData()
+   177→  }, [fetchData])
+   178→
+   179→  const totalEmp = employees.length
+   180→  const onShift = employees.filter(e => e.status === 'active' || e.status === 'on-shift' || e.status === 'new').length
+   181→  const onLeave = employees.filter(e => e.status === 'on-leave').length
+   182→  const newEmp = employees.filter(e => e.status === 'new').length
+   183→
+   184→  if (error) {
+   185→    return (
+   186→      <div className="macos-card p-8 text-center">
+   187→        <AlertCircle className="size-8 text-red-500 mx-auto mb-3" />
+   188→        <p className="text-[13px] font-semibold text-red-500 mb-1">Failed to load employee data</p>
+   189→        <p className="text-[12px] text-muted-foreground mb-3">{error}</p>
+   190→        <button onClick={fetchData} className="macos-btn gap-1.5">
+   191→          <RefreshCw className="size-3.5" /> Retry
+   192→        </button>
+   193→      </div>
+   194→    )
+   195→  }
+   196→
+   197→  return (
+   198→    <div className="space-y-5" style={{ fontStyle: 'normal !important' }}>
+   199→      {/* ── Summary Stats ── */}
+   200→      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+   201→        {loading ? (
+   202→          Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
+   203→        ) : (
+   204→          [
+   205→            { label: 'Total Employees', value: totalEmp.toString(), icon: Users, accent: false },
+   206→            { label: 'On Shift', value: onShift.toString(), icon: Clock, accent: false },
+   207→            { label: 'On Leave', value: onLeave.toString(), icon: Coffee, accent: false },
+   208→            { label: 'New Hires', value: newEmp.toString(), icon: UserPlus, accent: true },
+   209→          ].map((stat, i) => (
+   210→            <motion.div
+   211→              key={stat.label}
+   212→              initial={{ opacity: 0, y: 8 }}
+   213→              animate={{ opacity: 1, y: 0 }}
+   214→              transition={{ delay: i * 0.05, duration: 0.3 }}
+   215→              className="macos-card p-4"
+   216→            >
+   217→              <div className="flex items-start justify-between">
+   218→                <div>
+   219→                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{stat.label}</p>
+   220→                  <p className={`text-[20px] font-bold mt-1 ${stat.accent ? 'fuel-text-gradient' : 'text-foreground'}`}>
+   221→                    {stat.value}
+   222→                  </p>
+   223→                </div>
+   224→                <div className={`size-8 rounded-lg flex items-center justify-center ${stat.accent ? 'bg-teal-500/10' : 'bg-black/[0.03] dark:bg-white/[0.05]'}`}>
+   225→                  <stat.icon className={`size-4 ${stat.accent ? 'text-teal-500' : 'text-muted-foreground'}`} strokeWidth={1.5} />
+   226→                </div>
+   227→              </div>
+   228→            </motion.div>
+   229→          ))
+   230→        )}
+   231→      </div>
+   232→
+   233→      {/* ── Tab Bar ── */}
+   234→      <div className="flex items-center gap-1 overflow-x-auto pb-1 -mb-1">
+   235→        {tabs.map((tab) => {
+   236→          const isActive = activeTab === tab.key
+   237→          const Icon = tab.icon
+   238→          return (
+   239→            <button
+   240→              key={tab.key}
+   241→              onClick={() => setActiveTab(tab.key)}
+   242→              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all duration-150 whitespace-nowrap ${
+   243→                isActive
+   244→                  ? 'bg-teal-500/10 text-teal-600 dark:text-teal-400'
+   245→                  : 'text-muted-foreground hover:bg-black/[0.03] dark:hover:bg-white/[0.05] hover:text-foreground'
+   246→              }`}
+   247→            >
+   248→              <Icon className="size-3.5" strokeWidth={isActive ? 2 : 1.5} />
+   249→              {tab.label}
+   250→            </button>
+   251→          )
+   252→        })}
+   253→      </div>
+   254→
+   255→      {/* ── Tab Content ── */}
+   256→      <AnimatePresence mode="wait">
+   257→        <motion.div
+   258→          key={activeTab}
+   259→          initial={{ opacity: 0, y: 6 }}
+   260→          animate={{ opacity: 1, y: 0 }}
+   261→          exit={{ opacity: 0, y: -4 }}
+   262→          transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+   263→        >
+   264→          {activeTab === 'employees' && <EmployeesTab employees={employees} loading={loading} onRefresh={fetchData} />}
+   265→          {activeTab === 'attendance' && <AttendanceTab employees={employees} loading={loading} />}
+   266→          {activeTab === 'payroll' && <PayrollTab employees={employees} payrollSummary={payrollSummary} loading={loading} />}
+   267→          {activeTab === 'leave' && <LeaveTab leaveRequests={leaveRequests} loading={loading} onRefresh={fetchData} />}
+   268→        </motion.div>
+   269→      </AnimatePresence>
+   270→    </div>
+   271→  )
+   272→}
+   273→
+   274→// ── Employees Tab ─────────────────────────────────────────
+   275→
+   276→function EmployeesTab({ employees, loading, onRefresh }: { employees: EmployeeData[]; loading: boolean; onRefresh: () => void }) {
+   277→  const getRoleLabel = (role: string) => role.charAt(0).toUpperCase() + role.slice(1)
+   278→
+   279→  return (
+   280→    <div className="macos-card overflow-hidden">
+   281→      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+   282→        <div>
+   283→          <h3 className="text-[13px] font-semibold">Employees</h3>
+   284→          <p className="text-[11px] text-muted-foreground mt-0.5">{employees.length} total employees across stations</p>
+   285→        </div>
+   286→        <div className="flex items-center gap-2">
+   287→          <button onClick={onRefresh} className="macos-btn-secondary !px-2.5 !py-1 text-[11px] gap-1">
+   288→            <RefreshCw className="size-3" />
+   289→          </button>
+   290→          <button className="macos-btn gap-1">
+   291→            <UserPlus className="size-3.5" /> Add Employee
+   292→          </button>
+   293→        </div>
+   294→      </div>
+   295→      <div className="overflow-x-auto">
+   296→        <table className="macos-table">
+   297→          <thead>
+   298→            <tr>
+   299→              <th>Employee</th>
+   300→              <th>Role</th>
+   301→              <th>Station</th>
+   302→              <th>Shift</th>
+   303→              <th className="text-right">Salary</th>
+   304→              <th className="text-right">Commission</th>
+   305→              <th>Status</th>
+   306→            </tr>
+   307→          </thead>
+   308→          <tbody>
+   309→            {loading ? (
+   310→              Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={7} />)
+   311→            ) : employees.length === 0 ? (
+   312→              <tr>
+   313→                <td colSpan={7} className="text-center py-8 text-[13px] text-muted-foreground">
+   314→                  No employees found. Add employees or seed the database.
+   315→                </td>
+   316→              </tr>
+   317→            ) : (
+   318→              employees.map((emp) => {
+   319→                const role = roleConfig[emp.role] || roleConfig['attendant']
+   320→                const status = statusConfig[emp.status] || statusConfig['off-duty']
+   321→                const RoleIcon = role.icon
+   322→                return (
+   323→                  <tr key={emp.id}>
+   324→                    <td>
+   325→                      <div className="flex items-center gap-2.5">
+   326→                        <div className={`size-8 rounded-lg flex items-center justify-center ${role.bg}`}>
+   327→                          <span className={`text-[11px] font-bold ${role.color}`}>
+   328→                            {emp.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+   329→                          </span>
+   330→                        </div>
+   331→                        <div>
+   332→                          <p className="text-[13px] font-semibold">{emp.name}</p>
+   333→                          <p className="text-[11px] text-muted-foreground">{emp.employeeId || emp.id.slice(0, 8)} · {emp.phone || '—'}</p>
+   334→                        </div>
+   335→                      </div>
+   336→                    </td>
+   337→                    <td>
+   338→                      <div className="flex items-center gap-1.5">
+   339→                        <RoleIcon className={`size-3 ${role.color}`} />
+   340→                        <span className="text-[12px] font-medium">{getRoleLabel(emp.role)}</span>
+   341→                      </div>
+   342→                    </td>
+   343→                    <td className="text-muted-foreground">{emp.station?.name || '—'}</td>
+   344→                    <td>
+   345→                      <span className="macos-pill bg-black/[0.04] dark:bg-white/[0.06] text-muted-foreground">
+   346→                        {emp.todayAttendance ? (emp.todayAttendance.checkIn ? 'Morning' : '—') : '—'}
+   347→                      </span>
+   348→                    </td>
+   349→                    <td className="text-right font-mono">{emp.salary ? pkr(emp.salary) : '—'}</td>
+   350→                    <td className="text-right">
+   351→                      {emp.commissionRate > 0 ? (
+   352→                        <span className="font-mono text-teal-600 dark:text-teal-400">{emp.commissionRate}%</span>
+   353→                      ) : (
+   354→                        <span className="text-muted-foreground">—</span>
+   355→                      )}
+   356→                    </td>
+   357→                    <td>
+   358→                      <div className="flex items-center gap-1.5">
+   359→                        <div className={`macos-status-dot ${status.dot}`} />
+   360→                        <span className={`text-[11px] font-medium ${status.color}`}>{status.label}</span>
+   361→                      </div>
+   362→                    </td>
+   363→                  </tr>
+   364→                )
+   365→              })
+   366→            )}
+   367→          </tbody>
+   368→        </table>
+   369→      </div>
+   370→    </div>
+   371→  )
+   372→}
+   373→
+   374→// ── Attendance Tab ────────────────────────────────────────
+   375→
+   376→function AttendanceTab({ employees, loading }: { employees: EmployeeData[]; loading: boolean }) {
+   377→  const present = employees.filter(e => e.todayAttendance && e.todayAttendance.checkIn).length
+   378→  const onLeave = employees.filter(e => e.status === 'on-leave').length
+   379→  const offDuty = employees.filter(e => !e.todayAttendance || !e.todayAttendance.checkIn).length
+   380→  const late = employees.filter(e => e.todayAttendance && e.todayAttendance.status === 'late').length
+   381→  const total = employees.length || 1
+   382→  const rate = total > 0 ? Math.round((present / total) * 100) : 0
+   383→
+   384→  const attStats = [
+   385→    { label: 'Present', value: present, total, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/10', dot: 'macos-status-online' },
+   386→    { label: 'On Leave', value: onLeave, total, color: 'text-teal-500', bg: 'bg-teal-500/10', dot: 'macos-status-warning' },
+   387→    { label: 'Off Duty', value: offDuty, total, color: 'text-muted-foreground', bg: 'bg-black/[0.03] dark:bg-white/[0.05]', dot: 'macos-status-offline' },
+   388→    { label: 'Late Check-in', value: late, total, color: 'text-red-500', bg: 'bg-red-500/10', dot: 'macos-status-error' },
+   389→  ]
+   390→
+   391→  const activeEmployees = employees.filter(e => e.status === 'active' || e.status === 'on-shift' || e.status === 'new')
+   392→
+   393→  return (
+   394→    <div className="space-y-4">
+   395→      {/* Attendance Stats */}
+   396→      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+   397→        {loading ? (
+   398→          Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
+   399→        ) : (
+   400→          attStats.map((s, i) => (
+   401→            <motion.div
+   402→              key={s.label}
+   403→              initial={{ opacity: 0, y: 8 }}
+   404→              animate={{ opacity: 1, y: 0 }}
+   405→              transition={{ delay: i * 0.05, duration: 0.3 }}
+   406→              className="macos-card p-4"
+   407→            >
+   408→              <div className="flex items-center gap-2 mb-2">
+   409→                <div className={`macos-status-dot ${s.dot}`} />
+   410→                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{s.label}</span>
+   411→              </div>
+   412→              <p className={`text-[24px] font-bold ${s.color}`}>{s.value}</p>
+   413→              <p className="text-[11px] text-muted-foreground">{Math.round((s.value / s.total) * 100)}% of workforce</p>
+   414→            </motion.div>
+   415→          ))
+   416→        )}
+   417→      </div>
+   418→
+   419→      {/* Attendance Rate Card */}
+   420→      <div className="macos-card p-5">
+   421→        <div className="flex items-center justify-between mb-4">
+   422→          <div>
+   423→            <h3 className="text-[13px] font-semibold">Attendance Rate</h3>
+   424→            <p className="text-[11px] text-muted-foreground mt-0.5">Current shift overview</p>
+   425→          </div>
+   426→          <div className="text-right">
+   427→            <p className="text-[28px] font-bold fuel-text-gradient">{rate}%</p>
+   428→            <div className="flex items-center gap-1 justify-end mt-0.5">
+   429→              <TrendingUp className="size-3 text-emerald-500" />
+   430→              <span className="text-[11px] font-medium text-emerald-500">Live data</span>
+   431→            </div>
+   432→          </div>
+   433→        </div>
+   434→        <div className="w-full h-2 rounded-full bg-black/[0.04] dark:bg-white/[0.06] overflow-hidden">
+   435→          <motion.div
+   436→            initial={{ width: 0 }}
+   437→            animate={{ width: `${rate}%` }}
+   438→            transition={{ duration: 0.8, ease: 'easeOut' }}
+   439→            className="h-full rounded-full fuel-gradient"
+   440→          />
+   441→        </div>
+   442→      </div>
+   443→
+   444→      {/* Who's On Shift */}
+   445→      <div className="macos-card overflow-hidden">
+   446→        <div className="px-4 py-3 border-b border-border">
+   447→          <h3 className="text-[13px] font-semibold">Currently Active</h3>
+   448→        </div>
+   449→        {loading ? (
+   450→          <div className="p-4 space-y-3">
+   451→            {Array.from({ length: 3 }).map((_, i) => (
+   452→              <div key={i} className="h-10 rounded-lg bg-muted/30 animate-pulse" />
+   453→            ))}
+   454→          </div>
+   455→        ) : activeEmployees.length === 0 ? (
+   456→          <div className="p-8 text-center text-[13px] text-muted-foreground">No active employees</div>
+   457→        ) : (
+   458→          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-0">
+   459→            {activeEmployees.map((emp) => {
+   460→              const role = roleConfig[emp.role] || roleConfig['attendant']
+   461→              return (
+   462→                <div key={emp.id} className="macos-group-item !py-3 !px-4 flex items-center gap-2.5">
+   463→                  <div className={`size-9 rounded-lg flex items-center justify-center ${role.bg} shrink-0`}>
+   464→                    <span className={`text-[11px] font-bold ${role.color}`}>
+   465→                      {emp.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+   466→                    </span>
+   467→                  </div>
+   468→                  <div className="min-w-0">
+   469→                    <p className="text-[13px] font-semibold truncate">{emp.name}</p>
+   470→                    <div className="flex items-center gap-1.5">
+   471→                      <span className={`text-[10px] font-medium ${role.color}`}>{emp.role}</span>
+   472→                      {emp.todayAttendance && (
+   473→                        <span className="text-[10px] text-muted-foreground">· {new Date(emp.todayAttendance.checkIn).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+   474→                      )}
+   475→                    </div>
+   476→                  </div>
+   477→                </div>
+   478→              )
+   479→            })}
+   480→          </div>
+   481→        )}
+   482→      </div>
+   483→    </div>
+   484→  )
+   485→}
+   486→
+   487→// ── Payroll Tab ───────────────────────────────────────────
+   488→
+   489→function PayrollTab({ employees, payrollSummary, loading }: { employees: EmployeeData[]; payrollSummary: PayrollSummary | null; loading: boolean }) {
+   490→  const pr = payrollSummary || {
+   491→    totalNetPay: 0, totalBaseSalary: 0, totalDeductions: 0,
+   492→    totalOvertime: 0, totalCommissions: 0, pendingCount: 0, paidCount: 0,
+   493→  }
+   494→
+   495→  // Derive period from current month
+   496→  const period = new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+   497→
+   498→  return (
+   499→    <div className="space-y-4">
+   500→      {/* Payroll Overview Card */}
+   501→      <div className="macos-card p-5">
+   502→        {loading ? (
+   503→          <div className="space-y-3 animate-pulse">
+   504→            <div className="h-4 rounded bg-muted/40 w-32" />
+   505→            <div className="h-8 rounded bg-muted/40 w-40" />
+   506→          </div>
+   507→        ) : (
+   508→          <>
+   509→            <div className="flex items-start justify-between mb-5">
+   510→              <div>
+   511→                <h3 className="text-[13px] font-semibold">Payroll Overview</h3>
+   512→                <p className="text-[11px] text-muted-foreground mt-0.5">Period: {period}</p>
+   513→              </div>
+   514→              <div className="text-right">
+   515→                <p className="text-[11px] text-muted-foreground uppercase font-semibold">Net Payable</p>
+   516→                <p className="text-[28px] font-bold fuel-text-gradient">{pkr(pr.totalNetPay)}</p>
+   517→              </div>
+   518→            </div>
+   519→
+   520→            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+   521→              {[
+   522→                { label: 'Base Salary', value: pr.totalBaseSalary, icon: Wallet },
+   523→                { label: 'Overtime', value: pr.totalOvertime, icon: Clock },
+   524→                { label: 'Commissions', value: pr.totalCommissions, icon: TrendingUp },
+   525→                { label: 'Deductions', value: pr.totalDeductions, icon: ArrowUpRight, negative: true },
+   526→              ].map((item) => (
+   527→                <div key={item.label}>
+   528→                  <div className="flex items-center gap-1.5 mb-1">
+   529→                    <item.icon className="size-3 text-muted-foreground" />
+   530→                    <span className="text-[11px] text-muted-foreground font-medium">{item.label}</span>
+   531→                  </div>
+   532→                  <p className={`text-[16px] font-bold ${item.negative ? 'text-red-500' : 'text-foreground'}`}>
+   533→                    {item.negative ? '-' : ''}{pkr(item.value)}
+   534→                  </p>
+   535→                </div>
+   536→              ))}
+   537→            </div>
+   538→          </>
+   539→        )}
+   540→      </div>
+   541→
+   542→      {/* Payment Status */}
+   543→      <div className="grid grid-cols-2 gap-3">
+   544→        <div className="macos-card p-4">
+   545→          <div className="flex items-center gap-2 mb-2">
+   546→            <div className="macos-status-dot macos-status-online" />
+   547→            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Paid</span>
+   548→          </div>
+   549→          <p className="text-[24px] font-bold text-emerald-600 dark:text-emerald-400">{pr.paidCount}</p>
+   550→          <p className="text-[11px] text-muted-foreground">employees paid this period</p>
+   551→        </div>
+   552→        <div className="macos-card p-4">
+   553→          <div className="flex items-center gap-2 mb-2">
+   554→            <div className="macos-status-dot macos-status-warning" />
+   555→            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Pending</span>
+   556→          </div>
+   557→          <p className="text-[24px] font-bold text-teal-500">{pr.pendingCount}</p>
+   558→          <p className="text-[11px] text-muted-foreground">awaiting processing</p>
+   559→        </div>
+   560→      </div>
+   561→
+   562→      {/* Salary Breakdown by Role */}
+   563→      <div className="macos-card overflow-hidden">
+   564→        <div className="px-4 py-3 border-b border-border">
+   565→          <h3 className="text-[13px] font-semibold">Salary Breakdown by Role</h3>
+   566→        </div>
+   567→        {loading ? (
+   568→          <div className="p-4 space-y-3">
+   569→            {Array.from({ length: 4 }).map((_, i) => (
+   570→              <div key={i} className="h-10 rounded-lg bg-muted/30 animate-pulse" />
+   571→            ))}
+   572→          </div>
+   573→        ) : (
+   574→          (() => {
+   575→            const roleGroups = employees.reduce<Record<string, { count: number; totalSalary: number }>>((acc, emp) => {
+   576→              if (!acc[emp.role]) acc[emp.role] = { count: 0, totalSalary: 0 }
+   577→              acc[emp.role].count++
+   578→              acc[emp.role].totalSalary += emp.salary || 0
+   579→              return acc
+   580→            }, {})
+   581→
+   582→            return Object.entries(roleGroups).map(([role, data]) => {
+   583→              const rc = roleConfig[role] || roleConfig['attendant']
+   584→              const RIcon = rc.icon
+   585→              return (
+   586→                <div key={role} className="macos-group-item flex items-center justify-between !px-4">
+   587→                  <div className="flex items-center gap-3">
+   588→                    <div className={`size-8 rounded-lg flex items-center justify-center ${rc.bg}`}>
+   589→                      <RIcon className={`size-4 ${rc.color}`} />
+   590→                    </div>
+   591→                    <div>
+   592→                      <p className="text-[13px] font-semibold">{role.charAt(0).toUpperCase() + role.slice(1)}</p>
+   593→                      <p className="text-[11px] text-muted-foreground">{data.count} employees</p>
+   594→                    </div>
+   595→                  </div>
+   596→                  <div className="text-right">
+   597→                    <p className="text-[13px] font-semibold text-teal-600 dark:text-teal-400">{pkr(data.totalSalary)}</p>
+   598→                    <p className="text-[11px] text-muted-foreground">avg {data.count > 0 ? pkr(Math.round(data.totalSalary / data.count)) : '—'}/mo</p>
+   599→                  </div>
+   600→                </div>
+   601→              )
+   602→            })
+   603→          })()
+   604→        )}
+   605→      </div>
+   606→    </div>
+   607→  )
+   608→}
+   609→
+   610→// ── Leave Tab ─────────────────────────────────────────────
+   611→
+   612→function LeaveTab({ leaveRequests, loading, onRefresh }: { leaveRequests: LeaveRequestData[]; loading: boolean; onRefresh: () => void }) {
+   613→  const [actionLoading, setActionLoading] = useState<string | null>(null)
+   614→
+   615→  const pending = leaveRequests.filter(l => l.status === 'pending').length
+   616→  const approved = leaveRequests.filter(l => l.status === 'approved').length
+   617→  const rejected = leaveRequests.filter(l => l.status === 'rejected').length
+   618→
+   619→  const handleLeaveAction = async (id: string, status: 'approved' | 'rejected') => {
+   620→    setActionLoading(id)
+   621→    try {
+   622→      const res = await fetch('/api/leave', {
+   623→        method: 'PUT',
+   624→        headers: { 'Content-Type': 'application/json' },
+   625→        body: JSON.stringify({ id, status }),
+   626→      })
+   627→      if (res.ok) {
+   628→        onRefresh()
+   629→      }
+   630→    } catch (err) {
+   631→      console.error('Leave action error:', err)
+   632→    } finally {
+   633→      setActionLoading(null)
+   634→    }
+   635→  }
+   636→
+   637→  const formatDate = (dateStr: string) => {
+   638→    try {
+   639→      return new Date(dateStr).toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' })
+   640→    } catch {
+   641→      return dateStr
+   642→    }
+   643→  }
+   644→
+   645→  const getDays = (start: string, end: string) => {
+   646→    try {
+   647→      const s = new Date(start)
+   648→      const e = new Date(end)
+   649→      return Math.max(1, Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1)
+   650→    } catch {
+   651→      return 1
+   652→    }
+   653→  }
+   654→
+   655→  return (
+   656→    <div className="space-y-4">
+   657→      {/* Leave Stats */}
+   658→      <div className="grid grid-cols-3 gap-3">
+   659→        <div className="macos-card p-4">
+   660→          <div className="flex items-center gap-2 mb-1">
+   661→            <div className="macos-status-dot macos-status-warning" />
+   662→            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Pending</span>
+   663→          </div>
+   664→          <p className="text-[20px] font-bold text-teal-500">{pending}</p>
+   665→        </div>
+   666→        <div className="macos-card p-4">
+   667→          <div className="flex items-center gap-2 mb-1">
+   668→            <div className="macos-status-dot macos-status-online" />
+   669→            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Approved</span>
+   670→          </div>
+   671→          <p className="text-[20px] font-bold text-emerald-600 dark:text-emerald-400">{approved}</p>
+   672→        </div>
+   673→        <div className="macos-card p-4">
+   674→          <div className="flex items-center gap-2 mb-1">
+   675→            <div className="macos-status-dot macos-status-error" />
+   676→            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Rejected</span>
+   677→          </div>
+   678→          <p className="text-[20px] font-bold text-red-500">{rejected}</p>
+   679→        </div>
+   680→      </div>
+   681→
+   682→      {/* Leave Requests List */}
+   683→      <div className="macos-card overflow-hidden">
+   684→        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+   685→          <h3 className="text-[13px] font-semibold">Leave Requests</h3>
+   686→          <span className="text-[11px] text-muted-foreground">{leaveRequests.length} total requests</span>
+   687→        </div>
+   688→        <div className="overflow-x-auto">
+   689→          <table className="macos-table">
+   690→            <thead>
+   691→              <tr>
+   692→                <th>Employee</th>
+   693→                <th>Role</th>
+   694→                <th>Type</th>
+   695→                <th>From</th>
+   696→                <th>To</th>
+   697→                <th className="text-center">Days</th>
+   698→                <th>Reason</th>
+   699→                <th>Status</th>
+   700→                <th>Actions</th>
+   701→              </tr>
+   702→            </thead>
+   703→            <tbody>
+   704→              {loading ? (
+   705→                Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} cols={9} />)
+   706→              ) : leaveRequests.length === 0 ? (
+   707→                <tr>
+   708→                  <td colSpan={9} className="text-center py-8 text-[13px] text-muted-foreground">
+   709→                    No leave requests found
+   710→                  </td>
+   711→                </tr>
+   712→              ) : (
+   713→                leaveRequests.map((lr) => {
+   714→                  const statusCfg = leaveStatusConfig[lr.status] || leaveStatusConfig['pending']
+   715→                  const StatusIcon = statusCfg.icon
+   716→                  return (
+   717→                    <tr key={lr.id}>
+   718→                      <td className="font-semibold">{lr.employee?.name || 'Unknown'}</td>
+   719→                      <td className="text-muted-foreground">{lr.employee?.role ? lr.employee.role.charAt(0).toUpperCase() + lr.employee.role.slice(1) : '—'}</td>
+   720→                      <td>
+   721→                        <span className={`macos-pill ${
+   722→                          lr.leaveType === 'sick'
+   723→                            ? 'bg-red-500/10 text-red-500'
+   724→                            : lr.leaveType === 'annual'
+   725→                              ? 'bg-teal-500/10 text-teal-600 dark:text-teal-400'
+   726→                              : 'bg-black/[0.04] dark:bg-white/[0.06] text-muted-foreground'
+   727→                        }`}>
+   728→                          {lr.leaveType.charAt(0).toUpperCase() + lr.leaveType.slice(1)} Leave
+   729→                        </span>
+   730→                      </td>
+   731→                      <td className="font-mono text-[12px]">{formatDate(lr.startDate)}</td>
+   732→                      <td className="font-mono text-[12px]">{formatDate(lr.endDate)}</td>
+   733→                      <td className="text-center">{getDays(lr.startDate, lr.endDate)}</td>
+   734→                      <td className="text-muted-foreground max-w-32 truncate">{lr.reason || '—'}</td>
+   735→                      <td>
+   736→                        <div className="flex items-center gap-1.5">
+   737→                          <StatusIcon className={`size-3 ${statusCfg.color}`} />
+   738→                          <span className={`text-[11px] font-medium ${statusCfg.color}`}>{statusCfg.label}</span>
+   739→                        </div>
+   740→                      </td>
+   741→                      <td>
+   742→                        {lr.status === 'pending' && (
+   743→                          <div className="flex items-center gap-1.5">
+   744→                            <button
+   745→                              onClick={() => handleLeaveAction(lr.id, 'approved')}
+   746→                              disabled={actionLoading === lr.id}
+   747→                              className="macos-btn-secondary !px-2.5 !py-1 text-[11px] text-emerald-600 dark:text-emerald-400 gap-1 disabled:opacity-50"
+   748→                            >
+   749→                              {actionLoading === lr.id ? <Loader2 className="size-3 animate-spin" /> : <CheckCircle2 className="size-3" />} Approve
+   750→                            </button>
+   751→                            <button
+   752→                              onClick={() => handleLeaveAction(lr.id, 'rejected')}
+   753→                              disabled={actionLoading === lr.id}
+   754→                              className="macos-btn-secondary !px-2.5 !py-1 text-[11px] text-red-500 gap-1 disabled:opacity-50"
+   755→                            >
+   756→                              <XCircle className="size-3" /> Reject
+   757→                            </button>
+   758→                          </div>
+   759→                        )}
+   760→                      </td>
+   761→                    </tr>
+   762→                  )
+   763→                })
+   764→              )}
+   765→            </tbody>
+   766→          </table>
+   767→        </div>
+   768→      </div>
+   769→    </div>
+   770→  )
+   771→}
+   772→

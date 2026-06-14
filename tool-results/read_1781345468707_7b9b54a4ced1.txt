@@ -1,0 +1,643 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useCallback } from 'react'
+     4→import {
+     5→  Building2,
+     6→  Package,
+     7→  Key,
+     8→  FileText,
+     9→  CreditCard,
+    10→  RefreshCw,
+    11→  ArrowUpDown,
+    12→  CheckCircle2,
+    13→  XCircle,
+    14→  Clock,
+    15→  AlertTriangle,
+    16→  Activity,
+    17→  Zap,
+    18→  Users,
+    19→  Monitor,
+    20→  Cloud,
+    21→} from 'lucide-react'
+    22→import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+    23→import { Badge } from '@/components/ui/badge'
+    24→import { Button } from '@/components/ui/button'
+    25→import { Skeleton } from '@/components/ui/skeleton'
+    26→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    27→import {
+    28→  Table,
+    29→  TableBody,
+    30→  TableCell,
+    31→  TableHead,
+    32→  TableHeader,
+    33→  TableRow,
+    34→} from '@/components/ui/table'
+    35→
+    36→// ── Types ──────────────────────────────────────────────
+    37→
+    38→interface OMSClient {
+    39→  id: string
+    40→  omsClientId: string
+    41→  companyName: string
+    42→  registrationDate: string
+    43→  subscriptionPlan: string
+    44→  licenseKey: string
+    45→  licenseStatus: string
+    46→  licensedModules: string | null
+    47→  maxStations: number
+    48→  maxUsers: number
+    49→  maxDevices: number
+    50→  currentStations: number
+    51→  currentUsers: number
+    52→  currentDevices: number
+    53→  billingCycle: string
+    54→  basePrice: number
+    55→  perStationPrice: number
+    56→  perUserPrice: number
+    57→  totalMonthly: number
+    58→  currency: string
+    59→  lastSyncAt: string | null
+    60→  syncStatus: string
+    61→  isActive: boolean
+    62→}
+    63→
+    64→interface OMSPackage {
+    65→  id: string
+    66→  packageName: string
+    67→  description: string | null
+    68→  modules: string
+    69→  stationLimit: number
+    70→  userLimit: number
+    71→  deviceLimit: number
+    72→  price: number
+    73→  currency: string
+    74→  billingCycle: string
+    75→  isCustom: boolean
+    76→  isActive: boolean
+    77→}
+    78→
+    79→interface OMSLicense {
+    80→  id: string
+    81→  licenseKey: string
+    82→  moduleKey: string
+    83→  moduleName: string
+    84→  is_enabled: boolean
+    85→  validFrom: string
+    86→  validTo: string | null
+    87→  maxUsage: number | null
+    88→  currentUsage: number
+    89→  status: string
+    90→}
+    91→
+    92→interface OMSInvoice {
+    93→  id: string
+    94→  invoiceNumber: string
+    95→  invoiceDate: string
+    96→  dueDate: string
+    97→  subtotal: number
+    98→  taxAmount: number
+    99→  totalAmount: number
+   100→  status: string
+   101→  paidAmount: number
+   102→  paidDate: string | null
+   103→}
+   104→
+   105→interface OMSPayment {
+   106→  id: string
+   107→  amount: number
+   108→  paymentMethod: string
+   109→  referenceNumber: string | null
+   110→  transactionId: string | null
+   111→  status: string
+   112→  paymentDate: string
+   113→  notes: string | null
+   114→}
+   115→
+   116→interface OMSSyncLog {
+   117→  id: string
+   118→  syncType: string
+   119→  direction: string
+   120→  status: string
+   121→  payload: string | null
+   122→  response: string | null
+   123→  errorMessage: string | null
+   124→  syncedAt: string
+   125→}
+   126→
+   127→interface ApexFlowData {
+   128→  tenant: { id: string; name: string; slug: string }
+   129→  omsClient: OMSClient & {
+   130→    packages: OMSPackage[]
+   131→    invoices: OMSInvoice[]
+   132→    payments: OMSPayment[]
+   133→    syncLogs: OMSSyncLog[]
+   134→    licenses: OMSLicense[]
+   135→  }
+   136→}
+   137→
+   138→// ── Badge Configs ──────────────────────────────────────
+   139→
+   140→const LICENSE_STATUS: Record<string, string> = {
+   141→  active: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/25',
+   142→  suspended: 'bg-amber-500/15 text-amber-600 border-amber-500/25',
+   143→  expired: 'bg-red-500/15 text-red-600 border-red-500/25',
+   144→  cancelled: 'bg-slate-500/15 text-slate-500 border-slate-500/25',
+   145→  disabled: 'bg-slate-500/15 text-slate-500 border-slate-500/25',
+   146→}
+   147→
+   148→const INVOICE_STATUS: Record<string, string> = {
+   149→  paid: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/25',
+   150→  pending: 'bg-amber-500/15 text-amber-600 border-amber-500/25',
+   151→  overdue: 'bg-red-500/15 text-red-600 border-red-500/25',
+   152→  cancelled: 'bg-slate-500/15 text-slate-500 border-slate-500/25',
+   153→}
+   154→
+   155→const PAYMENT_STATUS: Record<string, string> = {
+   156→  completed: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/25',
+   157→  pending: 'bg-amber-500/15 text-amber-600 border-amber-500/25',
+   158→  failed: 'bg-red-500/15 text-red-600 border-red-500/25',
+   159→  refunded: 'bg-slate-500/15 text-slate-500 border-slate-500/25',
+   160→}
+   161→
+   162→const SYNC_STATUS: Record<string, string> = {
+   163→  success: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/25',
+   164→  pending: 'bg-amber-500/15 text-amber-600 border-amber-500/25',
+   165→  error: 'bg-red-500/15 text-red-600 border-red-500/25',
+   166→}
+   167→
+   168→const PLAN_COLORS: Record<string, string> = {
+   169→  starter: 'bg-slate-500/10 text-slate-600 border-slate-500/25',
+   170→  professional: 'bg-amber-500/10 text-amber-600 border-amber-500/25',
+   171→  enterprise: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/25',
+   172→  custom: 'bg-purple-500/10 text-purple-600 border-purple-500/25',
+   173→}
+   174→
+   175→function LoadingSkeleton() {
+   176→  return (
+   177→    <div className="space-y-4">
+   178→      {Array.from({ length: 4 }).map((_, i) => (
+   179→        <Card key={i}><CardContent className="p-4"><Skeleton className="h-20 w-full" /></CardContent></Card>
+   180→      ))}
+   181→    </div>
+   182→  )
+   183→}
+   184→
+   185→function formatPKR(amount: number, currency: string = 'PKR') {
+   186→  return `Rs. ${amount.toLocaleString('en-PK')}`
+   187→}
+   188→
+   189→// ── Main Component ─────────────────────────────────────
+   190→
+   191→export default function ApexFlowOMSModule() {
+   192→  const [data, setData] = useState<ApexFlowData | null>(null)
+   193→  const [loading, setLoading] = useState(true)
+   194→  const [error, setError] = useState<string | null>(null)
+   195→
+   196→  const fetchData = useCallback(async () => {
+   197→    setLoading(true)
+   198→    setError(null)
+   199→    try {
+   200→      const res = await fetch('/api/apexflow')
+   201→      if (!res.ok) throw new Error('Failed to fetch OMS data')
+   202→      const json = await res.json()
+   203→      setData(json)
+   204→    } catch (err) {
+   205→      setError(err instanceof Error ? err.message : 'Failed to load data')
+   206→    } finally {
+   207→      setLoading(false)
+   208→    }
+   209→  }, [])
+   210→
+   211→  useEffect(() => {
+   212→    fetchData()
+   213→  }, [fetchData])
+   214→
+   215→  if (loading) return <LoadingSkeleton />
+   216→  if (error || !data) {
+   217→    return (
+   218→      <Card className="bg-card border rounded-lg">
+   219→        <CardContent className="p-8 text-center">
+   220→          <AlertTriangle className="size-8 mx-auto text-amber-500" />
+   221→          <p className="text-sm text-muted-foreground mt-2">{error || 'No OMS client data found'}</p>
+   222→          <Button size="sm" variant="outline" className="mt-3 h-7 text-xs" onClick={fetchData}>
+   223→            <RefreshCw className="size-3 mr-1" /> Retry
+   224→          </Button>
+   225→        </CardContent>
+   226→      </Card>
+   227→    )
+   228→  }
+   229→
+   230→  const client = data.omsClient
+   231→  const usagePct = (current: number, max: number) => max > 0 ? Math.min((current / max) * 100, 100) : 0
+   232→
+   233→  return (
+   234→    <div className="space-y-4">
+   235→      <Tabs defaultValue="overview">
+   236→        <div className="overflow-x-auto pb-1">
+   237→          <TabsList className="h-9 w-max gap-0.5 bg-muted/50">
+   238→            <TabsTrigger value="overview" className="text-xs px-3 h-7 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">Overview</TabsTrigger>
+   239→            <TabsTrigger value="client" className="text-xs px-3 h-7 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">Client</TabsTrigger>
+   240→            <TabsTrigger value="packages" className="text-xs px-3 h-7 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">Packages</TabsTrigger>
+   241→            <TabsTrigger value="licenses" className="text-xs px-3 h-7 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">Licenses</TabsTrigger>
+   242→            <TabsTrigger value="invoices" className="text-xs px-3 h-7 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">Invoices</TabsTrigger>
+   243→            <TabsTrigger value="payments" className="text-xs px-3 h-7 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">Payments</TabsTrigger>
+   244→            <TabsTrigger value="sync-logs" className="text-xs px-3 h-7 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">Sync Logs</TabsTrigger>
+   245→          </TabsList>
+   246→        </div>
+   247→
+   248→        {/* ── Overview ── */}
+   249→        <TabsContent value="overview" className="mt-4 space-y-4">
+   250→          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+   251→            <Card className="bg-card border rounded-lg">
+   252→              <CardContent className="p-4">
+   253→                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Plan</p>
+   254→                <Badge className={`mt-1 text-[10px] ${PLAN_COLORS[client.subscriptionPlan] || ''}`}>{client.subscriptionPlan}</Badge>
+   255→              </CardContent>
+   256→            </Card>
+   257→            <Card className="bg-card border rounded-lg">
+   258→              <CardContent className="p-4">
+   259→                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">License</p>
+   260→                <Badge variant="outline" className={`mt-1 text-[10px] ${LICENSE_STATUS[client.licenseStatus] || ''}`}>{client.licenseStatus}</Badge>
+   261→              </CardContent>
+   262→            </Card>
+   263→            <Card className="bg-card border rounded-lg">
+   264→              <CardContent className="p-4">
+   265→                <div className="flex items-center justify-between">
+   266→                  <div>
+   267→                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Stations</p>
+   268→                    <p className="text-lg font-bold">{client.currentStations}/{client.maxStations}</p>
+   269→                  </div>
+   270→                  <Building2 className="size-4 text-amber-500" />
+   271→                </div>
+   272→                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 mt-2">
+   273→                  <div className="bg-amber-500 h-1.5 rounded-full" style={{ width: `${usagePct(client.currentStations, client.maxStations)}%` }} />
+   274→                </div>
+   275→              </CardContent>
+   276→            </Card>
+   277→            <Card className="bg-card border rounded-lg">
+   278→              <CardContent className="p-4">
+   279→                <div className="flex items-center justify-between">
+   280→                  <div>
+   281→                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Users</p>
+   282→                    <p className="text-lg font-bold">{client.currentUsers}/{client.maxUsers}</p>
+   283→                  </div>
+   284→                  <Users className="size-4 text-amber-500" />
+   285→                </div>
+   286→                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 mt-2">
+   287→                  <div className="bg-amber-500 h-1.5 rounded-full" style={{ width: `${usagePct(client.currentUsers, client.maxUsers)}%` }} />
+   288→                </div>
+   289→              </CardContent>
+   290→            </Card>
+   291→            <Card className="bg-card border rounded-lg">
+   292→              <CardContent className="p-4">
+   293→                <div className="flex items-center justify-between">
+   294→                  <div>
+   295→                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Monthly Cost</p>
+   296→                    <p className="text-lg font-bold">{formatPKR(client.totalMonthly, client.currency)}</p>
+   297→                  </div>
+   298→                  <CreditCard className="size-4 text-amber-500" />
+   299→                </div>
+   300→                <p className="text-[10px] text-muted-foreground mt-1">{client.billingCycle} billing</p>
+   301→              </CardContent>
+   302→            </Card>
+   303→          </div>
+   304→
+   305→          {/* Quick Summary */}
+   306→          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+   307→            <Card className="bg-card border rounded-lg">
+   308→              <CardContent className="p-4">
+   309→                <div className="flex items-center gap-2 mb-2">
+   310→                  <Package className="size-4 text-amber-500" />
+   311→                  <span className="text-sm font-medium">Packages</span>
+   312→                </div>
+   313→                <p className="text-2xl font-bold">{client.packages.length}</p>
+   314→                <p className="text-[10px] text-muted-foreground">{client.packages.filter(p => p.isActive).length} active</p>
+   315→              </CardContent>
+   316→            </Card>
+   317→            <Card className="bg-card border rounded-lg">
+   318→              <CardContent className="p-4">
+   319→                <div className="flex items-center gap-2 mb-2">
+   320→                  <Key className="size-4 text-amber-500" />
+   321→                  <span className="text-sm font-medium">Licenses</span>
+   322→                </div>
+   323→                <p className="text-2xl font-bold">{client.licenses.length}</p>
+   324→                <p className="text-[10px] text-muted-foreground">{client.licenses.filter(l => l.status === 'active').length} active</p>
+   325→              </CardContent>
+   326→            </Card>
+   327→            <Card className="bg-card border rounded-lg">
+   328→              <CardContent className="p-4">
+   329→                <div className="flex items-center gap-2 mb-2">
+   330→                  <FileText className="size-4 text-amber-500" />
+   331→                  <span className="text-sm font-medium">Invoices</span>
+   332→                </div>
+   333→                <p className="text-2xl font-bold">{client.invoices.length}</p>
+   334→                <p className="text-[10px] text-muted-foreground">{client.invoices.filter(i => i.status === 'pending').length} pending</p>
+   335→              </CardContent>
+   336→            </Card>
+   337→          </div>
+   338→        </TabsContent>
+   339→
+   340→        {/* ── Client ── */}
+   341→        <TabsContent value="client" className="mt-4 space-y-4">
+   342→          <Card className="bg-card border rounded-lg">
+   343→            <CardHeader className="pb-3">
+   344→              <div className="flex items-center justify-between">
+   345→                <div className="flex items-center gap-3">
+   346→                  <div className="size-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
+   347→                    <Building2 className="size-5 text-amber-500" />
+   348→                  </div>
+   349→                  <div>
+   350→                    <CardTitle className="text-base">{client.companyName}</CardTitle>
+   351→                    <CardDescription className="text-xs">OMS Client ID: {client.omsClientId}</CardDescription>
+   352→                  </div>
+   353→                </div>
+   354→                <Badge variant="outline" className={`text-[10px] ${PLAN_COLORS[client.subscriptionPlan] || ''}`}>{client.subscriptionPlan}</Badge>
+   355→              </div>
+   356→            </CardHeader>
+   357→            <CardContent className="space-y-3">
+   358→              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+   359→                <div className="flex justify-between p-2 bg-muted/30 rounded">
+   360→                  <span className="text-muted-foreground">Registration Date</span>
+   361→                  <span>{new Date(client.registrationDate).toLocaleDateString()}</span>
+   362→                </div>
+   363→                <div className="flex justify-between p-2 bg-muted/30 rounded">
+   364→                  <span className="text-muted-foreground">License Status</span>
+   365→                  <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${LICENSE_STATUS[client.licenseStatus] || ''}`}>{client.licenseStatus}</Badge>
+   366→                </div>
+   367→                <div className="flex justify-between p-2 bg-muted/30 rounded">
+   368→                  <span className="text-muted-foreground">License Key</span>
+   369→                  <span className="font-mono">{client.licenseKey.slice(0, 12)}...</span>
+   370→                </div>
+   371→                <div className="flex justify-between p-2 bg-muted/30 rounded">
+   372→                  <span className="text-muted-foreground">Billing Cycle</span>
+   373→                  <span>{client.billingCycle}</span>
+   374→                </div>
+   375→                <div className="flex justify-between p-2 bg-muted/30 rounded">
+   376→                  <span className="text-muted-foreground">Base Price</span>
+   377→                  <span>{formatPKR(client.basePrice)}</span>
+   378→                </div>
+   379→                <div className="flex justify-between p-2 bg-muted/30 rounded">
+   380→                  <span className="text-muted-foreground">Per Station</span>
+   381→                  <span>{formatPKR(client.perStationPrice)}</span>
+   382→                </div>
+   383→                <div className="flex justify-between p-2 bg-muted/30 rounded">
+   384→                  <span className="text-muted-foreground">Per User</span>
+   385→                  <span>{formatPKR(client.perUserPrice)}</span>
+   386→                </div>
+   387→                <div className="flex justify-between p-2 bg-muted/30 rounded">
+   388→                  <span className="text-muted-foreground">Last Sync</span>
+   389→                  <span>{client.lastSyncAt ? new Date(client.lastSyncAt).toLocaleString() : 'Never'}</span>
+   390→                </div>
+   391→              </div>
+   392→              <div className="flex justify-between p-2 bg-amber-500/5 border border-amber-500/20 rounded">
+   393→                <span className="text-xs font-medium text-amber-600">Total Monthly Cost</span>
+   394→                <span className="text-sm font-bold text-amber-600">{formatPKR(client.totalMonthly)}</span>
+   395→              </div>
+   396→            </CardContent>
+   397→          </Card>
+   398→        </TabsContent>
+   399→
+   400→        {/* ── Packages ── */}
+   401→        <TabsContent value="packages" className="mt-4 space-y-4">
+   402→          <div className="flex items-center justify-between">
+   403→            <h3 className="text-sm font-semibold">OMS Packages</h3>
+   404→            <Badge variant="outline" className="text-[9px] px-1.5 py-0">{client.packages.length} packages</Badge>
+   405→          </div>
+   406→          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+   407→            {client.packages.length === 0 ? (
+   408→              <Card className="bg-card border rounded-lg col-span-full">
+   409→                <CardContent className="p-8 text-center">
+   410→                  <Package className="size-8 mx-auto text-muted-foreground/40" />
+   411→                  <p className="text-sm text-muted-foreground mt-2">No packages found</p>
+   412→                </CardContent>
+   413→              </Card>
+   414→            ) : (
+   415→              client.packages.map(pkg => (
+   416→                <Card key={pkg.id} className="bg-card border rounded-lg hover:border-amber-500/30 transition-colors">
+   417→                  <CardContent className="p-4">
+   418→                    <div className="flex items-start justify-between mb-2">
+   419→                      <div>
+   420→                        <p className="text-sm font-medium">{pkg.packageName}</p>
+   421→                        {pkg.description && <p className="text-[10px] text-muted-foreground mt-0.5">{pkg.description}</p>}
+   422→                      </div>
+   423→                      {pkg.isCustom && <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-purple-500/10 text-purple-600 border-purple-500/25">Custom</Badge>}
+   424→                    </div>
+   425→                    <div className="space-y-1.5 mt-3 text-xs text-muted-foreground">
+   426→                      <div className="flex justify-between">
+   427→                        <span>Price</span>
+   428→                        <span className="font-semibold text-foreground">{formatPKR(pkg.price, pkg.currency)}/{pkg.billingCycle}</span>
+   429→                      </div>
+   430→                      <div className="flex justify-between">
+   431→                        <span>Stations</span>
+   432→                        <span className="text-foreground">{pkg.stationLimit}</span>
+   433→                      </div>
+   434→                      <div className="flex justify-between">
+   435→                        <span>Users</span>
+   436→                        <span className="text-foreground">{pkg.userLimit}</span>
+   437→                      </div>
+   438→                      <div className="flex justify-between">
+   439→                        <span>Devices</span>
+   440→                        <span className="text-foreground">{pkg.deviceLimit}</span>
+   441→                      </div>
+   442→                    </div>
+   443→                    <div className="mt-2">
+   444→                      <Badge variant={pkg.isActive ? 'default' : 'secondary'} className={`text-[9px] px-1.5 py-0 ${pkg.isActive ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/25' : 'bg-slate-500/15 text-slate-500 border-slate-500/25'}`}>
+   445→                        {pkg.isActive ? 'Active' : 'Inactive'}
+   446→                      </Badge>
+   447→                    </div>
+   448→                  </CardContent>
+   449→                </Card>
+   450→              ))
+   451→            )}
+   452→          </div>
+   453→        </TabsContent>
+   454→
+   455→        {/* ── Licenses ── */}
+   456→        <TabsContent value="licenses" className="mt-4 space-y-4">
+   457→          <h3 className="text-sm font-semibold">Module Licenses</h3>
+   458→          <Card className="bg-card border rounded-lg">
+   459→            <CardContent className="p-0">
+   460→              <div className="max-h-96 overflow-y-auto">
+   461→                <Table>
+   462→                  <TableHeader>
+   463→                    <TableRow>
+   464→                      <TableHead className="text-[10px] h-8">Module</TableHead>
+   465→                      <TableHead className="text-[10px]">Key</TableHead>
+   466→                      <TableHead className="text-[10px]">Enabled</TableHead>
+   467→                      <TableHead className="text-[10px]">Usage</TableHead>
+   468→                      <TableHead className="text-[10px]">Valid From</TableHead>
+   469→                      <TableHead className="text-[10px]">Valid To</TableHead>
+   470→                      <TableHead className="text-[10px]">Status</TableHead>
+   471→                    </TableRow>
+   472→                  </TableHeader>
+   473→                  <TableBody>
+   474→                    {client.licenses.length === 0 ? (
+   475→                      <TableRow>
+   476→                        <TableCell colSpan={7} className="text-center text-xs text-muted-foreground py-8">No licenses found</TableCell>
+   477→                      </TableRow>
+   478→                    ) : (
+   479→                      client.licenses.map(lic => (
+   480→                        <TableRow key={lic.id}>
+   481→                          <TableCell className="text-xs font-medium">{lic.moduleName}</TableCell>
+   482→                          <TableCell className="text-[10px] font-mono">{lic.licenseKey.slice(0, 12)}...</TableCell>
+   483→                          <TableCell>
+   484→                            {lic.is_enabled ? <CheckCircle2 className="size-3.5 text-emerald-500" /> : <XCircle className="size-3.5 text-red-500" />}
+   485→                          </TableCell>
+   486→                          <TableCell className="text-[10px]">{lic.currentUsage}{lic.maxUsage ? `/${lic.maxUsage}` : ''}</TableCell>
+   487→                          <TableCell className="text-[10px]">{new Date(lic.validFrom).toLocaleDateString()}</TableCell>
+   488→                          <TableCell className="text-[10px]">{lic.validTo ? new Date(lic.validTo).toLocaleDateString() : '∞'}</TableCell>
+   489→                          <TableCell>
+   490→                            <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${LICENSE_STATUS[lic.status] || ''}`}>{lic.status}</Badge>
+   491→                          </TableCell>
+   492→                        </TableRow>
+   493→                      ))
+   494→                    )}
+   495→                  </TableBody>
+   496→                </Table>
+   497→              </div>
+   498→            </CardContent>
+   499→          </Card>
+   500→        </TabsContent>
+   501→
+   502→        {/* ── Invoices ── */}
+   503→        <TabsContent value="invoices" className="mt-4 space-y-4">
+   504→          <h3 className="text-sm font-semibold">Invoices</h3>
+   505→          <Card className="bg-card border rounded-lg">
+   506→            <CardContent className="p-0">
+   507→              <div className="max-h-96 overflow-y-auto">
+   508→                <Table>
+   509→                  <TableHeader>
+   510→                    <TableRow>
+   511→                      <TableHead className="text-[10px] h-8">Invoice #</TableHead>
+   512→                      <TableHead className="text-[10px]">Date</TableHead>
+   513→                      <TableHead className="text-[10px]">Due Date</TableHead>
+   514→                      <TableHead className="text-[10px]">Subtotal</TableHead>
+   515→                      <TableHead className="text-[10px]">Tax</TableHead>
+   516→                      <TableHead className="text-[10px]">Total</TableHead>
+   517→                      <TableHead className="text-[10px]">Paid</TableHead>
+   518→                      <TableHead className="text-[10px]">Status</TableHead>
+   519→                    </TableRow>
+   520→                  </TableHeader>
+   521→                  <TableBody>
+   522→                    {client.invoices.length === 0 ? (
+   523→                      <TableRow>
+   524→                        <TableCell colSpan={8} className="text-center text-xs text-muted-foreground py-8">No invoices found</TableCell>
+   525→                      </TableRow>
+   526→                    ) : (
+   527→                      client.invoices.map(inv => (
+   528→                        <TableRow key={inv.id}>
+   529→                          <TableCell className="text-xs font-mono">{inv.invoiceNumber}</TableCell>
+   530→                          <TableCell className="text-[10px]">{new Date(inv.invoiceDate).toLocaleDateString()}</TableCell>
+   531→                          <TableCell className="text-[10px]">{new Date(inv.dueDate).toLocaleDateString()}</TableCell>
+   532→                          <TableCell className="text-[10px]">{formatPKR(inv.subtotal)}</TableCell>
+   533→                          <TableCell className="text-[10px]">{formatPKR(inv.taxAmount)}</TableCell>
+   534→                          <TableCell className="text-[10px] font-medium">{formatPKR(inv.totalAmount)}</TableCell>
+   535→                          <TableCell className="text-[10px]">{formatPKR(inv.paidAmount)}</TableCell>
+   536→                          <TableCell>
+   537→                            <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${INVOICE_STATUS[inv.status] || ''}`}>{inv.status}</Badge>
+   538→                          </TableCell>
+   539→                        </TableRow>
+   540→                      ))
+   541→                    )}
+   542→                  </TableBody>
+   543→                </Table>
+   544→              </div>
+   545→            </CardContent>
+   546→          </Card>
+   547→        </TabsContent>
+   548→
+   549→        {/* ── Payments ── */}
+   550→        <TabsContent value="payments" className="mt-4 space-y-4">
+   551→          <h3 className="text-sm font-semibold">Payments</h3>
+   552→          <Card className="bg-card border rounded-lg">
+   553→            <CardContent className="p-0">
+   554→              <div className="max-h-96 overflow-y-auto">
+   555→                <Table>
+   556→                  <TableHeader>
+   557→                    <TableRow>
+   558→                      <TableHead className="text-[10px] h-8">Date</TableHead>
+   559→                      <TableHead className="text-[10px]">Amount</TableHead>
+   560→                      <TableHead className="text-[10px]">Method</TableHead>
+   561→                      <TableHead className="text-[10px]">Reference</TableHead>
+   562→                      <TableHead className="text-[10px]">Status</TableHead>
+   563→                    </TableRow>
+   564→                  </TableHeader>
+   565→                  <TableBody>
+   566→                    {client.payments.length === 0 ? (
+   567→                      <TableRow>
+   568→                        <TableCell colSpan={5} className="text-center text-xs text-muted-foreground py-8">No payments found</TableCell>
+   569→                      </TableRow>
+   570→                    ) : (
+   571→                      client.payments.map(pay => (
+   572→                        <TableRow key={pay.id}>
+   573→                          <TableCell className="text-[10px]">{new Date(pay.paymentDate).toLocaleDateString()}</TableCell>
+   574→                          <TableCell className="text-xs font-medium">{formatPKR(pay.amount)}</TableCell>
+   575→                          <TableCell className="text-[10px]">{pay.paymentMethod}</TableCell>
+   576→                          <TableCell className="text-[10px] font-mono">{pay.referenceNumber || '-'}</TableCell>
+   577→                          <TableCell>
+   578→                            <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${PAYMENT_STATUS[pay.status] || ''}`}>{pay.status}</Badge>
+   579→                          </TableCell>
+   580→                        </TableRow>
+   581→                      ))
+   582→                    )}
+   583→                  </TableBody>
+   584→                </Table>
+   585→              </div>
+   586→            </CardContent>
+   587→          </Card>
+   588→        </TabsContent>
+   589→
+   590→        {/* ── Sync Logs ── */}
+   591→        <TabsContent value="sync-logs" className="mt-4 space-y-4">
+   592→          <div className="flex items-center justify-between">
+   593→            <h3 className="text-sm font-semibold">Sync Logs</h3>
+   594→            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={fetchData}>
+   595→              <RefreshCw className="size-3 mr-1" /> Refresh
+   596→            </Button>
+   597→          </div>
+   598→          <Card className="bg-card border rounded-lg">
+   599→            <CardContent className="p-0">
+   600→              <div className="max-h-96 overflow-y-auto">
+   601→                <Table>
+   602→                  <TableHeader>
+   603→                    <TableRow>
+   604→                      <TableHead className="text-[10px] h-8">Time</TableHead>
+   605→                      <TableHead className="text-[10px]">Type</TableHead>
+   606→                      <TableHead className="text-[10px]">Direction</TableHead>
+   607→                      <TableHead className="text-[10px]">Status</TableHead>
+   608→                      <TableHead className="text-[10px]">Error</TableHead>
+   609→                    </TableRow>
+   610→                  </TableHeader>
+   611→                  <TableBody>
+   612→                    {client.syncLogs.length === 0 ? (
+   613→                      <TableRow>
+   614→                        <TableCell colSpan={5} className="text-center text-xs text-muted-foreground py-8">No sync logs found</TableCell>
+   615→                      </TableRow>
+   616→                    ) : (
+   617→                      client.syncLogs.map(log => (
+   618→                        <TableRow key={log.id}>
+   619→                          <TableCell className="text-[10px] font-mono">{new Date(log.syncedAt).toLocaleString()}</TableCell>
+   620→                          <TableCell className="text-[10px]">{log.syncType}</TableCell>
+   621→                          <TableCell className="text-[10px]">
+   622→                            <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${log.direction === 'outbound' ? 'bg-blue-500/10 text-blue-600 border-blue-500/25' : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/25'}`}>
+   623→                              {log.direction}
+   624→                            </Badge>
+   625→                          </TableCell>
+   626→                          <TableCell>
+   627→                            <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${SYNC_STATUS[log.status] || ''}`}>{log.status}</Badge>
+   628→                          </TableCell>
+   629→                          <TableCell className="text-[10px] text-red-500 max-w-[200px] truncate">{log.errorMessage || '-'}</TableCell>
+   630→                        </TableRow>
+   631→                      ))
+   632→                    )}
+   633→                  </TableBody>
+   634→                </Table>
+   635→              </div>
+   636→            </CardContent>
+   637→          </Card>
+   638→        </TabsContent>
+   639→      </Tabs>
+   640→    </div>
+   641→  )
+   642→}
+   643→

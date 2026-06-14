@@ -1,0 +1,1138 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useCallback } from 'react'
+     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→import {
+     6→  Settings, Cpu, Users, Bell, Link2, FileText, AlertTriangle,
+     7→  Building2, MapPin, Clock, Wifi, CheckCircle2, Shield, Save,
+     8→  Fuel, Gauge, Droplets, Radio, Monitor, CreditCard, Database,
+     9→  Key, HardDrive, RefreshCw, Copy, Eye, Trash2, Plus,
+    10→  ChevronRight, Globe, Package, Server, Activity, Cable,
+    11→  Camera, Volume2, Mail, MessageSquare, Smartphone,
+    12→  Calendar, Download, RotateCcw, Info, Zap, Layers,
+    13→  Loader2, AlertCircle,
+    14→} from 'lucide-react'
+    15→import { Badge } from '@/components/ui/badge'
+    16→import { Button } from '@/components/ui/button'
+    17→import { Switch } from '@/components/ui/switch'
+    18→import { ScrollArea } from '@/components/ui/scroll-area'
+    19→
+    20→// ── Types ──────────────────────────────────────
+    21→
+    22→type SettingsCategory = 'general' | 'hardware' | 'brands' | 'notifications' | 'billing' | 'users' | 'backup' | 'about'
+    23→
+    24→interface CategoryItem {
+    25→  key: SettingsCategory
+    26→  label: string
+    27→  icon: React.ElementType
+    28→  subtitle: string
+    29→}
+    30→
+    31→// ── Navigation Data (OK to keep static) ──────────────────────────────────────
+    32→
+    33→const categories: CategoryItem[] = [
+    34→  { key: 'general', label: 'General', icon: Settings, subtitle: 'Station name, timezone, language' },
+    35→  { key: 'hardware', label: 'Hardware Integration', icon: Cpu, subtitle: 'Controllers, dispensers, ATG' },
+    36→  { key: 'brands', label: 'Dispenser Brands', icon: Fuel, subtitle: 'Supported brand configuration' },
+    37→  { key: 'notifications', label: 'Notifications', icon: Bell, subtitle: 'Alert rules and channels' },
+    38→  { key: 'billing', label: 'Billing', icon: CreditCard, subtitle: 'Subscription and serial key' },
+    39→  { key: 'users', label: 'Users & Roles', icon: Users, subtitle: 'User management, permissions' },
+    40→  { key: 'backup', label: 'Backup', icon: Database, subtitle: 'Backup schedule and restore' },
+    41→  { key: 'about', label: 'About', icon: Info, subtitle: 'Version and system info' },
+    42→]
+    43→
+    44→// ── Color Maps (OK to keep static) ──────────────────────────────────────
+    45→
+    46→const ROLE_COLORS: Record<string, string> = {
+    47→  Admin: 'bg-red-500/10 text-red-600 border-red-500/20',
+    48→  'Station Manager': 'bg-teal-500/10 text-teal-600 border-teal-500/20',
+    49→  Manager: 'bg-teal-500/10 text-teal-600 border-teal-500/20',
+    50→  Operator: 'bg-sky-500/10 text-sky-600 border-sky-500/20',
+    51→  Cashier: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
+    52→  Attendant: 'bg-slate-500/10 text-slate-500 border-slate-500/20',
+    53→}
+    54→
+    55→const USER_STATUS: Record<string, { dot: string; text: string }> = {
+    56→  active: { dot: 'macos-status-online', text: 'text-emerald-600 dark:text-emerald-400' },
+    57→  inactive: { dot: 'macos-status-offline', text: 'text-muted-foreground' },
+    58→  locked: { dot: 'macos-status-error', text: 'text-red-600 dark:text-red-400' },
+    59→}
+    60→
+    61→// ── Skeleton Loader ──────────────────────────────────────
+    62→
+    63→function SkeletonRow({ cols = 4 }: { cols?: number }) {
+    64→  return (
+    65→    <tr>
+    66→      {Array.from({ length: cols }).map((_, i) => (
+    67→        <td key={i} className="p-3">
+    68→          <div className="h-4 bg-muted/40 rounded animate-pulse" style={{ width: `${60 + Math.random() * 40}%` }} />
+    69→        </td>
+    70→      ))}
+    71→    </tr>
+    72→  )
+    73→}
+    74→
+    75→function SkeletonCard() {
+    76→  return (
+    77→    <div className="macos-card p-4 space-y-3 animate-pulse">
+    78→      <div className="flex items-center gap-3">
+    79→        <div className="size-9 rounded-[10px] bg-muted/40" />
+    80→        <div className="space-y-1.5 flex-1">
+    81→          <div className="h-3.5 bg-muted/40 rounded w-1/3" />
+    82→          <div className="h-3 bg-muted/30 rounded w-1/4" />
+    83→        </div>
+    84→      </div>
+    85→    </div>
+    86→  )
+    87→}
+    88→
+    89→function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => void }) {
+    90→  return (
+    91→    <div className="macos-card p-4 flex items-center gap-3 border border-red-500/20">
+    92→      <AlertCircle className="size-4 text-red-500 shrink-0" />
+    93→      <p className="text-[12px] text-red-600 dark:text-red-400 flex-1">{message}</p>
+    94→      <button onClick={onRetry} className="macos-btn-secondary text-[11px] px-2 py-0.5 flex items-center gap-1">
+    95→        <RefreshCw className="size-3" /> Retry
+    96→      </button>
+    97→    </div>
+    98→  )
+    99→}
+   100→
+   101→// ── Main Component ──────────────────────────────────────
+   102→
+   103→export default function SettingsModule() {
+   104→  const [activeCategory, setActiveCategory] = useState<SettingsCategory>('general')
+   105→
+   106→  return (
+   107→    <div className="flex gap-6 min-h-[calc(100vh-140px)]" style={{ fontStyle: 'normal !important' }}>
+   108→      {/* ── Left: Category Sidebar ── */}
+   109→      <nav className="w-[220px] shrink-0">
+   110→        <div className="macos-card p-2 sticky top-0">
+   111→          {categories.map(cat => {
+   112→            const isActive = activeCategory === cat.key
+   113→            const Icon = cat.icon
+   114→            return (
+   115→              <button
+   116→                key={cat.key}
+   117→                onClick={() => setActiveCategory(cat.key)}
+   118→                className={`macos-sidebar-item w-full ${isActive ? 'active' : ''}`}
+   119→              >
+   120→                <Icon className="size-[15px] shrink-0" strokeWidth={isActive ? 2 : 1.5} />
+   121→                <div className="flex-1 text-left min-w-0">
+   122→                  <span className="text-[13px] block truncate">{cat.label}</span>
+   123→                </div>
+   124→                {isActive && <ChevronRight className="size-3 text-teal-500 shrink-0" />}
+   125→              </button>
+   126→            )
+   127→          })}
+   128→        </div>
+   129→      </nav>
+   130→
+   131→      {/* ── Right: Detail Panel ── */}
+   132→      <div className="flex-1 min-w-0">
+   133→        <AnimatePresence mode="wait">
+   134→          <motion.div
+   135→            key={activeCategory}
+   136→            initial={{ opacity: 0, x: 8 }}
+   137→            animate={{ opacity: 1, x: 0 }}
+   138→            exit={{ opacity: 0, x: -8 }}
+   139→            transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+   140→          >
+   141→            {activeCategory === 'general' && <GeneralSettings />}
+   142→            {activeCategory === 'hardware' && <HardwareSettings />}
+   143→            {activeCategory === 'brands' && <BrandsSettings />}
+   144→            {activeCategory === 'notifications' && <NotificationsSettings />}
+   145→            {activeCategory === 'billing' && <BillingSettings />}
+   146→            {activeCategory === 'users' && <UsersSettings />}
+   147→            {activeCategory === 'backup' && <BackupSettings />}
+   148→            {activeCategory === 'about' && <AboutSettings />}
+   149→          </motion.div>
+   150→        </AnimatePresence>
+   151→      </div>
+   152→    </div>
+   153→  )
+   154→}
+   155→
+   156→// ── General Settings ──
+   157→function GeneralSettings() {
+   158→  const [station, setStation] = useState<Record<string, unknown> | null>(null)
+   159→  const [loading, setLoading] = useState(true)
+   160→  const [error, setError] = useState<string | null>(null)
+   161→
+   162→  const fetchStation = useCallback(async () => {
+   163→    setLoading(true)
+   164→    setError(null)
+   165→    try {
+   166→      const res = await fetch('/api/stations')
+   167→      if (!res.ok) throw new Error('Failed to load station data')
+   168→      const data = await res.json()
+   169→      setStation(data.stations?.[0] ?? null)
+   170→    } catch (err) {
+   171→      setError(err instanceof Error ? err.message : 'Unknown error')
+   172→    } finally {
+   173→      setLoading(false)
+   174→    }
+   175→  }, [])
+   176→
+   177→  useEffect(() => { fetchStation() }, [fetchStation])
+   178→
+   179→  if (error) return <ErrorBanner message={error} onRetry={fetchStation} />
+   180→
+   181→  const stationInfo = station ? [
+   182→    { label: 'Station Name', value: String(station.name ?? '—'), mono: false },
+   183→    { label: 'Station Code', value: String(station.code ?? '—'), mono: true },
+   184→    { label: 'Address', value: String(station.address ?? '—') },
+   185→    { label: 'City', value: String(station.city ?? '—') },
+   186→    { label: 'Station Type', value: String(station.stationType ?? '—') },
+   187→    { label: 'Dispensers', value: String(station.dispenserCount ?? 0) },
+   188→    { label: 'Tanks', value: String(station.tankCount ?? 0) },
+   189→    { label: 'Employees', value: String(station.employeeCount ?? 0) },
+   190→  ] : []
+   191→
+   192→  const regionalInfo = [
+   193→    { label: 'Timezone', value: 'Asia/Karachi (UTC+5)', icon: Clock },
+   194→    { label: 'Language', value: 'English (US)', icon: Globe },
+   195→    { label: 'Currency', value: 'PKR — Pakistani Rupee', icon: CreditCard },
+   196→    { label: 'Tax Rate', value: '17.0%', icon: Building2 },
+   197→  ]
+   198→
+   199→  return (
+   200→    <div className="space-y-4" style={{ fontStyle: 'normal !important' }}>
+   201→      <h2 className="text-[20px] font-semibold tracking-tight">General</h2>
+   202→      <p className="text-[13px] text-muted-foreground -mt-2">Configure station details, timezone, and regional settings</p>
+   203→
+   204→      <div className="macos-section-header">Station Information</div>
+   205→      {loading ? (
+   206→        <div className="macos-group">
+   207→          {Array.from({ length: 6 }).map((_, i) => (
+   208→            <div key={i} className="macos-group-item">
+   209→              <div className="flex items-center justify-between">
+   210→                <div className="h-4 bg-muted/40 rounded animate-pulse w-24" />
+   211→                <div className="h-4 bg-muted/30 rounded animate-pulse w-40" />
+   212→              </div>
+   213→            </div>
+   214→          ))}
+   215→        </div>
+   216→      ) : (
+   217→        <div className="macos-group">
+   218→          {stationInfo.map(item => (
+   219→            <div key={item.label} className="macos-group-item">
+   220→              <div className="flex items-center justify-between">
+   221→                <span className="text-[13px] text-muted-foreground">{item.label}</span>
+   222→                <span className={`text-[13px] font-medium ${'mono' in item && item.mono ? 'font-mono' : ''}`}>{item.value}</span>
+   223→              </div>
+   224→            </div>
+   225→          ))}
+   226→        </div>
+   227→      )}
+   228→
+   229→      <div className="macos-section-header">Regional Settings</div>
+   230→      <div className="macos-group">
+   231→        {regionalInfo.map(item => (
+   232→          <div key={item.label} className="macos-group-item">
+   233→            <div className="flex items-center justify-between">
+   234→              <div className="flex items-center gap-2">
+   235→                <item.icon className="size-3.5 text-muted-foreground" />
+   236→                <span className="text-[13px] text-muted-foreground">{item.label}</span>
+   237→              </div>
+   238→              <span className="text-[13px] font-medium">{item.value}</span>
+   239→            </div>
+   240→          </div>
+   241→        ))}
+   242→      </div>
+   243→
+   244→      <div className="flex justify-end pt-2">
+   245→        <button className="macos-btn text-[12px] px-4 py-1.5 flex items-center gap-1.5">
+   246→          <Save className="size-3.5" /> Save Changes
+   247→        </button>
+   248→      </div>
+   249→    </div>
+   250→  )
+   251→}
+   252→
+   253→// ── Hardware Integration Settings ──
+   254→function HardwareSettings() {
+   255→  const [controllers, setControllers] = useState<Record<string, unknown>[]>([])
+   256→  const [dispensers, setDispensers] = useState<Record<string, unknown>[]>([])
+   257→  const [protocols, setProtocols] = useState<Record<string, unknown>[]>([])
+   258→  const [loading, setLoading] = useState(true)
+   259→  const [error, setError] = useState<string | null>(null)
+   260→
+   261→  const fetchData = useCallback(async () => {
+   262→    setLoading(true)
+   263→    setError(null)
+   264→    try {
+   265→      const [ctrlRes, protoRes] = await Promise.all([
+   266→        fetch('/api/hardware?action=controllers'),
+   267→        fetch('/api/comms?section=protocols'),
+   268→      ])
+   269→      if (!ctrlRes.ok) throw new Error('Failed to load hardware data')
+   270→      const ctrlData = await ctrlRes.json()
+   271→      const protoData = await protoRes.json()
+   272→
+   273→      const allControllers: Record<string, unknown>[] = ctrlData.controllers ?? []
+   274→      const allDispensers: Record<string, unknown>[] = []
+   275→      for (const ctrl of allControllers) {
+   276→        const ctrlDispensers = (ctrl.dispensers ?? []) as Record<string, unknown>[]
+   277→        for (const d of ctrlDispensers) {
+   278→          allDispensers.push({
+   279→            ...d,
+   280→            controllerName: ctrl.name,
+   281→          })
+   282→        }
+   283→      }
+   284→
+   285→      setControllers(allControllers)
+   286→      setDispensers(allDispensers)
+   287→      setProtocols(protoData.protocols ?? [])
+   288→    } catch (err) {
+   289→      setError(err instanceof Error ? err.message : 'Unknown error')
+   290→    } finally {
+   291→      setLoading(false)
+   292→    }
+   293→  }, [])
+   294→
+   295→  useEffect(() => { fetchData() }, [fetchData])
+   296→
+   297→  if (error) return <ErrorBanner message={error} onRetry={fetchData} />
+   298→
+   299→  return (
+   300→    <div className="space-y-4" style={{ fontStyle: 'normal !important' }}>
+   301→      <h2 className="text-[20px] font-semibold tracking-tight">Hardware Integration</h2>
+   302→      <p className="text-[13px] text-muted-foreground -mt-2">Configure forecourt controllers, dispensers, ATG systems, and communication protocols</p>
+   303→
+   304→      <div className="macos-section-header">Forecourt Controllers</div>
+   305→      {loading ? (
+   306→        <div className="space-y-3">
+   307→          <SkeletonCard />
+   308→          <SkeletonCard />
+   309→        </div>
+   310→      ) : controllers.length === 0 ? (
+   311→        <div className="macos-card p-6 text-center">
+   312→          <Server className="size-8 text-muted-foreground mx-auto mb-2" />
+   313→          <p className="text-[13px] text-muted-foreground">No forecourt controllers configured</p>
+   314→          <button className="macos-btn text-[11px] px-2.5 py-1 mt-3 flex items-center gap-1 mx-auto">
+   315→            <Plus className="size-3" /> Add Controller
+   316→          </button>
+   317→        </div>
+   318→      ) : (
+   319→        controllers.map(fc => (
+   320→          <div key={String(fc.id)} className="macos-card p-4">
+   321→            <div className="flex items-start justify-between mb-3">
+   322→              <div className="flex items-center gap-3">
+   323→                <div className="size-9 rounded-[10px] bg-teal-500/10 flex items-center justify-center">
+   324→                  <Server className="size-4 text-teal-500" />
+   325→                </div>
+   326→                <div>
+   327→                  <h3 className="text-[13px] font-semibold">{String(fc.name ?? '—')}</h3>
+   328→                  <p className="text-[11px] text-muted-foreground">{String(fc.manufacturer ?? '')} {String(fc.model ?? '')}</p>
+   329→                </div>
+   330→              </div>
+   331→              <div className="flex items-center gap-1.5">
+   332→                <div className={`macos-status-dot ${fc.status === 'online' ? 'macos-status-online' : fc.status === 'error' ? 'macos-status-error' : 'macos-status-offline'}`} />
+   333→                <span className={`text-[11px] font-medium ${fc.status === 'online' ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+   334→                  {String(fc.status === 'online' ? 'Online' : fc.status === 'error' ? 'Error' : 'Offline')}
+   335→                </span>
+   336→              </div>
+   337→            </div>
+   338→            <div className="macos-group">
+   339→              <div className="macos-group-item">
+   340→                <div className="flex justify-between text-[12px]">
+   341→                  <span className="text-muted-foreground">IP Address</span>
+   342→                  <span className="font-mono">{String(fc.ipAddress ?? '—')}:{String(fc.port ?? '—')}</span>
+   343→                </div>
+   344→              </div>
+   345→              <div className="macos-group-item">
+   346→                <div className="flex justify-between text-[12px]">
+   347→                  <span className="text-muted-foreground">Protocol</span>
+   348→                  <span className="font-mono text-teal-600 dark:text-teal-400">{String(fc.protocol ?? '—')}</span>
+   349→                </div>
+   350→              </div>
+   351→              <div className="macos-group-item">
+   352→                <div className="flex justify-between text-[12px]">
+   353→                  <span className="text-muted-foreground">Connected Pumps</span>
+   354→                  <span className="font-medium">{((fc.dispensers ?? []) as unknown[]).length}</span>
+   355→                </div>
+   356→              </div>
+   357→            </div>
+   358→          </div>
+   359→        ))
+   360→      )}
+   361→
+   362→      <div className="macos-section-header">Dispenser Profiles</div>
+   363→      <div className="macos-card overflow-hidden">
+   364→        <div className="max-h-[320px] overflow-y-auto">
+   365→          <table className="macos-table">
+   366→            <thead>
+   367→              <tr>
+   368→                <th>ID</th>
+   369→                <th>Name</th>
+   370→                <th>Brand</th>
+   371→                <th>Model</th>
+   372→                <th>Protocol</th>
+   373→                <th>Nozzles</th>
+   374→                <th>Status</th>
+   375→              </tr>
+   376→            </thead>
+   377→            <tbody>
+   378→              {loading ? (
+   379→                Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} cols={7} />)
+   380→              ) : dispensers.length === 0 ? (
+   381→                <tr><td colSpan={7} className="text-center py-6 text-[12px] text-muted-foreground">No dispensers found</td></tr>
+   382→              ) : (
+   383→                dispensers.map(d => {
+   384→                  const st = d.status === 'online' ? 'macos-status-online' : d.status === 'warning' ? 'macos-status-warning' : d.status === 'error' ? 'macos-status-error' : 'macos-status-offline'
+   385→                  const tc = d.status === 'online' ? 'text-emerald-600 dark:text-emerald-400' : d.status === 'warning' ? 'text-teal-600 dark:text-teal-400' : d.status === 'error' ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'
+   386→                  return (
+   387→                    <tr key={String(d.id)}>
+   388→                      <td className="font-mono text-[12px] text-teal-600 dark:text-teal-400">{String(d.code ?? d.id)}</td>
+   389→                      <td className="text-[13px] font-medium">{String(d.name ?? '—')}</td>
+   390→                      <td className="text-[12px]">{String(d.manufacturer ?? '—')}</td>
+   391→                      <td className="text-[12px] text-muted-foreground">{String(d.model ?? '—')}</td>
+   392→                      <td className="text-[11px] font-mono">{String(d.protocol ?? '—')}</td>
+   393→                      <td className="text-[12px] text-center">{String(d.nozzleCount ?? '—')}</td>
+   394→                      <td>
+   395→                        <div className="flex items-center gap-1.5">
+   396→                          <div className={`macos-status-dot ${st}`} />
+   397→                          <span className={`text-[11px] font-medium capitalize ${tc}`}>{String(d.status ?? 'unknown')}</span>
+   398→                        </div>
+   399→                      </td>
+   400→                    </tr>
+   401→                  )
+   402→                })
+   403→              )}
+   404→            </tbody>
+   405→          </table>
+   406→        </div>
+   407→      </div>
+   408→
+   409→      <div className="macos-section-header">Communication Protocols</div>
+   410→      <div className="macos-group">
+   411→        {loading ? (
+   412→          Array.from({ length: 4 }).map((_, i) => (
+   413→            <div key={i} className="macos-group-item">
+   414→              <div className="flex items-center justify-between">
+   415→                <div className="h-4 bg-muted/40 rounded animate-pulse w-32" />
+   416→                <div className="h-4 bg-muted/30 rounded animate-pulse w-24" />
+   417→              </div>
+   418→            </div>
+   419→          ))
+   420→        ) : protocols.length === 0 ? (
+   421→          <div className="macos-group-item text-center py-4 text-[12px] text-muted-foreground">No protocols configured</div>
+   422→        ) : (
+   423→          protocols.map(proto => (
+   424→            <div key={String(proto.id)} className="macos-group-item">
+   425→              <div className="flex items-center justify-between">
+   426→                <div className="flex items-center gap-2.5">
+   427→                  <Cable className="size-3.5 text-teal-500" />
+   428→                  <span className="text-[13px] font-medium font-mono">{String(proto.name ?? '—')}</span>
+   429→                  <span className="text-[11px] text-muted-foreground">{String(proto.transportType ?? '')}</span>
+   430→                </div>
+   431→                <div className="flex items-center gap-3">
+   432→                  {proto.port && <span className="text-[12px] text-muted-foreground">Port: {String(proto.port)}</span>}
+   433→                  <span className="text-[12px] text-teal-600 dark:text-teal-400 font-medium">{((proto.connections ?? []) as unknown[]).length} connections</span>
+   434→                  <div className="flex items-center gap-1.5">
+   435→                    <div className={`macos-status-dot ${proto.isActive ? 'macos-status-online' : 'macos-status-offline'}`} />
+   436→                    <span className={`text-[10px] ${proto.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{proto.isActive ? 'Active' : 'Inactive'}</span>
+   437→                  </div>
+   438→                </div>
+   439→              </div>
+   440→            </div>
+   441→          ))
+   442→        )}
+   443→      </div>
+   444→    </div>
+   445→  )
+   446→}
+   447→
+   448→// ── Dispenser Brands Settings ──
+   449→function BrandsSettings() {
+   450→  const [brands, setBrands] = useState<Record<string, unknown>[]>([])
+   451→  const [loading, setLoading] = useState(true)
+   452→  const [error, setError] = useState<string | null>(null)
+   453→  const [enabledBrands, setEnabledBrands] = useState<Record<string, boolean>>({})
+   454→
+   455→  const fetchData = useCallback(async () => {
+   456→    setLoading(true)
+   457→    setError(null)
+   458→    try {
+   459→      const res = await fetch('/api/hardware?action=catalog&category=dispenser')
+   460→      if (!res.ok) throw new Error('Failed to load dispenser brands')
+   461→      const data = await res.json()
+   462→      const items = data.items ?? []
+   463→      // Group by manufacturer
+   464→      const brandMap = new Map<string, { models: string[]; protocol: string; enabled: boolean }>()
+   465→      for (const item of items) {
+   466→        const mfr = String(item.manufacturer ?? 'Unknown')
+   467→        if (!brandMap.has(mfr)) {
+   468→          brandMap.set(mfr, { models: [], protocol: String(item.protocols ?? ''), enabled: true })
+   469→        }
+   470→        brandMap.get(mfr)!.models.push(String(item.modelName ?? ''))
+   471→      }
+   472→      const brandList = Array.from(brandMap.entries()).map(([brand, info]) => ({
+   473→        brand,
+   474→        models: info.models,
+   475→        protocol: info.protocol,
+   476→        region: 'Global',
+   477→        enabled: info.enabled,
+   478→        configuredPumps: 0,
+   479→      }))
+   480→      setBrands(brandList)
+   481→      setEnabledBrands(Object.fromEntries(brandList.map(b => [b.brand, b.enabled])))
+   482→    } catch (err) {
+   483→      setError(err instanceof Error ? err.message : 'Unknown error')
+   484→    } finally {
+   485→      setLoading(false)
+   486→    }
+   487→  }, [])
+   488→
+   489→  useEffect(() => { fetchData() }, [fetchData])
+   490→
+   491→  if (error) return <ErrorBanner message={error} onRetry={fetchData} />
+   492→
+   493→  return (
+   494→    <div className="space-y-4" style={{ fontStyle: 'normal !important' }}>
+   495→      <h2 className="text-[20px] font-semibold tracking-tight">Dispenser Brands</h2>
+   496→      <p className="text-[13px] text-muted-foreground -mt-2">Configure supported dispenser manufacturers and their protocol mappings</p>
+   497→
+   498→      {loading ? (
+   499→        <div className="space-y-2">
+   500→          <SkeletonCard />
+   501→          <SkeletonCard />
+   502→          <SkeletonCard />
+   503→        </div>
+   504→      ) : brands.length === 0 ? (
+   505→        <div className="macos-card p-6 text-center">
+   506→          <Fuel className="size-8 text-muted-foreground mx-auto mb-2" />
+   507→          <p className="text-[13px] text-muted-foreground">No dispenser brands in catalog</p>
+   508→        </div>
+   509→      ) : (
+   510→        <div className="space-y-2">
+   511→          {brands.map(brand => (
+   512→            <div key={brand.brand} className="macos-card p-4">
+   513→              <div className="flex items-center justify-between">
+   514→                <div className="flex items-center gap-3">
+   515→                  <div className="size-10 rounded-[10px] bg-teal-500/10 flex items-center justify-center">
+   516→                    <Fuel className="size-5 text-teal-500" />
+   517→                  </div>
+   518→                  <div>
+   519→                    <h3 className="text-[13px] font-semibold">{String(brand.brand)}</h3>
+   520→                    <p className="text-[11px] text-muted-foreground">{String(brand.region)} • Protocol: <span className="font-mono text-teal-600 dark:text-teal-400">{String(brand.protocol)}</span></p>
+   521→                  </div>
+   522→                </div>
+   523→                <div className="flex items-center gap-4">
+   524→                  <span className="text-[11px] text-muted-foreground">{String(brand.configuredPumps)} pump{Number(brand.configuredPumps) > 1 ? 's' : ''}</span>
+   525→                  <Switch
+   526→                    checked={enabledBrands[String(brand.brand)] ?? true}
+   527→                    onCheckedChange={(checked) => setEnabledBrands(prev => ({ ...prev, [String(brand.brand)]: checked }))}
+   528→                  />
+   529→                </div>
+   530→              </div>
+   531→              {enabledBrands[String(brand.brand)] && (
+   532→                <motion.div
+   533→                  initial={{ opacity: 0, height: 0 }}
+   534→                  animate={{ opacity: 1, height: 'auto' }}
+   535→                  exit={{ opacity: 0, height: 0 }}
+   536→                  className="mt-3 pt-3 border-t border-border"
+   537→                >
+   538→                  <div className="macos-section-header">Supported Models</div>
+   539→                  <div className="flex flex-wrap gap-1.5 mt-1">
+   540→                    {(brand.models as string[]).map(model => (
+   541→                      <Badge key={model} variant="outline" className="text-[10px] px-2 py-0.5 bg-teal-500/5 text-teal-600 border-teal-500/15 font-medium">
+   542→                        {model}
+   543→                      </Badge>
+   544→                    ))}
+   545→                  </div>
+   546→                </motion.div>
+   547→              )}
+   548→            </div>
+   549→          ))}
+   550→        </div>
+   551→      )}
+   552→    </div>
+   553→  )
+   554→}
+   555→
+   556→// ── Notifications Settings ──
+   557→function NotificationsSettings() {
+   558→  const [rules, setRules] = useState<Record<string, unknown>[]>([])
+   559→  const [loading, setLoading] = useState(true)
+   560→  const [error, setError] = useState<string | null>(null)
+   561→
+   562→  const fetchData = useCallback(async () => {
+   563→    setLoading(true)
+   564→    setError(null)
+   565→    try {
+   566→      const res = await fetch('/api/notifications?limit=100')
+   567→      if (!res.ok) throw new Error('Failed to load notifications')
+   568→      const data = await res.json()
+   569→      setRules(data.notifications ?? [])
+   570→    } catch (err) {
+   571→      setError(err instanceof Error ? err.message : 'Unknown error')
+   572→    } finally {
+   573→      setLoading(false)
+   574→    }
+   575→  }, [])
+   576→
+   577→  useEffect(() => { fetchData() }, [fetchData])
+   578→
+   579→  if (error) return <ErrorBanner message={error} onRetry={fetchData} />
+   580→
+   581→  return (
+   582→    <div className="space-y-4" style={{ fontStyle: 'normal !important' }}>
+   583→      <h2 className="text-[20px] font-semibold tracking-tight">Notifications</h2>
+   584→      <p className="text-[13px] text-muted-foreground -mt-2">Configure alert rules and notification delivery channels</p>
+   585→
+   586→      <div className="macos-section-header">Recent Notifications</div>
+   587→      {loading ? (
+   588→        <div className="space-y-1">
+   589→          {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
+   590→        </div>
+   591→      ) : rules.length === 0 ? (
+   592→        <div className="macos-card p-6 text-center">
+   593→          <Bell className="size-8 text-muted-foreground mx-auto mb-2" />
+   594→          <p className="text-[13px] text-muted-foreground">No notifications found</p>
+   595→        </div>
+   596→      ) : (
+   597→        <div className="space-y-1">
+   598→          {rules.map((rule, i) => {
+   599→            const ruleType = String(rule.type ?? 'info')
+   600→            const isRead = Boolean(rule.isRead)
+   601→            return (
+   602→              <div key={String(rule.id)} className="macos-card p-3">
+   603→                <div className="flex items-center justify-between">
+   604→                  <div className="flex items-center gap-3 flex-1 min-w-0">
+   605→                    <div className={`size-8 rounded-lg flex items-center justify-center shrink-0 ${
+   606→                      !isRead ? 'bg-teal-500/10' : 'bg-slate-500/10'
+   607→                    }`}>
+   608→                      {ruleType === 'alert' || ruleType === 'critical' ? (
+   609→                        <AlertTriangle className={`size-4 ${!isRead ? 'text-teal-500' : 'text-slate-400'}`} />
+   610→                      ) : ruleType === 'warning' ? (
+   611→                        <Bell className={`size-4 ${!isRead ? 'text-teal-500' : 'text-slate-400'}`} />
+   612→                      ) : (
+   613→                        <Mail className={`size-4 ${!isRead ? 'text-teal-500' : 'text-slate-400'}`} />
+   614→                      )}
+   615→                    </div>
+   616→                    <div className="flex-1 min-w-0">
+   617→                      <h3 className="text-[13px] font-medium">{String(rule.title ?? 'Notification')}</h3>
+   618→                      <p className="text-[11px] text-muted-foreground truncate">{String(rule.message ?? '')}</p>
+   619→                    </div>
+   620→                  </div>
+   621→                  <div className="flex items-center gap-3 shrink-0">
+   622→                    <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${
+   623→                      ruleType === 'critical' ? 'bg-red-500/10 text-red-600 border-red-500/20' :
+   624→                      ruleType === 'alert' ? 'bg-teal-500/10 text-teal-600 border-teal-500/20' :
+   625→                      'bg-slate-500/10 text-slate-500 border-slate-500/20'
+   626→                    }`}>
+   627→                      {ruleType}
+   628→                    </Badge>
+   629→                    {!isRead && (
+   630→                      <div className="size-2 rounded-full bg-teal-500" />
+   631→                    )}
+   632→                  </div>
+   633→                </div>
+   634→              </div>
+   635→            )
+   636→          })}
+   637→        </div>
+   638→      )}
+   639→
+   640→      <div className="macos-section-header">Notification Channels</div>
+   641→      <div className="macos-group">
+   642→        {[
+   643→          { name: 'Email', icon: Mail, detail: 'ops@apexfuel.pk', enabled: true },
+   644→          { name: 'SMS', icon: Smartphone, detail: '+92-301-5550123', enabled: true },
+   645→          { name: 'Push Notifications', icon: Bell, detail: 'Mobile app push', enabled: true },
+   646→          { name: 'Dashboard', icon: Monitor, detail: 'In-app notifications', enabled: true },
+   647→          { name: 'Webhook', icon: Link2, detail: 'https://hooks.slack.com/***', enabled: false },
+   648→        ].map(ch => (
+   649→          <div key={ch.name} className="macos-group-item">
+   650→            <div className="flex items-center justify-between">
+   651→              <div className="flex items-center gap-2.5">
+   652→                <ch.icon className="size-4 text-muted-foreground" />
+   653→                <div>
+   654→                  <span className="text-[13px] font-medium">{ch.name}</span>
+   655→                  <p className="text-[11px] text-muted-foreground">{ch.detail}</p>
+   656→                </div>
+   657→              </div>
+   658→              <Switch defaultChecked={ch.enabled} />
+   659→            </div>
+   660→          </div>
+   661→        ))}
+   662→      </div>
+   663→    </div>
+   664→  )
+   665→}
+   666→
+   667→// ── Billing Settings ──
+   668→function BillingSettings() {
+   669→  const [billingData, setBillingData] = useState<Record<string, unknown> | null>(null)
+   670→  const [loading, setLoading] = useState(true)
+   671→  const [error, setError] = useState<string | null>(null)
+   672→
+   673→  const fetchData = useCallback(async () => {
+   674→    setLoading(true)
+   675→    setError(null)
+   676→    try {
+   677→      const res = await fetch('/api/webhooks?type=overview')
+   678→      if (!res.ok) throw new Error('Failed to load billing data')
+   679→      const data = await res.json()
+   680→      setBillingData(data.overview ?? null)
+   681→    } catch (err) {
+   682→      setError(err instanceof Error ? err.message : 'Unknown error')
+   683→    } finally {
+   684→      setLoading(false)
+   685→    }
+   686→  }, [])
+   687→
+   688→  useEffect(() => { fetchData() }, [fetchData])
+   689→
+   690→  if (error) return <ErrorBanner message={error} onRetry={fetchData} />
+   691→
+   692→  const keysInfo = billingData?.keys as Record<string, number> | undefined
+   693→  const endpointsInfo = billingData?.endpoints as Record<string, number> | undefined
+   694→
+   695→  return (
+   696→    <div className="space-y-4" style={{ fontStyle: 'normal !important' }}>
+   697→      <h2 className="text-[20px] font-semibold tracking-tight">Billing</h2>
+   698→      <p className="text-[13px] text-muted-foreground -mt-2">Manage your subscription, serial key, and billing information</p>
+   699→
+   700→      <div className="macos-card p-5">
+   701→        <div className="flex items-start gap-4">
+   702→          <div className="size-12 rounded-2xl bg-teal-500/10 flex items-center justify-center shrink-0">
+   703→            <Package className="size-6 text-teal-500" />
+   704→          </div>
+   705→          <div className="flex-1">
+   706→            <div className="flex items-center gap-3 mb-1">
+   707→              <h3 className="text-[15px] font-semibold">Enterprise Plan</h3>
+   708→              <Badge variant="outline" className="text-[10px] px-2 py-0 bg-emerald-500/10 text-emerald-600 border-emerald-500/20 font-semibold">
+   709→                <CheckCircle2 className="size-2.5 mr-0.5" /> Active
+   710→              </Badge>
+   711→            </div>
+   712→            <p className="text-[13px] font-medium" style={{ color: '#e8930c' }}>PKR 227,000/month</p>
+   713→          </div>
+   714→        </div>
+   715→      </div>
+   716→
+   717→      <div className="macos-section-header">License Key</div>
+   718→      <div className="macos-card p-4">
+   719→        <div className="flex items-center justify-between">
+   720→          <div className="flex items-center gap-3">
+   721→            <Key className="size-4 text-teal-500" />
+   722→            <div>
+   723→              <code className="text-[13px] font-mono bg-muted/50 px-2 py-0.5 rounded">AFPK-ENT-2023-****-****-7F2A</code>
+   724→              <p className="text-[11px] text-muted-foreground mt-0.5">Billing cycle: Monthly</p>
+   725→            </div>
+   726→          </div>
+   727→          <button className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+   728→            <Copy className="size-3" /> Copy
+   729→          </button>
+   730→        </div>
+   731→      </div>
+   732→
+   733→      <div className="macos-section-header">API & Integration Usage</div>
+   734→      {loading ? (
+   735→        <div className="macos-group">
+   736→          {Array.from({ length: 3 }).map((_, i) => (
+   737→            <div key={i} className="macos-group-item">
+   738→              <div className="flex items-center justify-between">
+   739→                <div className="h-4 bg-muted/40 rounded animate-pulse w-20" />
+   740→                <div className="h-4 bg-muted/30 rounded animate-pulse w-24" />
+   741→              </div>
+   742→            </div>
+   743→          ))}
+   744→        </div>
+   745→      ) : (
+   746→        <div className="macos-group">
+   747→          {[
+   748→            { label: 'API Keys', value: `${keysInfo?.active ?? 0} / ${keysInfo?.total ?? 0} active`, icon: Key },
+   749→            { label: 'Webhook Endpoints', value: `${endpointsInfo?.active ?? 0} / ${endpointsInfo?.total ?? 0} active`, icon: Link2 },
+   750→            { label: 'Webhook Deliveries', value: `${((billingData?.deliveries as Record<string, number>)?.successful ?? 0)} successful`, icon: Activity },
+   751→          ].map(item => (
+   752→            <div key={item.label} className="macos-group-item">
+   753→              <div className="flex items-center justify-between">
+   754→                <div className="flex items-center gap-2.5">
+   755→                  <item.icon className="size-4 text-muted-foreground" />
+   756→                  <span className="text-[13px]">{item.label}</span>
+   757→                </div>
+   758→                <span className="text-[13px] font-medium">{item.value}</span>
+   759→              </div>
+   760→            </div>
+   761→          ))}
+   762→        </div>
+   763→      )}
+   764→
+   765→      <div className="macos-section-header">Payment Information</div>
+   766→      <div className="macos-group">
+   767→        <div className="macos-group-item">
+   768→          <div className="flex justify-between text-[13px]">
+   769→            <span className="text-muted-foreground">Payment Method</span>
+   770→            <span className="font-medium">Bank Transfer — HBL Account ****7821</span>
+   771→          </div>
+   772→        </div>
+   773→        <div className="macos-group-item">
+   774→          <div className="flex justify-between text-[13px]">
+   775→            <span className="text-muted-foreground">Last Payment</span>
+   776→            <span>March 3, 2026</span>
+   777→          </div>
+   778→        </div>
+   779→        <div className="macos-group-item">
+   780→          <div className="flex justify-between text-[13px]">
+   781→            <span className="text-muted-foreground">Next Billing Date</span>
+   782→            <span className="font-medium">April 1, 2026</span>
+   783→          </div>
+   784→        </div>
+   785→      </div>
+   786→    </div>
+   787→  )
+   788→}
+   789→
+   790→// ── Users & Roles Settings ──
+   791→function UsersSettings() {
+   792→  const [users, setUsers] = useState<Record<string, unknown>[]>([])
+   793→  const [permissions, setPermissions] = useState<Record<string, unknown>[]>([])
+   794→  const [loading, setLoading] = useState(true)
+   795→  const [error, setError] = useState<string | null>(null)
+   796→
+   797→  const fetchData = useCallback(async () => {
+   798→    setLoading(true)
+   799→    setError(null)
+   800→    try {
+   801→      const [usersRes, rbacRes] = await Promise.all([
+   802→        fetch('/api/users'),
+   803→        fetch('/api/security?section=rbac'),
+   804→      ])
+   805→      if (!usersRes.ok) throw new Error('Failed to load users')
+   806→      const usersData = await usersRes.json()
+   807→      const rbacData = await rbacRes.json()
+   808→
+   809→      setUsers(usersData.users ?? [])
+   810→      setPermissions(rbacData.permissions ?? [])
+   811→    } catch (err) {
+   812→      setError(err instanceof Error ? err.message : 'Unknown error')
+   813→    } finally {
+   814→      setLoading(false)
+   815→    }
+   816→  }, [])
+   817→
+   818→  useEffect(() => { fetchData() }, [fetchData])
+   819→
+   820→  if (error) return <ErrorBanner message={error} onRetry={fetchData} />
+   821→
+   822→  // Compute role counts from users
+   823→  const roleCounts = users.reduce<Record<string, number>>((acc, u) => {
+   824→    const role = String(u.role ?? 'Unknown')
+   825→    acc[role] = (acc[role] || 0) + 1
+   826→    return acc
+   827→  }, {})
+   828→
+   829→  // Group permissions by role for display
+   830→  const roleDescriptions: Record<string, string> = {
+   831→    Admin: 'Full system access including user management and billing',
+   832→    'Station Manager': 'Operations, pricing, finance, reports, and settings',
+   833→    Manager: 'Multi-station oversight with read-only finance access',
+   834→    Operator: 'Forecourt, sales, and basic tank monitoring',
+   835→    Cashier: 'Sales processing and shift management',
+   836→    Attendant: 'View-only forecourt and basic sales entry',
+   837→  }
+   838→
+   839→  return (
+   840→    <div className="space-y-4" style={{ fontStyle: 'normal !important' }}>
+   841→      <div className="flex items-center justify-between">
+   842→        <div>
+   843→          <h2 className="text-[20px] font-semibold tracking-tight">Users & Roles</h2>
+   844→          <p className="text-[13px] text-muted-foreground -mt-2">Manage user accounts, roles, and permissions</p>
+   845→        </div>
+   846→        <button className="macos-btn text-[12px] px-3 py-1.5 flex items-center gap-1.5">
+   847→          <Plus className="size-3.5" /> Add User
+   848→        </button>
+   849→      </div>
+   850→
+   851→      <div className="macos-section-header">User Accounts</div>
+   852→      {loading ? (
+   853→        <div className="space-y-1">
+   854→          {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
+   855→        </div>
+   856→      ) : users.length === 0 ? (
+   857→        <div className="macos-card p-6 text-center">
+   858→          <Users className="size-8 text-muted-foreground mx-auto mb-2" />
+   859→          <p className="text-[13px] text-muted-foreground">No users found</p>
+   860→        </div>
+   861→      ) : (
+   862→        <div className="space-y-1">
+   863→          {users.map(user => {
+   864→            const status = user.isActive ? 'active' : 'inactive'
+   865→            const st = USER_STATUS[status] || USER_STATUS.inactive
+   866→            const role = String(user.role ?? 'Unknown')
+   867→            return (
+   868→              <div key={String(user.id)} className="macos-card p-3">
+   869→                <div className="flex items-center justify-between">
+   870→                  <div className="flex items-center gap-3">
+   871→                    <div className="size-9 rounded-[10px] bg-teal-500/10 flex items-center justify-center text-[11px] font-bold text-teal-600 dark:text-teal-400">
+   872→                      {String(user.name ?? '?').split(' ').map(w => w[0]).join('').slice(0, 2)}
+   873→                    </div>
+   874→                    <div>
+   875→                      <h3 className="text-[13px] font-medium">{String(user.name ?? '—')}</h3>
+   876→                      <p className="text-[11px] text-muted-foreground">{String(user.email ?? '—')}</p>
+   877→                    </div>
+   878→                  </div>
+   879→                  <div className="flex items-center gap-3">
+   880→                    <Badge variant="outline" className={`text-[9px] px-1.5 py-0 font-semibold ${ROLE_COLORS[role] || ''}`}>
+   881→                      {role}
+   882→                    </Badge>
+   883→                    <div className="flex items-center gap-1.5">
+   884→                      <div className={`macos-status-dot ${st.dot}`} />
+   885→                      <span className={`text-[10px] font-medium capitalize ${st.text}`}>{status}</span>
+   886→                    </div>
+   887→                  </div>
+   888→                </div>
+   889→              </div>
+   890→            )
+   891→          })}
+   892→        </div>
+   893→      )}
+   894→
+   895→      <div className="macos-section-header">Role Permissions</div>
+   896→      <div className="macos-group">
+   897→        {Object.entries(roleCounts).length > 0 ? (
+   898→          Object.entries(roleCounts).map(([role, count]) => (
+   899→            <div key={role} className="macos-group-item">
+   900→              <div className="flex items-center justify-between">
+   901→                <div>
+   902→                  <span className="text-[13px] font-medium">{role}</span>
+   903→                  <p className="text-[11px] text-muted-foreground">{roleDescriptions[role] ?? 'Custom role'}</p>
+   904→                </div>
+   905→                <span className="text-[11px] text-muted-foreground">{count} user{count > 1 ? 's' : ''}</span>
+   906→              </div>
+   907→            </div>
+   908→          ))
+   909→        ) : loading ? (
+   910→          Array.from({ length: 4 }).map((_, i) => (
+   911→            <div key={i} className="macos-group-item">
+   912→              <div className="flex items-center justify-between">
+   913→                <div className="h-4 bg-muted/40 rounded animate-pulse w-32" />
+   914→                <div className="h-4 bg-muted/30 rounded animate-pulse w-16" />
+   915→              </div>
+   916→            </div>
+   917→          ))
+   918→        ) : (
+   919→          <div className="macos-group-item text-center py-4 text-[12px] text-muted-foreground">No roles defined</div>
+   920→        )}
+   921→      </div>
+   922→    </div>
+   923→  )
+   924→}
+   925→
+   926→// ── Backup Settings ──
+   927→function BackupSettings() {
+   928→  const [backups, setBackups] = useState<Record<string, unknown>[]>([])
+   929→  const [overview, setOverview] = useState<Record<string, unknown> | null>(null)
+   930→  const [loading, setLoading] = useState(true)
+   931→  const [error, setError] = useState<string | null>(null)
+   932→
+   933→  const fetchData = useCallback(async () => {
+   934→    setLoading(true)
+   935→    setError(null)
+   936→    try {
+   937→      const [overviewRes, backupsRes] = await Promise.all([
+   938→        fetch('/api/security'),
+   939→        fetch('/api/security?section=backups'),
+   940→      ])
+   941→      if (!overviewRes.ok) throw new Error('Failed to load backup data')
+   942→      const overviewData = await overviewRes.json()
+   943→      const backupsData = await backupsRes.json()
+   944→
+   945→      setOverview(overviewData.overview ?? null)
+   946→      setBackups(backupsData.backups ?? [])
+   947→    } catch (err) {
+   948→      setError(err instanceof Error ? err.message : 'Unknown error')
+   949→    } finally {
+   950→      setLoading(false)
+   951→    }
+   952→  }, [])
+   953→
+   954→  useEffect(() => { fetchData() }, [fetchData])
+   955→
+   956→  if (error) return <ErrorBanner message={error} onRetry={fetchData} />
+   957→
+   958→  const lastBackup = overview?.lastBackup as Record<string, unknown> | null | undefined
+   959→
+   960→  return (
+   961→    <div className="space-y-4" style={{ fontStyle: 'normal !important' }}>
+   962→      <h2 className="text-[20px] font-semibold tracking-tight">Backup</h2>
+   963→      <p className="text-[13px] text-muted-foreground -mt-2">Configure automated backups and restore from previous snapshots</p>
+   964→
+   965→      <div className="macos-card p-5">
+   966→        <div className="flex items-start justify-between">
+   967→          <div className="flex items-center gap-3">
+   968→            <div className="size-10 rounded-[10px] bg-emerald-500/10 flex items-center justify-center">
+   969→              <Database className="size-5 text-emerald-500" />
+   970→            </div>
+   971→            <div>
+   972→              <h3 className="text-[13px] font-semibold">Automatic Backup</h3>
+   973→              <p className="text-[11px] text-muted-foreground mt-0.5">
+   974→                {lastBackup
+   975→                  ? `Last backup: ${lastBackup.completedAt ? new Date(String(lastBackup.completedAt)).toLocaleString('en-PK', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}`
+   976→                  : loading ? 'Loading...' : 'No backup data available'}
+   977→              </p>
+   978→            </div>
+   979→          </div>
+   980→          <Switch defaultChecked={true} />
+   981→        </div>
+   982→      </div>
+   983→
+   984→      <div className="macos-section-header">Backup Configuration</div>
+   985→      <div className="macos-group">
+   986→        {[
+   987→          { label: 'Frequency', value: 'Every 6 hours', icon: Clock },
+   988→          { label: 'Retention Period', value: '30 days', icon: Calendar },
+   989→          { label: 'Encryption', value: 'AES-256', icon: Shield },
+   990→        ].map(item => (
+   991→          <div key={item.label} className="macos-group-item">
+   992→            <div className="flex items-center justify-between">
+   993→              <div className="flex items-center gap-2">
+   994→                <item.icon className="size-3.5 text-muted-foreground" />
+   995→                <span className="text-[13px] text-muted-foreground">{item.label}</span>
+   996→              </div>
+   997→              <span className="text-[13px] font-medium">{item.value}</span>
+   998→            </div>
+   999→          </div>
+  1000→        ))}
+  1001→      </div>
+  1002→
+  1003→      <div className="flex gap-2 pt-1">
+  1004→        <button className="macos-btn text-[12px] px-3 py-1.5 flex items-center gap-1.5">
+  1005→          <Download className="size-3.5" /> Backup Now
+  1006→        </button>
+  1007→        <button className="macos-btn-secondary text-[12px] px-3 py-1.5 flex items-center gap-1.5">
+  1008→          <RotateCcw className="size-3.5" /> Restore from Backup
+  1009→        </button>
+  1010→      </div>
+  1011→
+  1012→      <div className="macos-section-header">Backup History</div>
+  1013→      <div className="macos-card overflow-hidden">
+  1014→        <div className="max-h-[260px] overflow-y-auto">
+  1015→          <table className="macos-table">
+  1016→            <thead>
+  1017→              <tr>
+  1018→                <th>Date</th>
+  1019→                <th>Type</th>
+  1020→                <th>Size</th>
+  1021→                <th>Status</th>
+  1022→                <th></th>
+  1023→              </tr>
+  1024→            </thead>
+  1025→            <tbody>
+  1026→              {loading ? (
+  1027→                Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} cols={5} />)
+  1028→              ) : backups.length === 0 ? (
+  1029→                <tr><td colSpan={5} className="text-center py-6 text-[12px] text-muted-foreground">No backup records found</td></tr>
+  1030→              ) : (
+  1031→                backups.map(bk => (
+  1032→                  <tr key={String(bk.id)}>
+  1033→                    <td className="text-[12px] whitespace-nowrap">
+  1034→                      {bk.createdAt ? new Date(String(bk.createdAt)).toLocaleString('en-PK', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+  1035→                    </td>
+  1036→                    <td>
+  1037→                      <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${bk.backupType === 'manual' ? 'bg-teal-500/10 text-teal-600 border-teal-500/20' : 'bg-slate-500/10 text-slate-500 border-slate-500/20'}`}>
+  1038→                        {String(bk.backupType ?? 'auto')}
+  1039→                      </Badge>
+  1040→                    </td>
+  1041→                    <td className="text-[12px] text-muted-foreground">{bk.fileSize ? `${(Number(bk.fileSize) / (1024 * 1024)).toFixed(1)} MB` : '—'}</td>
+  1042→                    <td>
+  1043→                      <div className="flex items-center gap-1.5">
+  1044→                        <div className={`macos-status-dot ${bk.status === 'completed' ? 'macos-status-online' : 'macos-status-warning'}`} />
+  1045→                        <span className={`text-[10px] ${bk.status === 'completed' ? 'text-emerald-600 dark:text-emerald-400' : 'text-teal-600 dark:text-teal-400'}`}>
+  1046→                          {String(bk.status === 'completed' ? 'Complete' : bk.status === 'in_progress' ? 'In Progress' : String(bk.status))}
+  1047→                        </span>
+  1048→                      </div>
+  1049→                    </td>
+  1050→                    <td>
+  1051→                      <button className="size-6 rounded-md flex items-center justify-center hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors" title="Restore">
+  1052→                        <RotateCcw className="size-3 text-muted-foreground" />
+  1053→                      </button>
+  1054→                    </td>
+  1055→                  </tr>
+  1056→                ))
+  1057→              )}
+  1058→            </tbody>
+  1059→          </table>
+  1060→        </div>
+  1061→      </div>
+  1062→    </div>
+  1063→  )
+  1064→}
+  1065→
+  1066→// ── About Settings ──
+  1067→function AboutSettings() {
+  1068→  return (
+  1069→    <div className="space-y-4" style={{ fontStyle: 'normal !important' }}>
+  1070→      <h2 className="text-[20px] font-semibold tracking-tight">About FuelFlow OS</h2>
+  1071→      <p className="text-[13px] text-muted-foreground -mt-2">System information and version details</p>
+  1072→
+  1073→      <div className="macos-card p-6 text-center">
+  1074→        <div className="size-16 rounded-2xl fuel-gradient flex items-center justify-center mx-auto mb-4 shadow-lg">
+  1075→          <Fuel className="size-8 text-white" />
+  1076→        </div>
+  1077→        <h3 className="text-[18px] font-bold">FuelFlow OS</h3>
+  1078→        <p className="text-[13px] text-muted-foreground mt-1">ApexFlow Ecosystem</p>
+  1079→        <p className="text-[15px] font-semibold mt-2" style={{ color: '#e8930c' }}>Version 3.2.1</p>
+  1080→        <p className="text-[11px] text-muted-foreground mt-1">Build 2026.03.04.1847 • macOS Golden Gate</p>
+  1081→      </div>
+  1082→
+  1083→      <div className="macos-section-header">System Information</div>
+  1084→      <div className="macos-group">
+  1085→        {[
+  1086→          { label: 'Platform', value: 'FuelFlow OS for macOS Golden Gate' },
+  1087→          { label: 'Version', value: '3.2.1 (Build 1847)' },
+  1088→          { label: 'Architecture', value: 'Next.js 16 / TypeScript 5 / Tailwind CSS 4' },
+  1089→          { label: 'Database', value: 'PostgreSQL / Prisma ORM' },
+  1090→          { label: 'License', value: 'Enterprise — Active' },
+  1091→        ].map(item => (
+  1092→          <div key={item.label} className="macos-group-item">
+  1093→            <div className="flex items-center justify-between">
+  1094→              <span className="text-[13px] text-muted-foreground">{item.label}</span>
+  1095→              <span className="text-[13px] font-medium">{item.value}</span>
+  1096→            </div>
+  1097→          </div>
+  1098→        ))}
+  1099→      </div>
+  1100→
+  1101→      <div className="macos-section-header">Runtime Status</div>
+  1102→      <div className="macos-group">
+  1103→        {[
+  1104→          { label: 'Uptime', value: '14d 7h 32m', icon: Activity },
+  1105→          { label: 'Node Version', value: 'Bun 1.2.x', icon: Zap },
+  1106→          { label: 'Connected Devices', value: '30', icon: Cpu },
+  1107→          { label: 'Active Sessions', value: '7', icon: Users },
+  1108→          { label: 'Database Size', value: '248 MB', icon: Database },
+  1109→          { label: 'Cache Status', value: 'Healthy', icon: Layers },
+  1110→        ].map(item => (
+  1111→          <div key={item.label} className="macos-group-item">
+  1112→            <div className="flex items-center justify-between">
+  1113→              <div className="flex items-center gap-2">
+  1114→                <item.icon className="size-3.5 text-muted-foreground" />
+  1115→                <span className="text-[13px] text-muted-foreground">{item.label}</span>
+  1116→              </div>
+  1117→              <span className="text-[13px] font-medium">{item.value}</span>
+  1118→            </div>
+  1119→          </div>
+  1120→        ))}
+  1121→      </div>
+  1122→
+  1123→      <div className="macos-section-header">Acknowledgments</div>
+  1124→      <div className="macos-card p-4">
+  1125→        <p className="text-[12px] text-muted-foreground leading-relaxed">
+  1126→          FuelFlow OS is built on the ApexFlow Ecosystem platform, designed for modern fuel retail operations in Pakistan.
+  1127→          Powered by Next.js, TypeScript, Tailwind CSS, and Prisma. Communication protocols support IFSF, PARIUS, DFS, and TLS-350 standards.
+  1128→          All transaction data is encrypted with AES-256. Compliance with OGRA and PRA regulatory requirements.
+  1129→        </p>
+  1130→      </div>
+  1131→
+  1132→      <div className="text-center pt-4">
+  1133→        <p className="text-[11px] text-muted-foreground">© 2023–2026 ApexFlow Technologies (Pvt.) Ltd. All rights reserved.</p>
+  1134→      </div>
+  1135→    </div>
+  1136→  )
+  1137→}
+  1138→

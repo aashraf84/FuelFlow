@@ -1,0 +1,567 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useCallback } from 'react'
+     4→import { motion } from 'framer-motion'
+     5→import {
+     6→  BarChart3, FileText, Calendar, Plus, RefreshCw, Clock,
+     7→  PieChart, TrendingUp, Table, LayoutDashboard, CheckCircle2,
+     8→  Mail, Download, ChevronRight, Eye, Share2, Trash2,
+     9→  Activity, Database, Filter, AlertTriangle, Loader2,
+    10→} from 'lucide-react'
+    11→import { Badge } from '@/components/ui/badge'
+    12→import { Button } from '@/components/ui/button'
+    13→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    14→import { useAppStore } from '@/stores/app-store'
+    15→
+    16→// ── Types ──────────────────────────────────────
+    17→
+    18→interface ReportTemplate {
+    19→  id: string
+    20→  tenantId: string
+    21→  name: string
+    22→  description: string | null
+    23→  reportType: string
+    24→  category: string | null
+    25→  dataSource: string
+    26→  columns: string
+    27→  filters: string | null
+    28→  groupBy: string | null
+    29→  sortBy: string | null
+    30→  chartType: string | null
+    31→  isSystem: boolean
+    32→  isPublic: boolean
+    33→  createdBy: string | null
+    34→  createdAt: string
+    35→  updatedAt: string
+    36→}
+    37→
+    38→interface ScheduledReport {
+    39→  id: string
+    40→  tenantId: string
+    41→  reportTemplateId: string
+    42→  scheduleType: string
+    43→  scheduleTime: string | null
+    44→  scheduleDay: number | null
+    45→  recipients: string // JSON array of emails
+    46→  format: string
+    47→  lastRunAt: string | null
+    48→  nextRunAt: string | null
+    49→  isActive: boolean
+    50→  createdAt: string
+    51→  updatedAt: string
+    52→}
+    53→
+    54→interface DailyReport {
+    55→  id: string
+    56→  stationId: string
+    57→  reportDate: string
+    58→  totalRevenue: number
+    59→  fuelRevenue: number
+    60→  retailRevenue: number
+    61→  totalVolume: number
+    62→  transactionCount: number
+    63→  averageTicket: number
+    64→  cashVariance: number
+    65→  fuelVariance: number
+    66→  expenses: number
+    67→  netProfit: number
+    68→  createdAt: string
+    69→  station: { id: string; name: string; code: string; city: string | null }
+    70→}
+    71→
+    72→// ── Static Config ──────────────────────────────────
+    73→
+    74→const TYPE_CONFIG: Record<string, { label: string; color: string }> = {
+    75→  daily_sales: { label: 'Daily Sales', color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' },
+    76→  shift_summary: { label: 'Shift Summary', color: 'bg-sky-500/10 text-sky-600 border-sky-500/20' },
+    77→  fuel_variance: { label: 'Fuel Variance', color: 'bg-red-500/10 text-red-600 border-red-500/20' },
+    78→  wet_stock: { label: 'Wet Stock', color: 'bg-teal-500/10 text-teal-600 border-teal-500/20' },
+    79→  financial: { label: 'Financial', color: 'bg-teal-500/10 text-teal-600 border-teal-500/20' },
+    80→  compliance: { label: 'Compliance', color: 'bg-slate-500/10 text-slate-600 border-slate-500/20' },
+    81→  custom: { label: 'Custom', color: 'bg-teal-500/10 text-teal-600 border-teal-500/20' },
+    82→}
+    83→
+    84→const CATEGORY_CONFIG: Record<string, string> = {
+    85→  operations: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
+    86→  finance: 'bg-teal-500/10 text-teal-600 border-teal-500/20',
+    87→  compliance: 'bg-red-500/10 text-red-600 border-red-500/20',
+    88→  management: 'bg-sky-500/10 text-sky-600 border-sky-500/20',
+    89→}
+    90→
+    91→const CHART_ICONS: Record<string, React.ElementType> = {
+    92→  bar: BarChart3,
+    93→  line: TrendingUp,
+    94→  pie: PieChart,
+    95→  table: Table,
+    96→}
+    97→
+    98→const SCHEDULE_BADGE: Record<string, string> = {
+    99→  daily: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
+   100→  weekly: 'bg-sky-500/10 text-sky-600 border-sky-500/20',
+   101→  monthly: 'bg-teal-500/10 text-teal-600 border-teal-500/20',
+   102→  quarterly: 'bg-teal-500/10 text-teal-600 border-teal-500/20',
+   103→}
+   104→
+   105→const FORMAT_BADGE: Record<string, string> = {
+   106→  pdf: 'bg-red-500/10 text-red-600 border-red-500/20',
+   107→  excel: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
+   108→  csv: 'bg-sky-500/10 text-sky-600 border-sky-500/20',
+   109→}
+   110→
+   111→// ── Component ──────────────────────────────────────
+   112→
+   113→export default function ReportBuilderModule() {
+   114→  const [activeTab, setActiveTab] = useState('templates')
+   115→  const [templates, setTemplates] = useState<ReportTemplate[]>([])
+   116→  const [scheduledReports, setScheduledReports] = useState<ScheduledReport[]>([])
+   117→  const [recentReports, setRecentReports] = useState<DailyReport[]>([])
+   118→  const [loading, setLoading] = useState(true)
+   119→  const [error, setError] = useState<string | null>(null)
+   120→  const [generating, setGenerating] = useState<string | null>(null)
+   121→
+   122→  const fetchData = useCallback(async () => {
+   123→    setLoading(true)
+   124→    setError(null)
+   125→    try {
+   126→      const [templatesRes, scheduledRes, dailyRes] = await Promise.all([
+   127→        fetch('/api/reports?type=templates'),
+   128→        fetch('/api/reports?type=scheduled'),
+   129→        fetch('/api/daily-reports?days=30'),
+   130→      ])
+   131→
+   132→      if (!templatesRes.ok) throw new Error('Failed to fetch report templates')
+   133→
+   134→      const templatesData = await templatesRes.json()
+   135→      const scheduledData = scheduledRes.ok ? await scheduledRes.json() : { scheduled: [] }
+   136→      const dailyData = dailyRes.ok ? await dailyRes.json() : { reports: [] }
+   137→
+   138→      setTemplates(templatesData.templates || [])
+   139→      setScheduledReports(scheduledData.scheduled || [])
+   140→      setRecentReports(dailyData.reports || [])
+   141→    } catch (err) {
+   142→      setError(err instanceof Error ? err.message : 'Failed to load report data')
+   143→    } finally {
+   144→      setLoading(false)
+   145→    }
+   146→  }, [])
+   147→
+   148→  useEffect(() => {
+   149→    fetchData()
+   150→  }, [fetchData])
+   151→
+   152→  const handleGenerate = async (templateId: string, templateName: string) => {
+   153→    setGenerating(templateId)
+   154→    try {
+   155→      const res = await fetch('/api/reports', {
+   156→        method: 'POST',
+   157→        headers: { 'Content-Type': 'application/json' },
+   158→        body: JSON.stringify({
+   159→          action: 'run_report',
+   160→          templateId,
+   161→        }),
+   162→      })
+   163→
+   164→      if (!res.ok) {
+   165→        const errData = await res.json().catch(() => ({}))
+   166→        throw new Error(errData.error || 'Report generation failed')
+   167→      }
+   168→
+   169→      // Refresh recent reports after generation
+   170→      const dailyRes = await fetch('/api/daily-reports?days=30')
+   171→      if (dailyRes.ok) {
+   172→        const dailyData = await dailyRes.json()
+   173→        setRecentReports(dailyData.reports || [])
+   174→      }
+   175→    } catch (err) {
+   176→      // Silent fail - could add toast notification
+   177→    } finally {
+   178→      setGenerating(null)
+   179→    }
+   180→  }
+   181→
+   182→  // Loading state
+   183→  if (loading) {
+   184→    return (
+   185→      <div className="space-y-4">
+   186→        <div className="flex items-center justify-between">
+   187→          <div className="h-5 bg-muted rounded w-32 animate-pulse" />
+   188→          <div className="h-7 bg-muted rounded w-28 animate-pulse" />
+   189→        </div>
+   190→        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+   191→          {[1, 2, 3, 4, 5, 6].map((i) => (
+   192→            <div key={i} className="macos-card p-4 animate-pulse">
+   193→              <div className="flex items-start gap-2.5 mb-2">
+   194→                <div className="size-9 rounded-[10px] bg-muted" />
+   195→                <div className="flex-1">
+   196→                  <div className="h-4 bg-muted rounded w-32 mb-1" />
+   197→                  <div className="h-3 bg-muted rounded w-16" />
+   198→                </div>
+   199→              </div>
+   200→              <div className="h-3 bg-muted rounded w-full mb-1" />
+   201→              <div className="h-3 bg-muted rounded w-2/3" />
+   202→            </div>
+   203→          ))}
+   204→        </div>
+   205→      </div>
+   206→    )
+   207→  }
+   208→
+   209→  // Error state
+   210→  if (error) {
+   211→    return (
+   212→      <div className="macos-card p-12 flex flex-col items-center justify-center text-muted-foreground">
+   213→        <AlertTriangle className="size-10 mb-3 text-teal-500" />
+   214→        <p className="text-[13px] font-medium">Failed to load report data</p>
+   215→        <p className="text-[11px] mt-1">{error}</p>
+   216→        <button onClick={fetchData} className="macos-btn mt-4 text-[12px] flex items-center gap-1.5">
+   217→          <RefreshCw className="size-3" /> Retry
+   218→        </button>
+   219→      </div>
+   220→    )
+   221→  }
+   222→
+   223→  return (
+   224→    <div className="space-y-4">
+   225→      <div className="flex justify-end">
+   226→        <button onClick={fetchData} className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+   227→          <RefreshCw className="size-3" /> Refresh
+   228→        </button>
+   229→      </div>
+   230→
+   231→      <Tabs value={activeTab} onValueChange={setActiveTab}>
+   232→        <div className="overflow-x-auto pb-1">
+   233→          <TabsList className="h-8 w-max gap-0.5 bg-muted/50">
+   234→            <TabsTrigger value="templates" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Templates</TabsTrigger>
+   235→            <TabsTrigger value="scheduled" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Scheduled</TabsTrigger>
+   236→            <TabsTrigger value="builder" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Builder</TabsTrigger>
+   237→            <TabsTrigger value="recent" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Recent Reports</TabsTrigger>
+   238→          </TabsList>
+   239→        </div>
+   240→
+   241→        {/* ── Templates ── */}
+   242→        <TabsContent value="templates" className="mt-4 space-y-3">
+   243→          <div className="flex items-center justify-between">
+   244→            <div className="macos-section-header">{templates.length} Report Templates</div>
+   245→            <button className="macos-btn text-[11px] px-2.5 py-1 flex items-center gap-1" onClick={() => setActiveTab('builder')}>
+   246→              <Plus className="size-3" /> Create Template
+   247→            </button>
+   248→          </div>
+   249→          {templates.length === 0 ? (
+   250→            <div className="macos-card p-12 flex flex-col items-center justify-center text-muted-foreground">
+   251→              <FileText className="size-10 mb-3 opacity-20" />
+   252→              <p className="text-[13px] font-medium">No report templates</p>
+   253→              <p className="text-[11px]">Create your first report template using the Builder tab</p>
+   254→              <button onClick={() => setActiveTab('builder')} className="macos-btn mt-4 text-[12px] flex items-center gap-1.5">
+   255→                <Plus className="size-3" /> Create Template
+   256→              </button>
+   257→            </div>
+   258→          ) : (
+   259→            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+   260→              {templates.map((template, i) => {
+   261→                const typeConf = TYPE_CONFIG[template.reportType] || TYPE_CONFIG.custom
+   262→                const ChartIcon = CHART_ICONS[template.chartType || ''] || Table
+   263→                return (
+   264→                  <motion.div
+   265→                    key={template.id}
+   266→                    initial={{ opacity: 0, y: 8 }}
+   267→                    animate={{ opacity: 1, y: 0 }}
+   268→                    transition={{ delay: i * 0.04 }}
+   269→                    className="macos-card p-4"
+   270→                  >
+   271→                    <div className="flex items-start justify-between mb-2">
+   272→                      <div className="flex items-center gap-2.5">
+   273→                        <div className="size-9 rounded-[10px] bg-teal-500/10 flex items-center justify-center">
+   274→                          <ChartIcon className="size-4 text-teal-500" />
+   275→                        </div>
+   276→                        <div>
+   277→                          <h3 className="text-[13px] font-semibold">{template.name}</h3>
+   278→                          <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${typeConf.color}`}>{typeConf.label}</Badge>
+   279→                        </div>
+   280→                      </div>
+   281→                      {template.isSystem && (
+   282→                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-slate-500/10 text-slate-500 border-slate-500/20">System</Badge>
+   283→                      )}
+   284→                    </div>
+   285→                    <p className="text-[11px] text-muted-foreground mt-2 line-clamp-2">{template.description || 'No description'}</p>
+   286→                    <div className="flex flex-wrap items-center gap-1.5 mt-3">
+   287→                      {template.category && (
+   288→                        <Badge variant="outline" className={`text-[9px] px-1.5 py-0 capitalize ${CATEGORY_CONFIG[template.category] || ''}`}>
+   289→                          {template.category}
+   290→                        </Badge>
+   291→                      )}
+   292→                      {template.chartType && (
+   293→                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-teal-500/5 text-teal-600 border-teal-500/15">
+   294→                          {template.chartType}
+   295→                        </Badge>
+   296→                      )}
+   297→                      {template.isPublic && (
+   298→                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600 border-emerald-500/20">Public</Badge>
+   299→                      )}
+   300→                    </div>
+   301→                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
+   302→                      <span className="text-[10px] text-muted-foreground">Created: {new Date(template.createdAt).toLocaleDateString()}</span>
+   303→                      <div className="flex gap-1.5">
+   304→                        <button className="size-6 rounded-md flex items-center justify-center hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors" title="Preview">
+   305→                          <Eye className="size-3 text-muted-foreground" />
+   306→                        </button>
+   307→                        <button
+   308→                          className="macos-btn text-[10px] px-2 py-0.5 flex items-center gap-1"
+   309→                          disabled={generating === template.id}
+   310→                          onClick={() => handleGenerate(template.id, template.name)}
+   311→                        >
+   312→                          {generating === template.id ? (
+   313→                            <Loader2 className="size-2.5 animate-spin" />
+   314→                          ) : (
+   315→                            <Activity className="size-2.5" />
+   316→                          )}
+   317→                          Generate
+   318→                        </button>
+   319→                      </div>
+   320→                    </div>
+   321→                  </motion.div>
+   322→                )
+   323→              })}
+   324→            </div>
+   325→          )}
+   326→        </TabsContent>
+   327→
+   328→        {/* ── Scheduled Reports ── */}
+   329→        <TabsContent value="scheduled" className="mt-4 space-y-3">
+   330→          <div className="flex items-center justify-between">
+   331→            <div className="macos-section-header">Scheduled Reports</div>
+   332→            <button className="macos-btn text-[11px] px-2.5 py-1 flex items-center gap-1">
+   333→              <Plus className="size-3" /> New Schedule
+   334→            </button>
+   335→          </div>
+   336→          {scheduledReports.length === 0 ? (
+   337→            <div className="macos-card p-12 flex flex-col items-center justify-center text-muted-foreground">
+   338→              <Calendar className="size-10 mb-3 opacity-20" />
+   339→              <p className="text-[13px] font-medium">No scheduled reports</p>
+   340→              <p className="text-[11px]">Schedule a report to run automatically at specified intervals</p>
+   341→            </div>
+   342→          ) : (
+   343→            <div className="macos-card overflow-hidden">
+   344→              <div className="max-h-[420px] overflow-y-auto">
+   345→                <table className="macos-table">
+   346→                  <thead>
+   347→                    <tr>
+   348→                      <th>Template</th>
+   349→                      <th>Schedule</th>
+   350→                      <th>Time</th>
+   351→                      <th>Format</th>
+   352→                      <th>Recipients</th>
+   353→                      <th>Last Run</th>
+   354→                      <th>Next Run</th>
+   355→                      <th>Status</th>
+   356→                    </tr>
+   357→                  </thead>
+   358→                  <tbody>
+   359→                    {scheduledReports.map(sched => {
+   360→                      let recipients: string[] = []
+   361→                      try { recipients = JSON.parse(sched.recipients) } catch { recipients = [sched.recipients] }
+   362→                      return (
+   363→                        <tr key={sched.id}>
+   364→                          <td className="text-[13px] font-medium">{sched.reportTemplateId}</td>
+   365→                          <td>
+   366→                            <Badge variant="outline" className={`text-[9px] px-1.5 py-0 font-semibold capitalize ${SCHEDULE_BADGE[sched.scheduleType] || ''}`}>
+   367→                              {sched.scheduleType}
+   368→                            </Badge>
+   369→                          </td>
+   370→                          <td className="text-[12px] text-muted-foreground">{sched.scheduleTime || 'Auto'}</td>
+   371→                          <td>
+   372→                            <Badge variant="outline" className={`text-[9px] px-1.5 py-0 font-semibold uppercase ${FORMAT_BADGE[sched.format] || ''}`}>
+   373→                              {sched.format}
+   374→                            </Badge>
+   375→                          </td>
+   376→                          <td>
+   377→                            <div className="flex items-center gap-1">
+   378→                              <Mail className="size-2.5 text-muted-foreground shrink-0" />
+   379→                              <span className="text-[11px] text-muted-foreground">{recipients.length} recipient{recipients.length > 1 ? 's' : ''}</span>
+   380→                            </div>
+   381→                          </td>
+   382→                          <td className="text-[11px] text-muted-foreground whitespace-nowrap">
+   383→                            {sched.lastRunAt ? new Date(sched.lastRunAt).toLocaleDateString('en-PK', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Never'}
+   384→                          </td>
+   385→                          <td className="text-[11px] text-muted-foreground whitespace-nowrap">
+   386→                            {sched.nextRunAt ? new Date(sched.nextRunAt).toLocaleDateString('en-PK', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+   387→                          </td>
+   388→                          <td>
+   389→                            <div className="flex items-center gap-1.5">
+   390→                              <div className={`macos-status-dot ${sched.isActive ? 'macos-status-online' : 'macos-status-offline'}`} />
+   391→                              <span className={`text-[11px] font-medium ${sched.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+   392→                                {sched.isActive ? 'Active' : 'Inactive'}
+   393→                              </span>
+   394→                            </div>
+   395→                          </td>
+   396→                        </tr>
+   397→                      )
+   398→                    })}
+   399→                  </tbody>
+   400→                </table>
+   401→              </div>
+   402→            </div>
+   403→          )}
+   404→        </TabsContent>
+   405→
+   406→        {/* ── Builder ── */}
+   407→        <TabsContent value="builder" className="mt-4 space-y-4">
+   408→          <div className="macos-section-header">Report Builder</div>
+   409→          <div className="macos-card p-5">
+   410→            <div className="flex items-start gap-4 mb-6">
+   411→              <div className="size-10 rounded-[10px] bg-teal-500/10 flex items-center justify-center shrink-0">
+   412→                <LayoutDashboard className="size-5 text-teal-500" />
+   413→              </div>
+   414→              <div>
+   415→                <h2 className="text-[15px] font-semibold">Create Custom Report</h2>
+   416→                <p className="text-[12px] text-muted-foreground mt-0.5">Build a custom report template with your choice of data sources, filters, and visualization</p>
+   417→              </div>
+   418→            </div>
+   419→
+   420→            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   421→              <div className="macos-group">
+   422→                <div className="macos-group-item">
+   423→                  <div className="flex items-center justify-between">
+   424→                    <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Report Name</span>
+   425→                    <span className="text-[13px] font-medium">Custom Report</span>
+   426→                  </div>
+   427→                </div>
+   428→                <div className="macos-group-item">
+   429→                  <div className="flex items-center justify-between">
+   430→                    <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Report Type</span>
+   431→                    <span className="text-[13px]">Custom</span>
+   432→                  </div>
+   433→                </div>
+   434→                <div className="macos-group-item">
+   435→                  <div className="flex items-center justify-between">
+   436→                    <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Category</span>
+   437→                    <span className="text-[13px]">Operations</span>
+   438→                  </div>
+   439→                </div>
+   440→                <div className="macos-group-item">
+   441→                  <div className="flex items-center justify-between">
+   442→                    <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Chart Type</span>
+   443→                    <span className="text-[13px]">Bar Chart</span>
+   444→                  </div>
+   445→                </div>
+   446→              </div>
+   447→
+   448→              <div className="macos-group">
+   449→                <div className="macos-group-item">
+   450→                  <div className="flex items-center justify-between">
+   451→                    <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Data Source</span>
+   452→                    <span className="text-[13px]">Fuel Sales</span>
+   453→                  </div>
+   454→                </div>
+   455→                <div className="macos-group-item">
+   456→                  <div className="flex items-center justify-between">
+   457→                    <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Date Range</span>
+   458→                    <span className="text-[13px]">Last 30 Days</span>
+   459→                  </div>
+   460→                </div>
+   461→                <div className="macos-group-item">
+   462→                  <div className="flex items-center justify-between">
+   463→                    <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Group By</span>
+   464→                    <span className="text-[13px]">Fuel Type</span>
+   465→                  </div>
+   466→                </div>
+   467→                <div className="macos-group-item">
+   468→                  <div className="flex items-center justify-between">
+   469→                    <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Visibility</span>
+   470→                    <span className="text-[13px]">Private</span>
+   471→                  </div>
+   472→                </div>
+   473→              </div>
+   474→            </div>
+   475→
+   476→            <div className="flex items-center justify-between mt-6 pt-4 border-t border-border">
+   477→              <div className="flex items-center gap-2">
+   478→                <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-teal-500/10 text-teal-600 border-teal-500/20">
+   479→                  <Database className="size-2.5 mr-0.5" /> 3 columns selected
+   480→                </Badge>
+   481→                <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-sky-500/10 text-sky-600 border-sky-500/20">
+   482→                  <Filter className="size-2.5 mr-0.5" /> 2 filters applied
+   483→                </Badge>
+   484→              </div>
+   485→              <div className="flex gap-2">
+   486→                <button className="macos-btn-secondary text-[11px] px-2.5 py-1">Preview</button>
+   487→                <button className="macos-btn text-[11px] px-2.5 py-1 flex items-center gap-1">
+   488→                  <Plus className="size-3" /> Create Template
+   489→                </button>
+   490→              </div>
+   491→            </div>
+   492→          </div>
+   493→        </TabsContent>
+   494→
+   495→        {/* ── Recent Reports ── */}
+   496→        <TabsContent value="recent" className="mt-4 space-y-3">
+   497→          <div className="flex items-center justify-between">
+   498→            <div className="macos-section-header">Generated Reports ({recentReports.length})</div>
+   499→            <button className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+   500→              <Download className="size-3" /> Export All
+   501→            </button>
+   502→          </div>
+   503→          {recentReports.length === 0 ? (
+   504→            <div className="macos-card p-12 flex flex-col items-center justify-center text-muted-foreground">
+   505→              <BarChart3 className="size-10 mb-3 opacity-20" />
+   506→              <p className="text-[13px] font-medium">No generated reports yet</p>
+   507→              <p className="text-[11px]">Reports will appear here once they are generated from templates</p>
+   508→              <button onClick={() => setActiveTab('templates')} className="macos-btn mt-4 text-[12px] flex items-center gap-1.5">
+   509→                <FileText className="size-3" /> View Templates
+   510→              </button>
+   511→            </div>
+   512→          ) : (
+   513→            <div className="macos-card overflow-hidden">
+   514→              <div className="max-h-[420px] overflow-y-auto">
+   515→                <table className="macos-table">
+   516→                  <thead>
+   517→                    <tr>
+   518→                      <th>Report ID</th>
+   519→                      <th>Station</th>
+   520→                      <th>Report Date</th>
+   521→                      <th>Revenue</th>
+   522→                      <th>Volume</th>
+   523→                      <th>Transactions</th>
+   524→                      <th>Net Profit</th>
+   525→                      <th>Actions</th>
+   526→                    </tr>
+   527→                  </thead>
+   528→                  <tbody>
+   529→                    {recentReports.map(report => (
+   530→                      <tr key={report.id}>
+   531→                        <td className="font-mono text-[12px] text-teal-600 dark:text-teal-400">{report.id.slice(0, 12)}…</td>
+   532→                        <td className="text-[13px] font-medium">{report.station?.name || 'Unknown'}</td>
+   533→                        <td className="text-[12px] text-muted-foreground whitespace-nowrap">
+   534→                          {new Date(report.reportDate).toLocaleDateString('en-PK', { month: 'short', day: 'numeric', year: 'numeric' })}
+   535→                        </td>
+   536→                        <td className="text-[13px] font-semibold tabular-nums">PKR {report.totalRevenue.toLocaleString()}</td>
+   537→                        <td className="text-[12px] text-muted-foreground tabular-nums">{Math.round(report.totalVolume).toLocaleString()} L</td>
+   538→                        <td className="text-[12px] text-muted-foreground">{report.transactionCount}</td>
+   539→                        <td className={`text-[13px] font-semibold tabular-nums ${report.netProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+   540→                          PKR {report.netProfit.toLocaleString()}
+   541→                        </td>
+   542→                        <td>
+   543→                          <div className="flex items-center gap-1">
+   544→                            <button className="size-6 rounded-md flex items-center justify-center hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors" title="Download">
+   545→                              <Download className="size-3 text-muted-foreground" />
+   546→                            </button>
+   547→                            <button className="size-6 rounded-md flex items-center justify-center hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors" title="Share">
+   548→                              <Share2 className="size-3 text-muted-foreground" />
+   549→                            </button>
+   550→                            <button className="size-6 rounded-md flex items-center justify-center hover:bg-red-500/10 transition-colors" title="Delete">
+   551→                              <Trash2 className="size-3 text-red-400" />
+   552→                            </button>
+   553→                          </div>
+   554→                        </td>
+   555→                      </tr>
+   556→                    ))}
+   557→                  </tbody>
+   558→                </table>
+   559→              </div>
+   560→            </div>
+   561→          )}
+   562→        </TabsContent>
+   563→      </Tabs>
+   564→    </div>
+   565→  )
+   566→}
+   567→

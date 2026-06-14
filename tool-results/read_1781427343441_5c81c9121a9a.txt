@@ -1,0 +1,797 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useCallback } from 'react'
+     4→import { motion } from 'framer-motion'
+     5→import {
+     6→  Shield, Users, AlertTriangle, HardDrive, Lock, Key, Clock,
+     7→  RefreshCw, Monitor, Ban, CheckCircle2, XCircle, Eye,
+     8→  Globe, Fingerprint, Server, Activity, Search, Filter,
+     9→  ChevronRight, Wifi, Database, Scan, ScanFace, FileWarning,
+    10→  Loader2,
+    11→} from 'lucide-react'
+    12→import { Badge } from '@/components/ui/badge'
+    13→import { Button } from '@/components/ui/button'
+    14→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    15→import { useAppStore } from '@/stores/app-store'
+    16→
+    17→// ── Types ──────────────────────────────────────────────────
+    18→
+    19→interface SecurityOverview {
+    20→  activeSessions: number
+    21→  unresolvedAlerts: number
+    22→  lastBackup: {
+    23→    id: string
+    24→    backupType: string
+    25→    status: string
+    26→    completedAt: string | null
+    27→    fileSize: number | null
+    28→  } | null
+    29→  activeEncryptionKeys: number
+    30→}
+    31→
+    32→interface SecuritySessionData {
+    33→  id: string
+    34→  userId: string
+    35→  tenantId: string | null
+    36→  tokenHash: string | null
+    37→  ipAddress: string | null
+    38→  userAgent: string | null
+    39→  deviceInfo: string | null
+    40→  loginAt: string
+    41→  lastActivityAt: string
+    42→  logoutAt: string | null
+    43→  status: string
+    44→  expiresAt: string | null
+    45→  user: { id: string; name: string; email: string; role: string }
+    46→}
+    47→
+    48→interface RBACPermissionData {
+    49→  id: string
+    50→  tenantId: string | null
+    51→  role: string
+    52→  module: string
+    53→  action: string
+    54→  isAllowed: boolean
+    55→}
+    56→
+    57→interface SecurityAlertData {
+    58→  id: string
+    59→  tenantId: string | null
+    60→  stationId: string | null
+    61→  alertType: string
+    62→  severity: string
+    63→  title: string
+    64→  description: string | null
+    65→  sourceIp: string | null
+    66→  targetEntity: string | null
+    67→  targetEntityId: string | null
+    68→  isResolved: boolean
+    69→  resolvedAt: string | null
+    70→  resolvedBy: string | null
+    71→  createdAt: string
+    72→}
+    73→
+    74→interface EncryptionKeyData {
+    75→  id: string
+    76→  tenantId: string | null
+    77→  keyType: string
+    78→  keyReference: string
+    79→  isActive: boolean
+    80→  rotatedAt: string | null
+    81→  expiresAt: string | null
+    82→  createdAt: string
+    83→}
+    84→
+    85→interface AuditLogData {
+    86→  id: string
+    87→  userId: string | null
+    88→  tenantId: string | null
+    89→  action: string
+    90→  entity: string
+    91→  entityId: string | null
+    92→  details: string | null
+    93→  ipAddress: string | null
+    94→  userAgent: string | null
+    95→  createdAt: string
+    96→  user: { id: string; name: string; email: string; role: string } | null
+    97→}
+    98→
+    99→// ── Helpers ──────────────────────────────────────────────
+   100→
+   101→const THREAT_MAP: Record<string, { label: string; color: string; dot: string }> = {
+   102→  low: { label: 'Low', color: 'text-emerald-600 dark:text-emerald-400', dot: 'macos-status-online' },
+   103→  medium: { label: 'Medium', color: 'text-teal-600 dark:text-teal-400', dot: 'macos-status-warning' },
+   104→  high: { label: 'High', color: 'text-red-600 dark:text-red-400', dot: 'macos-status-error' },
+   105→}
+   106→
+   107→const LEVEL_MAP: Record<string, string> = {
+   108→  info: 'text-muted-foreground',
+   109→  warning: 'text-teal-600 dark:text-teal-400',
+   110→  critical: 'text-red-600 dark:text-red-400',
+   111→  error: 'text-red-600 dark:text-red-400',
+   112→}
+   113→
+   114→const ALERT_TYPE_MAP: Record<string, { dot: string; bg: string }> = {
+   115→  critical: { dot: 'macos-status-error', bg: 'bg-red-500/5 border-red-500/10' },
+   116→  error: { dot: 'macos-status-error', bg: 'bg-red-500/5 border-red-500/10' },
+   117→  warning: { dot: 'macos-status-warning', bg: 'bg-teal-500/5 border-teal-500/10' },
+   118→  info: { dot: 'macos-status-online', bg: 'bg-emerald-500/5 border-emerald-500/10' },
+   119→}
+   120→
+   121→const PERMISSION_COLORS: Record<string, string> = {
+   122→  full: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
+   123→  edit: 'bg-teal-500/10 text-teal-600 border-teal-500/20',
+   124→  write: 'bg-teal-500/10 text-teal-600 border-teal-500/20',
+   125→  view: 'bg-sky-500/10 text-sky-600 border-sky-500/20',
+   126→  read: 'bg-sky-500/10 text-sky-600 border-sky-500/20',
+   127→  none: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+   128→  deny: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+   129→}
+   130→
+   131→const ROLE_COLORS: Record<string, string> = {
+   132→  superadmin: 'bg-red-500/10 text-red-600 border-red-500/20',
+   133→  admin: 'bg-teal-500/10 text-teal-600 border-teal-500/20',
+   134→  manager: 'bg-teal-500/10 text-teal-600 border-teal-500/20',
+   135→  operator: 'bg-sky-500/10 text-sky-600 border-sky-500/20',
+   136→  cashier: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
+   137→  attendant: 'bg-slate-500/10 text-slate-500 border-slate-500/20',
+   138→  viewer: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+   139→}
+   140→
+   141→const SEVERITY_MAP: Record<string, string> = {
+   142→  error: 'critical',
+   143→  critical: 'critical',
+   144→  warning: 'warning',
+   145→  info: 'info',
+   146→}
+   147→
+   148→const KEY_TYPE_MAP: Record<string, string> = {
+   149→  aes256: 'AES-256-GCM',
+   150→  aes128: 'AES-128-CBC',
+   151→  rsa2048: 'RSA-2048',
+   152→  rsa4096: 'RSA-4096',
+   153→  hmac256: 'HMAC-SHA256',
+   154→}
+   155→
+   156→// ── Skeleton ──────────────────────────────────────────────
+   157→
+   158→function SkeletonRow({ cols }: { cols: number }) {
+   159→  return (
+   160→    <tr>
+   161→      {Array.from({ length: cols }).map((_, i) => (
+   162→        <td key={i} className="py-3 px-4">
+   163→          <div className="h-3.5 rounded bg-muted/40 animate-pulse" style={{ width: `${60 + Math.random() * 40}%` }} />
+   164→        </td>
+   165→      ))}
+   166→    </tr>
+   167→  )
+   168→}
+   169→
+   170→// ── Component ──────────────────────────────────────────────
+   171→
+   172→export default function SecurityCenterModule() {
+   173→  const [activeTab, setActiveTab] = useState('overview')
+   174→  const [auditFilter, setAuditFilter] = useState('all')
+   175→
+   176→  // Data state
+   177→  const [overview, setOverview] = useState<SecurityOverview | null>(null)
+   178→  const [sessions, setSessions] = useState<SecuritySessionData[]>([])
+   179→  const [permissions, setPermissions] = useState<RBACPermissionData[]>([])
+   180→  const [securityAlerts, setSecurityAlerts] = useState<SecurityAlertData[]>([])
+   181→  const [encryptionKeys, setEncryptionKeys] = useState<EncryptionKeyData[]>([])
+   182→  const [auditLogs, setAuditLogs] = useState<AuditLogData[]>([])
+   183→
+   184→  // Loading & error state
+   185→  const [loading, setLoading] = useState(true)
+   186→  const [error, setError] = useState<string | null>(null)
+   187→  const [actionLoading, setActionLoading] = useState<string | null>(null)
+   188→
+   189→  const fetchData = useCallback(async () => {
+   190→    setLoading(true)
+   191→    setError(null)
+   192→    try {
+   193→      const [overviewRes, sessionsRes, rbacRes, alertsRes, encryptionRes, auditRes] = await Promise.all([
+   194→        fetch('/api/security'),
+   195→        fetch('/api/security?section=sessions'),
+   196→        fetch('/api/security?section=rbac'),
+   197→        fetch('/api/security?section=alerts'),
+   198→        fetch('/api/security?section=encryption'),
+   199→        fetch('/api/audit?limit=50'),
+   200→      ])
+   201→
+   202→      if (!overviewRes.ok) throw new Error('Failed to fetch security data')
+   203→
+   204→      const overviewData = await overviewRes.json()
+   205→      const sessionsData = await sessionsRes.json()
+   206→      const rbacData = await rbacRes.json()
+   207→      const alertsData = await alertsRes.json()
+   208→      const encryptionData = await encryptionRes.json()
+   209→      const auditData = await auditRes.json()
+   210→
+   211→      setOverview(overviewData.overview || null)
+   212→      setSessions(sessionsData.sessions || [])
+   213→      setPermissions(rbacData.permissions || [])
+   214→      setSecurityAlerts(alertsData.alerts || [])
+   215→      setEncryptionKeys(encryptionData.keys || [])
+   216→      setAuditLogs(auditData.logs || [])
+   217→    } catch (err) {
+   218→      setError(err instanceof Error ? err.message : 'Unknown error')
+   219→    } finally {
+   220→      setLoading(false)
+   221→    }
+   222→  }, [])
+   223→
+   224→  useEffect(() => {
+   225→    fetchData()
+   226→  }, [fetchData])
+   227→
+   228→  const handleRevokeSession = async (sessionId: string) => {
+   229→    setActionLoading(sessionId)
+   230→    try {
+   231→      const res = await fetch('/api/security', {
+   232→        method: 'POST',
+   233→        headers: { 'Content-Type': 'application/json' },
+   234→        body: JSON.stringify({ action: 'revoke_session', sessionId }),
+   235→      })
+   236→      if (res.ok) {
+   237→        setSessions(prev => prev.filter(s => s.id !== sessionId))
+   238→      }
+   239→    } catch (err) {
+   240→      console.error('Revoke session error:', err)
+   241→    } finally {
+   242→      setActionLoading(null)
+   243→    }
+   244→  }
+   245→
+   246→  const handleResolveAlert = async (alertId: string) => {
+   247→    setActionLoading(alertId)
+   248→    try {
+   249→      const res = await fetch('/api/security', {
+   250→        method: 'POST',
+   251→        headers: { 'Content-Type': 'application/json' },
+   252→        body: JSON.stringify({ action: 'resolve_alert', alertId }),
+   253→      })
+   254→      if (res.ok) {
+   255→        setSecurityAlerts(prev => prev.map(a => a.id === alertId ? { ...a, isResolved: true, resolvedAt: new Date().toISOString() } : a))
+   256→      }
+   257→    } catch (err) {
+   258→      console.error('Resolve alert error:', err)
+   259→    } finally {
+   260→      setActionLoading(null)
+   261→    }
+   262→  }
+   263→
+   264→  // Determine threat level based on unresolved alerts
+   265→  const threatLevel = (() => {
+   266→    const unresolvedCritical = securityAlerts.filter(a => !a.isResolved && (a.severity === 'critical' || a.severity === 'error')).length
+   267→    const unresolvedWarning = securityAlerts.filter(a => !a.isResolved && a.severity === 'warning').length
+   268→    if (unresolvedCritical > 0) return 'high'
+   269→    if (unresolvedWarning > 2) return 'medium'
+   270→    return 'low'
+   271→  })()
+   272→
+   273→  const threat = THREAT_MAP[threatLevel]
+   274→
+   275→  const filteredLogs = auditFilter === 'all'
+   276→    ? auditLogs
+   277→    : auditLogs.filter(l => {
+   278→        if (auditFilter === 'critical') return l.action.toLowerCase().includes('fail') || l.action.toLowerCase().includes('delete')
+   279→        if (auditFilter === 'warning') return l.action.toLowerCase().includes('update') || l.action.toLowerCase().includes('warning')
+   280→        return true
+   281→      })
+   282→
+   283→  // Build RBAC matrix from permissions
+   284→  const rbacMatrix = (() => {
+   285→    const roleMap = new Map<string, Map<string, string>>()
+   286→    permissions.forEach(p => {
+   287→      if (!roleMap.has(p.role)) roleMap.set(p.role, new Map())
+   288→      const modules = roleMap.get(p.role)!
+   289→      const current = modules.get(p.module)
+   290→      if (p.isAllowed) {
+   291→        if (p.action === 'delete' || p.action === 'approve' || p.action === 'configure') {
+   292→          modules.set(p.module, 'full')
+   293→        } else if (p.action === 'write' && current !== 'full') {
+   294→          modules.set(p.module, 'edit')
+   295→        } else if (p.action === 'read' && !current) {
+   296→          modules.set(p.module, 'view')
+   297→        }
+   298→      } else if (!current) {
+   299→        modules.set(p.module, 'none')
+   300→      }
+   301→    })
+   302→    return Array.from(roleMap.entries()).map(([role, modules]) => ({
+   303→      role,
+   304→      modules: Object.fromEntries(modules),
+   305→    }))
+   306→  })()
+   307→
+   308→  // Compute compliance score based on resolved alerts and active keys
+   309→  const complianceScore = (() => {
+   310→    if (!overview) return 0
+   311→    const total = securityAlerts.length || 1
+   312→    const resolved = securityAlerts.filter(a => a.isResolved).length
+   313→    const hasActiveKeys = overview.activeEncryptionKeys > 0
+   314→    const base = Math.round((resolved / total) * 100)
+   315→    return hasActiveKeys ? Math.min(100, base + 10) : base
+   316→  })()
+   317→
+   318→  if (error) {
+   319→    return (
+   320→      <div className="macos-card p-8 text-center">
+   321→        <AlertTriangle className="size-8 text-red-500 mx-auto mb-3" />
+   322→        <p className="text-[13px] font-semibold text-red-500 mb-1">Failed to load security data</p>
+   323→        <p className="text-[12px] text-muted-foreground mb-3">{error}</p>
+   324→        <button onClick={fetchData} className="macos-btn gap-1.5">
+   325→          <RefreshCw className="size-3.5" /> Retry
+   326→        </button>
+   327→      </div>
+   328→    )
+   329→  }
+   330→
+   331→  return (
+   332→    <div className="space-y-4" style={{ fontStyle: 'normal !important' }}>
+   333→      <Tabs value={activeTab} onValueChange={setActiveTab}>
+   334→        <div className="overflow-x-auto pb-1">
+   335→          <TabsList className="h-8 w-max gap-0.5 bg-muted/50">
+   336→            <TabsTrigger value="overview" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Overview</TabsTrigger>
+   337→            <TabsTrigger value="audit" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Audit Log</TabsTrigger>
+   338→            <TabsTrigger value="sessions" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Sessions</TabsTrigger>
+   339→            <TabsTrigger value="rbac" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">RBAC</TabsTrigger>
+   340→            <TabsTrigger value="alerts" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Alerts</TabsTrigger>
+   341→            <TabsTrigger value="encryption" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Encryption</TabsTrigger>
+   342→          </TabsList>
+   343→        </div>
+   344→
+   345→        {/* ── Overview ── */}
+   346→        <TabsContent value="overview" className="mt-4 space-y-4">
+   347→          {loading ? (
+   348→            <div className="space-y-4">
+   349→              <div className="macos-card p-5 animate-pulse">
+   350→                <div className="flex items-center gap-4">
+   351→                  <div className="size-14 rounded-2xl bg-muted/40" />
+   352→                  <div className="flex-1 space-y-2">
+   353→                    <div className="h-4 rounded bg-muted/40 w-48" />
+   354→                    <div className="h-3 rounded bg-muted/40 w-64" />
+   355→                  </div>
+   356→                  <div className="size-14 rounded bg-muted/40" />
+   357→                </div>
+   358→              </div>
+   359→              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   360→                {Array.from({ length: 4 }).map((_, i) => (
+   361→                  <div key={i} className="macos-card p-4 animate-pulse">
+   362→                    <div className="h-3 rounded bg-muted/40 w-24 mb-2" />
+   363→                    <div className="h-8 rounded bg-muted/40 w-12" />
+   364→                  </div>
+   365→                ))}
+   366→              </div>
+   367→            </div>
+   368→          ) : (
+   369→            <>
+   370→              {/* Threat Level Banner */}
+   371→              <div className="macos-card p-5">
+   372→                <div className="flex items-center gap-4">
+   373→                  <div className="size-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center shrink-0">
+   374→                    <Shield className="size-7 text-emerald-500" />
+   375→                  </div>
+   376→                  <div className="flex-1">
+   377→                    <div className="flex items-center gap-2 mb-1">
+   378→                      <h2 className="text-[15px] font-semibold">Security Status</h2>
+   379→                      <div className="flex items-center gap-1.5">
+   380→                        <div className={`macos-status-dot ${threat.dot}`} />
+   381→                        <span className={`text-[11px] font-semibold ${threat.color}`}>Threat Level: {threat.label}</span>
+   382→                      </div>
+   383→                    </div>
+   384→                    <p className="text-[12px] text-muted-foreground">
+   385→                      {overview?.unresolvedAlerts ? `${overview.unresolvedAlerts} unresolved alerts` : 'All security services operating normally. No active threats detected.'}
+   386→                    </p>
+   387→                  </div>
+   388→                  <div className="text-center">
+   389→                    <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{complianceScore}</div>
+   390→                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Compliance</div>
+   391→                  </div>
+   392→                </div>
+   393→              </div>
+   394→
+   395→              {/* Stats Grid */}
+   396→              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   397→                {[
+   398→                  { label: 'Active Sessions', value: overview?.activeSessions ?? 0, icon: Monitor, accent: '#34c759' },
+   399→                  { label: 'Unresolved Alerts', value: overview?.unresolvedAlerts ?? 0, icon: Ban, accent: '#ff3b30' },
+   400→                  { label: 'Last Backup', value: overview?.lastBackup ? new Date(overview.lastBackup.completedAt || '').toLocaleDateString('en-PK', { month: 'short', day: 'numeric' }) : 'Never', icon: HardDrive, accent: '#ff9f0a', isText: true },
+   401→                  { label: 'Encryption Keys', value: overview?.activeEncryptionKeys ?? 0, icon: Key, accent: '#e8930c' },
+   402→                ].map((stat) => (
+   403→                  <div key={stat.label} className="macos-card p-4">
+   404→                    <div className="flex items-center justify-between">
+   405→                      <div>
+   406→                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">{stat.label}</p>
+   407→                        <p className={`text-2xl font-bold mt-0.5 ${stat.isText ? 'text-[16px]' : ''}`} style={{ color: stat.accent }}>{stat.value}</p>
+   408→                      </div>
+   409→                      <div className="size-9 rounded-[10px] flex items-center justify-center" style={{ backgroundColor: `${stat.accent}12` }}>
+   410→                        <stat.icon className="size-4" style={{ color: stat.accent }} />
+   411→                      </div>
+   412→                    </div>
+   413→                  </div>
+   414→                ))}
+   415→              </div>
+   416→
+   417→              {/* Recent Alerts Preview */}
+   418→              <div>
+   419→                <div className="macos-section-header">Recent Alerts</div>
+   420→                <div className="macos-group mt-1">
+   421→                  {securityAlerts.length === 0 ? (
+   422→                    <div className="macos-group-item text-center py-6 text-[13px] text-muted-foreground">No security alerts</div>
+   423→                  ) : (
+   424→                    securityAlerts.slice(0, 3).map(alert => {
+   425→                      const severity = SEVERITY_MAP[alert.severity] || alert.severity
+   426→                      const cfg = ALERT_TYPE_MAP[severity] || ALERT_TYPE_MAP['info']
+   427→                      return (
+   428→                        <div key={alert.id} className="macos-group-item flex items-center gap-3">
+   429→                          <div className={`macos-status-dot ${cfg.dot}`} />
+   430→                          <div className="flex-1 min-w-0">
+   431→                            <div className="flex items-center gap-2">
+   432→                              <span className="text-[13px] font-medium">{alert.title}</span>
+   433→                              {alert.isResolved && (
+   434→                                <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600 border-emerald-500/20">Resolved</Badge>
+   435→                              )}
+   436→                            </div>
+   437→                            <p className="text-[11px] text-muted-foreground truncate">{alert.description || alert.alertType}</p>
+   438→                          </div>
+   439→                          <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+   440→                            {new Date(alert.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+   441→                          </span>
+   442→                        </div>
+   443→                      )
+   444→                    })
+   445→                  )}
+   446→                </div>
+   447→              </div>
+   448→            </>
+   449→          )}
+   450→        </TabsContent>
+   451→
+   452→        {/* ── Audit Log ── */}
+   453→        <TabsContent value="audit" className="mt-4 space-y-3">
+   454→          <div className="flex items-center gap-3">
+   455→            <div className="relative flex-1 max-w-xs">
+   456→              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+   457→              <input className="macos-search pl-8 py-1.5 text-[12px]" placeholder="Search audit logs..." />
+   458→            </div>
+   459→            <div className="flex items-center gap-1.5">
+   460→              {['all', 'info', 'warning', 'critical'].map(f => (
+   461→                <button
+   462→                  key={f}
+   463→                  onClick={() => setAuditFilter(f)}
+   464→                  className={`text-[11px] px-2.5 py-1 rounded-md font-medium transition-colors capitalize ${
+   465→                    auditFilter === f
+   466→                      ? 'bg-teal-500/15 text-teal-600 dark:text-teal-400'
+   467→                      : 'text-muted-foreground hover:bg-black/[0.03] dark:hover:bg-white/[0.04]'
+   468→                  }`}
+   469→                >
+   470→                  {f}
+   471→                </button>
+   472→              ))}
+   473→            </div>
+   474→          </div>
+   475→
+   476→          <div className="macos-card overflow-hidden">
+   477→            <div className="max-h-[420px] overflow-y-auto">
+   478→              <table className="macos-table">
+   479→                <thead>
+   480→                  <tr>
+   481→                    <th>Time</th>
+   482→                    <th>User</th>
+   483→                    <th>Action</th>
+   484→                    <th>Entity</th>
+   485→                    <th>Details</th>
+   486→                    <th>IP</th>
+   487→                  </tr>
+   488→                </thead>
+   489→                <tbody>
+   490→                  {loading ? (
+   491→                    Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} cols={6} />)
+   492→                  ) : filteredLogs.length === 0 ? (
+   493→                    <tr>
+   494→                      <td colSpan={6} className="text-center text-[13px] text-muted-foreground py-8">No audit logs found</td>
+   495→                    </tr>
+   496→                  ) : (
+   497→                    filteredLogs.map(log => {
+   498→                      const level = log.action.toLowerCase().includes('fail') || log.action.toLowerCase().includes('delete') ? 'critical' :
+   499→                                    log.action.toLowerCase().includes('update') ? 'warning' : 'info'
+   500→                      return (
+   501→                        <tr key={log.id}>
+   502→                          <td className="text-[12px] font-mono text-muted-foreground whitespace-nowrap">
+   503→                            {new Date(log.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+   504→                          </td>
+   505→                          <td className="text-[13px] font-medium">{log.user?.name || 'System'}</td>
+   506→                          <td>
+   507→                            <span className={`text-[12px] font-medium ${LEVEL_MAP[level] || ''}`}>{log.action}</span>
+   508→                          </td>
+   509→                          <td>
+   510→                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">{log.entity}</Badge>
+   511→                          </td>
+   512→                          <td className="text-[12px] text-muted-foreground max-w-[250px] truncate">{log.details || '—'}</td>
+   513→                          <td className="text-[11px] font-mono text-muted-foreground">{log.ipAddress || '—'}</td>
+   514→                        </tr>
+   515→                      )
+   516→                    })
+   517→                  )}
+   518→                </tbody>
+   519→              </table>
+   520→            </div>
+   521→          </div>
+   522→          <p className="text-[11px] text-muted-foreground">{filteredLogs.length} log entries</p>
+   523→        </TabsContent>
+   524→
+   525→        {/* ── Active Sessions ── */}
+   526→        <TabsContent value="sessions" className="mt-4 space-y-3">
+   527→          <div className="flex items-center justify-between">
+   528→            <div className="macos-section-header">Active Sessions</div>
+   529→            <button className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+   530→              <Ban className="size-3" /> Revoke All
+   531→            </button>
+   532→          </div>
+   533→          <div className="macos-card overflow-hidden">
+   534→            <div className="max-h-[400px] overflow-y-auto">
+   535→              <table className="macos-table">
+   536→                <thead>
+   537→                  <tr>
+   538→                    <th>User</th>
+   539→                    <th>Role</th>
+   540→                    <th>Device</th>
+   541→                    <th>IP</th>
+   542→                    <th>Login</th>
+   543→                    <th>Last Active</th>
+   544→                    <th></th>
+   545→                  </tr>
+   546→                </thead>
+   547→                <tbody>
+   548→                  {loading ? (
+   549→                    Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} cols={7} />)
+   550→                  ) : sessions.length === 0 ? (
+   551→                    <tr>
+   552→                      <td colSpan={7} className="text-center text-[13px] text-muted-foreground py-8">No active sessions</td>
+   553→                    </tr>
+   554→                  ) : (
+   555→                    sessions.map(s => (
+   556→                      <tr key={s.id}>
+   557→                        <td>
+   558→                          <div className="flex items-center gap-2">
+   559→                            <div className="size-7 rounded-lg bg-teal-500/10 flex items-center justify-center text-[10px] font-bold text-teal-600 dark:text-teal-400">
+   560→                              {s.user?.name?.split(' ').map(w => w[0]).join('').slice(0, 2) || 'SY'}
+   561→                            </div>
+   562→                            <span className="text-[13px] font-medium">{s.user?.name || 'Unknown'}</span>
+   563→                          </div>
+   564→                        </td>
+   565→                        <td>
+   566→                          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-semibold ${ROLE_COLORS[s.user?.role?.toLowerCase()] || ''}`}>
+   567→                            {s.user?.role || 'Unknown'}
+   568→                          </Badge>
+   569→                        </td>
+   570→                        <td className="text-[12px] text-muted-foreground">{s.deviceInfo || s.userAgent || 'Unknown'}</td>
+   571→                        <td className="text-[11px] font-mono text-muted-foreground">{s.ipAddress || '—'}</td>
+   572→                        <td className="text-[12px] text-muted-foreground">
+   573→                          {new Date(s.loginAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+   574→                        </td>
+   575→                        <td className="text-[12px]">
+   576→                          {(() => {
+   577→                            const diff = Date.now() - new Date(s.lastActivityAt).getTime()
+   578→                            const mins = Math.floor(diff / 60000)
+   579→                            return mins < 1 ? 'Just now' : mins < 60 ? `${mins} min ago` : `${Math.floor(mins / 60)} hr ago`
+   580→                          })()}
+   581→                        </td>
+   582→                        <td>
+   583→                          <button
+   584→                            onClick={() => handleRevokeSession(s.id)}
+   585→                            disabled={actionLoading === s.id}
+   586→                            className="text-[11px] text-red-500 hover:text-red-600 font-medium transition-colors disabled:opacity-50"
+   587→                          >
+   588→                            {actionLoading === s.id ? <Loader2 className="size-3 animate-spin" /> : 'Revoke'}
+   589→                          </button>
+   590→                        </td>
+   591→                      </tr>
+   592→                    ))
+   593→                  )}
+   594→                </tbody>
+   595→              </table>
+   596→            </div>
+   597→          </div>
+   598→        </TabsContent>
+   599→
+   600→        {/* ── RBAC Matrix ── */}
+   601→        <TabsContent value="rbac" className="mt-4 space-y-3">
+   602→          <div className="macos-section-header">Role-Based Access Control Matrix</div>
+   603→          {loading ? (
+   604→            <div className="macos-card p-6 animate-pulse space-y-3">
+   605→              {Array.from({ length: 4 }).map((_, i) => (
+   606→                <div key={i} className="h-8 rounded bg-muted/40" />
+   607→              ))}
+   608→            </div>
+   609→          ) : rbacMatrix.length === 0 ? (
+   610→            <div className="macos-card p-8 text-center text-[13px] text-muted-foreground">No RBAC permissions configured</div>
+   611→          ) : (
+   612→            <div className="macos-card overflow-hidden">
+   613→              <div className="overflow-x-auto">
+   614→                <table className="macos-table">
+   615→                  <thead>
+   616→                    <tr>
+   617→                      <th>Role</th>
+   618→                      {rbacMatrix[0] && Object.keys(rbacMatrix[0].modules).map(mod => (
+   619→                        <th key={mod} className="text-center">{mod}</th>
+   620→                      ))}
+   621→                    </tr>
+   622→                  </thead>
+   623→                  <tbody>
+   624→                    {rbacMatrix.map(row => (
+   625→                      <tr key={row.role}>
+   626→                        <td>
+   627→                          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-semibold capitalize ${ROLE_COLORS[row.role.toLowerCase()] || ''}`}>
+   628→                            {row.role}
+   629→                          </Badge>
+   630→                        </td>
+   631→                        {Object.entries(row.modules).map(([mod, perm]) => (
+   632→                          <td key={mod} className="text-center">
+   633→                            <Badge variant="outline" className={`text-[9px] px-1.5 py-0 font-semibold capitalize ${PERMISSION_COLORS[perm] || PERMISSION_COLORS['none']}`}>
+   634→                              {perm}
+   635→                            </Badge>
+   636→                          </td>
+   637→                        ))}
+   638→                      </tr>
+   639→                    ))}
+   640→                  </tbody>
+   641→                </table>
+   642→              </div>
+   643→            </div>
+   644→          )}
+   645→          <div className="flex items-center gap-4 mt-2">
+   646→            {Object.entries(PERMISSION_COLORS).map(([perm, cls]) => (
+   647→              <div key={perm} className="flex items-center gap-1.5">
+   648→                <Badge variant="outline" className={`text-[9px] px-1.5 py-0 font-semibold capitalize ${cls}`}>{perm}</Badge>
+   649→              </div>
+   650→            ))}
+   651→          </div>
+   652→        </TabsContent>
+   653→
+   654→        {/* ── Security Alerts ── */}
+   655→        <TabsContent value="alerts" className="mt-4 space-y-3">
+   656→          <div className="macos-section-header">Security Alerts Feed</div>
+   657→          {loading ? (
+   658→            <div className="space-y-2">
+   659→              {Array.from({ length: 4 }).map((_, i) => (
+   660→                <div key={i} className="macos-card p-4 animate-pulse">
+   661→                  <div className="flex items-start gap-3">
+   662→                    <div className="size-3 rounded-full bg-muted/40 mt-1.5" />
+   663→                    <div className="flex-1 space-y-2">
+   664→                      <div className="h-4 rounded bg-muted/40 w-48" />
+   665→                      <div className="h-3 rounded bg-muted/40 w-full" />
+   666→                    </div>
+   667→                  </div>
+   668→                </div>
+   669→              ))}
+   670→            </div>
+   671→          ) : securityAlerts.length === 0 ? (
+   672→            <div className="macos-card p-8 text-center text-[13px] text-muted-foreground">No security alerts</div>
+   673→          ) : (
+   674→            <div className="space-y-2">
+   675→              {securityAlerts.map((alert, i) => {
+   676→                const severity = SEVERITY_MAP[alert.severity] || alert.severity
+   677→                const cfg = ALERT_TYPE_MAP[severity] || ALERT_TYPE_MAP['info']
+   678→                return (
+   679→                  <motion.div
+   680→                    key={alert.id}
+   681→                    initial={{ opacity: 0, y: 6 }}
+   682→                    animate={{ opacity: 1, y: 0 }}
+   683→                    transition={{ delay: i * 0.04 }}
+   684→                    className={`macos-card p-4 border ${cfg.bg}`}
+   685→                  >
+   686→                    <div className="flex items-start gap-3">
+   687→                      <div className={`macos-status-dot mt-1.5 ${cfg.dot}`} />
+   688→                      <div className="flex-1 min-w-0">
+   689→                        <div className="flex items-center gap-2 mb-1">
+   690→                          <span className="text-[13px] font-semibold">{alert.title}</span>
+   691→                          <Badge variant="outline" className={`text-[9px] px-1.5 py-0 font-semibold capitalize ${
+   692→                            alert.severity === 'critical' || alert.severity === 'error' ? 'bg-red-500/10 text-red-600 border-red-500/20' :
+   693→                            alert.severity === 'warning' ? 'bg-teal-500/10 text-teal-600 border-teal-500/20' :
+   694→                            'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+   695→                          }`}>
+   696→                            {alert.severity}
+   697→                          </Badge>
+   698→                          {alert.isResolved && (
+   699→                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
+   700→                              <CheckCircle2 className="size-2.5 mr-0.5" /> Resolved
+   701→                            </Badge>
+   702→                          )}
+   703→                        </div>
+   704→                        <p className="text-[12px] text-muted-foreground">{alert.description || alert.alertType}</p>
+   705→                      </div>
+   706→                      <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+   707→                        {new Date(alert.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+   708→                      </span>
+   709→                    </div>
+   710→                    {!alert.isResolved && (
+   711→                      <div className="flex gap-2 mt-3 ml-5">
+   712→                        <button
+   713→                          onClick={() => handleResolveAlert(alert.id)}
+   714→                          disabled={actionLoading === alert.id}
+   715→                          className="macos-btn text-[11px] px-2.5 py-1 disabled:opacity-50"
+   716→                        >
+   717→                          {actionLoading === alert.id ? <Loader2 className="size-3 animate-spin" /> : 'Acknowledge'}
+   718→                        </button>
+   719→                        <button className="macos-btn-secondary text-[11px] px-2.5 py-1">Investigate</button>
+   720→                      </div>
+   721→                    )}
+   722→                  </motion.div>
+   723→                )
+   724→              })}
+   725→            </div>
+   726→          )}
+   727→        </TabsContent>
+   728→
+   729→        {/* ── Encryption Keys ── */}
+   730→        <TabsContent value="encryption" className="mt-4 space-y-3">
+   731→          <div className="macos-card p-5">
+   732→            <div className="flex items-start gap-4">
+   733→              <div className="size-10 rounded-[10px] bg-teal-500/10 flex items-center justify-center shrink-0">
+   734→                <Fingerprint className="size-5 text-teal-500" />
+   735→              </div>
+   736→              <div className="flex-1">
+   737→                <h3 className="text-[13px] font-semibold">Encryption Management</h3>
+   738→                <p className="text-[12px] text-muted-foreground mt-0.5">All encryption keys are managed and rotated according to security policy. Keys are stored in a secure vault with AES-256 encryption at rest.</p>
+   739→              </div>
+   740→              <button className="macos-btn text-[11px] px-2.5 py-1 flex items-center gap-1">
+   741→                <RefreshCw className="size-3" /> Rotate All
+   742→              </button>
+   743→            </div>
+   744→          </div>
+   745→
+   746→          <div className="macos-section-header">Encryption Keys</div>
+   747→          <div className="macos-card overflow-hidden">
+   748→            <div className="max-h-[350px] overflow-y-auto">
+   749→              <table className="macos-table">
+   750→                <thead>
+   751→                  <tr>
+   752→                    <th>Key ID</th>
+   753→                    <th>Algorithm</th>
+   754→                    <th>Purpose</th>
+   755→                    <th>Created</th>
+   756→                    <th>Last Rotated</th>
+   757→                    <th>Status</th>
+   758→                  </tr>
+   759→                </thead>
+   760→                <tbody>
+   761→                  {loading ? (
+   762→                    Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} cols={6} />)
+   763→                  ) : encryptionKeys.length === 0 ? (
+   764→                    <tr>
+   765→                      <td colSpan={6} className="text-center text-[13px] text-muted-foreground py-8">No encryption keys found</td>
+   766→                    </tr>
+   767→                  ) : (
+   768→                    encryptionKeys.map(key => (
+   769→                      <tr key={key.id}>
+   770→                        <td className="font-mono text-[12px] text-teal-600 dark:text-teal-400">{key.keyReference.slice(0, 12)}…</td>
+   771→                        <td className="text-[12px] font-mono">{KEY_TYPE_MAP[key.keyType] || key.keyType.toUpperCase()}</td>
+   772→                        <td className="text-[13px]">{key.keyReference}</td>
+   773→                        <td className="text-[12px] text-muted-foreground">{new Date(key.createdAt).toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' })}</td>
+   774→                        <td className="text-[12px] text-muted-foreground">
+   775→                          {key.rotatedAt ? new Date(key.rotatedAt).toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Never'}
+   776→                        </td>
+   777→                        <td>
+   778→                          <div className="flex items-center gap-1.5">
+   779→                            <div className={`macos-status-dot ${key.isActive ? 'macos-status-online' : 'macos-status-offline'}`} />
+   780→                            <span className={`text-[11px] font-medium ${key.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+   781→                              {key.isActive ? 'Active' : 'Inactive'}
+   782→                            </span>
+   783→                          </div>
+   784→                        </td>
+   785→                      </tr>
+   786→                    ))
+   787→                  )}
+   788→                </tbody>
+   789→              </table>
+   790→            </div>
+   791→          </div>
+   792→        </TabsContent>
+   793→      </Tabs>
+   794→    </div>
+   795→  )
+   796→}
+   797→

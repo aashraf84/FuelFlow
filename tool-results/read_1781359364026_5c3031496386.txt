@@ -1,0 +1,660 @@
+     1→'use client'
+     2→
+     3→import { useState } from 'react'
+     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→import {
+     6→  Zap,
+     7→  Fuel,
+     8→  Battery,
+     9→  Gauge,
+    10→  Activity,
+    11→  AlertTriangle,
+    12→  Plug,
+    13→  Cpu,
+    14→  Clock,
+    15→  DollarSign,
+    16→  ArrowUpRight,
+    17→  Thermometer,
+    18→  Cylinder,
+    19→  Power,
+    20→  Wind,
+    21→  CheckCircle2,
+    22→  XCircle,
+    23→  RefreshCw,
+    24→  BarChart3,
+    25→} from 'lucide-react'
+    26→import { Badge } from '@/components/ui/badge'
+    27→import { ScrollArea } from '@/components/ui/scroll-area'
+    28→import {
+    29→  BarChart,
+    30→  Bar,
+    31→  XAxis,
+    32→  YAxis,
+    33→  Tooltip,
+    34→  ResponsiveContainer,
+    35→  CartesianGrid,
+    36→} from 'recharts'
+    37→
+    38→// ── Static Data ──────────────────────────────────────────
+    39→
+    40→interface EVCharger {
+    41→  id: string
+    42→  name: string
+    43→  code: string
+    44→  connectorType: string
+    45→  maxPowerKw: number
+    46→  status: 'available' | 'charging' | 'occupied' | 'offline' | 'error'
+    47→  station: string
+    48→  activeSession: {
+    49→    vehiclePlate: string
+    50→    energyKwh: number
+    51→    durationMin: number
+    52→    pricePerKwh: number
+    53→    totalAmount: number
+    54→    startedAt: string
+    55→    socStart: number
+    56→    socCurrent: number
+    57→  } | null
+    58→}
+    59→
+    60→const evChargers: EVCharger[] = [
+    61→  {
+    62→    id: 'ev1', name: 'EV Charger 1', code: 'EVC-DWT-01', connectorType: 'CCS2', maxPowerKw: 120,
+    63→    status: 'charging', station: 'Downtown Station',
+    64→    activeSession: { vehiclePlate: 'LEA-4521', energyKwh: 34.2, durationMin: 28, pricePerKwh: 45, totalAmount: 1539, startedAt: '10:32 AM', socStart: 22, socCurrent: 58 },
+    65→  },
+    66→  {
+    67→    id: 'ev2', name: 'EV Charger 2', code: 'EVC-DWT-02', connectorType: 'Type 2', maxPowerKw: 22,
+    68→    status: 'available', station: 'Downtown Station', activeSession: null,
+    69→  },
+    70→  {
+    71→    id: 'ev3', name: 'EV Charger 3', code: 'EVC-DWT-03', connectorType: 'CHAdeMO', maxPowerKw: 50,
+    72→    status: 'charging', station: 'Downtown Station',
+    73→    activeSession: { vehiclePlate: 'LHR-8934', energyKwh: 18.6, durationMin: 42, pricePerKwh: 42, totalAmount: 781, startedAt: '10:18 AM', socStart: 35, socCurrent: 62 },
+    74→  },
+    75→  {
+    76→    id: 'ev4', name: 'EV Charger 4', code: 'EVC-APT-01', connectorType: 'CCS2', maxPowerKw: 150,
+    77→    status: 'charging', station: 'Airport Terminal',
+    78→    activeSession: { vehiclePlate: 'ISB-1102', energyKwh: 56.8, durationMin: 35, pricePerKwh: 48, totalAmount: 2726, startedAt: '10:25 AM', socStart: 12, socCurrent: 71 },
+    79→  },
+    80→  {
+    81→    id: 'ev5', name: 'EV Charger 5', code: 'EVC-APT-02', connectorType: 'CCS2', maxPowerKw: 150,
+    82→    status: 'available', station: 'Airport Terminal', activeSession: null,
+    83→  },
+    84→  {
+    85→    id: 'ev6', name: 'EV Charger 6', code: 'EVC-EV-01', connectorType: 'CCS2', maxPowerKw: 120,
+    86→    status: 'occupied', station: 'EV Station DHA', activeSession: null,
+    87→  },
+    88→  {
+    89→    id: 'ev7', name: 'EV Charger 7', code: 'EVC-EV-02', connectorType: 'Type 2', maxPowerKw: 22,
+    90→    status: 'available', station: 'EV Station DHA', activeSession: null,
+    91→  },
+    92→  {
+    93→    id: 'ev8', name: 'EV Charger 8', code: 'EVC-EV-03', connectorType: 'Type 2', maxPowerKw: 22,
+    94→    status: 'offline', station: 'EV Station DHA', activeSession: null,
+    95→  },
+    96→  {
+    97→    id: 'ev9', name: 'EV Charger 9', code: 'EVC-EV-04', connectorType: 'CCS2', maxPowerKw: 120,
+    98→    status: 'error', station: 'EV Station DHA', activeSession: null,
+    99→  },
+   100→  {
+   101→    id: 'ev10', name: 'EV Charger 10', code: 'EVC-EV-05', connectorType: 'CHAdeMO', maxPowerKw: 50,
+   102→    status: 'charging', station: 'EV Station DHA',
+   103→    activeSession: { vehiclePlate: 'MUL-6673', energyKwh: 12.4, durationMin: 18, pricePerKwh: 42, totalAmount: 521, startedAt: '10:42 AM', socStart: 44, socCurrent: 56 },
+   104→  },
+   105→]
+   106→
+   107→const chargingSessions = [
+   108→  { id: 'cs1', charger: 'EVC-DWT-01', vehicle: 'LEA-4521', energy: 34.2, duration: 28, amount: 1539, status: 'active' as const, started: '10:32 AM' },
+   109→  { id: 'cs2', charger: 'EVC-DWT-03', vehicle: 'LHR-8934', energy: 18.6, duration: 42, amount: 781, status: 'active' as const, started: '10:18 AM' },
+   110→  { id: 'cs3', charger: 'EVC-APT-01', vehicle: 'ISB-1102', energy: 56.8, duration: 35, amount: 2726, status: 'active' as const, started: '10:25 AM' },
+   111→  { id: 'cs4', charger: 'EVC-EV-05', vehicle: 'MUL-6673', energy: 12.4, duration: 18, amount: 521, status: 'active' as const, started: '10:42 AM' },
+   112→  { id: 'cs5', charger: 'EVC-DWT-02', vehicle: 'RWP-3412', energy: 45.0, duration: 92, amount: 1890, status: 'completed' as const, started: '08:45 AM' },
+   113→  { id: 'cs6', charger: 'EVC-APT-01', vehicle: 'KHI-7788', energy: 62.3, duration: 48, amount: 2990, status: 'completed' as const, started: '07:30 AM' },
+   114→  { id: 'cs7', charger: 'EVC-EV-01', vehicle: 'LHR-2291', energy: 28.7, duration: 38, amount: 1205, status: 'completed' as const, started: '06:15 AM' },
+   115→]
+   116→
+   117→const cngDispensers = [
+   118→  { id: 'cng1', name: 'CNG Dispenser 1', code: 'CNG-FSD-01', status: 'dispensing' as const, pressure: 220, station: 'CNG Hub Faisalabad', currentVehicle: 'FDA-8834', kgsDispensed: 12.4, durationMin: 8 },
+   119→  { id: 'cng2', name: 'CNG Dispenser 2', code: 'CNG-FSD-02', status: 'idle' as const, pressure: 215, station: 'CNG Hub Faisalabad', currentVehicle: null, kgsDispensed: 0, durationMin: 0 },
+   120→  { id: 'cng3', name: 'CNG Dispenser 3', code: 'CNG-FSD-03', status: 'dispensing' as const, pressure: 218, station: 'CNG Hub Faisalabad', currentVehicle: 'LHR-4421', kgsDispensed: 8.2, durationMin: 5 },
+   121→  { id: 'cng4', name: 'CNG Dispenser 4', code: 'CNG-FSD-04', status: 'idle' as const, pressure: 210, station: 'CNG Hub Faisalabad', currentVehicle: null, kgsDispensed: 0, durationMin: 0 },
+   122→  { id: 'cng5', name: 'CNG Dispenser 5', code: 'CNG-DWT-01', status: 'stopped' as const, pressure: 0, station: 'Downtown Station', currentVehicle: null, kgsDispensed: 0, durationMin: 0 },
+   123→  { id: 'cng6', name: 'CNG Dispenser 6', code: 'CNG-DWT-02', status: 'error' as const, pressure: 95, station: 'Downtown Station', currentVehicle: null, kgsDispensed: 0, durationMin: 0 },
+   124→]
+   125→
+   126→const cngCompressors = [
+   127→  { id: 'comp1', name: 'Compressor A', status: 'running' as const, pressure: 250, temperature: 82, runtime: 1847, loadPercent: 78, station: 'CNG Hub Faisalabad' },
+   128→  { id: 'comp2', name: 'Compressor B', status: 'warning' as const, pressure: 195, temperature: 94, runtime: 3201, loadPercent: 62, station: 'CNG Hub Faisalabad' },
+   129→  { id: 'comp3', name: 'Compressor C', status: 'standby' as const, pressure: 0, temperature: 28, runtime: 0, loadPercent: 0, station: 'CNG Hub Faisalabad' },
+   130→]
+   131→
+   132→const cngStorage = [
+   133→  { id: 'st1', name: 'Storage Bank A', capacity: 5000, current: 4200, pressure: 240, status: 'normal' as const, station: 'CNG Hub Faisalabad' },
+   134→  { id: 'st2', name: 'Storage Bank B', capacity: 5000, current: 2800, pressure: 185, status: 'low' as const, station: 'CNG Hub Faisalabad' },
+   135→  { id: 'st3', name: 'Storage Bank C', capacity: 3000, current: 2650, pressure: 225, status: 'normal' as const, station: 'CNG Hub Faisalabad' },
+   136→]
+   137→
+   138→const revenueData = [
+   139→  { month: 'Jul', ev: 420000, cng: 680000 },
+   140→  { month: 'Aug', ev: 510000, cng: 720000 },
+   141→  { month: 'Sep', ev: 620000, cng: 780000 },
+   142→  { month: 'Oct', ev: 710000, cng: 840000 },
+   143→  { month: 'Nov', ev: 830000, cng: 910000 },
+   144→  { month: 'Dec', ev: 890000, cng: 1560000 },
+   145→]
+   146→
+   147→const chargerStatusConfig: Record<string, { label: string; dot: string; color: string; bg: string }> = {
+   148→  available: { label: 'Available', dot: 'macos-status-online', color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+   149→  charging: { label: 'Charging', dot: 'macos-status-warning', color: 'text-amber-500', bg: 'bg-amber-500/10' },
+   150→  occupied: { label: 'Occupied', dot: 'macos-status-warning', color: 'text-orange-500', bg: 'bg-orange-500/10' },
+   151→  offline: { label: 'Offline', dot: 'macos-status-offline', color: 'text-slate-400', bg: 'bg-slate-500/10' },
+   152→  error: { label: 'Error', dot: 'macos-status-error', color: 'text-red-500', bg: 'bg-red-500/10' },
+   153→}
+   154→
+   155→const cngStatusConfig: Record<string, { label: string; dot: string; color: string; bg: string }> = {
+   156→  dispensing: { label: 'Dispensing', dot: 'macos-status-warning', color: 'text-amber-500', bg: 'bg-amber-500/10' },
+   157→  idle: { label: 'Idle', dot: 'macos-status-online', color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+   158→  stopped: { label: 'Stopped', dot: 'macos-status-offline', color: 'text-slate-400', bg: 'bg-slate-500/10' },
+   159→  error: { label: 'Error', dot: 'macos-status-error', color: 'text-red-500', bg: 'bg-red-500/10' },
+   160→}
+   161→
+   162→const compressorStatusConfig: Record<string, { label: string; dot: string; color: string }> = {
+   163→  running: { label: 'Running', dot: 'macos-status-online', color: 'text-emerald-500' },
+   164→  standby: { label: 'Standby', dot: 'macos-status-offline', color: 'text-slate-400' },
+   165→  warning: { label: 'Warning', dot: 'macos-status-warning', color: 'text-amber-500' },
+   166→  error: { label: 'Error', dot: 'macos-status-error', color: 'text-red-500' },
+   167→}
+   168→
+   169→// ── Helpers ──────────────────────────────────────────────
+   170→
+   171→function formatPKR(amount: number): string {
+   172→  if (amount >= 1000000) return `PKR ${(amount / 1000000).toFixed(2)}M`
+   173→  if (amount >= 1000) return `PKR ${(amount / 1000).toFixed(0)}K`
+   174→  return `PKR ${amount.toLocaleString()}`
+   175→}
+   176→
+   177→const fadeUp = {
+   178→  initial: { opacity: 0, y: 8 },
+   179→  animate: { opacity: 1, y: 0 },
+   180→  transition: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
+   181→}
+   182→
+   183→// ── Component ────────────────────────────────────────────
+   184→
+   185→export default function EVCNGModule() {
+   186→  const [activeTab, setActiveTab] = useState<'ev' | 'sessions' | 'cng' | 'revenue'>('ev')
+   187→
+   188→  const evSummary = {
+   189→    total: evChargers.length,
+   190→    available: evChargers.filter((c) => c.status === 'available').length,
+   191→    charging: evChargers.filter((c) => c.status === 'charging').length,
+   192→    occupied: evChargers.filter((c) => c.status === 'occupied').length,
+   193→    offline: evChargers.filter((c) => c.status === 'offline').length,
+   194→    error: evChargers.filter((c) => c.status === 'error').length,
+   195→  }
+   196→
+   197→  const cngSummary = {
+   198→    total: cngDispensers.length,
+   199→    dispensing: cngDispensers.filter((d) => d.status === 'dispensing').length,
+   200→    idle: cngDispensers.filter((d) => d.status === 'idle').length,
+   201→    stopped: cngDispensers.filter((d) => d.status === 'stopped').length,
+   202→    error: cngDispensers.filter((d) => d.status === 'error').length,
+   203→  }
+   204→
+   205→  const totalEVCRevenue = revenueData.reduce((s, d) => s + d.ev, 0)
+   206→  const totalCNGRevenue = revenueData.reduce((s, d) => s + d.cng, 0)
+   207→
+   208→  const tabs = [
+   209→    { key: 'ev' as const, label: 'EV Chargers' },
+   210→    { key: 'sessions' as const, label: 'Sessions' },
+   211→    { key: 'cng' as const, label: 'CNG' },
+   212→    { key: 'revenue' as const, label: 'Revenue' },
+   213→  ]
+   214→
+   215→  return (
+   216→    <div className="space-y-5">
+   217→      {/* Tab Bar */}
+   218→      <div className="flex items-center gap-1 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] p-1 w-fit overflow-x-auto">
+   219→        {tabs.map((tab) => (
+   220→          <button
+   221→            key={tab.key}
+   222→            onClick={() => setActiveTab(tab.key)}
+   223→            className={`px-4 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-150 whitespace-nowrap ${
+   224→              activeTab === tab.key
+   225→                ? 'bg-card text-foreground shadow-sm'
+   226→                : 'text-muted-foreground hover:text-foreground'
+   227→            }`}
+   228→          >
+   229→            {tab.label}
+   230→          </button>
+   231→        ))}
+   232→      </div>
+   233→
+   234→      <AnimatePresence mode="wait">
+   235→        {/* ── EV Chargers Tab ── */}
+   236→        {activeTab === 'ev' && (
+   237→          <motion.div key="ev" {...fadeUp} className="space-y-5">
+   238→            {/* EV Summary Row */}
+   239→            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+   240→              {[
+   241→                { label: 'Total', value: evSummary.total, color: '' },
+   242→                { label: 'Available', value: evSummary.available, color: 'text-emerald-500' },
+   243→                { label: 'Charging', value: evSummary.charging, color: 'text-amber-500' },
+   244→                { label: 'Occupied', value: evSummary.occupied, color: 'text-orange-500' },
+   245→                { label: 'Offline', value: evSummary.offline, color: 'text-slate-400' },
+   246→                { label: 'Error', value: evSummary.error, color: 'text-red-500' },
+   247→              ].map((item) => (
+   248→                <div key={item.label} className="macos-card p-3 text-center">
+   249→                  <p className={`text-[18px] font-bold ${item.color}`}>{item.value}</p>
+   250→                  <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{item.label}</p>
+   251→                </div>
+   252→              ))}
+   253→            </div>
+   254→
+   255→            {/* Charger Grid */}
+   256→            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   257→              {evChargers.map((charger, i) => {
+   258→                const cfg = chargerStatusConfig[charger.status]
+   259→                return (
+   260→                  <motion.div
+   261→                    key={charger.id}
+   262→                    initial={{ opacity: 0, y: 8 }}
+   263→                    animate={{ opacity: 1, y: 0 }}
+   264→                    transition={{ delay: i * 0.04, duration: 0.25 }}
+   265→                    className="macos-card p-4"
+   266→                  >
+   267→                    <div className="flex items-center justify-between mb-3">
+   268→                      <div className="flex items-center gap-2">
+   269→                        <Zap className={`size-4 ${cfg.color} ${charger.status === 'charging' ? 'animate-pulse' : ''}`} />
+   270→                        <h4 className="text-[13px] font-semibold">{charger.name}</h4>
+   271→                      </div>
+   272→                      <div className="flex items-center gap-1.5">
+   273→                        <div className={`macos-status-dot ${cfg.dot}`} />
+   274→                        <span className={`text-[11px] font-medium ${cfg.color}`}>{cfg.label}</span>
+   275→                      </div>
+   276→                    </div>
+   277→
+   278→                    <div className="grid grid-cols-2 gap-2 text-[12px] mb-3">
+   279→                      <div className="flex items-center gap-1.5 text-muted-foreground">
+   280→                        <Plug className="size-3" />
+   281→                        <span>{charger.connectorType}</span>
+   282→                      </div>
+   283→                      <div className="flex items-center gap-1.5 text-muted-foreground">
+   284→                        <Battery className="size-3" />
+   285→                        <span>{charger.maxPowerKw} kW</span>
+   286→                      </div>
+   287→                      <div className="flex items-center gap-1.5 text-muted-foreground col-span-2">
+   288→                        <Cpu className="size-3" />
+   289→                        <span>{charger.station}</span>
+   290→                      </div>
+   291→                    </div>
+   292→
+   293→                    {/* Active Session */}
+   294→                    {charger.activeSession && (
+   295→                      <div className="rounded-xl bg-amber-500/5 border border-amber-500/10 p-3 space-y-2">
+   296→                        <div className="flex items-center justify-between">
+   297→                          <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Active Session</span>
+   298→                          <span className="text-[11px] text-muted-foreground">{charger.activeSession.startedAt}</span>
+   299→                        </div>
+   300→                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[12px]">
+   301→                          <div className="flex justify-between">
+   302→                            <span className="text-muted-foreground">Vehicle</span>
+   303→                            <span className="font-mono font-medium">{charger.activeSession.vehiclePlate}</span>
+   304→                          </div>
+   305→                          <div className="flex justify-between">
+   306→                            <span className="text-muted-foreground">Energy</span>
+   307→                            <span className="font-medium">{charger.activeSession.energyKwh.toFixed(1)} kWh</span>
+   308→                          </div>
+   309→                          <div className="flex justify-between">
+   310→                            <span className="text-muted-foreground">SoC</span>
+   311→                            <span className="font-medium">{charger.activeSession.socStart}% → {charger.activeSession.socCurrent}%</span>
+   312→                          </div>
+   313→                          <div className="flex justify-between">
+   314→                            <span className="text-muted-foreground">Amount</span>
+   315→                            <span className="font-semibold text-amber-600 dark:text-amber-400">{formatPKR(charger.activeSession.totalAmount)}</span>
+   316→                          </div>
+   317→                        </div>
+   318→                        {/* SoC Progress */}
+   319→                        <div className="space-y-1">
+   320→                          <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+   321→                            <div
+   322→                              className="h-full rounded-full bg-amber-500 transition-all"
+   323→                              style={{ width: `${charger.activeSession.socCurrent}%` }}
+   324→                            />
+   325→                          </div>
+   326→                        </div>
+   327→                      </div>
+   328→                    )}
+   329→                  </motion.div>
+   330→                )
+   331→              })}
+   332→            </div>
+   333→          </motion.div>
+   334→        )}
+   335→
+   336→        {/* ── Sessions Tab ── */}
+   337→        {activeTab === 'sessions' && (
+   338→          <motion.div key="sessions" {...fadeUp} className="space-y-4">
+   339→            <div className="flex items-center gap-2">
+   340→              <Clock className="size-4 text-amber-500" />
+   341→              <h3 className="text-[13px] font-semibold">Active Charging Sessions</h3>
+   342→              <Badge variant="outline" className="text-[11px] px-2 py-0.5">{chargingSessions.filter((s) => s.status === 'active').length} active</Badge>
+   343→            </div>
+   344→
+   345→            <div className="macos-card overflow-hidden">
+   346→              <ScrollArea className="max-h-[500px]">
+   347→                <table className="macos-table">
+   348→                  <thead>
+   349→                    <tr>
+   350→                      <th>Charger</th>
+   351→                      <th>Vehicle</th>
+   352→                      <th className="text-right">Energy (kWh)</th>
+   353→                      <th className="text-right">Duration</th>
+   354→                      <th className="text-right">Amount</th>
+   355→                      <th>Status</th>
+   356→                      <th>Started</th>
+   357→                    </tr>
+   358→                  </thead>
+   359→                  <tbody>
+   360→                    {chargingSessions.map((session) => (
+   361→                      <tr key={session.id}>
+   362→                        <td className="text-[13px] font-medium">{session.charger}</td>
+   363→                        <td className="text-[13px] font-mono">{session.vehicle}</td>
+   364→                        <td className="text-right text-[13px] tabular-nums">{session.energy.toFixed(1)}</td>
+   365→                        <td className="text-right text-[13px] tabular-nums">{session.duration} min</td>
+   366→                        <td className="text-right text-[13px] font-medium tabular-nums">{formatPKR(session.amount)}</td>
+   367→                        <td>
+   368→                          <div className="flex items-center gap-1.5">
+   369→                            <div className={`macos-status-dot ${session.status === 'active' ? 'macos-status-warning' : 'macos-status-online'}`} />
+   370→                            <span className={`text-[11px] font-medium capitalize ${session.status === 'active' ? 'text-amber-500' : 'text-emerald-500'}`}>
+   371→                              {session.status}
+   372→                            </span>
+   373→                          </div>
+   374→                        </td>
+   375→                        <td className="text-[12px] text-muted-foreground">{session.started}</td>
+   376→                      </tr>
+   377→                    ))}
+   378→                  </tbody>
+   379→                </table>
+   380→              </ScrollArea>
+   381→            </div>
+   382→          </motion.div>
+   383→        )}
+   384→
+   385→        {/* ── CNG Tab ── */}
+   386→        {activeTab === 'cng' && (
+   387→          <motion.div key="cng" {...fadeUp} className="space-y-5">
+   388→            {/* CNG Summary */}
+   389→            <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+   390→              {[
+   391→                { label: 'Total', value: cngSummary.total, color: '' },
+   392→                { label: 'Dispensing', value: cngSummary.dispensing, color: 'text-amber-500' },
+   393→                { label: 'Idle', value: cngSummary.idle, color: 'text-emerald-500' },
+   394→                { label: 'Stopped', value: cngSummary.stopped, color: 'text-slate-400' },
+   395→                { label: 'Error', value: cngSummary.error, color: 'text-red-500' },
+   396→              ].map((item) => (
+   397→                <div key={item.label} className="macos-card p-3 text-center">
+   398→                  <p className={`text-[18px] font-bold ${item.color}`}>{item.value}</p>
+   399→                  <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{item.label}</p>
+   400→                </div>
+   401→              ))}
+   402→            </div>
+   403→
+   404→            {/* CNG Dispensers */}
+   405→            <div>
+   406→              <div className="macos-section-header flex items-center gap-2 px-0">
+   407→                <Fuel className="size-3 text-amber-500" />
+   408→                CNG Dispensers
+   409→              </div>
+   410→              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
+   411→                {cngDispensers.map((disp) => {
+   412→                  const cfg = cngStatusConfig[disp.status]
+   413→                  return (
+   414→                    <div key={disp.id} className="macos-card p-4">
+   415→                      <div className="flex items-center justify-between mb-3">
+   416→                        <div className="flex items-center gap-2">
+   417→                          <Fuel className={`size-4 ${cfg.color}`} />
+   418→                          <h4 className="text-[13px] font-semibold">{disp.name}</h4>
+   419→                        </div>
+   420→                        <div className="flex items-center gap-1.5">
+   421→                          <div className={`macos-status-dot ${cfg.dot}`} />
+   422→                          <span className={`text-[11px] font-medium ${cfg.color}`}>{cfg.label}</span>
+   423→                        </div>
+   424→                      </div>
+   425→                      <div className="grid grid-cols-2 gap-2 text-[12px] text-muted-foreground">
+   426→                        <div className="flex items-center gap-1.5">
+   427→                          <Gauge className="size-3" />
+   428→                          <span>{disp.pressure > 0 ? `${disp.pressure} bar` : 'N/A'}</span>
+   429→                        </div>
+   430→                        <div className="flex items-center gap-1.5">
+   431→                          <Cpu className="size-3" />
+   432→                          <span>{disp.station.split(' ').slice(0, 2).join(' ')}</span>
+   433→                        </div>
+   434→                      </div>
+   435→                      {disp.currentVehicle && (
+   436→                        <div className="mt-2 pt-2 border-t border-border/50">
+   437→                          <div className="flex items-center justify-between text-[12px]">
+   438→                            <span className="text-muted-foreground">Vehicle:</span>
+   439→                            <span className="font-mono font-medium">{disp.currentVehicle}</span>
+   440→                          </div>
+   441→                          <div className="flex items-center justify-between text-[12px] mt-1">
+   442→                            <span className="text-muted-foreground">Dispensed:</span>
+   443→                            <span className="font-medium">{disp.kgsDispensed} kg · {disp.durationMin} min</span>
+   444→                          </div>
+   445→                        </div>
+   446→                      )}
+   447→                    </div>
+   448→                  )
+   449→                })}
+   450→              </div>
+   451→            </div>
+   452→
+   453→            {/* Compressors & Storage */}
+   454→            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   455→              {/* Compressors */}
+   456→              <div>
+   457→                <div className="macos-section-header flex items-center gap-2 px-0">
+   458→                  <Wind className="size-3 text-amber-500" />
+   459→                  Compressors
+   460→                </div>
+   461→                <div className="macos-group mt-2">
+   462→                  {cngCompressors.map((comp) => {
+   463→                    const cfg = compressorStatusConfig[comp.status]
+   464→                    return (
+   465→                      <div key={comp.id} className="macos-group-item">
+   466→                        <div className="flex items-center justify-between">
+   467→                          <div className="flex items-center gap-2.5">
+   468→                            <div className={`macos-status-dot ${cfg.dot}`} />
+   469→                            <div>
+   470→                              <p className="text-[13px] font-medium">{comp.name}</p>
+   471→                              <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5">
+   472→                                <span className="flex items-center gap-1"><Gauge className="size-2.5" />{comp.pressure} bar</span>
+   473→                                <span className="flex items-center gap-1"><Thermometer className="size-2.5" />{comp.temperature}°C</span>
+   474→                                <span className="flex items-center gap-1"><Power className="size-2.5" />{comp.loadPercent}% load</span>
+   475→                              </div>
+   476→                            </div>
+   477→                          </div>
+   478→                          <span className={`macos-pill ${cfg.color} bg-black/[0.03] dark:bg-white/[0.04] text-[10px]`}>{cfg.label}</span>
+   479→                        </div>
+   480→                      </div>
+   481→                    )
+   482→                  })}
+   483→                </div>
+   484→              </div>
+   485→
+   486→              {/* Storage */}
+   487→              <div>
+   488→                <div className="macos-section-header flex items-center gap-2 px-0">
+   489→                  <Cylinder className="size-3 text-amber-500" />
+   490→                  Storage Monitoring
+   491→                </div>
+   492→                <div className="macos-group mt-2">
+   493→                  {cngStorage.map((storage) => {
+   494→                    const fillPercent = Math.round((storage.current / storage.capacity) * 100)
+   495→                    const isLow = storage.status === 'low'
+   496→                    return (
+   497→                      <div key={storage.id} className="macos-group-item">
+   498→                        <div className="flex items-center justify-between mb-1.5">
+   499→                          <p className="text-[13px] font-medium">{storage.name}</p>
+   500→                          <div className="flex items-center gap-1.5">
+   501→                            <div className={`macos-status-dot ${isLow ? 'macos-status-warning' : 'macos-status-online'}`} />
+   502→                            <span className={`text-[11px] font-medium ${isLow ? 'text-amber-500' : 'text-emerald-500'}`}>
+   503→                              {isLow ? 'Low' : 'Normal'}
+   504→                            </span>
+   505→                          </div>
+   506→                        </div>
+   507→                        <div className="flex items-center gap-3 text-[11px] text-muted-foreground mb-2">
+   508→                          <span>{storage.current.toLocaleString()} / {storage.capacity.toLocaleString()} kg</span>
+   509→                          <span>{storage.pressure} bar</span>
+   510→                        </div>
+   511→                        <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+   512→                          <div
+   513→                            className={`h-full rounded-full transition-all ${isLow ? 'bg-amber-500' : 'bg-emerald-500'}`}
+   514→                            style={{ width: `${fillPercent}%` }}
+   515→                          />
+   516→                        </div>
+   517→                      </div>
+   518→                    )
+   519→                  })}
+   520→                </div>
+   521→              </div>
+   522→            </div>
+   523→
+   524→            {/* CNG Warning */}
+   525→            {cngCompressors.some((c) => c.status === 'warning') && (
+   526→              <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/5 border border-amber-500/10">
+   527→                <AlertTriangle className="size-4 text-amber-500 shrink-0" />
+   528→                <p className="text-[12px] text-amber-700 dark:text-amber-400">
+   529→                  <strong>Compressor B</strong> is running at elevated temperature (94°C) with reduced pressure output. Schedule maintenance to prevent auto-shutdown.
+   530→                </p>
+   531→              </div>
+   532→            )}
+   533→          </motion.div>
+   534→        )}
+   535→
+   536→        {/* ── Revenue Tab ── */}
+   537→        {activeTab === 'revenue' && (
+   538→          <motion.div key="revenue" {...fadeUp} className="space-y-5">
+   539→            {/* Revenue Summary Cards */}
+   540→            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+   541→              <div className="macos-card p-4">
+   542→                <div className="flex items-start justify-between">
+   543→                  <div>
+   544→                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">EV Revenue (6mo)</p>
+   545→                    <p className="text-[20px] font-bold mt-1 tracking-tight">{formatPKR(totalEVCRevenue)}</p>
+   546→                    <div className="flex items-center gap-1 mt-1">
+   547→                      <ArrowUpRight className="size-3 text-emerald-500" />
+   548→                      <span className="text-[12px] font-medium text-emerald-500">+32.4%</span>
+   549→                    </div>
+   550→                  </div>
+   551→                  <div className="flex size-9 items-center justify-center rounded-xl bg-amber-500/10">
+   552→                    <Zap className="size-[18px] text-amber-500" />
+   553→                  </div>
+   554→                </div>
+   555→              </div>
+   556→              <div className="macos-card p-4">
+   557→                <div className="flex items-start justify-between">
+   558→                  <div>
+   559→                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">CNG Revenue (6mo)</p>
+   560→                    <p className="text-[20px] font-bold mt-1 tracking-tight">{formatPKR(totalCNGRevenue)}</p>
+   561→                    <div className="flex items-center gap-1 mt-1">
+   562→                      <ArrowUpRight className="size-3 text-emerald-500" />
+   563→                      <span className="text-[12px] font-medium text-emerald-500">+18.7%</span>
+   564→                    </div>
+   565→                  </div>
+   566→                  <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-500/10">
+   567→                    <Fuel className="size-[18px] text-emerald-500" />
+   568→                  </div>
+   569→                </div>
+   570→              </div>
+   571→              <div className="macos-card p-4">
+   572→                <div className="flex items-start justify-between">
+   573→                  <div>
+   574→                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Combined Revenue</p>
+   575→                    <p className="text-[20px] font-bold mt-1 tracking-tight">{formatPKR(totalEVCRevenue + totalCNGRevenue)}</p>
+   576→                    <div className="flex items-center gap-1 mt-1">
+   577→                      <ArrowUpRight className="size-3 text-emerald-500" />
+   578→                      <span className="text-[12px] font-medium text-emerald-500">+23.1%</span>
+   579→                    </div>
+   580→                  </div>
+   581→                  <div className="flex size-9 items-center justify-center rounded-xl bg-orange-500/10">
+   582→                    <DollarSign className="size-[18px] text-orange-500" />
+   583→                  </div>
+   584→                </div>
+   585→              </div>
+   586→            </div>
+   587→
+   588→            {/* Revenue Chart */}
+   589→            <div className="macos-card p-5">
+   590→              <div className="flex items-center gap-2 mb-4">
+   591→                <BarChart3 className="size-4 text-amber-500" />
+   592→                <h3 className="text-[13px] font-semibold">EV & CNG Monthly Revenue</h3>
+   593→              </div>
+   594→              <div className="h-64">
+   595→                <ResponsiveContainer width="100%" height="100%">
+   596→                  <BarChart data={revenueData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+   597→                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+   598→                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+   599→                    <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${(v / 1000000).toFixed(1)}M`} />
+   600→                    <Tooltip
+   601→                      contentStyle={{ fontSize: 12, borderRadius: 10, border: '0.5px solid var(--border)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+   602→                      formatter={(value: number, name: string) => [formatPKR(value), name === 'ev' ? 'EV Charging' : 'CNG']}
+   603→                    />
+   604→                    <Bar dataKey="ev" name="ev" fill="#e8930c" radius={[4, 4, 0, 0]} />
+   605→                    <Bar dataKey="cng" name="cng" fill="#34c759" radius={[4, 4, 0, 0]} />
+   606→                  </BarChart>
+   607→                </ResponsiveContainer>
+   608→              </div>
+   609→              <div className="flex items-center justify-center gap-6 mt-3">
+   610→                <div className="flex items-center gap-1.5">
+   611→                  <div className="size-2.5 rounded-full bg-amber-500" />
+   612→                  <span className="text-[11px] text-muted-foreground">EV Charging</span>
+   613→                </div>
+   614→                <div className="flex items-center gap-1.5">
+   615→                  <div className="size-2.5 rounded-full bg-emerald-500" />
+   616→                  <span className="text-[11px] text-muted-foreground">CNG</span>
+   617→                </div>
+   618→              </div>
+   619→            </div>
+   620→
+   621→            {/* Revenue by Source Breakdown */}
+   622→            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   623→              <div className="macos-card p-4">
+   624→                <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">EV Revenue by Charger Type</h4>
+   625→                <div className="macos-group">
+   626→                  <div className="macos-group-item flex items-center justify-between">
+   627→                    <span className="text-[13px]">CCS2 (120–150 kW)</span>
+   628→                    <span className="text-[13px] font-semibold tabular-nums">{formatPKR(580000)}</span>
+   629→                  </div>
+   630→                  <div className="macos-group-item flex items-center justify-between">
+   631→                    <span className="text-[13px]">CHAdeMO (50 kW)</span>
+   632→                    <span className="text-[13px] font-semibold tabular-nums">{formatPKR(178000)}</span>
+   633→                  </div>
+   634→                  <div className="macos-group-item flex items-center justify-between">
+   635→                    <span className="text-[13px]">Type 2 (22 kW)</span>
+   636→                    <span className="text-[13px] font-semibold tabular-nums">{formatPKR(132000)}</span>
+   637→                  </div>
+   638→                </div>
+   639→              </div>
+   640→              <div className="macos-card p-4">
+   641→                <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">CNG Revenue by Station</h4>
+   642→                <div className="macos-group">
+   643→                  <div className="macos-group-item flex items-center justify-between">
+   644→                    <span className="text-[13px]">CNG Hub Faisalabad</span>
+   645→                    <span className="text-[13px] font-semibold tabular-nums">{formatPKR(1280000)}</span>
+   646→                  </div>
+   647→                  <div className="macos-group-item flex items-center justify-between">
+   648→                    <span className="text-[13px]">Downtown Station</span>
+   649→                    <span className="text-[13px] font-semibold tabular-nums">{formatPKR(280000)}</span>
+   650→                  </div>
+   651→                </div>
+   652→              </div>
+   653→            </div>
+   654→          </motion.div>
+   655→        )}
+   656→      </AnimatePresence>
+   657→    </div>
+   658→  )
+   659→}
+   660→

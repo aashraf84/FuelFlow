@@ -1,0 +1,1038 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useCallback } from 'react'
+     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→import {
+     6→  Fuel,
+     7→  Play,
+     8→  Square,
+     9→  RotateCcw,
+    10→  AlertTriangle,
+    11→  OctagonX,
+    12→  Cpu,
+    13→  Wifi,
+    14→  WifiOff,
+    15→  Clock,
+    16→  Activity,
+    17→  ChevronRight,
+    18→  Droplets,
+    19→  Zap,
+    20→  DollarSign,
+    21→  ArrowUpRight,
+    22→  Radio,
+    23→  CheckCircle2,
+    24→  XCircle,
+    25→  Timer,
+    26→  Gauge,
+    27→  Hash,
+    28→  Send,
+    29→  ShieldAlert,
+    30→  Tag,
+    31→  Server,
+    32→  Cable,
+    33→  RefreshCw,
+    34→} from 'lucide-react'
+    35→import { Badge } from '@/components/ui/badge'
+    36→import { ScrollArea } from '@/components/ui/scroll-area'
+    37→import { Separator } from '@/components/ui/separator'
+    38→import { useAppStore } from '@/stores/app-store'
+    39→
+    40→// ── Types ──────────────────────────────────────────────────
+    41→
+    42→type DispenserStatus = 'idle' | 'dispensing' | 'error' | 'offline'
+    43→type NozzleStatus = 'idle' | 'dispensing' | 'error' | 'offline'
+    44→type CommandStatus = 'pending' | 'sent' | 'acknowledged' | 'failed'
+    45→
+    46→interface Nozzle {
+    47→  id: string
+    48→  nozzleNumber: number
+    49→  fuelType: string
+    50→  fuelGrade: string
+    51→  pricePerLitre: number
+    52→  status: NozzleStatus
+    53→  totalVolume: number
+    54→  lastTransactionVolume: number
+    55→  lastTransactionAmount: number
+    56→}
+    57→
+    58→interface Dispenser {
+    59→  id: string
+    60→  name: string
+    61→  code: string
+    62→  status: DispenserStatus
+    63→  pumpLane: number
+    64→  nozzles: Nozzle[]
+    65→  currentVolume?: number
+    66→  currentAmount?: number
+    67→  flowRate?: number
+    68→  lastCommunication: string
+    69→}
+    70→
+    71→interface CommandQueueEntry {
+    72→  id: string
+    73→  command: string
+    74→  target: string
+    75→  status: CommandStatus
+    76→  timestamp: string
+    77→}
+    78→
+    79→interface NozzleEvent {
+    80→  id: string
+    81→  nozzleId: string
+    82→  eventType: string
+    83→  volume: number | null
+    84→  fuelType: string | null
+    85→  isAuthorized: boolean
+    86→  createdAt: string
+    87→  nozzle?: {
+    88→    id: string
+    89→    nozzleNumber: number
+    90→    fuelType: string
+    91→    dispenser?: { name: string; code: string }
+    92→  }
+    93→}
+    94→
+    95→// ── Status Config ──────────────────────────────────────────
+    96→
+    97→const STATUS_CONFIG: Record<DispenserStatus, { label: string; borderClass: string; dotClass: string; bgClass: string }> = {
+    98→  idle: {
+    99→    label: 'Idle',
+   100→    borderClass: 'border-teal-400/40',
+   101→    dotClass: 'macos-status-dot macos-status-warning',
+   102→    bgClass: 'bg-teal-500/5',
+   103→  },
+   104→  dispensing: {
+   105→    label: 'Dispensing',
+   106→    borderClass: 'border-emerald-400/50',
+   107→    dotClass: 'macos-status-dot macos-status-online',
+   108→    bgClass: 'bg-emerald-500/5',
+   109→  },
+   110→  error: {
+   111→    label: 'Error',
+   112→    borderClass: 'border-red-400/50',
+   113→    dotClass: 'macos-status-dot macos-status-error',
+   114→    bgClass: 'bg-red-500/5',
+   115→  },
+   116→  offline: {
+   117→    label: 'Offline',
+   118→    borderClass: 'border-gray-300/40 dark:border-gray-600/40',
+   119→    dotClass: 'macos-status-dot macos-status-offline',
+   120→    bgClass: 'bg-gray-500/5',
+   121→  },
+   122→}
+   123→
+   124→const NOZZLE_STATUS_CONFIG: Record<NozzleStatus, { label: string; dotClass: string }> = {
+   125→  idle: { label: 'Idle', dotClass: 'macos-status-dot macos-status-warning' },
+   126→  dispensing: { label: 'Dispensing', dotClass: 'macos-status-dot macos-status-online' },
+   127→  error: { label: 'Error', dotClass: 'macos-status-dot macos-status-error' },
+   128→  offline: { label: 'Offline', dotClass: 'macos-status-dot macos-status-offline' },
+   129→}
+   130→
+   131→const COMMAND_STATUS_CONFIG: Record<CommandStatus, { label: string; icon: typeof CheckCircle2; colorClass: string }> = {
+   132→  pending: { label: 'Pending', icon: Timer, colorClass: 'text-teal-500' },
+   133→  sent: { label: 'Sent', icon: Send, colorClass: 'text-sky-500' },
+   134→  acknowledged: { label: 'ACK', icon: CheckCircle2, colorClass: 'text-emerald-500' },
+   135→  failed: { label: 'Failed', icon: XCircle, colorClass: 'text-red-500' },
+   136→}
+   137→
+   138→// ── Framer Motion Variants ─────────────────────────────────
+   139→
+   140→const cardVariants = {
+   141→  hidden: { opacity: 0, y: 8, scale: 0.98 },
+   142→  visible: (i: number) => ({
+   143→    opacity: 1,
+   144→    y: 0,
+   145→    scale: 1,
+   146→    transition: { delay: i * 0.04, duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
+   147→  }),
+   148→}
+   149→
+   150→const sectionVariants = {
+   151→  hidden: { opacity: 0, y: 10 },
+   152→  visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.25, 0.1, 0.25, 1] } },
+   153→}
+   154→
+   155→// ── Helpers ──────────────────────────────────────────────────
+   156→
+   157→function mapApiDispenserStatus(status: string): DispenserStatus {
+   158→  if (status === 'dispensing' || status === 'active') return 'dispensing'
+   159→  if (status === 'error' || status === 'fault') return 'error'
+   160→  if (status === 'offline' || status === 'disconnected') return 'offline'
+   161→  return 'idle'
+   162→}
+   163→
+   164→function mapApiNozzleStatus(status: string): NozzleStatus {
+   165→  if (status === 'dispensing' || status === 'active') return 'dispensing'
+   166→  if (status === 'error' || status === 'fault') return 'error'
+   167→  if (status === 'offline' || status === 'disconnected') return 'offline'
+   168→  return 'idle'
+   169→}
+   170→
+   171→function timeAgo(dateStr: string): string {
+   172→  if (!dateStr) return '—'
+   173→  const now = new Date()
+   174→  const date = new Date(dateStr)
+   175→  const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000)
+   176→  if (diffSec < 60) return `${diffSec} sec ago`
+   177→  if (diffSec < 3600) return `${Math.floor(diffSec / 60)} min ago`
+   178→  return `${Math.floor(diffSec / 3600)} hr ago`
+   179→}
+   180→
+   181→function formatTime(iso: string): string {
+   182→  return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+   183→}
+   184→
+   185→// ── Skeleton ───────────────────────────────────────────────
+   186→
+   187→function SkeletonCard() {
+   188→  return (
+   189→    <div className="macos-card p-4 space-y-3 animate-pulse">
+   190→      <div className="flex items-center justify-between">
+   191→        <div className="h-4 w-28 rounded bg-muted/30" />
+   192→        <div className="h-3 w-12 rounded bg-muted/30" />
+   193→      </div>
+   194→      <div className="space-y-2">
+   195→        <div className="h-8 rounded bg-muted/20" />
+   196→        <div className="h-8 rounded bg-muted/20" />
+   197→      </div>
+   198→    </div>
+   199→  )
+   200→}
+   201→
+   202→function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => void }) {
+   203→  return (
+   204→    <div className="macos-card p-5">
+   205→      <div className="flex flex-col items-center gap-3 text-center">
+   206→        <AlertTriangle className="size-8 text-teal-500" />
+   207→        <p className="text-[13px] text-muted-foreground">{message}</p>
+   208→        <button onClick={onRetry} className="macos-btn gap-1.5">
+   209→          <RefreshCw className="size-3.5" /> Retry
+   210→        </button>
+   211→      </div>
+   212→    </div>
+   213→  )
+   214→}
+   215→
+   216→// ── Sub-Components ─────────────────────────────────────────
+   217→
+   218→function DispenserCard({ dispenser, index, selected, onSelect }: {
+   219→  dispenser: Dispenser
+   220→  index: number
+   221→  selected: boolean
+   222→  onSelect: () => void
+   223→}) {
+   224→  const cfg = STATUS_CONFIG[dispenser.status]
+   225→  const isDispensing = dispenser.status === 'dispensing'
+   226→  const isOffline = dispenser.status === 'offline'
+   227→  const isError = dispenser.status === 'error'
+   228→
+   229→  return (
+   230→    <motion.div
+   231→      custom={index}
+   232→      variants={cardVariants}
+   233→      initial="hidden"
+   234→      animate="visible"
+   235→      whileHover={{ y: -2, transition: { duration: 0.15 } }}
+   236→      whileTap={{ scale: 0.985 }}
+   237→      onClick={onSelect}
+   238→      className={`macos-card cursor-pointer overflow-hidden border-2 transition-colors duration-200 ${
+   239→        selected ? 'border-[var(--macos-accent)]' : cfg.borderClass
+   240→      } ${isOffline ? 'opacity-60' : ''}`}
+   241→    >
+   242→      {/* Header */}
+   243→      <div className={`px-4 py-3 ${cfg.bgClass}`}>
+   244→        <div className="flex items-center justify-between">
+   245→          <div className="flex items-center gap-2">
+   246→            <Fuel className={`size-4 ${isDispensing ? 'text-emerald-500' : isError ? 'text-red-500' : isOffline ? 'text-gray-400' : 'text-teal-500'}`} />
+   247→            <span className="text-[13px] font-semibold text-foreground">{dispenser.name}</span>
+   248→            <span className="text-[11px] text-muted-foreground font-mono">{dispenser.code}</span>
+   249→          </div>
+   250→          <div className="flex items-center gap-1.5">
+   251→            <div className={cfg.dotClass} />
+   252→            <span className="text-[11px] font-medium text-muted-foreground">{cfg.label}</span>
+   253→          </div>
+   254→        </div>
+   255→        <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+   256→          <span>Lane {dispenser.pumpLane}</span>
+   257→          <span className="text-border">|</span>
+   258→          <span>{dispenser.nozzles.length} nozzle{dispenser.nozzles.length > 1 ? 's' : ''}</span>
+   259→          <span className="text-border">|</span>
+   260→          <span className="flex items-center gap-1">
+   261→            <Radio className="size-3" />
+   262→            {dispenser.lastCommunication}
+   263→          </span>
+   264→        </div>
+   265→      </div>
+   266→
+   267→      {/* Nozzles */}
+   268→      <div className="px-4 py-3 space-y-2">
+   269→        {dispenser.nozzles.map((nozzle) => {
+   270→          const nCfg = NOZZLE_STATUS_CONFIG[nozzle.status]
+   271→          const isActiveNozzle = nozzle.status === 'dispensing'
+   272→          return (
+   273→            <div
+   274→              key={nozzle.id}
+   275→              className={`flex items-center justify-between rounded-lg px-3 py-2 transition-colors ${
+   276→                isActiveNozzle ? 'bg-emerald-500/8 dark:bg-emerald-500/10' : 'bg-black/[0.02] dark:bg-white/[0.03]'
+   277→              }`}
+   278→            >
+   279→              <div className="flex items-center gap-2.5">
+   280→                <Droplets className={`size-3.5 ${isActiveNozzle ? 'text-emerald-500' : 'text-muted-foreground'}`} />
+   281→                <div>
+   282→                  <div className="flex items-center gap-1.5">
+   283→                    <span className="text-[13px] font-medium text-foreground">N{nozzle.nozzleNumber}</span>
+   284→                    <span className="text-[11px] text-muted-foreground">{nozzle.fuelGrade}</span>
+   285→                  </div>
+   286→                  <span className="text-[11px] text-muted-foreground">PKR {nozzle.pricePerLitre.toFixed(2)}/L</span>
+   287→                </div>
+   288→              </div>
+   289→              <div className="flex items-center gap-2">
+   290→                <div className="text-right">
+   291→                  <p className="text-[12px] font-mono text-foreground">
+   292→                    {nozzle.totalVolume.toLocaleString('en-PK', { maximumFractionDigits: 1 })} L
+   293→                  </p>
+   294→                </div>
+   295→                <div className={nCfg.dotClass} />
+   296→              </div>
+   297→            </div>
+   298→          )
+   299→        })}
+   300→      </div>
+   301→
+   302→      {/* Live Transaction (when dispensing) */}
+   303→      {isDispensing && dispenser.currentVolume !== undefined && (
+   304→        <motion.div
+   305→          initial={{ opacity: 0, height: 0 }}
+   306→          animate={{ opacity: 1, height: 'auto' }}
+   307→          exit={{ opacity: 0, height: 0 }}
+   308→          className="border-t border-emerald-500/15 bg-emerald-500/[0.03] px-4 py-3"
+   309→        >
+   310→          <div className="flex items-center gap-1.5 mb-2">
+   311→            <Activity className="size-3.5 text-emerald-500" />
+   312→            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Live Transaction</span>
+   313→          </div>
+   314→          <div className="grid grid-cols-3 gap-3">
+   315→            <div>
+   316→              <p className="text-[11px] text-muted-foreground">Volume</p>
+   317→              <p className="text-[15px] font-semibold text-foreground font-mono">
+   318→                {dispenser.currentVolume.toFixed(2)} <span className="text-[11px] text-muted-foreground font-normal">L</span>
+   319→              </p>
+   320→            </div>
+   321→            <div>
+   322→              <p className="text-[11px] text-muted-foreground">Amount</p>
+   323→              <p className="text-[15px] font-semibold text-foreground font-mono">
+   324→                PKR {dispenser.currentAmount!.toLocaleString('en-PK', { maximumFractionDigits: 0 })}
+   325→              </p>
+   326→            </div>
+   327→            <div>
+   328→              <p className="text-[11px] text-muted-foreground">Flow Rate</p>
+   329→              <p className="text-[15px] font-semibold text-foreground font-mono">
+   330→                {dispenser.flowRate!.toFixed(1)} <span className="text-[11px] text-muted-foreground font-normal">L/m</span>
+   331→              </p>
+   332→            </div>
+   333→          </div>
+   334→        </motion.div>
+   335→      )}
+   336→
+   337→      {/* Error Banner */}
+   338→      {isError && (
+   339→        <div className="border-t border-red-500/15 bg-red-500/[0.03] px-4 py-2.5">
+   340→          <div className="flex items-center gap-1.5">
+   341→            <AlertTriangle className="size-3.5 text-red-500" />
+   342→            <span className="text-[11px] font-medium text-red-600 dark:text-red-400">Communication error — pump unresponsive</span>
+   343→          </div>
+   344→        </div>
+   345→      )}
+   346→
+   347→      {/* Offline Banner */}
+   348→      {isOffline && (
+   349→        <div className="border-t border-gray-300/15 dark:border-gray-600/15 bg-gray-500/[0.03] px-4 py-2.5">
+   350→          <div className="flex items-center gap-1.5">
+   351→            <WifiOff className="size-3.5 text-gray-400" />
+   352→            <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400">Controller offline — no communication</span>
+   353→          </div>
+   354→        </div>
+   355→      )}
+   356→    </motion.div>
+   357→  )
+   358→}
+   359→
+   360→function NozzleStatusTable({ dispensers }: { dispensers: Dispenser[] }) {
+   361→  const allNozzles = dispensers.flatMap((d) =>
+   362→    d.nozzles.map((n) => ({
+   363→      ...n,
+   364→      dispenserName: d.name,
+   365→      dispenserCode: d.code,
+   366→    }))
+   367→  )
+   368→
+   369→  return (
+   370→    <motion.div variants={sectionVariants} initial="hidden" animate="visible">
+   371→      <div className="macos-card overflow-hidden">
+   372→        <div className="px-5 py-4 border-b border-border">
+   373→          <div className="flex items-center justify-between">
+   374→            <div>
+   375→              <h3 className="text-[13px] font-semibold text-foreground">Nozzle Status</h3>
+   376→              <p className="text-[11px] text-muted-foreground mt-0.5">{allNozzles.length} nozzles across {dispensers.length} dispensers</p>
+   377→            </div>
+   378→            <Badge variant="outline" className="text-[11px] rounded-md px-2 py-0.5 font-medium border-teal-500/20 text-teal-600 dark:text-teal-400">
+   379→              <Hash className="size-3 mr-1" />
+   380→              {allNozzles.filter((n) => n.status === 'dispensing').length} Active
+   381→            </Badge>
+   382→          </div>
+   383→        </div>
+   384→        <ScrollArea className="max-h-96">
+   385→          <table className="macos-table">
+   386→            <thead>
+   387→              <tr>
+   388→                <th>Dispenser</th>
+   389→                <th>Nozzle</th>
+   390→                <th>Fuel Type</th>
+   391→                <th>Status</th>
+   392→                <th className="text-right">Total Volume</th>
+   393→                <th className="text-right">Last Txn</th>
+   394→              </tr>
+   395→            </thead>
+   396→            <tbody>
+   397→              {allNozzles.map((nozzle) => {
+   398→                const nCfg = NOZZLE_STATUS_CONFIG[nozzle.status]
+   399→                return (
+   400→                  <tr key={nozzle.id}>
+   401→                    <td>
+   402→                      <div className="flex items-center gap-2">
+   403→                        <Fuel className="size-3.5 text-muted-foreground" />
+   404→                        <span className="font-medium">{nozzle.dispenserName}</span>
+   405→                      </div>
+   406→                    </td>
+   407→                    <td>
+   408→                      <span className="inline-flex items-center gap-1.5">
+   409→                        <Droplets className="size-3 text-muted-foreground" />
+   410→                        N{nozzle.nozzleNumber}
+   411→                      </span>
+   412→                    </td>
+   413→                    <td>
+   414→                      <div>
+   415→                        <span className="text-[13px]">{nozzle.fuelType}</span>
+   416→                        <span className="text-[11px] text-muted-foreground ml-1.5">{nozzle.fuelGrade}</span>
+   417→                      </div>
+   418→                    </td>
+   419→                    <td>
+   420→                      <div className="flex items-center gap-1.5">
+   421→                        <div className={nCfg.dotClass} />
+   422→                        <span className="text-[12px]">{nCfg.label}</span>
+   423→                      </div>
+   424→                    </td>
+   425→                    <td className="text-right font-mono text-[12px]">
+   426→                      {nozzle.totalVolume.toLocaleString('en-PK', { maximumFractionDigits: 1 })} L
+   427→                    </td>
+   428→                    <td className="text-right">
+   429→                      <div className="text-[12px] font-mono">
+   430→                        {nozzle.lastTransactionVolume} L
+   431→                      </div>
+   432→                      <div className="text-[11px] text-muted-foreground">
+   433→                        PKR {nozzle.lastTransactionAmount.toLocaleString('en-PK')}
+   434→                      </div>
+   435→                    </td>
+   436→                  </tr>
+   437→                )
+   438→              })}
+   439→            </tbody>
+   440→          </table>
+   441→        </ScrollArea>
+   442→      </div>
+   443→    </motion.div>
+   444→  )
+   445→}
+   446→
+   447→function ControllerStatusPanel({ dispensers }: { dispensers: Dispenser[] }) {
+   448→  const connectedCount = dispensers.filter(d => d.status !== 'offline').length
+   449→  return (
+   450→    <motion.div variants={sectionVariants} initial="hidden" animate="visible">
+   451→      <div className="macos-card overflow-hidden">
+   452→        <div className="px-5 py-4 border-b border-border">
+   453→          <div className="flex items-center gap-2">
+   454→            <Server className="size-4 text-[var(--macos-accent)]" />
+   455→            <h3 className="text-[13px] font-semibold text-foreground">Forecourt Controller</h3>
+   456→          </div>
+   457→        </div>
+   458→        <div className="p-5 space-y-4">
+   459→          {/* Connection Status */}
+   460→          <div className="flex items-center justify-between">
+   461→            <div className="flex items-center gap-2">
+   462→              <div className={`macos-status-dot ${connectedCount > 0 ? 'macos-status-online' : 'macos-status-error'}`} />
+   463→              <span className="text-[13px] font-medium text-foreground">{connectedCount > 0 ? 'Connected' : 'Disconnected'}</span>
+   464→            </div>
+   465→            <Badge variant="outline" className={`text-[11px] rounded-md px-2 py-0.5 font-medium ${connectedCount > 0 ? 'border-emerald-500/20 text-emerald-600 dark:text-emerald-400 bg-emerald-500/5' : 'border-red-500/20 text-red-600 bg-red-500/5'}`}>
+   466→              {connectedCount > 0 ? 'Online' : 'Offline'}
+   467→            </Badge>
+   468→          </div>
+   469→
+   470→          <Separator />
+   471→
+   472→          {/* Controller Details */}
+   473→          <div className="grid grid-cols-2 gap-4">
+   474→            <div className="space-y-3">
+   475→              <div>
+   476→                <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-medium">Controller Type</p>
+   477→                <div className="flex items-center gap-1.5 mt-0.5">
+   478→                  <Cpu className="size-3.5 text-muted-foreground" />
+   479→                  <span className="text-[13px] font-medium text-foreground">PTS-2</span>
+   480→                </div>
+   481→              </div>
+   482→              <div>
+   483→                <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-medium">Protocol</p>
+   484→                <div className="flex items-center gap-1.5 mt-0.5">
+   485→                  <Cable className="size-3.5 text-muted-foreground" />
+   486→                  <span className="text-[13px] font-medium text-foreground">IFSF</span>
+   487→                </div>
+   488→              </div>
+   489→              <div>
+   490→                <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-medium">Last Poll</p>
+   491→                <div className="flex items-center gap-1.5 mt-0.5">
+   492→                  <Clock className="size-3.5 text-muted-foreground" />
+   493→                  <span className="text-[13px] font-medium text-foreground">2 sec ago</span>
+   494→                </div>
+   495→              </div>
+   496→            </div>
+   497→            <div className="space-y-3">
+   498→              <div>
+   499→                <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-medium">IP Address</p>
+   500→                <div className="flex items-center gap-1.5 mt-0.5">
+   501→                  <Wifi className="size-3.5 text-muted-foreground" />
+   502→                  <span className="text-[13px] font-mono text-foreground">192.168.1.100</span>
+   503→                </div>
+   504→              </div>
+   505→              <div>
+   506→                <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-medium">Connected Dispensers</p>
+   507→                <div className="flex items-center gap-1.5 mt-0.5">
+   508→                  <Fuel className="size-3.5 text-muted-foreground" />
+   509→                  <span className="text-[13px] font-medium text-foreground">{connectedCount} / {dispensers.length}</span>
+   510→                </div>
+   511→              </div>
+   512→              <div>
+   513→                <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-medium">Active Commands</p>
+   514→                <div className="flex items-center gap-1.5 mt-0.5">
+   515→                  <Zap className="size-3.5 text-[var(--macos-accent)]" />
+   516→                  <span className="text-[13px] font-medium text-foreground">{dispensers.filter(d => d.status === 'dispensing').length}</span>
+   517→                </div>
+   518→              </div>
+   519→            </div>
+   520→          </div>
+   521→
+   522→          <Separator />
+   523→
+   524→          {/* Dispenser Connectivity Bar */}
+   525→          <div>
+   526→            <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-medium mb-2">Dispenser Connectivity</p>
+   527→            <div className={`grid gap-1.5 ${dispensers.length <= 4 ? 'grid-cols-4' : dispensers.length <= 6 ? 'grid-cols-6' : 'grid-cols-8'}`}>
+   528→              {dispensers.map((d) => {
+   529→                const isOn = d.status !== 'offline'
+   530→                return (
+   531→                  <div
+   532→                    key={d.id}
+   533→                    className={`flex flex-col items-center gap-1 rounded-md px-1 py-1.5 ${
+   534→                      isOn ? 'bg-emerald-500/8 dark:bg-emerald-500/10' : 'bg-red-500/8 dark:bg-red-500/10'
+   535→                    }`}
+   536→                  >
+   537→                    <div className={`macos-status-dot ${isOn ? 'macos-status-online' : 'macos-status-error'}`} />
+   538→                    <span className="text-[10px] font-medium text-muted-foreground">{d.name.replace('Dispenser ', '')}</span>
+   539→                  </div>
+   540→                )
+   541→              })}
+   542→            </div>
+   543→          </div>
+   544→        </div>
+   545→      </div>
+   546→    </motion.div>
+   547→  )
+   548→}
+   549→
+   550→function CommandQueuePanel({ commandQueue }: { commandQueue: CommandQueueEntry[] }) {
+   551→  return (
+   552→    <motion.div variants={sectionVariants} initial="hidden" animate="visible">
+   553→      <div className="macos-card overflow-hidden">
+   554→        <div className="px-5 py-4 border-b border-border">
+   555→          <div className="flex items-center justify-between">
+   556→            <div className="flex items-center gap-2">
+   557→              <Radio className="size-4 text-[var(--macos-accent)]" />
+   558→              <h3 className="text-[13px] font-semibold text-foreground">Command Queue</h3>
+   559→            </div>
+   560→            <Badge variant="outline" className="text-[11px] rounded-md px-2 py-0.5 font-medium">
+   561→              {commandQueue.length} Recent
+   562→            </Badge>
+   563→          </div>
+   564→        </div>
+   565→        {commandQueue.length === 0 ? (
+   566→          <div className="p-5 text-center text-[12px] text-muted-foreground">No recent commands</div>
+   567→        ) : (
+   568→          <ScrollArea className="max-h-80">
+   569→            <div className="divide-y divide-border">
+   570→              {commandQueue.map((cmd) => {
+   571→                const cfg = COMMAND_STATUS_CONFIG[cmd.status]
+   572→                const StatusIcon = cfg.icon
+   573→                return (
+   574→                  <div
+   575→                    key={cmd.id}
+   576→                    className="flex items-center gap-3 px-5 py-3 hover:bg-black/[0.015] dark:hover:bg-white/[0.02] transition-colors"
+   577→                  >
+   578→                    <StatusIcon className={`size-4 shrink-0 ${cfg.colorClass}`} />
+   579→                    <div className="flex-1 min-w-0">
+   580→                      <div className="flex items-center gap-2">
+   581→                        <span className="text-[13px] font-medium text-foreground">{cmd.command}</span>
+   582→                        <span className="text-[11px] text-muted-foreground">→</span>
+   583→                        <span className="text-[12px] text-muted-foreground truncate">{cmd.target}</span>
+   584→                      </div>
+   585→                    </div>
+   586→                    <div className="flex items-center gap-3 shrink-0">
+   587→                      <span className={`text-[11px] font-semibold ${cfg.colorClass}`}>{cfg.label}</span>
+   588→                      <span className="text-[11px] text-muted-foreground font-mono">{cmd.timestamp}</span>
+   589→                    </div>
+   590→                  </div>
+   591→                )
+   592→              })}
+   593→            </div>
+   594→          </ScrollArea>
+   595→        )}
+   596→      </div>
+   597→    </motion.div>
+   598→  )
+   599→}
+   600→
+   601→function QuickActions({ selectedDispenser }: { selectedDispenser: Dispenser | null }) {
+   602→  const actions = [
+   603→    {
+   604→      label: 'Authorize Pump',
+   605→      icon: Play,
+   606→      className: 'macos-btn',
+   607→      disabled: !selectedDispenser || selectedDispenser.status === 'dispensing' || selectedDispenser.status === 'offline',
+   608→    },
+   609→    {
+   610→      label: 'Stop Pump',
+   611→      icon: Square,
+   612→      className: 'macos-btn-secondary',
+   613→      disabled: !selectedDispenser || selectedDispenser.status !== 'dispensing',
+   614→    },
+   615→    {
+   616→      label: 'Reset Pump',
+   617→      icon: RotateCcw,
+   618→      className: 'macos-btn-secondary',
+   619→      disabled: !selectedDispenser || selectedDispenser.status !== 'error',
+   620→    },
+   621→    {
+   622→      label: 'Price Change',
+   623→      icon: Tag,
+   624→      className: 'macos-btn-secondary',
+   625→      disabled: false,
+   626→    },
+   627→    {
+   628→      label: 'Emergency Stop',
+   629→      icon: OctagonX,
+   630→      className: 'bg-red-500 hover:bg-red-600 active:bg-red-700 text-white inline-flex items-center justify-center rounded-lg px-4 py-1.5 text-[13px] font-medium transition-all duration-150 shadow-sm active:scale-[0.98]',
+   631→      disabled: false,
+   632→    },
+   633→  ]
+   634→
+   635→  return (
+   636→    <motion.div variants={sectionVariants} initial="hidden" animate="visible">
+   637→      <div className="macos-card overflow-hidden">
+   638→        <div className="px-5 py-4 border-b border-border">
+   639→          <div className="flex items-center gap-2">
+   640→            <Zap className="size-4 text-[var(--macos-accent)]" />
+   641→            <h3 className="text-[13px] font-semibold text-foreground">Quick Actions</h3>
+   642→            {selectedDispenser && (
+   643→              <Badge variant="outline" className="text-[11px] rounded-md px-2 py-0.5 font-medium ml-1">
+   644→                {selectedDispenser.name}
+   645→              </Badge>
+   646→            )}
+   647→          </div>
+   648→          {!selectedDispenser && (
+   649→            <p className="text-[11px] text-muted-foreground mt-1">Select a dispenser to enable pump controls</p>
+   650→          )}
+   651→        </div>
+   652→        <div className="p-5">
+   653→          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+   654→            {actions.map((action) => {
+   655→              const Icon = action.icon
+   656→              return (
+   657→                <motion.button
+   658→                  key={action.label}
+   659→                  whileHover={{ scale: action.disabled ? 1 : 1.02 }}
+   660→                  whileTap={{ scale: action.disabled ? 1 : 0.97 }}
+   661→                  className={`${action.className} gap-2 w-full ${action.disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+   662→                  disabled={action.disabled}
+   663→                >
+   664→                  <Icon className="size-4" />
+   665→                  {action.label}
+   666→                </motion.button>
+   667→              )
+   668→            })}
+   669→          </div>
+   670→        </div>
+   671→      </div>
+   672→    </motion.div>
+   673→  )
+   674→}
+   675→
+   676→// ── Detail Drawer ──────────────────────────────────────────
+   677→
+   678→function DispenserDetailPanel({ dispenser, onClose }: { dispenser: Dispenser; onClose: () => void }) {
+   679→  const cfg = STATUS_CONFIG[dispenser.status]
+   680→
+   681→  return (
+   682→    <motion.div
+   683→      initial={{ opacity: 0, x: 20 }}
+   684→      animate={{ opacity: 1, x: 0 }}
+   685→      exit={{ opacity: 0, x: 20 }}
+   686→      transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+   687→      className="macos-card overflow-hidden"
+   688→    >
+   689→      <div className={`px-5 py-4 ${cfg.bgClass} border-b border-border`}>
+   690→        <div className="flex items-center justify-between">
+   691→          <div className="flex items-center gap-2.5">
+   692→            <Fuel className={`size-5 ${dispenser.status === 'dispensing' ? 'text-emerald-500' : dispenser.status === 'error' ? 'text-red-500' : 'text-[var(--macos-accent)]'}`} />
+   693→            <div>
+   694→              <h3 className="text-[13px] font-semibold text-foreground">{dispenser.name}</h3>
+   695→              <p className="text-[11px] text-muted-foreground">{dispenser.code} • Lane {dispenser.pumpLane}</p>
+   696→            </div>
+   697→          </div>
+   698→          <button
+   699→            onClick={onClose}
+   700→            className="flex items-center justify-center size-6 rounded-md hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition-colors"
+   701→          >
+   702→            <ChevronRight className="size-4 text-muted-foreground rotate-180" />
+   703→          </button>
+   704→        </div>
+   705→      </div>
+   706→
+   707→      <div className="p-5 space-y-4">
+   708→        {/* Status */}
+   709→        <div className="flex items-center justify-between">
+   710→          <span className="text-[11px] text-muted-foreground uppercase tracking-wide font-medium">Status</span>
+   711→          <div className="flex items-center gap-1.5">
+   712→            <div className={cfg.dotClass} />
+   713→            <span className="text-[13px] font-medium">{cfg.label}</span>
+   714→          </div>
+   715→        </div>
+   716→
+   717→        <Separator />
+   718→
+   719→        {/* Nozzles Detail */}
+   720→        <div>
+   721→          <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-medium mb-2">Nozzles</p>
+   722→          <div className="space-y-2">
+   723→            {dispenser.nozzles.map((nozzle) => (
+   724→              <div key={nozzle.id} className="macos-group">
+   725→                <div className="macos-group-item">
+   726→                  <div className="flex items-center justify-between">
+   727→                    <div className="flex items-center gap-2">
+   728→                      <Droplets className="size-3.5 text-muted-foreground" />
+   729→                      <span className="text-[13px] font-medium">Nozzle {nozzle.nozzleNumber}</span>
+   730→                    </div>
+   731→                    <div className={NOZZLE_STATUS_CONFIG[nozzle.status].dotClass} />
+   732→                  </div>
+   733→                  <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1.5">
+   734→                    <div className="flex justify-between">
+   735→                      <span className="text-[11px] text-muted-foreground">Fuel</span>
+   736→                      <span className="text-[11px] font-medium">{nozzle.fuelGrade}</span>
+   737→                    </div>
+   738→                    <div className="flex justify-between">
+   739→                      <span className="text-[11px] text-muted-foreground">Price</span>
+   740→                      <span className="text-[11px] font-medium font-mono">PKR {nozzle.pricePerLitre.toFixed(2)}</span>
+   741→                    </div>
+   742→                    <div className="flex justify-between">
+   743→                      <span className="text-[11px] text-muted-foreground">Totalizer</span>
+   744→                      <span className="text-[11px] font-medium font-mono">{nozzle.totalVolume.toLocaleString('en-PK', { maximumFractionDigits: 1 })} L</span>
+   745→                    </div>
+   746→                    <div className="flex justify-between">
+   747→                      <span className="text-[11px] text-muted-foreground">Last Txn</span>
+   748→                      <span className="text-[11px] font-medium font-mono">{nozzle.lastTransactionVolume} L / PKR {nozzle.lastTransactionAmount.toLocaleString('en-PK')}</span>
+   749→                    </div>
+   750→                  </div>
+   751→                </div>
+   752→              </div>
+   753→            ))}
+   754→          </div>
+   755→        </div>
+   756→
+   757→        <Separator />
+   758→
+   759→        {/* Communication */}
+   760→        <div className="grid grid-cols-2 gap-3">
+   761→          <div className="flex items-center gap-1.5">
+   762→            <Clock className="size-3.5 text-muted-foreground" />
+   763→            <span className="text-[11px] text-muted-foreground">Last Comm:</span>
+   764→            <span className="text-[11px] font-medium">{dispenser.lastCommunication}</span>
+   765→          </div>
+   766→          <div className="flex items-center gap-1.5">
+   767→            <Gauge className="size-3.5 text-muted-foreground" />
+   768→            <span className="text-[11px] text-muted-foreground">Protocol:</span>
+   769→            <span className="text-[11px] font-medium">IFSF</span>
+   770→          </div>
+   771→        </div>
+   772→      </div>
+   773→    </motion.div>
+   774→  )
+   775→}
+   776→
+   777→// ── Main Component ─────────────────────────────────────────
+   778→
+   779→export default function ForecourtModule() {
+   780→  const [selectedDispenserId, setSelectedDispenserId] = useState<string | null>(null)
+   781→  const { selectedStation } = useAppStore()
+   782→
+   783→  // Data state
+   784→  const [dispensers, setDispensers] = useState<Dispenser[]>([])
+   785→  const [commandQueue, setCommandQueue] = useState<CommandQueueEntry[]>([])
+   786→  const [loading, setLoading] = useState(true)
+   787→  const [error, setError] = useState<string | null>(null)
+   788→
+   789→  const fetchData = useCallback(async () => {
+   790→    setLoading(true)
+   791→    setError(null)
+   792→    try {
+   793→      const stationParam = selectedStation && selectedStation !== 'all' ? `?stationId=${selectedStation}` : ''
+   794→
+   795→      const [dispRes, eventsRes] = await Promise.all([
+   796→        fetch(`/api/dispensers${stationParam ? `?stationId=${selectedStation}` : ''}`),
+   797→        fetch('/api/nozzle-events'),
+   798→      ])
+   799→
+   800→      if (!dispRes.ok) throw new Error('Failed to fetch dispensers')
+   801→
+   802→      const dispData = await dispRes.json()
+   803→      const eventsData = eventsRes.ok ? await eventsRes.json() : { events: [] }
+   804→
+   805→      // Map API dispensers to UI dispensers
+   806→      const mappedDispensers: Dispenser[] = (dispData.dispensers || []).map((d: Record<string, unknown>, idx: number) => {
+   807→        const apiStatus = mapApiDispenserStatus(d.status as string || 'idle')
+   808→        const nozzles = (d.nozzles || []) as Record<string, unknown>[]
+   809→        // Price defaults based on fuel type (PKR per litre)
+   810→        const priceMap: Record<string, number> = {
+   811→          petrol: 272.50, diesel: 285.00, hobc: 302.00, premium: 272.50, xl: 295.00,
+   812→        }
+   813→        return {
+   814→          id: d.id as string,
+   815→          name: (d.name as string) || `Dispenser ${idx + 1}`,
+   816→          code: (d.code as string) || `DSP-${String(idx + 1).padStart(3, '0')}`,
+   817→          status: apiStatus,
+   818→          pumpLane: (d.pumpLane as number) || Math.floor(idx / 2) + 1,
+   819→          nozzles: nozzles.map((n: Record<string, unknown>, nIdx: number) => {
+   820→            const fuelType = (n.fuelType as string) || 'petrol'
+   821→            const pricePerLitre = (n.pricePerLitre as number) || priceMap[fuelType.toLowerCase()] || 272.50
+   822→            const meterReading = (n.meterReading as number) || 0
+   823→            const previousReading = (n.previousReading as number) || 0
+   824→            const lastTxnVol = meterReading - previousReading
+   825→            return {
+   826→              id: n.id as string,
+   827→              nozzleNumber: (n.nozzleNumber as number) || nIdx + 1,
+   828→              fuelType: fuelType,
+   829→              fuelGrade: (n.fuelGrade as string) || fuelType.charAt(0).toUpperCase() + fuelType.slice(1),
+   830→              pricePerLitre,
+   831→              status: mapApiNozzleStatus((n.status as string) || 'idle'),
+   832→              totalVolume: (n.totalizer as number) || (n.totalVolume as number) || meterReading,
+   833→              lastTransactionVolume: lastTxnVol > 0 ? lastTxnVol : 0,
+   834→              lastTransactionAmount: lastTxnVol > 0 ? Math.round(lastTxnVol * pricePerLitre) : 0,
+   835→            }
+   836→          }),
+   837→          lastCommunication: (d.lastCommunication as string) || (d.updatedAt ? timeAgo(d.updatedAt as string) : '—'),
+   838→        }
+   839→      })
+   840→
+   841→      setDispensers(mappedDispensers)
+   842→
+   843→      // Build command queue from nozzle events
+   844→      const apiEvents = eventsData.events || []
+   845→      const cmdQueue: CommandQueueEntry[] = apiEvents
+   846→        .slice(0, 10)
+   847→        .map((evt: Record<string, unknown>, i: number) => {
+   848→          const eventType = evt.eventType as string || 'unknown'
+   849→          const nozzleInfo = evt.nozzle as Record<string, unknown> | undefined
+   850→          const dispenserInfo = nozzleInfo?.dispenser as Record<string, unknown> | undefined
+   851→          let command = eventType.toUpperCase().replace(/_/g, ' ')
+   852→          let cmdStatus: CommandStatus = evt.isAuthorized ? 'acknowledged' : 'failed'
+   853→          if (eventType === 'nozzle_up') command = 'AUTHORIZE'
+   854→          else if (eventType === 'nozzle_down') command = 'STOP'
+   855→          else if (eventType === 'fueling_start') command = 'AUTHORIZE'
+   856→          else if (eventType === 'fueling_end') command = 'STOP'
+   857→
+   858→          return {
+   859→            id: evt.id as string || `cmd-${i}`,
+   860→            command,
+   861→            target: dispenserInfo ? `${dispenserInfo.name} N${nozzleInfo?.nozzleNumber || '?'}` : `Nozzle ${evt.nozzleId}`,
+   862→            status: cmdStatus,
+   863→            timestamp: evt.createdAt ? formatTime(evt.createdAt as string) : '—',
+   864→          }
+   865→        })
+   866→
+   867→      setCommandQueue(cmdQueue)
+   868→    } catch (err) {
+   869→      console.error('ForecourtModule fetch error:', err)
+   870→      setError('Unable to load forecourt data. Please try again.')
+   871→    } finally {
+   872→      setLoading(false)
+   873→    }
+   874→  }, [selectedStation])
+   875→
+   876→  useEffect(() => {
+   877→    fetchData()
+   878→  }, [fetchData])
+   879→
+   880→  const selectedDispenser = dispensers.find((d) => d.id === selectedDispenserId) || null
+   881→
+   882→  // Summary stats
+   883→  const summary = {
+   884→    idle: dispensers.filter((d) => d.status === 'idle').length,
+   885→    dispensing: dispensers.filter((d) => d.status === 'dispensing').length,
+   886→    error: dispensers.filter((d) => d.status === 'error').length,
+   887→    offline: dispensers.filter((d) => d.status === 'offline').length,
+   888→  }
+   889→
+   890→  if (error) {
+   891→    return <ErrorBanner message={error} onRetry={fetchData} />
+   892→  }
+   893→
+   894→  return (
+   895→    <div className="space-y-5" style={{ fontStyle: 'normal !important' }}>
+   896→      {/* ── Header ── */}
+   897→      <motion.div
+   898→        initial={{ opacity: 0, y: -4 }}
+   899→        animate={{ opacity: 1, y: 0 }}
+   900→        transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+   901→        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+   902→      >
+   903→        <div className="flex items-center gap-3">
+   904→          <div className="flex size-9 items-center justify-center rounded-xl bg-[var(--macos-accent)]/10">
+   905→            <Fuel className="size-5 text-[var(--macos-accent)]" />
+   906→          </div>
+   907→          <div>
+   908→            <h2 className="text-[15px] font-semibold text-foreground tracking-tight">Forecourt Control</h2>
+   909→            <p className="text-[11px] text-muted-foreground">Real-time dispenser monitoring &amp; control</p>
+   910→          </div>
+   911→        </div>
+   912→
+   913→        <div className="flex items-center gap-3">
+   914→          {/* Live Status */}
+   915→          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/15">
+   916→            <div className="macos-status-dot macos-status-online" />
+   917→            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">LIVE</span>
+   918→          </div>
+   919→
+   920→          {/* Refresh */}
+   921→          <button onClick={fetchData} className="macos-btn-secondary gap-1 px-2 py-1.5" title="Refresh data">
+   922→            <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
+   923→          </button>
+   924→
+   925→          {/* Summary Pills */}
+   926→          <div className="hidden sm:flex items-center gap-1.5">
+   927→            {[
+   928→              { label: 'Dispensing', count: summary.dispensing, color: 'text-emerald-500' },
+   929→              { label: 'Idle', count: summary.idle, color: 'text-teal-500' },
+   930→              { label: 'Error', count: summary.error, color: 'text-red-500' },
+   931→              { label: 'Offline', count: summary.offline, color: 'text-gray-400' },
+   932→            ].map((item) => (
+   933→              <div key={item.label} className="flex items-center gap-1 px-2 py-1 rounded-md bg-black/[0.02] dark:bg-white/[0.03]">
+   934→                <span className={`text-[13px] font-semibold ${item.color}`}>{item.count}</span>
+   935→                <span className="text-[11px] text-muted-foreground">{item.label}</span>
+   936→              </div>
+   937→            ))}
+   938→          </div>
+   939→        </div>
+   940→      </motion.div>
+   941→
+   942→      {/* ── Dispenser Grid ── */}
+   943→      {loading ? (
+   944→        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+   945→          {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}
+   946→        </div>
+   947→      ) : dispensers.length === 0 ? (
+   948→        <div className="macos-card p-8 text-center">
+   949→          <Fuel className="size-8 text-muted-foreground mx-auto mb-3" />
+   950→          <p className="text-[13px] font-medium text-foreground">No dispensers found</p>
+   951→          <p className="text-[11px] text-muted-foreground mt-1">Dispensers will appear here once configured for your station.</p>
+   952→          <button className="macos-btn gap-1 mt-4 mx-auto" onClick={fetchData}>
+   953→            <RefreshCw className="size-3.5" /> Refresh
+   954→          </button>
+   955→        </div>
+   956→      ) : (
+   957→        <>
+   958→          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+   959→            {dispensers.map((dispenser, i) => (
+   960→              <DispenserCard
+   961→                key={dispenser.id}
+   962→                dispenser={dispenser}
+   963→                index={i}
+   964→                selected={selectedDispenserId === dispenser.id}
+   965→                onSelect={() => setSelectedDispenserId(selectedDispenserId === dispenser.id ? null : dispenser.id)}
+   966→              />
+   967→            ))}
+   968→          </div>
+   969→
+   970→          {/* ── Detail Panel (when dispenser selected) ── */}
+   971→          <AnimatePresence>
+   972→            {selectedDispenser && (
+   973→              <DispenserDetailPanel
+   974→                dispenser={selectedDispenser}
+   975→                onClose={() => setSelectedDispenserId(null)}
+   976→              />
+   977→            )}
+   978→          </AnimatePresence>
+   979→
+   980→          {/* ── Nozzle Status Table ── */}
+   981→          <NozzleStatusTable dispensers={dispensers} />
+   982→
+   983→          {/* ── Controller + Command Queue Row ── */}
+   984→          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+   985→            <ControllerStatusPanel dispensers={dispensers} />
+   986→            <CommandQueuePanel commandQueue={commandQueue} />
+   987→          </div>
+   988→
+   989→          {/* ── Quick Actions ── */}
+   990→          <QuickActions selectedDispenser={selectedDispenser} />
+   991→
+   992→          {/* ── Emergency Stop (Standalone) ── */}
+   993→          <motion.div variants={sectionVariants} initial="hidden" animate="visible">
+   994→            <div className="macos-card overflow-hidden border-red-200/40 dark:border-red-800/30">
+   995→              <div className="px-5 py-4 border-b border-red-200/20 dark:border-red-800/20 bg-red-500/[0.02]">
+   996→                <div className="flex items-center gap-2">
+   997→                  <ShieldAlert className="size-4 text-red-500" />
+   998→                  <h3 className="text-[13px] font-semibold text-red-600 dark:text-red-400">Emergency Controls</h3>
+   999→                </div>
+  1000→              </div>
+  1001→              <div className="p-5 space-y-4">
+  1002→                <motion.button
+  1003→                  whileHover={{ scale: 1.005 }}
+  1004→                  whileTap={{ scale: 0.99 }}
+  1005→                  className="w-full flex items-center justify-center gap-3 rounded-xl bg-red-500 hover:bg-red-600 active:bg-red-700 text-white py-5 text-[15px] font-bold transition-colors shadow-sm"
+  1006→                >
+  1007→                  <OctagonX className="size-6" />
+  1008→                  EMERGENCY STOP ALL PUMPS
+  1009→                </motion.button>
+  1010→                <p className="text-[11px] text-muted-foreground text-center">
+  1011→                  Immediately halts all dispensers and locks the forecourt. Use only in case of emergency.
+  1012→                </p>
+  1013→                <Separator />
+  1014→                <div>
+  1015→                  <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-medium mb-2">Individual Pump Lockdown</p>
+  1016→                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+  1017→                    {dispensers.map((d) => (
+  1018→                      <motion.button
+  1019→                        key={d.id}
+  1020→                        whileHover={{ scale: 1.02 }}
+  1021→                        whileTap={{ scale: 0.97 }}
+  1022→                        className="macos-btn-secondary gap-1.5 text-[12px] w-full"
+  1023→                      >
+  1024→                        <Square className="size-3 text-red-500" />
+  1025→                        {d.name}
+  1026→                      </motion.button>
+  1027→                    ))}
+  1028→                  </div>
+  1029→                </div>
+  1030→              </div>
+  1031→            </div>
+  1032→          </motion.div>
+  1033→        </>
+  1034→      )}
+  1035→    </div>
+  1036→  )
+  1037→}
+  1038→

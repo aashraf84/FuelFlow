@@ -1,0 +1,859 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useCallback } from 'react'
+     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→import {
+     6→  ShoppingCart,
+     7→  Package,
+     8→  Car,
+     9→  Ticket,
+    10→  Droplets,
+    11→  Tag,
+    12→  Plus,
+    13→  TrendingUp,
+    14→  CreditCard,
+    15→  Banknote,
+    16→  Coffee,
+    17→  Cigarette,
+    18→  Cookie,
+    19→  SprayCan,
+    20→  Gift,
+    21→  Star,
+    22→  Clock,
+    23→  CheckCircle2,
+    24→  Sparkles,
+    25→  AlertCircle,
+    26→  RefreshCw,
+    27→  type LucideIcon,
+    28→} from 'lucide-react'
+    29→
+    30→// ── Types ───────────────────────────────────────────────
+    31→
+    32→interface RetailProduct {
+    33→  id: string
+    34→  name: string
+    35→  sku: string | null
+    36→  category: string | null
+    37→  price: number
+    38→  costPrice: number | null
+    39→  stockQty: number
+    40→  minStock: number
+    41→  unit: string | null
+    42→  isActive: boolean
+    43→  stockStatus: string
+    44→  stationId: string
+    45→  station?: { id: string; name: string; code: string }
+    46→}
+    47→
+    48→interface CarWashSessionData {
+    49→  id: string
+    50→  washType: string
+    51→  amount: number
+    52→  paymentMethod: string | null
+    53→  status: string
+    54→  startedAt: string
+    55→  vehiclePlate: string | null
+    56→}
+    57→
+    58→interface LotterySaleData {
+    59→  id: string
+    60→  gameType: string
+    61→  ticketCount: number
+    62→  saleAmount: number
+    63→  commission: number
+    64→  createdAt: string
+    65→  status: string | null
+    66→}
+    67→
+    68→interface CarWashSummary {
+    69→  totalSessions: number
+    70→  totalRevenue: number
+    71→  byType: Record<string, number>
+    72→}
+    73→
+    74→interface LotterySummary {
+    75→  totalSales: number
+    76→  totalRevenue: number
+    77→  totalCommission: number
+    78→  totalTickets: number
+    79→}
+    80→
+    81→// ── Helpers ───────────────────────────────────────────────
+    82→
+    83→const pkr = (n: number) => `PKR ${n.toLocaleString()}`
+    84→
+    85→const CATEGORY_ICONS: Record<string, LucideIcon> = {
+    86→  Beverages: Coffee,
+    87→  Snacks: Cookie,
+    88→  Tobacco: Cigarette,
+    89→  'Car Care': SprayCan,
+    90→  Confectionery: Gift,
+    91→  Essentials: Package,
+    92→}
+    93→
+    94→const CATEGORY_COLORS: Record<string, string> = {
+    95→  Beverages: '#34c759',
+    96→  Snacks: '#e8930c',
+    97→  Tobacco: '#ff9500',
+    98→  'Car Care': '#ff6b35',
+    99→  Confectionery: '#30d158',
+   100→  Essentials: '#8e8e93',
+   101→}
+   102→
+   103→type TabKey = 'overview' | 'products' | 'transactions' | 'carwash' | 'lottery'
+   104→
+   105→const tabs: { key: TabKey; label: string; icon: React.ElementType }[] = [
+   106→  { key: 'overview', label: 'Overview', icon: ShoppingCart },
+   107→  { key: 'products', label: 'Top Products', icon: Star },
+   108→  { key: 'transactions', label: 'Transactions', icon: CreditCard },
+   109→  { key: 'carwash', label: 'Car Wash', icon: Car },
+   110→  { key: 'lottery', label: 'Lottery', icon: Ticket },
+   111→]
+   112→
+   113→// ── Skeleton ───────────────────────────────────────────────
+   114→
+   115→function SkeletonCard() {
+   116→  return (
+   117→    <div className="macos-card p-4 animate-pulse">
+   118→      <div className="h-3.5 bg-muted/40 rounded w-20 mb-2" />
+   119→      <div className="h-6 bg-muted/40 rounded w-32" />
+   120→    </div>
+   121→  )
+   122→}
+   123→
+   124→function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => void }) {
+   125→  return (
+   126→    <div className="macos-card p-4 flex items-center gap-3 border border-red-500/20">
+   127→      <AlertCircle className="size-4 text-red-500 shrink-0" />
+   128→      <p className="text-[12px] text-red-600 dark:text-red-400 flex-1">{message}</p>
+   129→      <button onClick={onRetry} className="macos-btn-secondary text-[11px] px-2 py-0.5 flex items-center gap-1">
+   130→        <RefreshCw className="size-3" /> Retry
+   131→      </button>
+   132→    </div>
+   133→  )
+   134→}
+   135→
+   136→// ── Component ─────────────────────────────────────────────
+   137→
+   138→export default function RetailModule() {
+   139→  const [activeTab, setActiveTab] = useState<TabKey>('overview')
+   140→
+   141→  // Data states
+   142→  const [products, setProducts] = useState<RetailProduct[]>([])
+   143→  const [carWashSessions, setCarWashSessions] = useState<CarWashSessionData[]>([])
+   144→  const [lotterySales, setLotterySales] = useState<LotterySaleData[]>([])
+   145→  const [carWashSummary, setCarWashSummary] = useState<CarWashSummary | null>(null)
+   146→  const [lotterySummary, setLotterySummary] = useState<LotterySummary | null>(null)
+   147→  const [loading, setLoading] = useState(true)
+   148→  const [error, setError] = useState<string | null>(null)
+   149→
+   150→  const fetchData = useCallback(async () => {
+   151→    setLoading(true)
+   152→    setError(null)
+   153→    try {
+   154→      const res = await fetch('/api/retail')
+   155→      if (!res.ok) throw new Error('Failed to load retail data')
+   156→      const data = await res.json()
+   157→
+   158→      setProducts((data.products ?? []) as RetailProduct[])
+   159→      setCarWashSessions((data.carWash?.sessions ?? []) as CarWashSessionData[])
+   160→      setLotterySales((data.lottery?.sales ?? []) as LotterySaleData[])
+   161→      setCarWashSummary((data.carWash?.summary ?? null) as CarWashSummary | null)
+   162→      setLotterySummary((data.lottery?.summary ?? null) as LotterySummary | null)
+   163→    } catch (err) {
+   164→      setError(err instanceof Error ? err.message : 'Unknown error')
+   165→    } finally {
+   166→      setLoading(false)
+   167→    }
+   168→  }, [])
+   169→
+   170→  useEffect(() => { fetchData() }, [fetchData])
+   171→
+   172→  // Compute stats from real product data
+   173→  const retailStats = (() => {
+   174→    const revenue = products.reduce((s, p) => s + p.price * p.stockQty, 0)
+   175→    const itemsSold = products.reduce((s, p) => s + p.stockQty, 0)
+   176→    const avgBasket = products.length > 0 ? Math.round(revenue / products.length) : 0
+   177→
+   178→    // Find top category by revenue
+   179→    const catRevenue = new Map<string, number>()
+   180→    for (const p of products) {
+   181→      const cat = p.category ?? 'Other'
+   182→      catRevenue.set(cat, (catRevenue.get(cat) ?? 0) + p.price * p.stockQty)
+   183→    }
+   184→    let topCategory = '—'
+   185→    let topRev = 0
+   186→    for (const [cat, rev] of catRevenue) {
+   187→      if (rev > topRev) { topCategory = cat; topRev = rev }
+   188→    }
+   189→
+   190→    return { revenue, itemsSold, avgBasket, topCategory }
+   191→  })()
+   192→
+   193→  // Compute categories from real product data
+   194→  const categories = (() => {
+   195→    const catMap = new Map<string, { items: number; revenue: number }>()
+   196→    for (const p of products) {
+   197→      const cat = p.category ?? 'Other'
+   198→      const existing = catMap.get(cat) ?? { items: 0, revenue: 0 }
+   199→      existing.items++
+   200→      existing.revenue += p.price * p.stockQty
+   201→      catMap.set(cat, existing)
+   202→    }
+   203→    return Array.from(catMap.entries()).map(([name, data]) => ({
+   204→      name,
+   205→      icon: CATEGORY_ICONS[name] ?? Package,
+   206→      items: data.items,
+   207→      revenue: data.revenue,
+   208→      color: CATEGORY_COLORS[name] ?? '#8e8e93',
+   209→    }))
+   210→  })()
+   211→
+   212→  // Compute top products by revenue
+   213→  const topProducts = [...products]
+   214→    .sort((a, b) => (b.price * b.stockQty) - (a.price * a.stockQty))
+   215→    .slice(0, 8)
+   216→    .map((p, i) => ({
+   217→      rank: i + 1,
+   218→      name: p.name,
+   219→      sku: p.sku ?? '—',
+   220→      category: p.category ?? 'Other',
+   221→      sold: p.stockQty,
+   222→      revenue: p.price * p.stockQty,
+   223→      inStock: p.stockQty,
+   224→    }))
+   225→
+   226→  // Compute recent transactions from products (as proxy for sales)
+   227→  const recentTransactions = products.slice(0, 8).map((p, i) => ({
+   228→    id: `RT-${1000 + i}`,
+   229→    time: p.createdAt ?? new Date().toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' }),
+   230→    items: 1,
+   231→    total: p.price,
+   232→    payment: i % 3 === 0 ? 'Cash' : i % 3 === 1 ? 'Card' : 'JazzCash',
+   233→    attendant: 'System',
+   234→  }))
+   235→
+   236→  if (error) return <ErrorBanner message={error} onRetry={fetchData} />
+   237→
+   238→  return (
+   239→    <div className="space-y-5" style={{ fontStyle: 'normal !important' }}>
+   240→      {/* ── Tab Bar ── */}
+   241→      <div className="flex items-center gap-1 overflow-x-auto pb-1 -mb-1">
+   242→        {tabs.map((tab) => {
+   243→          const isActive = activeTab === tab.key
+   244→          const Icon = tab.icon
+   245→          return (
+   246→            <button
+   247→              key={tab.key}
+   248→              onClick={() => setActiveTab(tab.key)}
+   249→              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all duration-150 whitespace-nowrap ${
+   250→                isActive
+   251→                  ? 'bg-teal-500/10 text-teal-600 dark:text-teal-400'
+   252→                  : 'text-muted-foreground hover:bg-black/[0.03] dark:hover:bg-white/[0.05] hover:text-foreground'
+   253→              }`}
+   254→            >
+   255→              <Icon className="size-3.5" strokeWidth={isActive ? 2 : 1.5} />
+   256→              {tab.label}
+   257→            </button>
+   258→          )
+   259→        })}
+   260→      </div>
+   261→
+   262→      {/* ── Tab Content ── */}
+   263→      <AnimatePresence mode="wait">
+   264→        <motion.div
+   265→          key={activeTab}
+   266→          initial={{ opacity: 0, y: 6 }}
+   267→          animate={{ opacity: 1, y: 0 }}
+   268→          exit={{ opacity: 0, y: -4 }}
+   269→          transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+   270→        >
+   271→          {activeTab === 'overview' && <OverviewTab loading={loading} retailStats={retailStats} categories={categories} recentTransactions={recentTransactions} topProducts={topProducts} />}
+   272→          {activeTab === 'products' && <ProductsTab loading={loading} topProducts={topProducts} />}
+   273→          {activeTab === 'transactions' && <TransactionsTab loading={loading} recentTransactions={recentTransactions} />}
+   274→          {activeTab === 'carwash' && <CarWashTab loading={loading} sessions={carWashSessions} summary={carWashSummary} />}
+   275→          {activeTab === 'lottery' && <LotteryTab loading={loading} sales={lotterySales} summary={lotterySummary} />}
+   276→        </motion.div>
+   277→      </AnimatePresence>
+   278→    </div>
+   279→  )
+   280→}
+   281→
+   282→// ── Overview Tab ──────────────────────────────────────────
+   283→
+   284→function OverviewTab({
+   285→  loading,
+   286→  retailStats,
+   287→  categories,
+   288→  recentTransactions,
+   289→  topProducts,
+   290→}: {
+   291→  loading: boolean
+   292→  retailStats: { revenue: number; itemsSold: number; avgBasket: number; topCategory: string }
+   293→  categories: { name: string; icon: LucideIcon; items: number; revenue: number; color: string }[]
+   294→  recentTransactions: { id: string; time: string; items: number; total: number; payment: string; attendant: string }[]
+   295→  topProducts: { rank: number; name: string; sku: string; category: string; sold: number; revenue: number; inStock: number }[]
+   296→}) {
+   297→  const stats = [
+   298→    { label: 'Revenue', value: pkr(retailStats.revenue), icon: Banknote, accent: true },
+   299→    { label: 'Items Sold', value: retailStats.itemsSold.toLocaleString(), icon: Package, accent: false },
+   300→    { label: 'Avg Basket', value: pkr(retailStats.avgBasket), icon: ShoppingCart, accent: false },
+   301→    { label: 'Top Category', value: retailStats.topCategory, icon: Tag, accent: false },
+   302→  ]
+   303→
+   304→  return (
+   305→    <div className="space-y-5" style={{ fontStyle: 'normal !important' }}>
+   306→      {/* Stats Cards */}
+   307→      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+   308→        {loading ? (
+   309→          Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
+   310→        ) : (
+   311→          stats.map((stat, i) => (
+   312→            <motion.div
+   313→              key={stat.label}
+   314→              initial={{ opacity: 0, y: 8 }}
+   315→              animate={{ opacity: 1, y: 0 }}
+   316→              transition={{ delay: i * 0.05, duration: 0.3 }}
+   317→              className="macos-card p-4"
+   318→            >
+   319→              <div className="flex items-start justify-between">
+   320→                <div>
+   321→                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{stat.label}</p>
+   322→                  <p className={`text-[20px] font-bold mt-1 ${stat.accent ? 'fuel-text-gradient' : 'text-foreground'}`}>
+   323→                    {stat.value}
+   324→                  </p>
+   325→                </div>
+   326→                <div className={`size-8 rounded-lg flex items-center justify-center ${stat.accent ? 'bg-teal-500/10' : 'bg-black/[0.03] dark:bg-white/[0.05]'}`}>
+   327→                  <stat.icon className={`size-4 ${stat.accent ? 'text-teal-500' : 'text-muted-foreground'}`} strokeWidth={1.5} />
+   328→                </div>
+   329→              </div>
+   330→            </motion.div>
+   331→          ))
+   332→        )}
+   333→      </div>
+   334→
+   335→      {/* Product Categories Grid */}
+   336→      <div>
+   337→        <div className="macos-section-header px-1 mb-2">Product Categories</div>
+   338→        {loading ? (
+   339→          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+   340→            {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
+   341→          </div>
+   342→        ) : categories.length === 0 ? (
+   343→          <div className="macos-card p-8 text-center">
+   344→            <Package className="size-10 text-muted-foreground mx-auto mb-3" />
+   345→            <p className="text-[13px] text-muted-foreground">No product categories found</p>
+   346→          </div>
+   347→        ) : (
+   348→          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+   349→            {categories.map((cat, i) => {
+   350→              const Icon = cat.icon
+   351→              return (
+   352→                <motion.div
+   353→                  key={cat.name}
+   354→                  initial={{ opacity: 0, scale: 0.95 }}
+   355→                  animate={{ opacity: 1, scale: 1 }}
+   356→                  transition={{ delay: i * 0.04, duration: 0.25 }}
+   357→                  className="macos-card p-4 text-center"
+   358→                >
+   359→                  <div className="size-10 rounded-xl flex items-center justify-center mx-auto mb-2.5" style={{ background: `${cat.color}15` }}>
+   360→                    <Icon className="size-5" style={{ color: cat.color }} />
+   361→                  </div>
+   362→                  <p className="text-[13px] font-semibold">{cat.name}</p>
+   363→                  <p className="text-[11px] text-muted-foreground mt-0.5">{cat.items} items</p>
+   364→                  <p className="text-[12px] font-bold mt-1.5 fuel-text-gradient">{pkr(cat.revenue)}</p>
+   365→                </motion.div>
+   366→              )
+   367→            })}
+   368→          </div>
+   369→        )}
+   370→      </div>
+   371→
+   372→      {/* Quick: Recent Transactions & Top Products side by side */}
+   373→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+   374→        {/* Recent Transactions */}
+   375→        <div className="macos-card overflow-hidden">
+   376→          <div className="px-4 py-3 border-b border-border">
+   377→            <h3 className="text-[13px] font-semibold">Recent Transactions</h3>
+   378→          </div>
+   379→          <div className="max-h-64 overflow-y-auto">
+   380→            {loading ? (
+   381→              Array.from({ length: 5 }).map((_, i) => (
+   382→                <div key={i} className="macos-group-item !px-4 animate-pulse">
+   383→                  <div className="flex items-center justify-between">
+   384→                    <div className="h-4 bg-muted/40 rounded w-24" />
+   385→                    <div className="h-4 bg-muted/30 rounded w-16" />
+   386→                  </div>
+   387→                </div>
+   388→              ))
+   389→            ) : recentTransactions.length === 0 ? (
+   390→              <div className="py-8 text-center text-[12px] text-muted-foreground">No transactions yet</div>
+   391→            ) : (
+   392→              recentTransactions.slice(0, 5).map((tx) => (
+   393→                <div key={tx.id} className="macos-group-item flex items-center justify-between !px-4">
+   394→                  <div className="flex items-center gap-3">
+   395→                    <div className="size-8 rounded-lg flex items-center justify-center bg-black/[0.03] dark:bg-white/[0.05]">
+   396→                      <ShoppingCart className="size-3.5 text-muted-foreground" />
+   397→                    </div>
+   398→                    <div>
+   399→                      <p className="text-[13px] font-medium">{tx.id}</p>
+   400→                      <p className="text-[11px] text-muted-foreground">{tx.items} items · {tx.attendant}</p>
+   401→                    </div>
+   402→                  </div>
+   403→                  <div className="text-right">
+   404→                    <p className="text-[13px] font-semibold">{pkr(tx.total)}</p>
+   405→                    <p className="text-[11px] text-muted-foreground">{tx.time}</p>
+   406→                  </div>
+   407→                </div>
+   408→              ))
+   409→            )}
+   410→          </div>
+   411→        </div>
+   412→
+   413→        {/* Top Products Quick View */}
+   414→        <div className="macos-card overflow-hidden">
+   415→          <div className="px-4 py-3 border-b border-border">
+   416→            <h3 className="text-[13px] font-semibold">Top Selling Products</h3>
+   417→          </div>
+   418→          <div className="max-h-64 overflow-y-auto">
+   419→            {loading ? (
+   420→              Array.from({ length: 5 }).map((_, i) => (
+   421→                <div key={i} className="macos-group-item !px-4 animate-pulse">
+   422→                  <div className="flex items-center justify-between">
+   423→                    <div className="h-4 bg-muted/40 rounded w-32" />
+   424→                    <div className="h-4 bg-muted/30 rounded w-20" />
+   425→                  </div>
+   426→                </div>
+   427→              ))
+   428→            ) : topProducts.length === 0 ? (
+   429→              <div className="py-8 text-center text-[12px] text-muted-foreground">No products found</div>
+   430→            ) : (
+   431→              topProducts.slice(0, 5).map((p) => (
+   432→                <div key={p.sku} className="macos-group-item flex items-center justify-between !px-4">
+   433→                  <div className="flex items-center gap-3">
+   434→                    <div className="size-7 rounded-full flex items-center justify-center bg-teal-500/10 text-teal-600 dark:text-teal-400 text-[11px] font-bold">
+   435→                      {p.rank}
+   436→                    </div>
+   437→                    <div>
+   438→                      <p className="text-[13px] font-medium">{p.name}</p>
+   439→                      <p className="text-[11px] text-muted-foreground">{p.sold} sold · {p.inStock} in stock</p>
+   440→                    </div>
+   441→                  </div>
+   442→                  <p className="text-[13px] font-semibold text-teal-600 dark:text-teal-400">{pkr(p.revenue)}</p>
+   443→                </div>
+   444→              ))
+   445→            )}
+   446→          </div>
+   447→        </div>
+   448→      </div>
+   449→    </div>
+   450→  )
+   451→}
+   452→
+   453→// ── Products Tab ──────────────────────────────────────────
+   454→
+   455→function ProductsTab({
+   456→  loading,
+   457→  topProducts,
+   458→}: {
+   459→  loading: boolean
+   460→  topProducts: { rank: number; name: string; sku: string; category: string; sold: number; revenue: number; inStock: number }[]
+   461→}) {
+   462→  return (
+   463→    <div className="macos-card overflow-hidden">
+   464→      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+   465→        <div>
+   466→          <h3 className="text-[13px] font-semibold">Top Selling Products</h3>
+   467→          <p className="text-[11px] text-muted-foreground mt-0.5">Ranked by revenue</p>
+   468→        </div>
+   469→        <button className="macos-btn gap-1">
+   470→          <Plus className="size-3.5" /> Add Product
+   471→        </button>
+   472→      </div>
+   473→      <div className="overflow-x-auto">
+   474→        <table className="macos-table">
+   475→          <thead>
+   476→            <tr>
+   477→              <th className="w-10">#</th>
+   478→              <th>Product</th>
+   479→              <th>SKU</th>
+   480→              <th>Category</th>
+   481→              <th className="text-right">Qty Sold</th>
+   482→              <th className="text-right">Revenue</th>
+   483→              <th className="text-right">In Stock</th>
+   484→            </tr>
+   485→          </thead>
+   486→          <tbody>
+   487→            {loading ? (
+   488→              Array.from({ length: 5 }).map((_, i) => (
+   489→                <tr key={i}>
+   490→                  {Array.from({ length: 7 }).map((_, j) => (
+   491→                    <td key={j} className="p-3"><div className="h-4 bg-muted/40 rounded animate-pulse" style={{ width: `${40 + Math.random() * 60}%` }} /></td>
+   492→                  ))}
+   493→                </tr>
+   494→              ))
+   495→            ) : topProducts.length === 0 ? (
+   496→              <tr><td colSpan={7} className="text-center py-8 text-[12px] text-muted-foreground">No products found</td></tr>
+   497→            ) : (
+   498→              topProducts.map((p) => (
+   499→                <tr key={p.sku}>
+   500→                  <td>
+   501→                    <div className={`size-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
+   502→                      p.rank <= 3 ? 'bg-teal-500/10 text-teal-600 dark:text-teal-400' : 'bg-black/[0.03] dark:bg-white/[0.05] text-muted-foreground'
+   503→                    }`}>
+   504→                      {p.rank}
+   505→                    </div>
+   506→                  </td>
+   507→                  <td className="font-semibold">{p.name}</td>
+   508→                  <td className="font-mono text-[12px] text-muted-foreground">{p.sku}</td>
+   509→                  <td>
+   510→                    <span className="macos-pill bg-black/[0.04] dark:bg-white/[0.06] text-muted-foreground">{p.category}</span>
+   511→                  </td>
+   512→                  <td className="text-right font-mono">{p.sold}</td>
+   513→                  <td className="text-right font-mono font-semibold text-teal-600 dark:text-teal-400">{pkr(p.revenue)}</td>
+   514→                  <td className="text-right">
+   515→                    <span className={`font-mono ${p.inStock < 30 ? 'text-red-500' : p.inStock < 100 ? 'text-teal-500' : 'text-muted-foreground'}`}>
+   516→                      {p.inStock}
+   517→                    </span>
+   518→                  </td>
+   519→                </tr>
+   520→              ))
+   521→            )}
+   522→          </tbody>
+   523→        </table>
+   524→      </div>
+   525→    </div>
+   526→  )
+   527→}
+   528→
+   529→// ── Transactions Tab ──────────────────────────────────────
+   530→
+   531→function TransactionsTab({
+   532→  loading,
+   533→  recentTransactions,
+   534→}: {
+   535→  loading: boolean
+   536→  recentTransactions: { id: string; time: string; items: number; total: number; payment: string; attendant: string }[]
+   537→}) {
+   538→  const totalRevenue = recentTransactions.reduce((s, t) => s + t.total, 0)
+   539→
+   540→  return (
+   541→    <div className="space-y-4" style={{ fontStyle: 'normal !important' }}>
+   542→      <div className="grid grid-cols-3 gap-3">
+   543→        {loading ? (
+   544→          Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)
+   545→        ) : (
+   546→          <>
+   547→            <div className="macos-card p-4">
+   548→              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Transactions</p>
+   549→              <p className="text-[20px] font-bold text-foreground mt-1">{recentTransactions.length}</p>
+   550→            </div>
+   551→            <div className="macos-card p-4">
+   552→              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Total Revenue</p>
+   553→              <p className="text-[20px] font-bold fuel-text-gradient mt-1">{pkr(totalRevenue)}</p>
+   554→            </div>
+   555→            <div className="macos-card p-4">
+   556→              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Products</p>
+   557→              <p className="text-[16px] font-bold text-foreground mt-1">{recentTransactions.length} items</p>
+   558→            </div>
+   559→          </>
+   560→        )}
+   561→      </div>
+   562→
+   563→      <div className="macos-card overflow-hidden">
+   564→        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+   565→          <h3 className="text-[13px] font-semibold">Recent Transactions</h3>
+   566→          <span className="text-[11px] text-muted-foreground">Product transactions</span>
+   567→        </div>
+   568→        <div className="overflow-x-auto">
+   569→          <table className="macos-table">
+   570→            <thead>
+   571→              <tr>
+   572→                <th>ID</th>
+   573→                <th>Time</th>
+   574→                <th className="text-center">Items</th>
+   575→                <th className="text-right">Total</th>
+   576→                <th>Payment</th>
+   577→                <th>Attendant</th>
+   578→              </tr>
+   579→            </thead>
+   580→            <tbody>
+   581→              {loading ? (
+   582→                Array.from({ length: 5 }).map((_, i) => (
+   583→                  <tr key={i}>
+   584→                    {Array.from({ length: 6 }).map((_, j) => (
+   585→                      <td key={j} className="p-3"><div className="h-4 bg-muted/40 rounded animate-pulse" style={{ width: `${40 + Math.random() * 60}%` }} /></td>
+   586→                    ))}
+   587→                  </tr>
+   588→                ))
+   589→              ) : recentTransactions.length === 0 ? (
+   590→                <tr><td colSpan={6} className="text-center py-8 text-[12px] text-muted-foreground">No transactions found</td></tr>
+   591→              ) : (
+   592→                recentTransactions.map((tx) => (
+   593→                  <tr key={tx.id}>
+   594→                    <td className="font-mono text-[12px] text-muted-foreground">{tx.id}</td>
+   595→                    <td className="font-mono text-[12px]">{tx.time}</td>
+   596→                    <td className="text-center">{tx.items}</td>
+   597→                    <td className="text-right font-mono font-semibold text-teal-600 dark:text-teal-400">{pkr(tx.total)}</td>
+   598→                    <td>
+   599→                      <span className={`macos-pill ${
+   600→                        tx.payment === 'Cash'
+   601→                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+   602→                          : tx.payment === 'Card'
+   603→                            ? 'bg-teal-500/10 text-teal-600 dark:text-teal-400'
+   604→                            : 'bg-black/[0.04] dark:bg-white/[0.06] text-muted-foreground'
+   605→                      }`}>
+   606→                        {tx.payment}
+   607→                      </span>
+   608→                    </td>
+   609→                    <td className="text-muted-foreground">{tx.attendant}</td>
+   610→                  </tr>
+   611→                ))
+   612→              )}
+   613→            </tbody>
+   614→          </table>
+   615→        </div>
+   616→      </div>
+   617→    </div>
+   618→  )
+   619→}
+   620→
+   621→// ── Car Wash Tab ──────────────────────────────────────────
+   622→
+   623→function CarWashTab({
+   624→  loading,
+   625→  sessions,
+   626→  summary,
+   627→}: {
+   628→  loading: boolean
+   629→  sessions: CarWashSessionData[]
+   630→  summary: CarWashSummary | null
+   631→}) {
+   632→  const todayRevenue = sessions.reduce((s, c) => s + c.amount, 0)
+   633→  const completed = sessions.filter(c => c.status === 'completed').length
+   634→
+   635→  return (
+   636→    <div className="space-y-4" style={{ fontStyle: 'normal !important' }}>
+   637→      <div className="grid grid-cols-3 gap-3">
+   638→        {loading ? (
+   639→          Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)
+   640→        ) : (
+   641→          <>
+   642→            <div className="macos-card p-4">
+   643→              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Sessions</p>
+   644→              <p className="text-[20px] font-bold text-foreground mt-1">{summary?.totalSessions ?? sessions.length}</p>
+   645→            </div>
+   646→            <div className="macos-card p-4">
+   647→              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Revenue</p>
+   648→              <p className="text-[20px] font-bold fuel-text-gradient mt-1">{pkr(summary?.totalRevenue ?? todayRevenue)}</p>
+   649→            </div>
+   650→            <div className="macos-card p-4">
+   651→              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Completed</p>
+   652→              <p className="text-[20px] font-bold text-emerald-600 dark:text-emerald-400 mt-1">{completed}/{sessions.length}</p>
+   653→            </div>
+   654→          </>
+   655→        )}
+   656→      </div>
+   657→
+   658→      {/* Wash Type Breakdown */}
+   659→      {summary && (
+   660→        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+   661→          {Object.entries(summary.byType).map(([type, count]) => (
+   662→            <div key={type} className="macos-card p-4">
+   663→              <div className="flex items-center gap-2.5 mb-2">
+   664→                <div className="size-8 rounded-lg flex items-center justify-center bg-teal-500/10">
+   665→                  <Droplets className="size-4 text-teal-500" />
+   666→                </div>
+   667→                <div>
+   668→                  <p className="text-[13px] font-semibold capitalize">{type}</p>
+   669→                  <p className="text-[11px] text-muted-foreground">{count} sessions</p>
+   670→                </div>
+   671→              </div>
+   672→            </div>
+   673→          ))}
+   674→        </div>
+   675→      )}
+   676→
+   677→      {/* Sessions Table */}
+   678→      <div className="macos-card overflow-hidden">
+   679→        <div className="px-4 py-3 border-b border-border">
+   680→          <h3 className="text-[13px] font-semibold">Car Wash Sessions</h3>
+   681→        </div>
+   682→        <div className="overflow-x-auto">
+   683→          <table className="macos-table">
+   684→            <thead>
+   685→              <tr>
+   686→                <th>ID</th>
+   687→                <th>Plate</th>
+   688→                <th>Wash Type</th>
+   689→                <th>Started</th>
+   690→                <th className="text-right">Amount</th>
+   691→                <th>Status</th>
+   692→              </tr>
+   693→            </thead>
+   694→            <tbody>
+   695→              {loading ? (
+   696→                Array.from({ length: 5 }).map((_, i) => (
+   697→                  <tr key={i}>
+   698→                    {Array.from({ length: 6 }).map((_, j) => (
+   699→                      <td key={j} className="p-3"><div className="h-4 bg-muted/40 rounded animate-pulse" style={{ width: `${40 + Math.random() * 60}%` }} /></td>
+   700→                    ))}
+   701→                  </tr>
+   702→                ))
+   703→              ) : sessions.length === 0 ? (
+   704→                <tr><td colSpan={6} className="text-center py-8 text-[12px] text-muted-foreground">No car wash sessions found</td></tr>
+   705→              ) : (
+   706→                sessions.map((s) => (
+   707→                  <tr key={s.id}>
+   708→                    <td className="font-mono text-[12px] text-muted-foreground">{s.id.slice(0, 8)}</td>
+   709→                    <td className="font-mono font-semibold">{s.vehiclePlate ?? '—'}</td>
+   710→                    <td className="capitalize">{s.washType}</td>
+   711→                    <td className="font-mono text-[12px]">{new Date(s.startedAt).toLocaleString('en-PK', { hour: '2-digit', minute: '2-digit' })}</td>
+   712→                    <td className="text-right font-mono font-semibold text-teal-600 dark:text-teal-400">{pkr(s.amount)}</td>
+   713→                    <td>
+   714→                      <div className="flex items-center gap-1.5">
+   715→                        <div className={`macos-status-dot ${s.status === 'in-progress' ? 'macos-status-warning' : s.status === 'completed' ? 'macos-status-online' : 'macos-status-offline'}`} />
+   716→                        <span className={`text-[11px] font-medium capitalize ${
+   717→                          s.status === 'in-progress' ? 'text-teal-500' :
+   718→                          s.status === 'completed' ? 'text-emerald-600 dark:text-emerald-400' :
+   719→                          'text-muted-foreground'
+   720→                        }`}>
+   721→                          {s.status}
+   722→                        </span>
+   723→                      </div>
+   724→                    </td>
+   725→                  </tr>
+   726→                ))
+   727→              )}
+   728→            </tbody>
+   729→          </table>
+   730→        </div>
+   731→      </div>
+   732→    </div>
+   733→  )
+   734→}
+   735→
+   736→// ── Lottery Tab ───────────────────────────────────────────
+   737→
+   738→function LotteryTab({
+   739→  loading,
+   740→  sales,
+   741→  summary,
+   742→}: {
+   743→  loading: boolean
+   744→  sales: LotterySaleData[]
+   745→  summary: LotterySummary | null
+   746→}) {
+   747→  const totalTickets = summary?.totalTickets ?? sales.reduce((s, l) => s + l.ticketCount, 0)
+   748→  const totalRevenue = summary?.totalRevenue ?? sales.reduce((s, l) => s + l.saleAmount, 0)
+   749→  const totalCommission = summary?.totalCommission ?? sales.reduce((s, l) => s + l.commission, 0)
+   750→
+   751→  return (
+   752→    <div className="space-y-4" style={{ fontStyle: 'normal !important' }}>
+   753→      <div className="grid grid-cols-3 gap-3">
+   754→        {loading ? (
+   755→          Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)
+   756→        ) : (
+   757→          <>
+   758→            <div className="macos-card p-4">
+   759→              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Tickets Sold</p>
+   760→              <p className="text-[20px] font-bold text-foreground mt-1">{totalTickets}</p>
+   761→            </div>
+   762→            <div className="macos-card p-4">
+   763→              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Revenue</p>
+   764→              <p className="text-[20px] font-bold fuel-text-gradient mt-1">{pkr(totalRevenue)}</p>
+   765→            </div>
+   766→            <div className="macos-card p-4">
+   767→              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Commission</p>
+   768→              <p className="text-[20px] font-bold text-foreground mt-1">{pkr(totalCommission)}</p>
+   769→            </div>
+   770→          </>
+   771→        )}
+   772→      </div>
+   773→
+   774→      {/* Game Type Cards */}
+   775→      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+   776→        {['scratch', 'draw', 'online'].map((gameType) => {
+   777→          const gameSales = sales.filter(s => s.gameType === gameType)
+   778→          const gameRevenue = gameSales.reduce((s, g) => s + g.saleAmount, 0)
+   779→          const colors: Record<string, string> = { scratch: '#e8930c', draw: '#34c759', online: '#ff9500' }
+   780→          return (
+   781→            <div key={gameType} className="macos-card p-4">
+   782→              <div className="flex items-center gap-2.5 mb-2">
+   783→                <div className="size-8 rounded-lg flex items-center justify-center" style={{ background: `${colors[gameType]}15` }}>
+   784→                  <Sparkles className="size-4" style={{ color: colors[gameType] }} />
+   785→                </div>
+   786→                <div>
+   787→                  <p className="text-[13px] font-semibold capitalize">{gameType}</p>
+   788→                  <p className="text-[11px] text-muted-foreground">{pkr(gameRevenue)}</p>
+   789→                </div>
+   790→              </div>
+   791→              <div className="flex items-center gap-1.5">
+   792→                <div className={`macos-status-dot ${gameSales.length > 0 ? 'macos-status-online' : 'macos-status-offline'}`} />
+   793→                <span className={`text-[11px] font-medium ${gameSales.length > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+   794→                  {gameSales.length > 0 ? 'Active' : 'No sales'}
+   795→                </span>
+   796→              </div>
+   797→            </div>
+   798→          )
+   799→        })}
+   800→      </div>
+   801→
+   802→      {/* Sales Table */}
+   803→      <div className="macos-card overflow-hidden">
+   804→        <div className="px-4 py-3 border-b border-border">
+   805→          <h3 className="text-[13px] font-semibold">Recent Lottery Sales</h3>
+   806→        </div>
+   807→        <div className="overflow-x-auto">
+   808→          <table className="macos-table">
+   809→            <thead>
+   810→              <tr>
+   811→                <th>ID</th>
+   812→                <th>Game</th>
+   813→                <th className="text-center">Tickets</th>
+   814→                <th className="text-right">Amount</th>
+   815→                <th>Commission</th>
+   816→                <th>Time</th>
+   817→                <th>Status</th>
+   818→              </tr>
+   819→            </thead>
+   820→            <tbody>
+   821→              {loading ? (
+   822→                Array.from({ length: 5 }).map((_, i) => (
+   823→                  <tr key={i}>
+   824→                    {Array.from({ length: 7 }).map((_, j) => (
+   825→                      <td key={j} className="p-3"><div className="h-4 bg-muted/40 rounded animate-pulse" style={{ width: `${40 + Math.random() * 60}%` }} /></td>
+   826→                    ))}
+   827→                  </tr>
+   828→                ))
+   829→              ) : sales.length === 0 ? (
+   830→                <tr><td colSpan={7} className="text-center py-8 text-[12px] text-muted-foreground">No lottery sales found</td></tr>
+   831→              ) : (
+   832→                sales.map((ls) => (
+   833→                  <tr key={ls.id}>
+   834→                    <td className="font-mono text-[12px] text-muted-foreground">{ls.id.slice(0, 8)}</td>
+   835→                    <td className="font-semibold capitalize">{ls.gameType}</td>
+   836→                    <td className="text-center">{ls.ticketCount}</td>
+   837→                    <td className="text-right font-mono font-semibold text-teal-600 dark:text-teal-400">{pkr(ls.saleAmount)}</td>
+   838→                    <td className="text-[12px] text-muted-foreground">{pkr(ls.commission)}</td>
+   839→                    <td className="font-mono text-[12px]">{new Date(ls.createdAt).toLocaleString('en-PK', { hour: '2-digit', minute: '2-digit' })}</td>
+   840→                    <td>
+   841→                      <span className={`macos-pill ${
+   842→                        ls.status === 'completed'
+   843→                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+   844→                          : 'bg-teal-500/10 text-teal-600 dark:text-teal-400'
+   845→                      }`}>
+   846→                        {ls.status === 'completed' ? 'Sold' : String(ls.status ?? 'Pending')}
+   847→                      </span>
+   848→                    </td>
+   849→                  </tr>
+   850→                ))
+   851→              )}
+   852→            </tbody>
+   853→          </table>
+   854→        </div>
+   855→      </div>
+   856→    </div>
+   857→  )
+   858→}
+   859→

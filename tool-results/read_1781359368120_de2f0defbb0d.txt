@@ -1,0 +1,714 @@
+     1→     1→'use client'
+     2→     2→
+     3→     3→import { useState } from 'react'
+     4→     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→     5→import {
+     6→     6→  Droplets,
+     7→     7→  Thermometer,
+     8→     8→  AlertTriangle,
+     9→     9→  Truck,
+    10→    10→  ClipboardCheck,
+    11→    11→  ArrowDownRight,
+    12→    12→  ArrowUpRight,
+    13→    13→  Clock,
+    14→    14→  Waves,
+    15→    15→  Fuel,
+    16→    16→  ChevronRight,
+    17→    17→  Info,
+    18→    18→  ShieldCheck,
+    19→    19→  XCircle,
+    20→    20→  AlertCircle,
+    21→    21→} from 'lucide-react'
+    22→    22→import {
+    23→    23→  BarChart,
+    24→    24→  Bar,
+    25→    25→  XAxis,
+    26→    26→  YAxis,
+    27→    27→  Tooltip,
+    28→    28→  ResponsiveContainer,
+    29→    29→  AreaChart,
+    30→    30→  Area,
+    31→    31→} from 'recharts'
+    32→    32→
+    33→    33→// ── Static Data ──────────────────────────────────────────────
+    34→    34→
+    35→    35→interface TankData {
+    36→    36→  id: string
+    37→    37→  name: string
+    38→    38→  fuelType: string
+    39→    39→  capacity: number
+    40→    40→  currentVolume: number
+    41→    41→  levelPercent: number
+    42→    42→  temperature: number
+    43→    43→  waterLevel: number
+    44→    44→  status: 'online' | 'warning' | 'error'
+    45→    45→}
+    46→    46→
+    47→    47→const tanks: TankData[] = [
+    48→    48→  {
+    49→    49→    id: 'T1',
+    50→    50→    name: 'Tank 1',
+    51→    51→    fuelType: 'Petrol (PMG)',
+    52→    52→    capacity: 24000,
+    53→    53→    currentVolume: 18240,
+    54→    54→    levelPercent: 76,
+    55→    55→    temperature: 28.4,
+    56→    56→    waterLevel: 0.2,
+    57→    57→    status: 'online',
+    58→    58→  },
+    59→    59→  {
+    60→    60→    id: 'T2',
+    61→    61→    name: 'Tank 2',
+    62→    62→    fuelType: 'Diesel (HSD)',
+    63→    63→    capacity: 30000,
+    64→    64→    currentVolume: 12750,
+    65→    65→    levelPercent: 42.5,
+    66→    66→    temperature: 31.2,
+    67→    67→    waterLevel: 1.4,
+    68→    68→    status: 'warning',
+    69→    69→  },
+    70→    70→  {
+    71→    71→    id: 'T3',
+    72→    72→    name: 'Tank 3',
+    73→    73→    fuelType: 'HOBC',
+    74→    74→    capacity: 12000,
+    75→    75→    currentVolume: 2520,
+    76→    76→    levelPercent: 21,
+    77→    77→    temperature: 27.8,
+    78→    78→    waterLevel: 0.1,
+    79→    79→    status: 'error',
+    80→    80→  },
+    81→    81→  {
+    82→    82→    id: 'T4',
+    83→    83→    name: 'Tank 4',
+    84→    84→    fuelType: 'Premium (XL)',
+    85→    85→    capacity: 18000,
+    86→    86→    currentVolume: 9900,
+    87→    87→    levelPercent: 55,
+    88→    88→    temperature: 29.6,
+    89→    89→    waterLevel: 0.5,
+    90→    90→    status: 'online',
+    91→    91→  },
+    92→    92→]
+    93→    93→
+    94→    94→interface TankReading {
+    95→    95→  id: string
+    96→    96→  timestamp: string
+    97→    97→  tank: string
+    98→    98→  fuelType: string
+    99→    99→  volume: number
+   100→   100→  temperature: number
+   101→   101→  waterLevel: number
+   102→   102→}
+   103→   103→
+   104→   104→const recentReadings: TankReading[] = [
+   105→   105→  { id: 'r1', timestamp: '2026-03-04T14:32:00', tank: 'Tank 1', fuelType: 'PMG', volume: 18240, temperature: 28.4, waterLevel: 0.2 },
+   106→   106→  { id: 'r2', timestamp: '2026-03-04T14:32:00', tank: 'Tank 2', fuelType: 'HSD', volume: 12750, temperature: 31.2, waterLevel: 1.4 },
+   107→   107→  { id: 'r3', timestamp: '2026-03-04T14:32:00', tank: 'Tank 3', fuelType: 'HOBC', volume: 2520, temperature: 27.8, waterLevel: 0.1 },
+   108→   108→  { id: 'r4', timestamp: '2026-03-04T14:32:00', tank: 'Tank 4', fuelType: 'XL', volume: 9900, temperature: 29.6, waterLevel: 0.5 },
+   109→   109→  { id: 'r5', timestamp: '2026-03-04T14:17:00', tank: 'Tank 1', fuelType: 'PMG', volume: 18360, temperature: 28.3, waterLevel: 0.2 },
+   110→   110→  { id: 'r6', timestamp: '2026-03-04T14:17:00', tank: 'Tank 2', fuelType: 'HSD', volume: 12980, temperature: 31.1, waterLevel: 1.3 },
+   111→   111→  { id: 'r7', timestamp: '2026-03-04T14:02:00', tank: 'Tank 1', fuelType: 'PMG', volume: 18520, temperature: 28.2, waterLevel: 0.2 },
+   112→   112→  { id: 'r8', timestamp: '2026-03-04T14:02:00', tank: 'Tank 4', fuelType: 'XL', volume: 10050, temperature: 29.5, waterLevel: 0.5 },
+   113→   113→  { id: 'r9', timestamp: '2026-03-04T13:47:00', tank: 'Tank 3', fuelType: 'HOBC', volume: 2640, temperature: 27.7, waterLevel: 0.1 },
+   114→   114→  { id: 'r10', timestamp: '2026-03-04T13:32:00', tank: 'Tank 2', fuelType: 'HSD', volume: 13400, temperature: 30.9, waterLevel: 1.2 },
+   115→   115→]
+   116→   116→
+   117→   117→interface Delivery {
+   118→   118→  id: string
+   119→   119→  tank: string
+   120→   120→  fuelType: string
+   121→   121→  volume: number
+   122→   122→  supplier: string
+   123→   123→  expectedAt: string
+   124→   124→  status: 'scheduled' | 'en-route' | 'delayed'
+   125→   125→}
+   126→   126→
+   127→   127→const deliveries: Delivery[] = [
+   128→   128→  { id: 'd1', tank: 'Tank 1', fuelType: 'PMG', volume: 12000, supplier: 'Pakistan State Oil', expectedAt: '2026-03-04T18:00:00', status: 'en-route' },
+   129→   129→  { id: 'd2', tank: 'Tank 3', fuelType: 'HOBC', volume: 8000, supplier: 'Shell Pakistan', expectedAt: '2026-03-05T09:00:00', status: 'scheduled' },
+   130→   130→  { id: 'd3', tank: 'Tank 2', fuelType: 'HSD', volume: 15000, supplier: 'Attock Petroleum', expectedAt: '2026-03-05T14:00:00', status: 'scheduled' },
+   131→   131→  { id: 'd4', tank: 'Tank 4', fuelType: 'XL', volume: 10000, supplier: 'Total Parco', expectedAt: '2026-03-04T16:30:00', status: 'delayed' },
+   132→   132→]
+   133→   133→
+   134→   134→interface Reconciliation {
+   135→   135→  id: string
+   136→   136→  tank: string
+   137→   137→  fuelType: string
+   138→   138→  bookVolume: number
+   139→   139→  physicalVolume: number
+   140→   140→  variance: number
+   141→   141→  variancePercent: number
+   142→   142→  date: string
+   143→   143→  status: 'ok' | 'warning' | 'error'
+   144→   144→}
+   145→   145→
+   146→   146→const reconciliations: Reconciliation[] = [
+   147→   147→  { id: 'rec1', tank: 'Tank 1', fuelType: 'PMG', bookVolume: 18420, physicalVolume: 18240, variance: -180, variancePercent: -0.98, date: '2026-03-04', status: 'ok' },
+   148→   148→  { id: 'rec2', tank: 'Tank 2', fuelType: 'HSD', bookVolume: 13150, physicalVolume: 12750, variance: -400, variancePercent: -3.04, date: '2026-03-04', status: 'error' },
+   149→   149→  { id: 'rec3', tank: 'Tank 3', fuelType: 'HOBC', bookVolume: 2580, physicalVolume: 2520, variance: -60, variancePercent: -2.33, date: '2026-03-04', status: 'warning' },
+   150→   150→  { id: 'rec4', tank: 'Tank 4', fuelType: 'XL', bookVolume: 9960, physicalVolume: 9900, variance: -60, variancePercent: -0.60, date: '2026-03-04', status: 'ok' },
+   151→   151→]
+   152→   152→
+   153→   153→interface TankAlert {
+   154→   154→  id: string
+   155→   155→  type: 'low-level' | 'high-water' | 'temperature' | 'delivery'
+   156→   156→  severity: 'critical' | 'warning' | 'info'
+   157→   157→  tank: string
+   158→   158→  message: string
+   159→   159→  timestamp: string
+   160→   160→}
+   161→   161→
+   162→   162→const alerts: TankAlert[] = [
+   163→   163→  { id: 'a1', type: 'low-level', severity: 'critical', tank: 'Tank 3', message: 'HOBC level critically low at 21% — below reorder point', timestamp: '2026-03-04T14:32:00' },
+   164→   164→  { id: 'a2', type: 'high-water', severity: 'warning', tank: 'Tank 2', message: 'Water level 1.4cm exceeds 1.0cm threshold — schedule draining', timestamp: '2026-03-04T14:32:00' },
+   165→   165→  { id: 'a3', type: 'temperature', severity: 'warning', tank: 'Tank 2', message: 'Diesel temperature 31.2°C above 30°C monitoring threshold', timestamp: '2026-03-04T14:17:00' },
+   166→   166→  { id: 'a4', type: 'delivery', severity: 'info', tank: 'Tank 4', message: 'Premium delivery delayed — ETA updated to 16:30', timestamp: '2026-03-04T13:50:00' },
+   167→   167→  { id: 'a5', type: 'low-level', severity: 'warning', tank: 'Tank 2', message: 'Diesel level at 42.5% — approaching reorder point', timestamp: '2026-03-04T12:00:00' },
+   168→   168→]
+   169→   169→
+   170→   170→const levelHistoryData = [
+   171→   171→  { time: '08:00', T1: 85, T2: 58, T3: 35, T4: 62 },
+   172→   172→  { time: '09:00', T1: 83, T2: 56, T3: 33, T4: 61 },
+   173→   173→  { time: '10:00', T1: 81, T2: 54, T3: 31, T4: 60 },
+   174→   174→  { time: '11:00', T1: 80, T2: 52, T3: 29, T4: 59 },
+   175→   175→  { time: '12:00', T1: 79, T2: 50, T3: 27, T4: 58 },
+   176→   176→  { time: '13:00', T1: 78, T2: 47, T3: 25, T4: 57 },
+   177→   177→  { time: '14:00', T1: 76, T2: 42, T3: 21, T4: 55 },
+   178→   178→]
+   179→   179→
+   180→   180→// ── Helpers ──────────────────────────────────────────────────
+   181→   181→
+   182→   182→function getLevelColor(pct: number): string {
+   183→   183→  if (pct > 50) return '#34c759'
+   184→   184→  if (pct >= 25) return '#ff9f0a'
+   185→   185→  return '#ff3b30'
+   186→   186→}
+   187→   187→
+   188→   188→function getLevelBgClass(pct: number): string {
+   189→   189→  if (pct > 50) return 'bg-[#34c759]'
+   190→   190→  if (pct >= 25) return 'bg-[#ff9f0a]'
+   191→   191→  return 'bg-[#ff3b30]'
+   192→   192→}
+   193→   193→
+   194→   194→function getStatusClass(status: TankData['status']): string {
+   195→   195→  if (status === 'online') return 'macos-status-online'
+   196→   196→  if (status === 'warning') return 'macos-status-warning'
+   197→   197→  return 'macos-status-error'
+   198→   198→}
+   199→   199→
+   200→   200→function formatPKR(amount: number): string {
+   201→   201→  return `PKR ${amount.toLocaleString('en-PK')}`
+   202→   202→}
+   203→   203→
+   204→   204→function formatTime(iso: string): string {
+   205→   205→  return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+   206→   206→}
+   207→   207→
+   208→   208→function formatDate(iso: string): string {
+   209→   209→  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+   210→   210→}
+   211→   211→
+   212→   212→// ── Sub-Components ───────────────────────────────────────────
+   213→   213→
+   214→   214→function TankOverviewCard({ tank, index }: { tank: TankData; index: number }) {
+   215→   215→  const levelColor = getLevelColor(tank.levelPercent)
+   216→   216→  return (
+   217→   217→    <motion.div
+   218→   218→      initial={{ opacity: 0, y: 8 }}
+   219→   219→      animate={{ opacity: 1, y: 0 }}
+   220→   220→      transition={{ duration: 0.3, delay: index * 0.06 }}
+   221→   221→      className="macos-card p-4"
+   222→   222→    >
+   223→   223→      <div className="flex items-start justify-between mb-3">
+   224→   224→        <div className="flex items-center gap-2">
+   225→   225→          <div className="flex size-8 items-center justify-center rounded-lg bg-amber-500/10">
+   226→   226→            <Droplets className="size-4 text-amber-500" />
+   227→   227→          </div>
+   228→   228→          <div>
+   229→   229→            <p className="text-[13px] font-semibold text-foreground">{tank.name}</p>
+   230→   230→            <p className="text-[11px] text-muted-foreground">{tank.fuelType}</p>
+   231→   231→          </div>
+   232→   232→        </div>
+   233→   233→        <div className="flex items-center gap-1.5">
+   234→   234→          <div className={`macos-status-dot ${getStatusClass(tank.status)}`} />
+   235→   235→          <span className="text-[11px] text-muted-foreground capitalize">{tank.status}</span>
+   236→   236→        </div>
+   237→   237→      </div>
+   238→   238→
+   239→   239→      {/* Level Progress Bar */}
+   240→   240→      <div className="mb-3">
+   241→   241→        <div className="flex items-end justify-between mb-1.5">
+   242→   242→          <span className="text-[22px] font-bold text-foreground leading-none">{tank.levelPercent}%</span>
+   243→   243→          <span className="text-[11px] text-muted-foreground">{tank.currentVolume.toLocaleString()} / {tank.capacity.toLocaleString()} L</span>
+   244→   244→        </div>
+   245→   245→        <div className="h-2 rounded-full bg-black/[0.04] dark:bg-white/[0.06] overflow-hidden">
+   246→   246→          <motion.div
+   247→   247→            initial={{ width: 0 }}
+   248→   248→            animate={{ width: `${tank.levelPercent}%` }}
+   249→   249→            transition={{ duration: 0.8, delay: 0.2 + index * 0.06, ease: [0.25, 0.1, 0.25, 1] }}
+   250→   250→            className={`h-full rounded-full ${getLevelBgClass(tank.levelPercent)}`}
+   251→   251→          />
+   252→   252→        </div>
+   253→   253→      </div>
+   254→   254→
+   255→   255→      {/* Metrics */}
+   256→   256→      <div className="grid grid-cols-2 gap-3">
+   257→   257→        <div className="flex items-center gap-2">
+   258→   258→          <Thermometer className="size-3.5 text-muted-foreground" />
+   259→   259→          <div>
+   260→   260→            <p className="text-[11px] text-muted-foreground uppercase font-semibold tracking-wide">Temp</p>
+   261→   261→            <p className="text-[13px] font-medium text-foreground">{tank.temperature}°C</p>
+   262→   262→          </div>
+   263→   263→        </div>
+   264→   264→        <div className="flex items-center gap-2">
+   265→   265→          <Waves className="size-3.5 text-muted-foreground" />
+   266→   266→          <div>
+   267→   267→            <p className="text-[11px] text-muted-foreground uppercase font-semibold tracking-wide">Water</p>
+   268→   268→            <p className={`text-[13px] font-medium ${tank.waterLevel > 1.0 ? 'text-[#ff3b30]' : tank.waterLevel > 0.5 ? 'text-[#ff9f0a]' : 'text-foreground'}`}>
+   269→   269→              {tank.waterLevel} cm
+   270→   270→            </p>
+   271→   271→          </div>
+   272→   272→        </div>
+   273→   273→      </div>
+   274→   274→    </motion.div>
+   275→   275→  )
+   276→   276→}
+   277→   277→
+   278→   278→function AlertItem({ alert, index }: { alert: TankAlert; index: number }) {
+   279→   279→  const severityIcon = {
+   280→   280→    critical: <XCircle className="size-4 text-[#ff3b30]" />,
+   281→   281→    warning: <AlertCircle className="size-4 text-[#ff9f0a]" />,
+   282→   282→    info: <Info className="size-4 text-[#007aff]" />,
+   283→   283→  }
+   284→   284→  const severityBg = {
+   285→   285→    critical: 'bg-[#ff3b30]/5 border-[#ff3b30]/10',
+   286→   286→    warning: 'bg-[#ff9f0a]/5 border-[#ff9f0a]/10',
+   287→   287→    info: 'bg-[#007aff]/5 border-[#007aff]/10',
+   288→   288→  }
+   289→   289→  return (
+   290→   290→    <motion.div
+   291→   291→      initial={{ opacity: 0, x: -8 }}
+   292→   292→      animate={{ opacity: 1, x: 0 }}
+   293→   293→      transition={{ duration: 0.25, delay: index * 0.05 }}
+   294→   294→      className={`macos-group-item flex items-start gap-3 border ${severityBg[alert.severity]} rounded-lg`}
+   295→   295→    >
+   296→   296→      <div className="mt-0.5 shrink-0">{severityIcon[alert.severity]}</div>
+   297→   297→      <div className="flex-1 min-w-0">
+   298→   298→        <div className="flex items-center justify-between gap-2">
+   299→   299→          <p className="text-[13px] font-medium text-foreground">{alert.tank}</p>
+   300→   300→          <span className="text-[11px] text-muted-foreground shrink-0">{formatTime(alert.timestamp)}</span>
+   301→   301→        </div>
+   302→   302→        <p className="text-[12px] text-muted-foreground mt-0.5 leading-relaxed">{alert.message}</p>
+   303→   303→      </div>
+   304→   304→    </motion.div>
+   305→   305→  )
+   306→   306→}
+   307→   307→
+   308→   308→// ── Main Component ───────────────────────────────────────────
+   309→   309→
+   310→   310→export default function TanksModule() {
+   311→   311→  const [activeTab, setActiveTab] = useState<'overview' | 'readings' | 'deliveries' | 'reconciliation'>('overview')
+   312→   312→
+   313→   313→  const tabs = [
+   314→   314→    { key: 'overview' as const, label: 'Overview' },
+   315→   315→    { key: 'readings' as const, label: 'Readings' },
+   316→   316→    { key: 'deliveries' as const, label: 'Deliveries' },
+   317→   317→    { key: 'reconciliation' as const, label: 'Reconciliation' },
+   318→   318→  ]
+   319→   319→
+   320→   320→  return (
+   321→   321→    <div className="space-y-5">
+   322→   322→      {/* ── Header ── */}
+   323→   323→      <div className="flex items-center justify-between">
+   324→   324→        <div>
+   325→   325→          <h2 className="text-[13px] font-semibold text-foreground">Tanks &amp; Wet Stock</h2>
+   326→   326→          <p className="text-[11px] text-muted-foreground mt-0.5">Real-time tank monitoring and inventory management</p>
+   327→   327→        </div>
+   328→   328→        <div className="flex items-center gap-2">
+   329→   329→          <div className="flex items-center gap-1.5 rounded-lg bg-card px-3 py-1.5 shadow-[0_0_0_0.5px_var(--border)]">
+   330→   330→            <div className="macos-status-dot macos-status-online" />
+   331→   331→            <span className="text-[11px] font-medium text-muted-foreground">4 Tanks Online</span>
+   332→   332→          </div>
+   333→   333→          <button className="macos-btn gap-1.5">
+   334→   334→            <ClipboardCheck className="size-3.5" />
+   335→   335→            New Reading
+   336→   336→          </button>
+   337→   337→        </div>
+   338→   338→      </div>
+   339→   339→
+   340→   340→      {/* ── Tab Bar ── */}
+   341→   341→      <div className="flex items-center gap-1 rounded-lg bg-black/[0.03] dark:bg-white/[0.04] p-0.5 w-fit">
+   342→   342→        {tabs.map((tab) => (
+   343→   343→          <button
+   344→   344→            key={tab.key}
+   345→   345→            onClick={() => setActiveTab(tab.key)}
+   346→   346→            className={`relative rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${
+   347→   347→              activeTab === tab.key ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+   348→   348→            }`}
+   349→   349→          >
+   350→   350→            {activeTab === tab.key && (
+   351→   351→              <motion.div
+   352→   352→                layoutId="tanks-tab-indicator"
+   353→   353→                className="absolute inset-0 rounded-md bg-card shadow-[0_0_0_0.5px_var(--border)]"
+   354→   354→                transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+   355→   355→              />
+   356→   356→            )}
+   357→   357→            <span className="relative z-10">{tab.label}</span>
+   358→   358→          </button>
+   359→   359→        ))}
+   360→   360→      </div>
+   361→   361→
+   362→   362→      {/* ── Tab Content ── */}
+   363→   363→      <AnimatePresence mode="wait">
+   364→   364→        {activeTab === 'overview' && (
+   365→   365→          <motion.div
+   366→   366→            key="overview"
+   367→   367→            initial={{ opacity: 0, y: 6 }}
+   368→   368→            animate={{ opacity: 1, y: 0 }}
+   369→   369→            exit={{ opacity: 0, y: -4 }}
+   370→   370→            transition={{ duration: 0.2 }}
+   371→   371→            className="space-y-5"
+   372→   372→          >
+   373→   373→            {/* Tank Overview Cards */}
+   374→   374→            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+   375→   375→              {tanks.map((tank, i) => (
+   376→   376→                <TankOverviewCard key={tank.id} tank={tank} index={i} />
+   377→   377→              ))}
+   378→   378→            </div>
+   379→   379→
+   380→   380→            {/* Level History Chart + Alerts */}
+   381→   381→            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+   382→   382→              {/* Level Trend Chart */}
+   383→   383→              <div className="macos-card p-4 lg:col-span-2">
+   384→   384→                <div className="flex items-center justify-between mb-4">
+   385→   385→                  <div>
+   386→   386→                    <p className="text-[13px] font-semibold text-foreground">Level Trend</p>
+   387→   387→                    <p className="text-[11px] text-muted-foreground">Today&apos;s tank level progression</p>
+   388→   388→                  </div>
+   389→   389→                  <div className="flex items-center gap-3">
+   390→   390→                    {(['T1', 'T2', 'T3', 'T4'] as const).map((key, i) => (
+   391→   391→                      <div key={key} className="flex items-center gap-1">
+   392→   392→                        <div
+   393→   393→                          className="size-2 rounded-full"
+   394→   394→                          style={{ backgroundColor: ['#e8930c', '#34c759', '#ff3b30', '#ff9f0a'][i] }}
+   395→   395→                        />
+   396→   396→                        <span className="text-[10px] text-muted-foreground">{key}</span>
+   397→   397→                      </div>
+   398→   398→                    ))}
+   399→   399→                  </div>
+   400→   400→                </div>
+   401→   401→                <div className="h-56">
+   402→   402→                  <ResponsiveContainer width="100%" height="100%">
+   403→   403→                    <AreaChart data={levelHistoryData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+   404→   404→                      <defs>
+   405→   405→                        <linearGradient id="gradT1" x1="0" y1="0" x2="0" y2="1">
+   406→   406→                          <stop offset="5%" stopColor="#e8930c" stopOpacity={0.15} />
+   407→   407→                          <stop offset="95%" stopColor="#e8930c" stopOpacity={0} />
+   408→   408→                        </linearGradient>
+   409→   409→                        <linearGradient id="gradT2" x1="0" y1="0" x2="0" y2="1">
+   410→   410→                          <stop offset="5%" stopColor="#34c759" stopOpacity={0.15} />
+   411→   411→                          <stop offset="95%" stopColor="#34c759" stopOpacity={0} />
+   412→   412→                        </linearGradient>
+   413→   413→                      </defs>
+   414→   414→                      <XAxis dataKey="time" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+   415→   415→                      <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} domain={[0, 100]} unit="%" />
+   416→   416→                      <Tooltip
+   417→   417→                        contentStyle={{ fontSize: 12, borderRadius: 10, border: '0.5px solid var(--border)', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', background: 'var(--card)' }}
+   418→   418→                        labelStyle={{ fontWeight: 600, fontSize: 11 }}
+   419→   419→                      />
+   420→   420→                      <Area type="monotone" dataKey="T1" stroke="#e8930c" strokeWidth={2} fill="url(#gradT1)" />
+   421→   421→                      <Area type="monotone" dataKey="T2" stroke="#34c759" strokeWidth={2} fill="url(#gradT2)" />
+   422→   422→                      <Area type="monotone" dataKey="T3" stroke="#ff3b30" strokeWidth={1.5} fill="none" strokeDasharray="4 2" />
+   423→   423→                      <Area type="monotone" dataKey="T4" stroke="#ff9f0a" strokeWidth={1.5} fill="none" strokeDasharray="4 2" />
+   424→   424→                    </AreaChart>
+   425→   425→                  </ResponsiveContainer>
+   426→   426→                </div>
+   427→   427→              </div>
+   428→   428→
+   429→   429→              {/* Alerts Panel */}
+   430→   430→              <div className="macos-card p-4">
+   431→   431→                <div className="flex items-center justify-between mb-3">
+   432→   432→                  <div className="flex items-center gap-2">
+   433→   433→                    <AlertTriangle className="size-4 text-[#ff9f0a]" />
+   434→   434→                    <p className="text-[13px] font-semibold text-foreground">Active Alerts</p>
+   435→   435→                  </div>
+   436→   436→                  <span className="macos-pill bg-[#ff3b30]/10 text-[#ff3b30]">{alerts.length}</span>
+   437→   437→                </div>
+   438→   438→                <div className="space-y-2 max-h-64 overflow-y-auto">
+   439→   439→                  {alerts.map((alert, i) => (
+   440→   440→                    <AlertItem key={alert.id} alert={alert} index={i} />
+   441→   441→                  ))}
+   442→   442→                </div>
+   443→   443→              </div>
+   444→   444→            </div>
+   445→   445→          </motion.div>
+   446→   446→        )}
+   447→   447→
+   448→   448→        {activeTab === 'readings' && (
+   449→   449→          <motion.div
+   450→   450→            key="readings"
+   451→   451→            initial={{ opacity: 0, y: 6 }}
+   452→   452→            animate={{ opacity: 1, y: 0 }}
+   453→   453→            exit={{ opacity: 0, y: -4 }}
+   454→   454→            transition={{ duration: 0.2 }}
+   455→   455→            className="space-y-4"
+   456→   456→          >
+   457→   457→            {/* Volume Comparison Chart */}
+   458→   458→            <div className="macos-card p-4">
+   459→   459→              <div className="flex items-center justify-between mb-4">
+   460→   460→                <div>
+   461→   461→                  <p className="text-[13px] font-semibold text-foreground">Current Volumes</p>
+   462→   462→                  <p className="text-[11px] text-muted-foreground">Volume by tank (litres)</p>
+   463→   463→                </div>
+   464→   464→              </div>
+   465→   465→              <div className="h-48">
+   466→   466→                <ResponsiveContainer width="100%" height="100%">
+   467→   467→                  <BarChart data={tanks.map((t) => ({ name: t.name, volume: t.currentVolume, capacity: t.capacity }))} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
+   468→   468→                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+   469→   469→                    <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+   470→   470→                    <Tooltip
+   471→   471→                      contentStyle={{ fontSize: 12, borderRadius: 10, border: '0.5px solid var(--border)', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', background: 'var(--card)' }}
+   472→   472→                      formatter={(val: number, name: string) => [`${val.toLocaleString()} L`, name === 'volume' ? 'Current' : 'Capacity']}
+   473→   473→                    />
+   474→   474→                    <Bar dataKey="capacity" fill="rgba(0,0,0,0.06)" radius={[6, 6, 0, 0]} />
+   475→   475→                    <Bar dataKey="volume" fill="#e8930c" radius={[6, 6, 0, 0]} />
+   476→   476→                  </BarChart>
+   477→   477→                </ResponsiveContainer>
+   478→   478→              </div>
+   479→   479→            </div>
+   480→   480→
+   481→   481→            {/* Readings Table */}
+   482→   482→            <div className="macos-card overflow-hidden">
+   483→   483→              <div className="px-4 py-3 flex items-center justify-between border-b border-border/50">
+   484→   484→                <div>
+   485→   485→                  <p className="text-[13px] font-semibold text-foreground">Recent Readings</p>
+   486→   486→                  <p className="text-[11px] text-muted-foreground">{recentReadings.length} entries · Auto-refresh every 15 min</p>
+   487→   487→                </div>
+   488→   488→                <button className="macos-btn-secondary gap-1.5">
+   489→   489→                  <Clock className="size-3" />
+   490→   490→                  Refresh
+   491→   491→                </button>
+   492→   492→              </div>
+   493→   493→              <div className="max-h-96 overflow-y-auto">
+   494→   494→                <table className="macos-table">
+   495→   495→                  <thead>
+   496→   496→                    <tr>
+   497→   497→                      <th>Timestamp</th>
+   498→   498→                      <th>Tank</th>
+   499→   499→                      <th>Fuel Type</th>
+   500→   500→                      <th className="text-right">Volume (L)</th>
+   501→   501→                      <th className="text-right">Temp (°C)</th>
+   502→   502→                      <th className="text-right">Water (cm)</th>
+   503→   503→                    </tr>
+   504→   504→                  </thead>
+   505→   505→                  <tbody>
+   506→   506→                    {recentReadings.map((r) => (
+   507→   507→                      <tr key={r.id}>
+   508→   508→                        <td className="font-mono text-[12px]">{formatTime(r.timestamp)}</td>
+   509→   509→                        <td className="font-medium">{r.tank}</td>
+   510→   510→                        <td>
+   511→   511→                          <span className="macos-pill bg-amber-500/10 text-amber-600 dark:text-amber-400">{r.fuelType}</span>
+   512→   512→                        </td>
+   513→   513→                        <td className="text-right font-mono">{r.volume.toLocaleString()}</td>
+   514→   514→                        <td className="text-right">{r.temperature}</td>
+   515→   515→                        <td className="text-right">
+   516→   516→                          <span className={r.waterLevel > 1.0 ? 'text-[#ff3b30] font-medium' : r.waterLevel > 0.5 ? 'text-[#ff9f0a]' : ''}>
+   517→   517→                            {r.waterLevel}
+   518→   518→                          </span>
+   519→   519→                        </td>
+   520→   520→                      </tr>
+   521→   521→                    ))}
+   522→   522→                  </tbody>
+   523→   523→                </table>
+   524→   524→              </div>
+   525→   525→            </div>
+   526→   526→          </motion.div>
+   527→   527→        )}
+   528→   528→
+   529→   529→        {activeTab === 'deliveries' && (
+   530→   530→          <motion.div
+   531→   531→            key="deliveries"
+   532→   532→            initial={{ opacity: 0, y: 6 }}
+   533→   533→            animate={{ opacity: 1, y: 0 }}
+   534→   534→            exit={{ opacity: 0, y: -4 }}
+   535→   535→            transition={{ duration: 0.2 }}
+   536→   536→            className="space-y-4"
+   537→   537→          >
+   538→   538→            {/* Delivery Stats */}
+   539→   539→            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+   540→   540→              <div className="macos-card p-4">
+   541→   541→                <div className="flex items-center gap-2 mb-2">
+   542→   542→                  <Truck className="size-4 text-amber-500" />
+   543→   543→                  <p className="text-[11px] text-muted-foreground uppercase font-semibold tracking-wide">Scheduled</p>
+   544→   544→                </div>
+   545→   545→                <p className="text-[22px] font-bold text-foreground">{deliveries.filter((d) => d.status === 'scheduled').length}</p>
+   546→   546→                <p className="text-[11px] text-muted-foreground mt-0.5">upcoming deliveries</p>
+   547→   547→              </div>
+   548→   548→              <div className="macos-card p-4">
+   549→   549→                <div className="flex items-center gap-2 mb-2">
+   550→   550→                  <ArrowUpRight className="size-4 text-[#34c759]" />
+   551→   551→                  <p className="text-[11px] text-muted-foreground uppercase font-semibold tracking-wide">En Route</p>
+   552→   552→                </div>
+   553→   553→                <p className="text-[22px] font-bold text-foreground">{deliveries.filter((d) => d.status === 'en-route').length}</p>
+   554→   554→                <p className="text-[11px] text-muted-foreground mt-0.5">in transit</p>
+   555→   555→              </div>
+   556→   556→              <div className="macos-card p-4">
+   557→   557→                <div className="flex items-center gap-2 mb-2">
+   558→   558→                  <AlertTriangle className="size-4 text-[#ff9f0a]" />
+   559→   559→                  <p className="text-[11px] text-muted-foreground uppercase font-semibold tracking-wide">Delayed</p>
+   560→   560→                </div>
+   561→   561→                <p className="text-[22px] font-bold text-foreground">{deliveries.filter((d) => d.status === 'delayed').length}</p>
+   562→   562→                <p className="text-[11px] text-muted-foreground mt-0.5">awaiting reschedule</p>
+   563→   563→              </div>
+   564→   564→            </div>
+   565→   565→
+   566→   566→            {/* Delivery List */}
+   567→   567→            <div className="macos-card overflow-hidden">
+   568→   568→              <div className="px-4 py-3 border-b border-border/50">
+   569→   569→                <p className="text-[13px] font-semibold text-foreground">Upcoming Deliveries</p>
+   570→   570→              </div>
+   571→   571→              <div className="divide-y divide-border/50">
+   572→   572→                {deliveries.map((d, i) => {
+   573→   573→                  const statusConfig = {
+   574→   574→                    scheduled: { label: 'Scheduled', dot: 'macos-status-online', color: 'text-[#34c759]' },
+   575→   575→                    'en-route': { label: 'En Route', dot: 'macos-status-warning', color: 'text-[#ff9f0a]' },
+   576→   576→                    delayed: { label: 'Delayed', dot: 'macos-status-error', color: 'text-[#ff3b30]' },
+   577→   577→                  }
+   578→   578→                  const cfg = statusConfig[d.status]
+   579→   579→                  return (
+   580→   580→                    <motion.div
+   581→   581→                      key={d.id}
+   582→   582→                      initial={{ opacity: 0, x: -6 }}
+   583→   583→                      animate={{ opacity: 1, x: 0 }}
+   584→   584→                      transition={{ duration: 0.2, delay: i * 0.05 }}
+   585→   585→                      className="macos-group-item flex items-center gap-4 py-3.5"
+   586→   586→                    >
+   587→   587→                      <div className="flex size-9 items-center justify-center rounded-lg bg-amber-500/10 shrink-0">
+   588→   588→                        <Truck className="size-4 text-amber-500" />
+   589→   589→                      </div>
+   590→   590→                      <div className="flex-1 min-w-0">
+   591→   591→                        <div className="flex items-center gap-2">
+   592→   592→                          <p className="text-[13px] font-medium text-foreground">{d.tank} — {d.fuelType}</p>
+   593→   593→                          <span className="macos-pill bg-amber-500/10 text-amber-600 dark:text-amber-400">{d.volume.toLocaleString()} L</span>
+   594→   594→                        </div>
+   595→   595→                        <p className="text-[11px] text-muted-foreground mt-0.5">{d.supplier} · ETA {formatTime(d.expectedAt)} · {formatDate(d.expectedAt)}</p>
+   596→   596→                      </div>
+   597→   597→                      <div className="flex items-center gap-1.5 shrink-0">
+   598→   598→                        <div className={`macos-status-dot ${cfg.dot}`} />
+   599→   599→                        <span className={`text-[11px] font-semibold ${cfg.color}`}>{cfg.label}</span>
+   600→   600→                      </div>
+   601→   601→                      <ChevronRight className="size-4 text-muted-foreground shrink-0" />
+   602→   602→                    </motion.div>
+   603→   603→                  )
+   604→   604→                })}
+   605→   605→              </div>
+   606→   606→            </div>
+   607→   607→          </motion.div>
+   608→   608→        )}
+   609→   609→
+   610→   610→        {activeTab === 'reconciliation' && (
+   611→   611→          <motion.div
+   612→   612→            key="reconciliation"
+   613→   613→            initial={{ opacity: 0, y: 6 }}
+   614→   614→            animate={{ opacity: 1, y: 0 }}
+   615→   615→            exit={{ opacity: 0, y: -4 }}
+   616→   616→            transition={{ duration: 0.2 }}
+   617→   617→            className="space-y-4"
+   618→   618→          >
+   619→   619→            {/* Summary Cards */}
+   620→   620→            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+   621→   621→              <div className="macos-card p-4">
+   622→   622→                <div className="flex items-center gap-2 mb-2">
+   623→   623→                  <ShieldCheck className="size-4 text-[#34c759]" />
+   624→   624→                  <p className="text-[11px] text-muted-foreground uppercase font-semibold tracking-wide">Within Tolerance</p>
+   625→   625→                </div>
+   626→   626→                <p className="text-[22px] font-bold text-[#34c759]">{reconciliations.filter((r) => r.status === 'ok').length}</p>
+   627→   627→                <p className="text-[11px] text-muted-foreground mt-0.5">tanks within ±0.5% variance</p>
+   628→   628→              </div>
+   629→   629→              <div className="macos-card p-4">
+   630→   630→                <div className="flex items-center gap-2 mb-2">
+   631→   631→                  <AlertCircle className="size-4 text-[#ff9f0a]" />
+   632→   632→                  <p className="text-[11px] text-muted-foreground uppercase font-semibold tracking-wide">Caution</p>
+   633→   633→                </div>
+   634→   634→                <p className="text-[22px] font-bold text-[#ff9f0a]">{reconciliations.filter((r) => r.status === 'warning').length}</p>
+   635→   635→                <p className="text-[11px] text-muted-foreground mt-0.5">tanks with elevated variance</p>
+   636→   636→              </div>
+   637→   637→              <div className="macos-card p-4">
+   638→   638→                <div className="flex items-center gap-2 mb-2">
+   639→   639→                  <XCircle className="size-4 text-[#ff3b30]" />
+   640→   640→                  <p className="text-[11px] text-muted-foreground uppercase font-semibold tracking-wide">Critical</p>
+   641→   641→                </div>
+   642→   642→                <p className="text-[22px] font-bold text-[#ff3b30]">{reconciliations.filter((r) => r.status === 'error').length}</p>
+   643→   643→                <p className="text-[11px] text-muted-foreground mt-0.5">tanks exceeding threshold</p>
+   644→   644→              </div>
+   645→   645→            </div>
+   646→   646→
+   647→   647→            {/* Reconciliation Table */}
+   648→   648→            <div className="macos-card overflow-hidden">
+   649→   649→              <div className="px-4 py-3 border-b border-border/50 flex items-center justify-between">
+   650→   650→                <div>
+   651→   651→                  <p className="text-[13px] font-semibold text-foreground">Latest Reconciliation</p>
+   652→   652→                  <p className="text-[11px] text-muted-foreground">{formatDate(reconciliations[0]?.date)}</p>
+   653→   653→                </div>
+   654→   654→                <button className="macos-btn gap-1.5">
+   655→   655→                  <ClipboardCheck className="size-3.5" />
+   656→   656→                  Run Reconciliation
+   657→   657→                </button>
+   658→   658→              </div>
+   659→   659→              <div className="max-h-80 overflow-y-auto">
+   660→   660→                <table className="macos-table">
+   661→   661→                  <thead>
+   662→   662→                    <tr>
+   663→   663→                      <th>Tank</th>
+   664→   664→                      <th>Fuel Type</th>
+   665→   665→                      <th className="text-right">Book Volume (L)</th>
+   666→   666→                      <th className="text-right">Physical (L)</th>
+   667→   667→                      <th className="text-right">Variance</th>
+   668→   668→                      <th className="text-right">Variance %</th>
+   669→   669→                      <th>Status</th>
+   670→   670→                    </tr>
+   671→   671→                  </thead>
+   672→   672→                  <tbody>
+   673→   673→                    {reconciliations.map((rec) => {
+   674→   674→                      const statusStyle = {
+   675→   675→                        ok: { dot: 'macos-status-online', label: 'OK', text: 'text-[#34c759]' },
+   676→   676→                        warning: { dot: 'macos-status-warning', label: 'Caution', text: 'text-[#ff9f0a]' },
+   677→   677→                        error: { dot: 'macos-status-error', label: 'Critical', text: 'text-[#ff3b30]' },
+   678→   678→                      }
+   679→   679→                      const s = statusStyle[rec.status]
+   680→   680→                      return (
+   681→   681→                        <tr key={rec.id}>
+   682→   682→                          <td className="font-medium">{rec.tank}</td>
+   683→   683→                          <td>
+   684→   684→                            <span className="macos-pill bg-amber-500/10 text-amber-600 dark:text-amber-400">{rec.fuelType}</span>
+   685→   685→                          </td>
+   686→   686→                          <td className="text-right font-mono">{rec.bookVolume.toLocaleString()}</td>
+   687→   687→                          <td className="text-right font-mono">{rec.physicalVolume.toLocaleString()}</td>
+   688→   688→                          <td className="text-right font-mono">
+   689→   689→                            <span className="flex items-center justify-end gap-1">
+   690→   690→                              <ArrowDownRight className="size-3 text-[#ff3b30]" />
+   691→   691→                              {Math.abs(rec.variance).toLocaleString()} L
+   692→   692→                            </span>
+   693→   693→                          </td>
+   694→   694→                          <td className={`text-right font-semibold ${s.text}`}>{rec.variancePercent.toFixed(2)}%</td>
+   695→   695→                          <td>
+   696→   696→                            <div className="flex items-center gap-1.5">
+   697→   697→                              <div className={`macos-status-dot ${s.dot}`} />
+   698→   698→                              <span className={`text-[11px] font-semibold ${s.text}`}>{s.label}</span>
+   699→   699→                            </div>
+   700→   700→                          </td>
+   701→   701→                        </tr>
+   702→   702→                      )
+   703→   703→                    })}
+   704→   704→                  </tbody>
+   705→   705→                </table>
+   706→   706→              </div>
+   707→   707→            </div>
+   708→   708→          </motion.div>
+   709→   709→        )}
+   710→   710→      </AnimatePresence>
+   711→   711→    </div>
+   712→   712→  )
+   713→   713→}
+   714→   714→

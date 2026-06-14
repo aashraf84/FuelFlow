@@ -1,0 +1,1071 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useRef, useCallback } from 'react'
+     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→import {
+     6→  Users, CreditCard, FileText, FileSpreadsheet, Key, Monitor, Fuel,
+     7→  Plus, Search, ChevronRight, X, Printer, Download, Copy,
+     8→  CheckCircle2, AlertCircle, Loader2, Building2, Mail, Phone,
+     9→  MapPin, Globe, Calendar, DollarSign, Eye, Edit, Trash2,
+    10→  MoreHorizontal, ArrowRight, Shield, Zap, Crown, Star, Cpu, Droplets,
+    11→  Hash, Link2, Clock, Send, CheckCircle, XCircle, RefreshCw,
+    12→  Database, Server, HardDrive, Activity,
+    13→} from 'lucide-react'
+    14→
+    15→// ── Types ──────────────────────────────────────────────
+    16→
+    17→type OwnerTab = 'clients' | 'subscriptions' | 'invoices' | 'quotations' | 'license-keys' | 'devices' | 'tenants'
+    18→
+    19→interface Client {
+    20→  id: string; companyName: string; slug: string; contactPerson: string; email: string
+    21→  phone: string; address?: string; city?: string; country: string; status: string
+    22→  industry?: string; notes?: string; taxId?: string; onboardedAt: string; createdAt: string
+    23→  databaseUrl?: string; databaseName?: string; databaseStatus?: string
+    24→  _count?: { subscriptions: number; invoices: number; devices: number; licenseKeys: number }
+    25→  tenantDatabase?: TenantDatabaseInfo
+    26→}
+    27→
+    28→interface TenantDatabaseInfo {
+    29→  id: string; databaseName: string; status: string; totalSize?: string
+    30→  tableCount: number; activatedAt?: string; lastMigratedAt?: string; schemaVersion?: string
+    31→}
+    32→
+    33→interface Plan {
+    34→  id: string; name: string; slug: string; description?: string; priceMonthly: number
+    35→  priceAnnual: number; currency: string; maxStations: number; maxDispensers: number
+    36→  maxUsers: number; maxDevices: number; features: string; isPopular: boolean
+    37→  _count?: { subscriptions: number; licenseKeys: number }
+    38→}
+    39→
+    40→interface Subscription {
+    41→  id: string; clientId: string; planId: string; status: string; billingCycle: string
+    42→  startDate: string; endDate?: string; autoRenew: boolean; notes?: string
+    43→  client?: Client; plan?: Plan
+    44→}
+    45→
+    46→interface InvoiceItem { id: string; description: string; quantity: number; unitPrice: number; amount: number }
+    47→interface InvoicePayment { id: string; amount: number; method: string; reference?: string; paidAt: string }
+    48→
+    49→interface Invoice {
+    50→  id: string; invoiceNumber: string; clientId: string; status: string
+    51→  issueDate: string; dueDate: string; paidDate?: string; subtotal: number
+    52→  taxRate: number; taxAmount: number; discountRate: number; discountAmount: number
+    53→  total: number; paidAmount: number; balanceDue: number; currency: string
+    54→  notes?: string; terms?: string; items: InvoiceItem[]; payments: InvoicePayment[]
+    55→  client?: Client
+    56→}
+    57→
+    58→interface QuotationItem { id: string; description: string; quantity: number; unitPrice: number; amount: number }
+    59→
+    60→interface Quotation {
+    61→  id: string; quotationNumber: string; clientId?: string; clientName: string
+    62→  clientEmail?: string; clientPhone?: string; clientAddress?: string
+    63→  status: string; issueDate: string; validUntil: string
+    64→  subtotal: number; taxRate: number; taxAmount: number; discountRate: number
+    65→  discountAmount: number; total: number; currency: string
+    66→  notes?: string; terms?: string; internalNotes?: string
+    67→  items: QuotationItem[]; client?: Client
+    68→}
+    69→
+    70→interface LicenseKey {
+    71→  id: string; key: string; clientId?: string; planId?: string; status: string
+    72→  maxStations: number; maxDispensers: number; maxUsers: number
+    73→  assignedAt?: string; expiresAt?: string; notes?: string
+    74→  client?: Client; plan?: Plan
+    75→}
+    76→
+    77→interface ClientDevice {
+    78→  id: string; clientId: string; deviceName: string; deviceType: string
+    79→  serialNumber?: string; macAddress?: string; ipAddress?: string
+    80→  location?: string; status: string; activatedAt: string; lastSeenAt?: string; notes?: string
+    81→  client?: Client
+    82→}
+    83→
+    84→// ── Helpers ────────────────────────────────────────────
+    85→
+    86→const formatPKR = (n: number) => `PKR ${n.toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+    87→const formatDate = (d: string) => new Date(d).toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' })
+    88→
+    89→const statusColor: Record<string, string> = {
+    90→  active: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+    91→  inactive: 'bg-gray-500/10 text-gray-500 border-gray-500/20',
+    92→  suspended: 'bg-red-500/10 text-red-500 border-red-500/20',
+    93→  trial: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+    94→  churned: 'bg-gray-500/10 text-gray-400 border-gray-500/20',
+    95→  past_due: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+    96→  cancelled: 'bg-red-500/10 text-red-500 border-red-500/20',
+    97→  expired: 'bg-gray-500/10 text-gray-400 border-gray-500/20',
+    98→  draft: 'bg-gray-500/10 text-gray-500 border-gray-500/20',
+    99→  sent: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+   100→  paid: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+   101→  partial: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
+   102→  overdue: 'bg-red-500/10 text-red-500 border-red-500/20',
+   103→  accepted: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+   104→  rejected: 'bg-red-500/10 text-red-500 border-red-500/20',
+   105→  converted: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+   106→  available: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+   107→  assigned: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+   108→  revoked: 'bg-red-500/10 text-red-500 border-red-500/20',
+   109→  maintenance: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+   110→  pending: 'bg-gray-500/10 text-gray-500 border-gray-500/20',
+   111→  provisioning: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+   112→  provisioning_schema: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+   113→  error: 'bg-red-500/10 text-red-500 border-red-500/20',
+   114→  deleted: 'bg-gray-500/10 text-gray-400 border-gray-500/20',
+   115→}
+   116→
+   117→const deviceTypeIcon: Record<string, React.ElementType> = {
+   118→  pos: Monitor, dispenser_controller: Cpu, atg: Droplets,
+   119→  payment_terminal: CreditCard, scanner: Search, other: MoreHorizontal,
+   120→}
+   121→
+   122→// ── Static Data ────────────────────────────────────────
+   123→
+   124→const staticPlans: Plan[] = [
+   125→  { id: 'p1', name: 'Starter', slug: 'starter', priceMonthly: 15000, priceAnnual: 150000, currency: 'PKR', maxStations: 1, maxDispensers: 4, maxUsers: 5, maxDevices: 10, features: JSON.stringify(['1 Station','4 Dispensers','5 Users','Basic Dashboard','Email Support']), isPopular: false, _count: { subscriptions: 12, licenseKeys: 18 } },
+   126→  { id: 'p2', name: 'Professional', slug: 'professional', priceMonthly: 45000, priceAnnual: 450000, currency: 'PKR', maxStations: 3, maxDispensers: 16, maxUsers: 15, maxDevices: 30, features: JSON.stringify(['3 Stations','16 Dispensers','15 Users','Full Dashboard','AI Analytics','Priority Support']), isPopular: true, _count: { subscriptions: 8, licenseKeys: 14 } },
+   127→  { id: 'p3', name: 'Enterprise', slug: 'enterprise', priceMonthly: 120000, priceAnnual: 1200000, currency: 'PKR', maxStations: 10, maxDispensers: 50, maxUsers: 50, maxDevices: 100, features: JSON.stringify(['10 Stations','50 Dispensers','50 Users','Full Suite','AI Suite','Hardware Integration','Dedicated Support','Custom Branding']), isPopular: false, _count: { subscriptions: 3, licenseKeys: 7 } },
+   128→]
+   129→
+   130→const staticClients: Client[] = [
+   131→  { id: 'c1', companyName: 'Shell Pakistan Ltd', slug: 'shell-pakistan', contactPerson: 'Ahmed Khan', email: 'ahmed@shell.com.pk', phone: '021-35612345', address: 'Clifton Block 9', city: 'Karachi', country: 'Pakistan', status: 'active', industry: 'Oil & Gas', onboardedAt: '2024-01-15', createdAt: '2024-01-15', _count: { subscriptions: 2, invoices: 8, devices: 24, licenseKeys: 3 } },
+   132→  { id: 'c2', companyName: 'Pakistan State Oil', slug: 'pso', contactPerson: 'Fatima Rizvi', email: 'fatima@pso.com.pk', phone: '021-99213456', address: 'Tower A, Business Bay', city: 'Karachi', country: 'Pakistan', status: 'active', industry: 'Oil & Gas', onboardedAt: '2024-02-20', createdAt: '2024-02-20', _count: { subscriptions: 1, invoices: 6, devices: 18, licenseKeys: 2 } },
+   133→  { id: 'c3', companyName: 'Total Parco Pakistan', slug: 'total-parco', contactPerson: 'Hassan Ali', email: 'hassan@totalparco.pk', phone: '051-2891234', address: 'Blue Area', city: 'Islamabad', country: 'Pakistan', status: 'active', industry: 'Oil & Gas', onboardedAt: '2024-03-10', createdAt: '2024-03-10', _count: { subscriptions: 1, invoices: 4, devices: 12, licenseKeys: 2 } },
+   134→  { id: 'c4', companyName: 'Attock Petroleum', slug: 'attock-petroleum', contactPerson: 'Sara Malik', email: 'sara@attock.com.pk', phone: '051-2876543', address: 'Jinnah Avenue', city: 'Islamabad', country: 'Pakistan', status: 'trial', industry: 'Oil & Gas', onboardedAt: '2025-05-01', createdAt: '2025-05-01', _count: { subscriptions: 1, invoices: 1, devices: 4, licenseKeys: 1 } },
+   135→  { id: 'c5', companyName: 'Hascol Petroleum', slug: 'hascol', contactPerson: 'Bilal Iqbal', email: 'bilal@hascol.pk', phone: '042-35678901', address: 'Mall Road', city: 'Lahore', country: 'Pakistan', status: 'suspended', industry: 'Oil & Gas', onboardedAt: '2024-06-15', createdAt: '2024-06-15', _count: { subscriptions: 1, invoices: 3, devices: 6, licenseKeys: 1 } },
+   136→]
+   137→
+   138→const staticSubscriptions: Subscription[] = [
+   139→  { id: 's1', clientId: 'c1', planId: 'p3', status: 'active', billingCycle: 'annual', startDate: '2024-01-15', endDate: '2025-01-14', autoRenew: true, client: staticClients[0], plan: staticPlans[2] },
+   140→  { id: 's2', clientId: 'c2', planId: 'p2', status: 'active', billingCycle: 'monthly', startDate: '2024-02-20', endDate: '2025-02-19', autoRenew: true, client: staticClients[1], plan: staticPlans[1] },
+   141→  { id: 's3', clientId: 'c3', planId: 'p2', status: 'active', billingCycle: 'annual', startDate: '2024-03-10', autoRenew: true, client: staticClients[2], plan: staticPlans[1] },
+   142→  { id: 's4', clientId: 'c4', planId: 'p1', status: 'trial', billingCycle: 'monthly', startDate: '2025-05-01', autoRenew: false, client: staticClients[3], plan: staticPlans[0] },
+   143→  { id: 's5', clientId: 'c5', planId: 'p1', status: 'past_due', billingCycle: 'monthly', startDate: '2024-06-15', autoRenew: false, client: staticClients[4], plan: staticPlans[0] },
+   144→]
+   145→
+   146→const staticInvoices: Invoice[] = [
+   147→  { id: 'i1', invoiceNumber: 'INV-2025-0001', clientId: 'c1', status: 'paid', issueDate: '2025-01-01', dueDate: '2025-01-15', paidDate: '2025-01-10', subtotal: 1200000, taxRate: 0, taxAmount: 0, discountRate: 0, discountAmount: 0, total: 1200000, paidAmount: 1200000, balanceDue: 0, currency: 'PKR', notes: 'Annual enterprise subscription', terms: 'Payment due within 15 days', items: [{ id: 'ii1', description: 'Enterprise Plan — Annual Subscription (10 Stations)', quantity: 1, unitPrice: 1200000, amount: 1200000 }], payments: [{ id: 'ip1', amount: 1200000, method: 'bank_transfer', reference: 'TT-2025-0901', paidAt: '2025-01-10' }], client: staticClients[0] },
+   148→  { id: 'i2', invoiceNumber: 'INV-2025-0002', clientId: 'c2', status: 'sent', issueDate: '2025-06-01', dueDate: '2025-06-15', subtotal: 45000, taxRate: 0, taxAmount: 0, discountRate: 0, discountAmount: 0, total: 45000, paidAmount: 0, balanceDue: 45000, currency: 'PKR', terms: 'Payment due within 15 days', items: [{ id: 'ii2', description: 'Professional Plan — Monthly Subscription (3 Stations)', quantity: 1, unitPrice: 45000, amount: 45000 }], payments: [], client: staticClients[1] },
+   149→  { id: 'i3', invoiceNumber: 'INV-2025-0003', clientId: 'c3', status: 'overdue', issueDate: '2025-05-01', dueDate: '2025-05-15', subtotal: 45000, taxRate: 0, taxAmount: 0, discountRate: 5, discountAmount: 2250, total: 42750, paidAmount: 0, balanceDue: 42750, currency: 'PKR', terms: 'Payment due within 15 days', items: [{ id: 'ii3', description: 'Professional Plan — Monthly Subscription', quantity: 1, unitPrice: 45000, amount: 45000 }], payments: [], client: staticClients[2] },
+   150→  { id: 'i4', invoiceNumber: 'INV-2025-0004', clientId: 'c4', status: 'draft', issueDate: '2025-06-10', dueDate: '2025-06-25', subtotal: 15000, taxRate: 0, taxAmount: 0, discountRate: 0, discountAmount: 0, total: 15000, paidAmount: 0, balanceDue: 15000, currency: 'PKR', items: [{ id: 'ii4', description: 'Starter Plan — Monthly Subscription', quantity: 1, unitPrice: 15000, amount: 15000 }], payments: [], client: staticClients[3] },
+   151→  { id: 'i5', invoiceNumber: 'INV-2025-0005', clientId: 'c5', status: 'overdue', issueDate: '2025-04-01', dueDate: '2025-04-15', subtotal: 15000, taxRate: 0, taxAmount: 0, discountRate: 0, discountAmount: 0, total: 15000, paidAmount: 0, balanceDue: 15000, currency: 'PKR', items: [{ id: 'ii5', description: 'Starter Plan — Monthly Subscription', quantity: 1, unitPrice: 15000, amount: 15000 }], payments: [], client: staticClients[4] },
+   152→]
+   153→
+   154→const staticQuotations: Quotation[] = [
+   155→  { id: 'q1', quotationNumber: 'QT-2025-0001', clientId: 'c1', clientName: 'Shell Pakistan Ltd', clientEmail: 'ahmed@shell.com.pk', clientPhone: '021-35612345', clientAddress: 'Clifton Block 9, Karachi', status: 'accepted', issueDate: '2024-12-15', validUntil: '2025-01-15', subtotal: 2400000, taxRate: 0, taxAmount: 0, discountRate: 0, discountAmount: 0, total: 2400000, currency: 'PKR', terms: 'Valid for 30 days. 50% advance, 50% on deployment.', items: [{ id: 'qi1', description: 'Enterprise Plan — 2 Year Subscription (10 Stations)', quantity: 1, unitPrice: 2400000, amount: 2400000 }], client: staticClients[0] },
+   156→  { id: 'q2', quotationNumber: 'QT-2025-0002', clientName: 'Caltex Pakistan', clientEmail: 'info@caltex.pk', clientPhone: '042-37891234', clientAddress: 'Gulberg III, Lahore', status: 'sent', issueDate: '2025-06-01', validUntil: '2025-07-01', subtotal: 450000, taxRate: 0, taxAmount: 0, discountRate: 10, discountAmount: 45000, total: 405000, currency: 'PKR', terms: 'Valid for 30 days. Annual billing with 10% early-bird discount.', items: [{ id: 'qi2', description: 'Professional Plan — Annual Subscription (3 Stations)', quantity: 1, unitPrice: 450000, amount: 450000 }], client: undefined },
+   157→  { id: 'q3', quotationNumber: 'QT-2025-0003', clientId: 'c4', clientName: 'Attock Petroleum', clientEmail: 'sara@attock.com.pk', clientPhone: '051-2876543', status: 'converted', issueDate: '2025-04-20', validUntil: '2025-05-20', subtotal: 15000, taxRate: 0, taxAmount: 0, discountRate: 0, discountAmount: 0, total: 15000, currency: 'PKR', terms: 'Starter plan trial conversion.', items: [{ id: 'qi3', description: 'Starter Plan — Monthly Subscription', quantity: 1, unitPrice: 15000, amount: 15000 }], client: staticClients[3] },
+   158→]
+   159→
+   160→const staticLicenseKeys: LicenseKey[] = [
+   161→  { id: 'lk1', key: 'FF-A7K2-M9P3-X4R8', clientId: 'c1', planId: 'p3', status: 'assigned', maxStations: 10, maxDispensers: 50, maxUsers: 50, assignedAt: '2024-01-15', expiresAt: '2025-01-14', client: staticClients[0], plan: staticPlans[2] },
+   162→  { id: 'lk2', key: 'FF-B3N5-Q8T2-Y6W1', clientId: 'c2', planId: 'p2', status: 'assigned', maxStations: 3, maxDispensers: 16, maxUsers: 15, assignedAt: '2024-02-20', expiresAt: '2025-02-19', client: staticClients[1], plan: staticPlans[1] },
+   163→  { id: 'lk3', key: 'FF-C1H4-J7L9-Z2V5', clientId: 'c3', planId: 'p2', status: 'assigned', maxStations: 3, maxDispensers: 16, maxUsers: 15, assignedAt: '2024-03-10', client: staticClients[2], plan: staticPlans[1] },
+   164→  { id: 'lk4', key: 'FF-D9F2-K5M8-W3X7', planId: 'p1', status: 'available', maxStations: 1, maxDispensers: 4, maxUsers: 5, plan: staticPlans[0] },
+   165→  { id: 'lk5', key: 'FF-E6G8-N2P4-R1S9', clientId: 'c5', planId: 'p1', status: 'revoked', maxStations: 1, maxDispensers: 4, maxUsers: 5, assignedAt: '2024-06-15', revokedAt: '2025-05-01', client: staticClients[4], plan: staticPlans[0] },
+   166→]
+   167→
+   168→const staticDevices: ClientDevice[] = [
+   169→  { id: 'd1', clientId: 'c1', deviceName: 'PTS Controller — Station 1', deviceType: 'dispenser_controller', serialNumber: 'PTS-2024-0901', ipAddress: '192.168.1.100', location: 'Shell Clifton', status: 'active', activatedAt: '2024-01-20', lastSeenAt: '2025-06-13T10:30:00Z', client: staticClients[0] },
+   170→  { id: 'd2', clientId: 'c1', deviceName: 'POS Terminal — Counter 1', deviceType: 'pos', serialNumber: 'POS-2024-0902', ipAddress: '192.168.1.50', location: 'Shell Clifton', status: 'active', activatedAt: '2024-01-20', lastSeenAt: '2025-06-13T10:32:00Z', client: staticClients[0] },
+   171→  { id: 'd3', clientId: 'c2', deviceName: 'FCC Controller — Main', deviceType: 'dispenser_controller', serialNumber: 'FCC-2024-0877', ipAddress: '10.0.1.100', location: 'PSO Tower', status: 'active', activatedAt: '2024-02-25', lastSeenAt: '2025-06-13T09:45:00Z', client: staticClients[1] },
+   172→  { id: 'd4', clientId: 'c3', deviceName: 'ATG Probe — Tank Farm', deviceType: 'atg', serialNumber: 'ATG-2024-1100', location: 'Total Blue Area', status: 'maintenance', activatedAt: '2024-03-15', client: staticClients[2] },
+   173→  { id: 'd5', clientId: 'c4', deviceName: 'Payment Terminal — Bay 1', deviceType: 'payment_terminal', serialNumber: 'PAY-2025-0033', ipAddress: '172.16.0.10', location: 'Attock Jinnah Ave', status: 'active', activatedAt: '2025-05-05', lastSeenAt: '2025-06-13T08:15:00Z', client: staticClients[3] },
+   174→]
+   175→
+   176→// ── Sub-Components ─────────────────────────────────────
+   177→
+   178→function StatusBadge({ status }: { status: string }) {
+   179→  return (
+   180→    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase ${statusColor[status] || 'bg-gray-500/10 text-gray-500 border-gray-500/20'}`}>
+   181→      {status.replace('_', ' ')}
+   182→    </span>
+   183→  )
+   184→}
+   185→
+   186→function StatCard({ label, value, icon: Icon, accent }: { label: string; value: string; icon: React.ElementType; accent?: boolean }) {
+   187→  return (
+   188→    <div className="macos-card p-4">
+   189→      <div className="flex items-center justify-between mb-1">
+   190→        <span className="text-[11px] font-semibold uppercase text-muted-foreground">{label}</span>
+   191→        <Icon className={`size-4 ${accent ? 'text-amber-500' : 'text-muted-foreground'}`} />
+   192→      </div>
+   193→      <p className={`text-[22px] font-bold leading-tight ${accent ? 'fuel-text-gradient' : ''}`}>{value}</p>
+   194→    </div>
+   195→  )
+   196→}
+   197→
+   198→// ── Professional Invoice/Quotation Print Layout ─────────
+   199→
+   200→function PrintDocument({ type, data }: { type: 'invoice' | 'quotation'; data: Invoice | Quotation }) {
+   201→  const isInvoice = type === 'invoice'
+   202→  const inv = isInvoice ? data as Invoice : null
+   203→  const quote = !isInvoice ? data as Quotation : null
+   204→  const items = data.items
+   205→  const companyName = data.client?.companyName || (quote?.clientName) || ''
+   206→  const clientEmail = data.client?.email || quote?.clientEmail || ''
+   207→  const clientPhone = data.client?.phone || quote?.clientPhone || ''
+   208→  const clientAddress = data.client?.address || quote?.clientAddress || ''
+   209→
+   210→  return (
+   211→    <div id="print-area" className="bg-white text-black p-10 max-w-[800px] mx-auto" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif' }}>
+   212→      {/* Header */}
+   213→      <div className="flex justify-between items-start mb-8">
+   214→        <div>
+   215→          <div className="flex items-center gap-3 mb-2">
+   216→            <div className="size-10 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #e8930c, #ea580c)' }}>
+   217→              <Fuel className="size-5 text-white" />
+   218→            </div>
+   219→            <div>
+   220→              <h1 className="text-xl font-bold text-gray-900">ApexFlow Ecosystem</h1>
+   221→              <p className="text-xs text-gray-500">Enterprise Fuel Station Solutions</p>
+   222→            </div>
+   223→          </div>
+   224→          <div className="text-[11px] text-gray-500 mt-2 leading-relaxed">
+   225→            <p>Office 1207, Business Avenue Tower</p>
+   226→            <p>Block 9, Clifton, Karachi 75600</p>
+   227→            <p>Pakistan</p>
+   228→            <p>Tax ID: NTN-4021948-6 | STR: 3210-948-1234</p>
+   229→          </div>
+   230→        </div>
+   231→        <div className="text-right">
+   232→          <h2 className="text-2xl font-bold mb-1" style={{ color: '#e8930c' }}>
+   233→            {isInvoice ? 'INVOICE' : 'QUOTATION'}
+   234→          </h2>
+   235→          <div className="text-[12px] text-gray-600 space-y-0.5">
+   236→            <p><span className="font-semibold">{isInvoice ? 'Invoice' : 'Quotation'} #:</span> {isInvoice ? inv?.invoiceNumber : quote?.quotationNumber}</p>
+   237→            <p><span className="font-semibold">Date:</span> {formatDate(data.issueDate)}</p>
+   238→            {isInvoice ? (
+   239→              <p><span className="font-semibold">Due Date:</span> {formatDate(inv!.dueDate)}</p>
+   240→            ) : (
+   241→              <p><span className="font-semibold">Valid Until:</span> {formatDate(quote!.validUntil)}</p>
+   242→            )}
+   243→            <div className="mt-1">
+   244→              <StatusBadge status={data.status} />
+   245→            </div>
+   246→          </div>
+   247→        </div>
+   248→      </div>
+   249→
+   250→      {/* Bill To */}
+   251→      <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+   252→        <p className="text-[10px] font-semibold uppercase text-gray-400 mb-1.5">{isInvoice ? 'Bill To' : 'Quote To'}</p>
+   253→        <p className="text-[14px] font-bold text-gray-900">{companyName}</p>
+   254→        {clientAddress && <p className="text-[12px] text-gray-600">{clientAddress}</p>}
+   255→        <div className="text-[12px] text-gray-500 space-x-4 mt-1">
+   256→          {clientEmail && <span>{clientEmail}</span>}
+   257→          {clientPhone && <span>{clientPhone}</span>}
+   258→        </div>
+   259→      </div>
+   260→
+   261→      {/* Items Table */}
+   262→      <table className="w-full mb-6 text-[12px]" style={{ borderCollapse: 'collapse' }}>
+   263→        <thead>
+   264→          <tr style={{ borderBottom: '2px solid #e8930c' }}>
+   265→            <th className="text-left py-2.5 px-3 font-semibold text-gray-700">#</th>
+   266→            <th className="text-left py-2.5 px-3 font-semibold text-gray-700">Description</th>
+   267→            <th className="text-center py-2.5 px-3 font-semibold text-gray-700">Qty</th>
+   268→            <th className="text-right py-2.5 px-3 font-semibold text-gray-700">Unit Price</th>
+   269→            <th className="text-right py-2.5 px-3 font-semibold text-gray-700">Amount</th>
+   270→          </tr>
+   271→        </thead>
+   272→        <tbody>
+   273→          {items.map((item, i) => (
+   274→            <tr key={item.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
+   275→              <td className="py-2.5 px-3 text-gray-500">{i + 1}</td>
+   276→              <td className="py-2.5 px-3 text-gray-900">{item.description}</td>
+   277→              <td className="py-2.5 px-3 text-center text-gray-700">{item.quantity}</td>
+   278→              <td className="py-2.5 px-3 text-right text-gray-700">{formatPKR(item.unitPrice)}</td>
+   279→              <td className="py-2.5 px-3 text-right font-medium text-gray-900">{formatPKR(item.amount)}</td>
+   280→            </tr>
+   281→          ))}
+   282→        </tbody>
+   283→      </table>
+   284→
+   285→      {/* Totals */}
+   286→      <div className="flex justify-end mb-6">
+   287→        <div className="w-[300px]">
+   288→          <div className="flex justify-between py-1.5 text-[12px]">
+   289→            <span className="text-gray-500">Subtotal</span>
+   290→            <span className="font-medium text-gray-900">{formatPKR(data.subtotal)}</span>
+   291→          </div>
+   292→          {data.discountAmount > 0 && (
+   293→            <div className="flex justify-between py-1.5 text-[12px]">
+   294→              <span className="text-gray-500">Discount ({data.discountRate}%)</span>
+   295→              <span className="text-red-500">-{formatPKR(data.discountAmount)}</span>
+   296→            </div>
+   297→          )}
+   298→          {data.taxAmount > 0 && (
+   299→            <div className="flex justify-between py-1.5 text-[12px]">
+   300→              <span className="text-gray-500">Tax ({data.taxRate}%)</span>
+   301→              <span className="text-gray-700">{formatPKR(data.taxAmount)}</span>
+   302→            </div>
+   303→          )}
+   304→          <div className="flex justify-between py-2 text-[14px] font-bold mt-1" style={{ borderTop: '2px solid #e8930c' }}>
+   305→            <span>Total</span>
+   306→            <span style={{ color: '#e8930c' }}>{formatPKR(data.total)}</span>
+   307→          </div>
+   308→          {isInvoice && inv && inv.balanceDue > 0 && (
+   309→            <div className="flex justify-between py-1.5 text-[12px] bg-red-50 -mx-3 px-3 rounded">
+   310→              <span className="text-red-600 font-semibold">Balance Due</span>
+   311→              <span className="text-red-600 font-bold">{formatPKR(inv.balanceDue)}</span>
+   312→            </div>
+   313→          )}
+   314→        </div>
+   315→      </div>
+   316→
+   317→      {/* Payments (invoice only) */}
+   318→      {isInvoice && inv && inv.payments && inv.payments.length > 0 && (
+   319→        <div className="mb-6">
+   320→          <p className="text-[10px] font-semibold uppercase text-gray-400 mb-2">Payments Received</p>
+   321→          <table className="w-full text-[12px]" style={{ borderCollapse: 'collapse' }}>
+   322→            <thead>
+   323→              <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+   324→                <th className="text-left py-1.5 px-2 font-semibold text-gray-600">Date</th>
+   325→                <th className="text-left py-1.5 px-2 font-semibold text-gray-600">Method</th>
+   326→                <th className="text-left py-1.5 px-2 font-semibold text-gray-600">Reference</th>
+   327→                <th className="text-right py-1.5 px-2 font-semibold text-gray-600">Amount</th>
+   328→              </tr>
+   329→            </thead>
+   330→            <tbody>
+   331→              {inv.payments.map(p => (
+   332→                <tr key={p.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+   333→                  <td className="py-1.5 px-2 text-gray-600">{formatDate(p.paidAt)}</td>
+   334→                  <td className="py-1.5 px-2 text-gray-600 capitalize">{p.method.replace('_', ' ')}</td>
+   335→                  <td className="py-1.5 px-2 text-gray-600">{p.reference || '—'}</td>
+   336→                  <td className="py-1.5 px-2 text-right font-medium text-emerald-600">{formatPKR(p.amount)}</td>
+   337→                </tr>
+   338→              ))}
+   339→            </tbody>
+   340→          </table>
+   341→        </div>
+   342→      )}
+   343→
+   344→      {/* Notes & Terms */}
+   345→      <div className="grid grid-cols-2 gap-6 mb-6">
+   346→        {data.notes && (
+   347→          <div>
+   348→            <p className="text-[10px] font-semibold uppercase text-gray-400 mb-1">Notes</p>
+   349→            <p className="text-[12px] text-gray-600">{data.notes}</p>
+   350→          </div>
+   351→        )}
+   352→        {data.terms && (
+   353→          <div>
+   354→            <p className="text-[10px] font-semibold uppercase text-gray-400 mb-1">Terms & Conditions</p>
+   355→            <p className="text-[12px] text-gray-600">{data.terms}</p>
+   356→          </div>
+   357→        )}
+   358→      </div>
+   359→
+   360→      {/* Quotation signature line */}
+   361→      {!isInvoice && (
+   362→        <div className="mt-8 pt-4 border-t border-gray-200">
+   363→          <div className="flex justify-between">
+   364→            <div>
+   365→              <p className="text-[10px] font-semibold uppercase text-gray-400 mb-1">Authorized By</p>
+   366→              <div className="w-48 border-b border-gray-300 mb-1" />
+   367→              <p className="text-[11px] text-gray-500">ApexFlow Ecosystem</p>
+   368→            </div>
+   369→            <div>
+   370→              <p className="text-[10px] font-semibold uppercase text-gray-400 mb-1">Accepted By</p>
+   371→              <div className="w-48 border-b border-gray-300 mb-1" />
+   372→              <p className="text-[11px] text-gray-500">{companyName}</p>
+   373→            </div>
+   374→          </div>
+   375→        </div>
+   376→      )}
+   377→
+   378→      {/* Footer */}
+   379→      <div className="mt-8 pt-4 border-t border-gray-200 text-center">
+   380→        <p className="text-[11px] text-gray-400">ApexFlow Ecosystem — FuelFlow OS &copy; {new Date().getFullYear()}</p>
+   381→        <p className="text-[10px] text-gray-300">Registered Office: Business Avenue Tower, Clifton, Karachi, Pakistan | NTN: 4021948-6</p>
+   382→      </div>
+   383→    </div>
+   384→  )
+   385→}
+   386→
+   387→// ── Tenant Databases Management Tab ──────────────────────
+   388→
+   389→function TenantDatabasesTab({ clients, onRefresh }: { clients: Client[]; onRefresh: () => void }) {
+   390→  const [provisioning, setProvisioning] = useState<string | null>(null)
+   391→  const [dropping, setDropping] = useState<string | null>(null)
+   392→  const [error, setError] = useState<string | null>(null)
+   393→  const [success, setSuccess] = useState<string | null>(null)
+   394→
+   395→  const dbStatusIcon: Record<string, React.ElementType> = {
+   396→    active: CheckCircle2,
+   397→    pending: Clock,
+   398→    provisioning: Loader2,
+   399→    provisioning_schema: Loader2,
+   400→    error: AlertCircle,
+   401→    suspended: XCircle,
+   402→  }
+   403→
+   404→  const dbStatusColor: Record<string, string> = {
+   405→    active: 'text-emerald-500',
+   406→    pending: 'text-gray-400',
+   407→    provisioning: 'text-blue-500',
+   408→    provisioning_schema: 'text-blue-500',
+   409→    error: 'text-red-500',
+   410→    suspended: 'text-amber-500',
+   411→  }
+   412→
+   413→  const handleProvision = async (clientId: string, companyName: string) => {
+   414→    setProvisioning(clientId)
+   415→    setError(null)
+   416→    setSuccess(null)
+   417→    try {
+   418→      const res = await fetch('/api/owner/tenants', {
+   419→        method: 'POST',
+   420→        headers: { 'Content-Type': 'application/json' },
+   421→        body: JSON.stringify({ clientId }),
+   422→      })
+   423→      const data = await res.json()
+   424→      if (!res.ok) {
+   425→        setError(data.error || 'Provisioning failed')
+   426→      } else {
+   427→        setSuccess(`Database for ${companyName} provisioned successfully`)
+   428→        onRefresh()
+   429→      }
+   430→    } catch (err) {
+   431→      setError('Network error during provisioning')
+   432→    } finally {
+   433→      setProvisioning(null)
+   434→    }
+   435→  }
+   436→
+   437→  const handleDrop = async (clientId: string, companyName: string) => {
+   438→    if (!confirm(`Are you sure you want to DROP the database for ${companyName}? This action is irreversible.`)) return
+   439→    setDropping(clientId)
+   440→    setError(null)
+   441→    setSuccess(null)
+   442→    try {
+   443→      const res = await fetch(`/api/owner/tenants?clientId=${clientId}`, { method: 'DELETE' })
+   444→      const data = await res.json()
+   445→      if (!res.ok) {
+   446→        setError(data.error || 'Failed to drop database')
+   447→      } else {
+   448→        setSuccess(`Database for ${companyName} dropped successfully`)
+   449→        onRefresh()
+   450→      }
+   451→    } catch {
+   452→      setError('Network error during drop')
+   453→    } finally {
+   454→      setDropping(null)
+   455→    }
+   456→  }
+   457→
+   458→  const activeClients = clients.filter(c => c.status === 'active' || c.status === 'trial')
+   459→  const withDb = clients.filter(c => c.databaseStatus === 'active')
+   460→  const pendingDb = clients.filter(c => c.databaseStatus === 'pending' || c.databaseStatus === 'error')
+   461→  const provisioningDb = clients.filter(c => c.databaseStatus === 'provisioning')
+   462→
+   463→  return (
+   464→    <div className="space-y-5">
+   465→      {/* Stats */}
+   466→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   467→        <StatCard label="Active Clients" value={String(activeClients.length)} icon={Users} accent />
+   468→        <StatCard label="With Database" value={String(withDb.length)} icon={Database} />
+   469→        <StatCard label="Pending Setup" value={String(pendingDb.length)} icon={Clock} />
+   470→        <StatCard label="Provisioning" value={String(provisioningDb.length)} icon={Loader2} />
+   471→      </div>
+   472→
+   473→      {/* Messages */}
+   474→      {error && (
+   475→        <div className="flex items-center gap-2.5 rounded-xl border border-red-500/15 bg-red-500/5 px-4 py-2.5">
+   476→          <AlertCircle className="size-4 text-red-500 shrink-0" />
+   477→          <p className="text-[12px] text-red-600 dark:text-red-400">{error}</p>
+   478→          <button onClick={() => setError(null)} className="ml-auto"><X className="size-3.5 text-red-400" /></button>
+   479→        </div>
+   480→      )}
+   481→      {success && (
+   482→        <div className="flex items-center gap-2.5 rounded-xl border border-emerald-500/15 bg-emerald-500/5 px-4 py-2.5">
+   483→          <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />
+   484→          <p className="text-[12px] text-emerald-600 dark:text-emerald-400">{success}</p>
+   485→          <button onClick={() => setSuccess(null)} className="ml-auto"><X className="size-3.5 text-emerald-400" /></button>
+   486→        </div>
+   487→      )}
+   488→
+   489→      {/* Architecture Info */}
+   490→      <div className="macos-card p-5">
+   491→        <div className="flex items-center gap-3 mb-3">
+   492→          <div className="size-9 rounded-xl flex items-center justify-center bg-amber-500/10">
+   493→            <Server className="size-4.5 text-amber-500" />
+   494→          </div>
+   495→          <div>
+   496→            <h3 className="text-[14px] font-bold">Multi-Tenant Architecture</h3>
+   497→            <p className="text-[11px] text-muted-foreground">Neon PostgreSQL — Each client operates in a fully isolated database</p>
+   498→          </div>
+   499→        </div>
+   500→        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+   501→          <div className="rounded-lg border border-border bg-black/[0.02] dark:bg-white/[0.02] p-3">
+   502→            <div className="flex items-center gap-2 mb-1.5">
+   503→              <Database className="size-3.5 text-amber-500" />
+   504→              <span className="text-[11px] font-semibold">Platform DB</span>
+   505→            </div>
+   506→            <p className="text-[10px] text-muted-foreground">Owner data, clients, billing, licensing — shared platform database</p>
+   507→            <code className="text-[9px] text-muted-foreground/70 mt-1 block truncate">neondb (Neon PostgreSQL)</code>
+   508→          </div>
+   509→          <div className="rounded-lg border border-border bg-black/[0.02] dark:bg-white/[0.02] p-3">
+   510→            <div className="flex items-center gap-2 mb-1.5">
+   511→              <HardDrive className="size-3.5 text-emerald-500" />
+   512→              <span className="text-[11px] font-semibold">Tenant DBs</span>
+   513→            </div>
+   514→            <p className="text-[10px] text-muted-foreground">Per-client isolated databases with full ERP schema for data separation</p>
+   515→            <code className="text-[9px] text-muted-foreground/70 mt-1 block truncate">ff_&lt;slug&gt;_&lt;id&gt; (Neon PostgreSQL)</code>
+   516→          </div>
+   517→          <div className="rounded-lg border border-border bg-black/[0.02] dark:bg-white/[0.02] p-3">
+   518→            <div className="flex items-center gap-2 mb-1.5">
+   519→              <Activity className="size-3.5 text-blue-500" />
+   520→              <span className="text-[11px] font-semibold">Connection Pool</span>
+   521→            </div>
+   522→            <p className="text-[10px] text-muted-foreground">Neon pooler for efficient connection management with auto-scaling</p>
+   523→            <code className="text-[9px] text-muted-foreground/70 mt-1 block truncate">ep-*-pooler.neon.tech</code>
+   524→          </div>
+   525→        </div>
+   526→      </div>
+   527→
+   528→      {/* Client Database List */}
+   529→      <div className="macos-card overflow-hidden">
+   530→        <div className="flex items-center justify-between p-4 border-b border-border">
+   531→          <h3 className="text-[13px] font-semibold">Client Databases</h3>
+   532→          <button onClick={onRefresh} className="macos-btn-secondary text-[11px] flex items-center gap-1.5">
+   533→            <RefreshCw className="size-3" /> Refresh
+   534→          </button>
+   535→        </div>
+   536→        <div className="divide-y divide-border">
+   537→          {clients.map(client => {
+   538→            const dbStatus = client.databaseStatus || 'pending'
+   539→            const StatusIcon = dbStatusIcon[dbStatus] || Clock
+   540→            const statusColorClass = dbStatusColor[dbStatus] || 'text-gray-400'
+   541→            const isProvisioning = provisioning === client.id
+   542→            const isDropping = dropping === client.id
+   543→            const td = client.tenantDatabase
+   544→
+   545→            return (
+   546→              <div key={client.id} className="flex items-center gap-4 p-4 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors">
+   547→                {/* Client Info */}
+   548→                <div className="flex items-center gap-3 min-w-[200px]">
+   549→                  <div className="size-9 rounded-lg flex items-center justify-center bg-amber-500/10 shrink-0">
+   550→                    <Building2 className="size-4 text-amber-500" />
+   551→                  </div>
+   552→                  <div className="min-w-0">
+   553→                    <p className="text-[13px] font-semibold truncate">{client.companyName}</p>
+   554→                    <p className="text-[11px] text-muted-foreground">{client.city || '—'}, {client.country}</p>
+   555→                  </div>
+   556→                </div>
+   557→
+   558→                {/* Database Name */}
+   559→                <div className="min-w-[160px]">
+   560→                  {client.databaseName ? (
+   561→                    <code className="text-[11px] font-mono bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded">{client.databaseName}</code>
+   562→                  ) : (
+   563→                    <span className="text-[11px] text-muted-foreground italic">Not provisioned</span>
+   564→                  )}
+   565→                </div>
+   566→
+   567→                {/* Database Status */}
+   568→                <div className="min-w-[130px]">
+   569→                  <div className="flex items-center gap-1.5">
+   570→                    <StatusIcon className={`size-3.5 ${dbStatus === 'provisioning' || dbStatus === 'provisioning_schema' ? 'animate-spin' : ''} ${statusColorClass}`} />
+   571→                    <span className={`text-[11px] font-semibold capitalize ${statusColorClass}`}>{dbStatus.replace('_', ' ')}</span>
+   572→                  </div>
+   573→                </div>
+   574→
+   575→                {/* Tenant DB Details */}
+   576→                {td && td.status === 'active' && (
+   577→                  <div className="flex-1 flex items-center gap-4 text-[11px] text-muted-foreground">
+   578→                    {td.totalSize && (
+   579→                      <div className="flex items-center gap-1">
+   580→                        <HardDrive className="size-3" />
+   581→                        <span>{td.totalSize}</span>
+   582→                      </div>
+   583→                    )}
+   584→                    {td.schemaVersion && (
+   585→                      <div className="flex items-center gap-1">
+   586→                        <Hash className="size-3" />
+   587→                        <span>v{td.schemaVersion}</span>
+   588→                      </div>
+   589→                    )}
+   590→                    {td.activatedAt && (
+   591→                      <div className="flex items-center gap-1">
+   592→                        <Calendar className="size-3" />
+   593→                        <span>Active {formatDate(td.activatedAt)}</span>
+   594→                      </div>
+   595→                    )}
+   596→                  </div>
+   597→                )}
+   598→
+   599→                {/* Error Message */}
+   600→                {dbStatus === 'error' && (
+   601→                  <div className="flex-1">
+   602→                    <p className="text-[11px] text-red-500 truncate">Error occurred during provisioning</p>
+   603→                  </div>
+   604→                )}
+   605→
+   606→                {/* Spacer for clients without active DB */}
+   607→                {!td || td.status !== 'active' ? (dbStatus !== 'error' && <div className="flex-1" />) : null}
+   608→
+   609→                {/* Actions */}
+   610→                <div className="flex items-center gap-2">
+   611→                  {dbStatus === 'pending' || dbStatus === 'error' ? (
+   612→                    <button
+   613→                      onClick={() => handleProvision(client.id, client.companyName)}
+   614→                      disabled={isProvisioning}
+   615→                      className="macos-btn text-[11px] flex items-center gap-1.5 disabled:opacity-50"
+   616→                    >
+   617→                      {isProvisioning ? <Loader2 className="size-3 animate-spin" /> : <Plus className="size-3" />}
+   618→                      {isProvisioning ? 'Provisioning...' : 'Provision DB'}
+   619→                    </button>
+   620→                  ) : dbStatus === 'active' ? (
+   621→                    <button
+   622→                      onClick={() => handleDrop(client.id, client.companyName)}
+   623→                      disabled={isDropping}
+   624→                      className="macos-btn-secondary text-[11px] flex items-center gap-1.5 text-red-500 hover:text-red-600 hover:bg-red-500/5 disabled:opacity-50"
+   625→                    >
+   626→                      {isDropping ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
+   627→                      {isDropping ? 'Dropping...' : 'Drop DB'}
+   628→                    </button>
+   629→                  ) : (
+   630→                    <span className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+   631→                      <Loader2 className="size-3 animate-spin" /> In progress...
+   632→                    </span>
+   633→                  )}
+   634→                </div>
+   635→              </div>
+   636→            )
+   637→          })}
+   638→        </div>
+   639→      </div>
+   640→    </div>
+   641→  )
+   642→}
+   643→
+   644→// ── Main OwnerModule ────────────────────────────────────
+   645→
+   646→export default function OwnerModule() {
+   647→  const [activeTab, setActiveTab] = useState<OwnerTab>('clients')
+   648→  const [searchQuery, setSearchQuery] = useState('')
+   649→  const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null)
+   650→  const [viewingQuotation, setViewingQuotation] = useState<Quotation | null>(null)
+   651→  const [showPrintView, setShowPrintView] = useState(false)
+   652→  const [copiedKey, setCopiedKey] = useState<string | null>(null)
+   653→  const printRef = useRef<HTMLDivElement>(null)
+   654→
+   655→  // Data state
+   656→  const [clients, setClients] = useState<Client[]>(staticClients)
+   657→  const [plans, setPlans] = useState<Plan[]>(staticPlans)
+   658→  const [subscriptions, setSubscriptions] = useState<Subscription[]>(staticSubscriptions)
+   659→  const [invoices, setInvoices] = useState<Invoice[]>(staticInvoices)
+   660→  const [quotations, setQuotations] = useState<Quotation[]>(staticQuotations)
+   661→  const [licenseKeys, setLicenseKeys] = useState<LicenseKey[]>(staticLicenseKeys)
+   662→  const [devices, setDevices] = useState<ClientDevice[]>(staticDevices)
+   663→  const [loading, setLoading] = useState(false)
+   664→
+   665→  // Fetch data on mount
+   666→  useEffect(() => {
+   667→    let cancelled = false
+   668→    const load = async () => {
+   669→      try {
+   670→        const [clientsRes, plansRes, subsRes, invRes, quotRes, keysRes, devRes] = await Promise.allSettled([
+   671→          fetch('/api/owner/clients'), fetch('/api/owner/plans'), fetch('/api/owner/subscriptions'),
+   672→          fetch('/api/owner/invoices'), fetch('/api/owner/quotations'), fetch('/api/owner/license-keys'),
+   673→          fetch('/api/owner/devices'),
+   674→        ])
+   675→        if (cancelled) return
+   676→        if (clientsRes.status === 'fulfilled' && clientsRes.value.ok) { const d = await clientsRes.value.json(); if (d.clients?.length) setClients(d.clients) }
+   677→        if (plansRes.status === 'fulfilled' && plansRes.value.ok) { const d = await plansRes.value.json(); if (d.length) setPlans(d) }
+   678→        if (subsRes.status === 'fulfilled' && subsRes.value.ok) { const d = await subsRes.value.json(); if (d.length) setSubscriptions(d) }
+   679→        if (invRes.status === 'fulfilled' && invRes.value.ok) { const d = await invRes.value.json(); if (d.length) setInvoices(d) }
+   680→        if (quotRes.status === 'fulfilled' && quotRes.value.ok) { const d = await quotRes.value.json(); if (d.length) setQuotations(d) }
+   681→        if (keysRes.status === 'fulfilled' && keysRes.value.ok) { const d = await keysRes.value.json(); if (d.length) setLicenseKeys(d) }
+   682→        if (devRes.status === 'fulfilled' && devRes.value.ok) { const d = await devRes.value.json(); if (d.length) setDevices(d) }
+   683→      } catch { /* use static data */ }
+   684→    }
+   685→    load()
+   686→    return () => { cancelled = true }
+   687→  }, [])
+   688→
+   689→  // Refresh data
+   690→  const refreshData = useCallback(async () => {
+   691→    try {
+   692→      const [clientsRes, plansRes, subsRes, invRes, quotRes, keysRes, devRes] = await Promise.allSettled([
+   693→        fetch('/api/owner/clients'), fetch('/api/owner/plans'), fetch('/api/owner/subscriptions'),
+   694→        fetch('/api/owner/invoices'), fetch('/api/owner/quotations'), fetch('/api/owner/license-keys'),
+   695→        fetch('/api/owner/devices'),
+   696→      ])
+   697→      if (clientsRes.status === 'fulfilled' && clientsRes.value.ok) { const d = await clientsRes.value.json(); if (d.clients?.length) setClients(d.clients) }
+   698→      if (plansRes.status === 'fulfilled' && plansRes.value.ok) { const d = await plansRes.value.json(); if (d.length) setPlans(d) }
+   699→      if (subsRes.status === 'fulfilled' && subsRes.value.ok) { const d = await subsRes.value.json(); if (d.length) setSubscriptions(d) }
+   700→      if (invRes.status === 'fulfilled' && invRes.value.ok) { const d = await invRes.value.json(); if (d.length) setInvoices(d) }
+   701→      if (quotRes.status === 'fulfilled' && quotRes.value.ok) { const d = await quotRes.value.json(); if (d.length) setQuotations(d) }
+   702→      if (keysRes.status === 'fulfilled' && keysRes.value.ok) { const d = await keysRes.value.json(); if (d.length) setLicenseKeys(d) }
+   703→      if (devRes.status === 'fulfilled' && devRes.value.ok) { const d = await devRes.value.json(); if (d.length) setDevices(d) }
+   704→    } catch { /* use static data */ }
+   705→  }, [])
+   706→
+   707→  // Seed data
+   708→  const handleSeed = async () => {
+   709→    try { await fetch('/api/owner/seed', { method: 'POST' }); refreshData() } catch { /* ignore */ }
+   710→  }
+   711→
+   712→  // Print
+   713→  const handlePrint = () => {
+   714→    const printContents = document.getElementById('print-area')
+   715→    if (!printContents) return
+   716→    const printWindow = window.open('', '_blank')
+   717→    if (!printWindow) return
+   718→    printWindow.document.write(`
+   719→      <html><head><title>${viewingInvoice ? 'Invoice' : 'Quotation'} — FuelFlow OS</title>
+   720→      <style>
+   721→        * { font-style: normal !important; margin: 0; padding: 0; box-sizing: border-box; }
+   722→        body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+   723→        @page { margin: 0.5in; size: A4; }
+   724→        @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+   725→      </style></head><body>${printContents.innerHTML}</body></html>
+   726→    `)
+   727→    printWindow.document.close()
+   728→    setTimeout(() => { printWindow.print(); printWindow.close() }, 250)
+   729→  }
+   730→
+   731→  // Copy key
+   732→  const copyKey = (key: string) => {
+   733→    navigator.clipboard.writeText(key)
+   734→    setCopiedKey(key)
+   735→    setTimeout(() => setCopiedKey(null), 2000)
+   736→  }
+   737→
+   738→  // Tab config
+   739→  const tabs: { key: OwnerTab; label: string; icon: React.ElementType }[] = [
+   740→    { key: 'clients', label: 'Clients', icon: Users },
+   741→    { key: 'subscriptions', label: 'Subscriptions', icon: CreditCard },
+   742→    { key: 'invoices', label: 'Invoices', icon: FileText },
+   743→    { key: 'quotations', label: 'Quotations', icon: FileSpreadsheet },
+   744→    { key: 'license-keys', label: 'License Keys', icon: Key },
+   745→    { key: 'devices', label: 'Devices', icon: Monitor },
+   746→    { key: 'tenants', label: 'Databases', icon: Database },
+   747→  ]
+   748→
+   749→  // ── Render ──
+   750→
+   751→  // Print view overlay
+   752→  if (showPrintView && (viewingInvoice || viewingQuotation)) {
+   753→    const doc = viewingInvoice || viewingQuotation!
+   754→    return (
+   755→      <div className="fixed inset-0 z-50 bg-gray-100 overflow-auto">
+   756→        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-gray-200 px-6 py-3 flex items-center justify-between print:hidden">
+   757→          <h2 className="text-[13px] font-semibold">
+   758→            {viewingInvoice ? `Invoice ${viewingInvoice.invoiceNumber}` : `Quotation ${viewingQuotation?.quotationNumber}`}
+   759→          </h2>
+   760→          <div className="flex items-center gap-2">
+   761→            <button onClick={handlePrint} className="macos-btn flex items-center gap-2">
+   762→              <Printer className="size-4" /> Print
+   763→            </button>
+   764→            <button onClick={() => { setShowPrintView(false); setViewingInvoice(null); setViewingQuotation(null) }} className="macos-btn-secondary flex items-center gap-2">
+   765→              <X className="size-4" /> Close
+   766→            </button>
+   767→          </div>
+   768→        </div>
+   769→        <div className="py-8" ref={printRef}>
+   770→          <PrintDocument type={viewingInvoice ? 'invoice' : 'quotation'} data={doc} />
+   771→        </div>
+   772→      </div>
+   773→    )
+   774→  }
+   775→
+   776→  return (
+   777→    <div className="space-y-6">
+   778→      {/* Header */}
+   779→      <div className="flex items-center justify-between">
+   780→        <div>
+   781→          <h2 className="text-[20px] font-bold text-foreground">Owner Console</h2>
+   782→          <p className="text-[13px] text-muted-foreground">Manage clients, subscriptions, billing & licensing</p>
+   783→        </div>
+   784→        <button onClick={handleSeed} className="macos-btn-secondary text-[12px] flex items-center gap-1.5">
+   785→          <RefreshCw className="size-3.5" /> Seed Data
+   786→        </button>
+   787→      </div>
+   788→
+   789→      {/* Tabs */}
+   790→      <div className="flex items-center gap-1 border-b border-border pb-px">
+   791→        {tabs.map(tab => {
+   792→          const isActive = activeTab === tab.key
+   793→          return (
+   794→            <button
+   795→              key={tab.key}
+   796→              onClick={() => setActiveTab(tab.key)}
+   797→              className={`flex items-center gap-1.5 px-3 py-2 text-[12px] font-medium border-b-2 transition-all ${
+   798→                isActive ? 'border-amber-500 text-amber-600 dark:text-amber-400' : 'border-transparent text-muted-foreground hover:text-foreground'
+   799→              }`}
+   800→            >
+   801→              <tab.icon className="size-3.5" />
+   802→              {tab.label}
+   803→            </button>
+   804→          )
+   805→        })}
+   806→      </div>
+   807→
+   808→      {/* Content */}
+   809→      <AnimatePresence mode="wait">
+   810→        <motion.div key={activeTab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.15 }}>
+   811→
+   812→          {/* ── CLIENTS TAB ── */}
+   813→          {activeTab === 'clients' && (
+   814→            <div className="space-y-5">
+   815→              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   816→                <StatCard label="Total Clients" value={String(clients.length)} icon={Users} accent />
+   817→                <StatCard label="Active" value={String(clients.filter(c => c.status === 'active').length)} icon={CheckCircle2} />
+   818→                <StatCard label="Trial" value={String(clients.filter(c => c.status === 'trial').length)} icon={Clock} />
+   819→                <StatCard label="Churned" value={String(clients.filter(c => c.status === 'churned' || c.status === 'suspended').length)} icon={XCircle} />
+   820→              </div>
+   821→
+   822→              <div className="macos-card overflow-hidden">
+   823→                <div className="flex items-center justify-between p-4 border-b border-border">
+   824→                  <div className="relative w-64">
+   825→                    <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+   826→                    <input className="macos-search !pl-8 !h-8" placeholder="Search clients..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+   827→                  </div>
+   828→                </div>
+   829→                <table className="macos-table">
+   830→                  <thead>
+   831→                    <tr>
+   832→                      <th>Company</th><th>Contact</th><th>Email</th><th>Plan</th><th>Status</th><th>Devices</th><th>Onboarded</th>
+   833→                    </tr>
+   834→                  </thead>
+   835→                  <tbody>
+   836→                    {clients.filter(c => !searchQuery || c.companyName.toLowerCase().includes(searchQuery.toLowerCase())).map(client => {
+   837→                      const sub = subscriptions.find(s => s.clientId === client.id && s.status === 'active' || s.status === 'trial')
+   838→                      return (
+   839→                        <tr key={client.id}>
+   840→                          <td className="font-medium">{client.companyName}</td>
+   841→                          <td>{client.contactPerson}</td>
+   842→                          <td className="text-muted-foreground text-[12px]">{client.email}</td>
+   843→                          <td><span className="text-[11px] font-medium">{sub?.plan?.name || '—'}</span></td>
+   844→                          <td><StatusBadge status={client.status} /></td>
+   845→                          <td className="text-center">{client._count?.devices || 0}</td>
+   846→                          <td className="text-muted-foreground text-[12px]">{formatDate(client.onboardedAt)}</td>
+   847→                        </tr>
+   848→                      )
+   849→                    })}
+   850→                  </tbody>
+   851→                </table>
+   852→              </div>
+   853→            </div>
+   854→          )}
+   855→
+   856→          {/* ── SUBSCRIPTIONS TAB ── */}
+   857→          {activeTab === 'subscriptions' && (
+   858→            <div className="space-y-5">
+   859→              {/* Plans */}
+   860→              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+   861→                {plans.map(plan => (
+   862→                  <div key={plan.id} className={`macos-card p-5 relative ${plan.isPopular ? 'ring-2 ring-amber-500/30' : ''}`}>
+   863→                    {plan.isPopular && <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-[9px] font-bold px-2.5 py-0.5 rounded-full">POPULAR</div>}
+   864→                    <div className="flex items-center gap-2 mb-3">
+   865→                      {plan.name === 'Starter' ? <Zap className="size-4 text-gray-400" /> : plan.name === 'Professional' ? <Star className="size-4 text-amber-500" /> : <Crown className="size-4 text-orange-500" />}
+   866→                      <h3 className="text-[15px] font-bold">{plan.name}</h3>
+   867→                    </div>
+   868→                    <div className="mb-3">
+   869→                      <span className="text-[28px] font-bold">{formatPKR(plan.priceMonthly)}</span>
+   870→                      <span className="text-[12px] text-muted-foreground">/mo</span>
+   871→                      <p className="text-[11px] text-muted-foreground mt-0.5">{formatPKR(plan.priceAnnual)}/yr (save {Math.round((1 - plan.priceAnnual / (plan.priceMonthly * 12)) * 100)}%)</p>
+   872→                    </div>
+   873→                    <div className="space-y-1.5 mb-3">
+   874→                      {(() => { try { return JSON.parse(plan.features).map((f: string, i: number) => <div key={i} className="flex items-center gap-1.5 text-[11px]"><CheckCircle2 className="size-3 text-emerald-500 shrink-0" />{f}</div>) } catch { return null } })()}
+   875→                    </div>
+   876→                    <div className="text-[10px] text-muted-foreground border-t border-border pt-2 mt-2">
+   877→                      {plan._count?.subscriptions || 0} active subscriptions · {plan._count?.licenseKeys || 0} keys
+   878→                    </div>
+   879→                  </div>
+   880→                ))}
+   881→              </div>
+   882→
+   883→              {/* Subscriptions Table */}
+   884→              <div className="macos-card overflow-hidden">
+   885→                <div className="p-4 border-b border-border">
+   886→                  <h3 className="text-[13px] font-semibold">Client Subscriptions</h3>
+   887→                </div>
+   888→                <table className="macos-table">
+   889→                  <thead><tr><th>Client</th><th>Plan</th><th>Billing</th><th>Status</th><th>Start</th><th>End</th><th>Auto-Renew</th></tr></thead>
+   890→                  <tbody>
+   891→                    {subscriptions.map(sub => (
+   892→                      <tr key={sub.id}>
+   893→                        <td className="font-medium">{sub.client?.companyName || '—'}</td>
+   894→                        <td><span className="text-[11px] font-medium">{sub.plan?.name || '—'}</span></td>
+   895→                        <td className="capitalize text-[12px]">{sub.billingCycle}</td>
+   896→                        <td><StatusBadge status={sub.status} /></td>
+   897→                        <td className="text-[12px] text-muted-foreground">{formatDate(sub.startDate)}</td>
+   898→                        <td className="text-[12px] text-muted-foreground">{sub.endDate ? formatDate(sub.endDate) : '—'}</td>
+   899→                        <td>{sub.autoRenew ? <CheckCircle2 className="size-4 text-emerald-500" /> : <XCircle className="size-4 text-gray-300" />}</td>
+   900→                      </tr>
+   901→                    ))}
+   902→                  </tbody>
+   903→                </table>
+   904→              </div>
+   905→            </div>
+   906→          )}
+   907→
+   908→          {/* ── INVOICES TAB ── */}
+   909→          {activeTab === 'invoices' && (
+   910→            <div className="space-y-5">
+   911→              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   912→                <StatCard label="Total Revenue" value={formatPKR(invoices.reduce((s, i) => s + i.total, 0))} icon={DollarSign} accent />
+   913→                <StatCard label="Outstanding" value={formatPKR(invoices.filter(i => i.balanceDue > 0).reduce((s, i) => s + i.balanceDue, 0))} icon={AlertCircle} />
+   914→                <StatCard label="Overdue" value={String(invoices.filter(i => i.status === 'overdue').length)} icon={Clock} />
+   915→                <StatCard label="Paid" value={String(invoices.filter(i => i.status === 'paid').length)} icon={CheckCircle2} />
+   916→              </div>
+   917→
+   918→              <div className="macos-card overflow-hidden">
+   919→                <table className="macos-table">
+   920→                  <thead><tr><th>Invoice #</th><th>Client</th><th>Issue Date</th><th>Due Date</th><th>Total</th><th>Balance</th><th>Status</th><th></th></tr></thead>
+   921→                  <tbody>
+   922→                    {invoices.map(inv => (
+   923→                      <tr key={inv.id}>
+   924→                        <td className="font-mono text-[12px] font-semibold">{inv.invoiceNumber}</td>
+   925→                        <td className="font-medium">{inv.client?.companyName || '—'}</td>
+   926→                        <td className="text-[12px] text-muted-foreground">{formatDate(inv.issueDate)}</td>
+   927→                        <td className="text-[12px] text-muted-foreground">{formatDate(inv.dueDate)}</td>
+   928→                        <td className="font-medium">{formatPKR(inv.total)}</td>
+   929→                        <td className={inv.balanceDue > 0 ? 'text-red-500 font-medium' : 'text-emerald-500'}>{formatPKR(inv.balanceDue)}</td>
+   930→                        <td><StatusBadge status={inv.status} /></td>
+   931→                        <td>
+   932→                          <button onClick={() => { setViewingInvoice(inv); setShowPrintView(true) }} className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+   933→                            <Eye className="size-4 text-muted-foreground" />
+   934→                          </button>
+   935→                        </td>
+   936→                      </tr>
+   937→                    ))}
+   938→                  </tbody>
+   939→                </table>
+   940→              </div>
+   941→            </div>
+   942→          )}
+   943→
+   944→          {/* ── QUOTATIONS TAB ── */}
+   945→          {activeTab === 'quotations' && (
+   946→            <div className="space-y-5">
+   947→              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   948→                <StatCard label="Total Quotes" value={String(quotations.length)} icon={FileSpreadsheet} accent />
+   949→                <StatCard label="Sent" value={String(quotations.filter(q => q.status === 'sent').length)} icon={Send} />
+   950→                <StatCard label="Accepted" value={String(quotations.filter(q => q.status === 'accepted').length)} icon={CheckCircle2} />
+   951→                <StatCard label="Total Value" value={formatPKR(quotations.reduce((s, q) => s + q.total, 0))} icon={DollarSign} />
+   952→              </div>
+   953→
+   954→              <div className="macos-card overflow-hidden">
+   955→                <table className="macos-table">
+   956→                  <thead><tr><th>Quote #</th><th>Client</th><th>Issue Date</th><th>Valid Until</th><th>Total</th><th>Status</th><th></th></tr></thead>
+   957→                  <tbody>
+   958→                    {quotations.map(q => (
+   959→                      <tr key={q.id}>
+   960→                        <td className="font-mono text-[12px] font-semibold">{q.quotationNumber}</td>
+   961→                        <td className="font-medium">{q.clientName}</td>
+   962→                        <td className="text-[12px] text-muted-foreground">{formatDate(q.issueDate)}</td>
+   963→                        <td className="text-[12px] text-muted-foreground">{formatDate(q.validUntil)}</td>
+   964→                        <td className="font-medium">{formatPKR(q.total)}</td>
+   965→                        <td><StatusBadge status={q.status} /></td>
+   966→                        <td>
+   967→                          <button onClick={() => { setViewingQuotation(q); setShowPrintView(true) }} className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+   968→                            <Eye className="size-4 text-muted-foreground" />
+   969→                          </button>
+   970→                        </td>
+   971→                      </tr>
+   972→                    ))}
+   973→                  </tbody>
+   974→                </table>
+   975→              </div>
+   976→            </div>
+   977→          )}
+   978→
+   979→          {/* ── LICENSE KEYS TAB ── */}
+   980→          {activeTab === 'license-keys' && (
+   981→            <div className="space-y-5">
+   982→              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   983→                <StatCard label="Total Keys" value={String(licenseKeys.length)} icon={Key} accent />
+   984→                <StatCard label="Available" value={String(licenseKeys.filter(k => k.status === 'available').length)} icon={CheckCircle2} />
+   985→                <StatCard label="Assigned" value={String(licenseKeys.filter(k => k.status === 'assigned').length)} icon={Link2} />
+   986→                <StatCard label="Revoked" value={String(licenseKeys.filter(k => k.status === 'revoked').length)} icon={XCircle} />
+   987→              </div>
+   988→
+   989→              <div className="macos-card overflow-hidden">
+   990→                <table className="macos-table">
+   991→                  <thead><tr><th>License Key</th><th>Client</th><th>Plan</th><th>Stations</th><th>Status</th><th>Assigned</th><th>Expires</th><th></th></tr></thead>
+   992→                  <tbody>
+   993→                    {licenseKeys.map(lk => (
+   994→                      <tr key={lk.id}>
+   995→                        <td>
+   996→                          <div className="flex items-center gap-1.5">
+   997→                            <code className="text-[12px] font-mono font-semibold bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded">{lk.key}</code>
+   998→                            <button onClick={() => copyKey(lk.key)} className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+   999→                              {copiedKey === lk.key ? <CheckCircle2 className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5 text-muted-foreground" />}
+  1000→                            </button>
+  1001→                          </div>
+  1002→                        </td>
+  1003→                        <td className="font-medium">{lk.client?.companyName || '—'}</td>
+  1004→                        <td className="text-[11px] font-medium">{lk.plan?.name || '—'}</td>
+  1005→                        <td className="text-center text-[12px]">{lk.maxStations}</td>
+  1006→                        <td><StatusBadge status={lk.status} /></td>
+  1007→                        <td className="text-[12px] text-muted-foreground">{lk.assignedAt ? formatDate(lk.assignedAt) : '—'}</td>
+  1008→                        <td className="text-[12px] text-muted-foreground">{lk.expiresAt ? formatDate(lk.expiresAt) : '—'}</td>
+  1009→                        <td>
+  1010→                          {lk.status === 'available' && (
+  1011→                            <button className="macos-btn-secondary text-[10px] px-2 py-0.5">Assign</button>
+  1012→                          )}
+  1013→                        </td>
+  1014→                      </tr>
+  1015→                    ))}
+  1016→                  </tbody>
+  1017→                </table>
+  1018→              </div>
+  1019→            </div>
+  1020→          )}
+  1021→
+  1022→          {/* ── DEVICES TAB ── */}
+  1023→          {activeTab === 'devices' && (
+  1024→            <div className="space-y-5">
+  1025→              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+  1026→                <StatCard label="Total Devices" value={String(devices.length)} icon={Monitor} accent />
+  1027→                <StatCard label="Active" value={String(devices.filter(d => d.status === 'active').length)} icon={CheckCircle2} />
+  1028→                <StatCard label="Maintenance" value={String(devices.filter(d => d.status === 'maintenance').length)} icon={AlertCircle} />
+  1029→                <StatCard label="Inactive" value={String(devices.filter(d => d.status === 'inactive').length)} icon={XCircle} />
+  1030→              </div>
+  1031→
+  1032→              <div className="macos-card overflow-hidden">
+  1033→                <table className="macos-table">
+  1034→                  <thead><tr><th>Client</th><th>Device</th><th>Type</th><th>Serial #</th><th>IP Address</th><th>Location</th><th>Status</th><th>Last Seen</th></tr></thead>
+  1035→                  <tbody>
+  1036→                    {devices.map(dev => {
+  1037→                      const IconComp = deviceTypeIcon[dev.deviceType] || Monitor
+  1038→                      return (
+  1039→                        <tr key={dev.id}>
+  1040→                          <td className="font-medium">{dev.client?.companyName || '—'}</td>
+  1041→                          <td>
+  1042→                            <div className="flex items-center gap-2">
+  1043→                              <IconComp className="size-3.5 text-muted-foreground" />
+  1044→                              <span>{dev.deviceName}</span>
+  1045→                            </div>
+  1046→                          </td>
+  1047→                          <td className="text-[11px] capitalize">{dev.deviceType.replace('_', ' ')}</td>
+  1048→                          <td className="font-mono text-[11px] text-muted-foreground">{dev.serialNumber || '—'}</td>
+  1049→                          <td className="font-mono text-[11px] text-muted-foreground">{dev.ipAddress || '—'}</td>
+  1050→                          <td className="text-[12px]">{dev.location || '—'}</td>
+  1051→                          <td><StatusBadge status={dev.status} /></td>
+  1052→                          <td className="text-[12px] text-muted-foreground">{dev.lastSeenAt ? formatDate(dev.lastSeenAt) : '—'}</td>
+  1053→                        </tr>
+  1054→                      )
+  1055→                    })}
+  1056→                  </tbody>
+  1057→                </table>
+  1058→              </div>
+  1059→            </div>
+  1060→          )}
+  1061→
+  1062→          {/* ── TENANT DATABASES TAB ── */}
+  1063→          {activeTab === 'tenants' && (
+  1064→            <TenantDatabasesTab clients={clients} onRefresh={refreshData} />
+  1065→          )}
+  1066→        </motion.div>
+  1067→      </AnimatePresence>
+  1068→    </div>
+  1069→  )
+  1070→}
+  1071→

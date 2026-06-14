@@ -1,0 +1,871 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useCallback } from 'react'
+     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→import {
+     6→  Receipt,
+     7→  DollarSign,
+     8→  Fuel,
+     9→  Clock,
+    10→  CreditCard,
+    11→  Banknote,
+    12→  TrendingUp,
+    13→  ArrowUpRight,
+    14→  ArrowDownRight,
+    15→  Activity,
+    16→  Smartphone,
+    17→  Users,
+    18→  ChevronRight,
+    19→  Timer,
+    20→  UserCircle,
+    21→  Wallet,
+    22→  RefreshCw,
+    23→  Loader2,
+    24→  AlertTriangle,
+    25→} from 'lucide-react'
+    26→import {
+    27→  PieChart,
+    28→  Pie,
+    29→  Cell,
+    30→  Tooltip,
+    31→  ResponsiveContainer,
+    32→  BarChart,
+    33→  Bar,
+    34→  XAxis,
+    35→  YAxis,
+    36→  AreaChart,
+    37→  Area,
+    38→} from 'recharts'
+    39→
+    40→// ── Types ──────────────────────────────────────────────────
+    41→
+    42→interface FuelingRecord {
+    43→  id: string
+    44→  fuelType: string
+    45→  volume: number
+    46→  totalAmount: number
+    47→  paymentMethod: string
+    48→  startedAt: string
+    49→  completedAt: string | null
+    50→  status: string
+    51→  vehiclePlate: string | null
+    52→  dispenser: { name: string; code: string } | null
+    53→  nozzle: { nozzleNumber: number; fuelType: string } | null
+    54→  attendant: { id: string; name: string } | null
+    55→  shift: { id: string; shiftNumber: number; status: string } | null
+    56→  fleetAccount: { id: string; companyName: string } | null
+    57→  loyaltyInfo: {
+    58→    customerName: string
+    59→    membershipTier: string
+    60→    currentPoints: number
+    61→    pointsEarned: number
+    62→  } | null
+    63→}
+    64→
+    65→interface DashboardData {
+    66→  kpis: {
+    67→    revenue: { today: number; week: number; currency: string }
+    68→    fuelSold: { value: number; unit: string }
+    69→    activePumps: { value: number; total: number }
+    70→    netProfit: { value: number; currency: string }
+    71→  }
+    72→  revenueChart: { hour: string; value: number }[]
+    73→  fuelBreakdown: { type: string; volume: number; revenue: number }[]
+    74→  recentTransactions: {
+    75→    id: string
+    76→    time: string
+    77→    pump: string
+    78→    product: string
+    79→    litres: number
+    80→    amount: number
+    81→    payment: string
+    82→    attendant: string
+    83→  }[]
+    84→  shiftInfo: {
+    85→    id: string
+    86→    name: string
+    87→    attendant: string
+    88→    supervisor: string
+    89→    openedAt: string
+    90→    sales: number
+    91→    fuelSales: number
+    92→    retailSales: number
+    93→    cardSales: number
+    94→    fleetSales: number
+    95→    cashSales: number
+    96→    transactionCount: number
+    97→  } | null
+    98→  stationInfo: { name: string; code: string; status: string; shift: string }
+    99→}
+   100→
+   101→// ── Helpers ──────────────────────────────────────────────────
+   102→
+   103→function formatPKR(amount: number): string {
+   104→  return `PKR ${amount.toLocaleString('en-PK')}`
+   105→}
+   106→
+   107→function formatCompactPKR(amount: number): string {
+   108→  if (amount >= 1000000) return `PKR ${(amount / 1000000).toFixed(1)}M`
+   109→  if (amount >= 1000) return `PKR ${(amount / 1000).toFixed(0)}K`
+   110→  return `PKR ${amount}`
+   111→}
+   112→
+   113→const FUEL_COLORS: Record<string, string> = {
+   114→  petrol: '#e8930c',
+   115→  pmg: '#e8930c',
+   116→  diesel: '#34c759',
+   117→  hsd: '#34c759',
+   118→  hobc: '#ff9f0a',
+   119→  premium: '#ff6b35',
+   120→  xl: '#ff6b35',
+   121→  default: '#e8930c',
+   122→}
+   123→
+   124→function getFuelColor(fuelType: string): string {
+   125→  const lower = fuelType.toLowerCase()
+   126→  for (const [key, color] of Object.entries(FUEL_COLORS)) {
+   127→    if (lower.includes(key)) return color
+   128→  }
+   129→  return FUEL_COLORS.default
+   130→}
+   131→
+   132→// ── Main Component ───────────────────────────────────────────
+   133→
+   134→export default function SalesModule() {
+   135→  const [activeTab, setActiveTab] = useState<'today' | 'transactions' | 'shift' | 'analytics'>('today')
+   136→  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
+   137→  const [fuelings, setFuelings] = useState<FuelingRecord[]>([])
+   138→  const [loading, setLoading] = useState(true)
+   139→  const [error, setError] = useState<string | null>(null)
+   140→
+   141→  const fetchData = useCallback(async () => {
+   142→    setLoading(true)
+   143→    setError(null)
+   144→    try {
+   145→      const [dashRes, fuelingsRes] = await Promise.all([
+   146→        fetch('/api/dashboard'),
+   147→        fetch('/api/fuelings?limit=50'),
+   148→      ])
+   149→      if (!dashRes.ok) throw new Error('Failed to load dashboard data')
+   150→      if (!fuelingsRes.ok) throw new Error('Failed to load fueling data')
+   151→      const dashJson = await dashRes.json()
+   152→      const fuelingsJson = await fuelingsRes.json()
+   153→      setDashboardData(dashJson)
+   154→      setFuelings(fuelingsJson.fuelings || [])
+   155→    } catch (err) {
+   156→      setError(err instanceof Error ? err.message : 'Unknown error')
+   157→    } finally {
+   158→      setLoading(false)
+   159→    }
+   160→  }, [])
+   161→
+   162→  useEffect(() => {
+   163→    fetchData()
+   164→  }, [fetchData])
+   165→
+   166→  // Derived data
+   167→  const fuelBreakdown = dashboardData?.fuelBreakdown || []
+   168→  const revenueChart = dashboardData?.revenueChart || []
+   169→  const recentTransactions = dashboardData?.recentTransactions || []
+   170→  const shiftInfo = dashboardData?.shiftInfo || null
+   171→
+   172→  const totalRevenue = fuelBreakdown.reduce((s, f) => s + f.revenue, 0)
+   173→  const totalVolume = fuelBreakdown.reduce((s, f) => s + f.volume, 0)
+   174→  const totalTransactions = recentTransactions.length
+   175→  const avgTransaction = totalTransactions > 0 ? Math.round(totalRevenue / totalTransactions) : 0
+   176→
+   177→  // Payment method breakdown from fuelings
+   178→  const paymentMethods = (() => {
+   179→    const methodMap: Record<string, { value: number; count: number }> = {}
+   180→    const today = new Date()
+   181→    today.setHours(0, 0, 0, 0)
+   182→    const todayFuelings = fuelings.filter(f => {
+   183→      const d = new Date(f.completedAt || f.startedAt)
+   184→      return d >= today && f.status === 'completed'
+   185→    })
+   186→    for (const f of todayFuelings) {
+   187→      const method = f.paymentMethod.charAt(0).toUpperCase() + f.paymentMethod.slice(1)
+   188→      if (!methodMap[method]) methodMap[method] = { value: 0, count: 0 }
+   189→      methodMap[method].value += f.totalAmount
+   190→      methodMap[method].count += 1
+   191→    }
+   192→    const colorMap: Record<string, string> = {
+   193→      Cash: '#34c759',
+   194→      Card: '#e8930c',
+   195→      'Fleet card': '#ff9f0a',
+   196→      'Fleet Card': '#ff9f0a',
+   197→      Mobile: '#ff3b30',
+   198→    }
+   199→    return Object.entries(methodMap).map(([name, data]) => ({
+   200→      name,
+   201→      value: Math.round(data.value),
+   202→      color: colorMap[name] || '#e8930c',
+   203→      count: data.count,
+   204→    }))
+   205→  })()
+   206→
+   207→  const tabs = [
+   208→    { key: 'today' as const, label: "Today's Sales" },
+   209→    { key: 'transactions' as const, label: 'Transactions' },
+   210→    { key: 'shift' as const, label: 'Shift' },
+   211→    { key: 'analytics' as const, label: 'Analytics' },
+   212→  ]
+   213→
+   214→  // ── Loading State ──
+   215→  if (loading && !dashboardData) {
+   216→    return (
+   217→      <div className="space-y-5">
+   218→        <div className="flex items-center justify-between">
+   219→          <div>
+   220→            <div className="h-5 w-32 bg-muted/30 rounded animate-pulse" />
+   221→            <div className="h-4 w-56 bg-muted/20 rounded animate-pulse mt-2" />
+   222→          </div>
+   223→        </div>
+   224→        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+   225→          {[...Array(4)].map((_, i) => (
+   226→            <div key={i} className="macos-card p-4 h-[90px] animate-pulse bg-muted/10" />
+   227→          ))}
+   228→        </div>
+   229→      </div>
+   230→    )
+   231→  }
+   232→
+   233→  // ── Error State ──
+   234→  if (error && !dashboardData) {
+   235→    return (
+   236→      <div className="macos-card p-8 flex flex-col items-center justify-center text-center min-h-[300px]">
+   237→        <AlertTriangle className="size-10 text-teal-500 mb-4" />
+   238→        <h3 className="text-[15px] font-semibold text-foreground mb-1">Failed to load sales data</h3>
+   239→        <p className="text-[13px] text-muted-foreground mb-4">{error}</p>
+   240→        <button onClick={fetchData} className="macos-btn flex items-center gap-1.5">
+   241→          <RefreshCw className="size-3.5" /> Retry
+   242→        </button>
+   243→      </div>
+   244→    )
+   245→  }
+   246→
+   247→  return (
+   248→    <div className="space-y-5">
+   249→      {/* ── Header ── */}
+   250→      <div className="flex items-center justify-between">
+   251→        <div>
+   252→          <h2 className="text-[13px] font-semibold text-foreground">Fuel Sales</h2>
+   253→          <p className="text-[11px] text-muted-foreground mt-0.5">Transaction monitoring and revenue tracking</p>
+   254→        </div>
+   255→        <div className="flex items-center gap-2">
+   256→          {shiftInfo && (
+   257→            <div className="flex items-center gap-1.5 rounded-lg bg-card px-3 py-1.5 shadow-[0_0_0_0.5px_var(--border)]">
+   258→              <div className="macos-status-dot macos-status-online" />
+   259→              <span className="text-[11px] font-medium text-muted-foreground">{shiftInfo.name} Active</span>
+   260→            </div>
+   261→          )}
+   262→          <button
+   263→            onClick={fetchData}
+   264→            disabled={loading}
+   265→            className="macos-btn-secondary gap-1.5 flex items-center"
+   266→          >
+   267→            {loading ? (
+   268→              <Loader2 className="size-3.5 animate-spin" />
+   269→            ) : (
+   270→              <RefreshCw className="size-3.5" />
+   271→            )}
+   272→            Refresh
+   273→          </button>
+   274→        </div>
+   275→      </div>
+   276→
+   277→      {/* ── Tab Bar ── */}
+   278→      <div className="flex items-center gap-1 rounded-lg bg-black/[0.03] dark:bg-white/[0.04] p-0.5 w-fit">
+   279→        {tabs.map((tab) => (
+   280→          <button
+   281→            key={tab.key}
+   282→            onClick={() => setActiveTab(tab.key)}
+   283→            className={`relative rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${
+   284→              activeTab === tab.key ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+   285→            }`}
+   286→          >
+   287→            {activeTab === tab.key && (
+   288→              <motion.div
+   289→                layoutId="sales-tab-indicator"
+   290→                className="absolute inset-0 rounded-md bg-card shadow-[0_0_0_0.5px_var(--border)]"
+   291→                transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+   292→              />
+   293→            )}
+   294→            <span className="relative z-10">{tab.label}</span>
+   295→          </button>
+   296→        ))}
+   297→      </div>
+   298→
+   299→      {/* ── Tab Content ── */}
+   300→      <AnimatePresence mode="wait">
+   301→        {activeTab === 'today' && (
+   302→          <motion.div
+   303→            key="today"
+   304→            initial={{ opacity: 0, y: 6 }}
+   305→            animate={{ opacity: 1, y: 0 }}
+   306→            exit={{ opacity: 0, y: -4 }}
+   307→            transition={{ duration: 0.2 }}
+   308→            className="space-y-5"
+   309→          >
+   310→            {/* ── Stats Cards ── */}
+   311→            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+   312→              {[
+   313→                { label: 'Total Revenue', value: formatCompactPKR(totalRevenue), icon: DollarSign, accent: 'text-teal-500', bg: 'bg-teal-500/10' },
+   314→                { label: 'Total Volume', value: `${totalVolume.toLocaleString()} L`, icon: Fuel, accent: 'text-[#34c759]', bg: 'bg-[#34c759]/10' },
+   315→                { label: 'Transactions', value: totalTransactions.toString(), icon: Receipt, accent: 'text-[#ff9f0a]', bg: 'bg-[#ff9f0a]/10' },
+   316→                { label: 'Avg Transaction', value: formatPKR(avgTransaction), icon: TrendingUp, accent: 'text-[#ff3b30]', bg: 'bg-[#ff3b30]/10' },
+   317→              ].map((stat, i) => (
+   318→                <motion.div
+   319→                  key={stat.label}
+   320→                  initial={{ opacity: 0, y: 8 }}
+   321→                  animate={{ opacity: 1, y: 0 }}
+   322→                  transition={{ duration: 0.3, delay: i * 0.06 }}
+   323→                  className="macos-card p-4"
+   324→                >
+   325→                  <div className="flex items-start justify-between">
+   326→                    <div>
+   327→                      <p className="text-[11px] text-muted-foreground uppercase font-semibold tracking-wide">{stat.label}</p>
+   328→                      <p className="text-[22px] font-bold text-foreground mt-1 leading-none">{stat.value}</p>
+   329→                    </div>
+   330→                    <div className={`flex size-8 items-center justify-center rounded-lg ${stat.bg}`}>
+   331→                      <stat.icon className={`size-4 ${stat.accent}`} />
+   332→                    </div>
+   333→                  </div>
+   334→                </motion.div>
+   335→              ))}
+   336→            </div>
+   337→
+   338→            {/* ── Sales by Fuel Type ── */}
+   339→            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+   340→              {fuelBreakdown.map((fuel, i) => (
+   341→                <motion.div
+   342→                  key={fuel.type}
+   343→                  initial={{ opacity: 0, y: 8 }}
+   344→                  animate={{ opacity: 1, y: 0 }}
+   345→                  transition={{ duration: 0.3, delay: 0.15 + i * 0.06 }}
+   346→                  className="macos-card p-4"
+   347→                >
+   348→                  <div className="flex items-center gap-2 mb-3">
+   349→                    <div className="size-2.5 rounded-full" style={{ backgroundColor: getFuelColor(fuel.type) }} />
+   350→                    <p className="text-[13px] font-semibold text-foreground">{fuel.type}</p>
+   351→                  </div>
+   352→                  <div className="space-y-2">
+   353→                    <div className="flex items-center justify-between">
+   354→                      <span className="text-[11px] text-muted-foreground uppercase font-semibold">Revenue</span>
+   355→                      <span className="text-[13px] font-semibold text-foreground">{formatCompactPKR(fuel.revenue)}</span>
+   356→                    </div>
+   357→                    <div className="flex items-center justify-between">
+   358→                      <span className="text-[11px] text-muted-foreground uppercase font-semibold">Volume</span>
+   359→                      <span className="text-[13px] font-medium text-foreground">{fuel.volume.toLocaleString()} L</span>
+   360→                    </div>
+   361→                    {/* Share bar */}
+   362→                    <div className="h-1.5 rounded-full bg-black/[0.04] dark:bg-white/[0.06] overflow-hidden">
+   363→                      <motion.div
+   364→                        initial={{ width: 0 }}
+   365→                        animate={{ width: totalRevenue > 0 ? `${(fuel.revenue / totalRevenue) * 100}%` : '0%' }}
+   366→                        transition={{ duration: 0.6, delay: 0.3 + i * 0.06 }}
+   367→                        className="h-full rounded-full"
+   368→                        style={{ backgroundColor: getFuelColor(fuel.type) }}
+   369→                      />
+   370→                    </div>
+   371→                    <p className="text-[10px] text-muted-foreground text-right">{totalRevenue > 0 ? ((fuel.revenue / totalRevenue) * 100).toFixed(1) : 0}% of total</p>
+   372→                  </div>
+   373→                </motion.div>
+   374→              ))}
+   375→            </div>
+   376→
+   377→            {/* ── Hourly Revenue Chart + Payment Methods ── */}
+   378→            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+   379→              {/* Hourly Revenue */}
+   380→              <div className="macos-card p-4 lg:col-span-2">
+   381→                <div className="flex items-center justify-between mb-4">
+   382→                  <div>
+   383→                    <p className="text-[13px] font-semibold text-foreground">Hourly Revenue</p>
+   384→                    <p className="text-[11px] text-muted-foreground">Today&apos;s revenue curve</p>
+   385→                  </div>
+   386→                  {revenueChart.length > 0 && (
+   387→                    <span className="macos-pill bg-[#34c759]/10 text-[#34c759]">
+   388→                      Peak: {revenueChart.reduce((max, p) => p.value > max.value ? p : max, revenueChart[0])?.hour || '--:--'}
+   389→                    </span>
+   390→                  )}
+   391→                </div>
+   392→                {revenueChart.length > 0 ? (
+   393→                  <div className="h-52">
+   394→                    <ResponsiveContainer width="100%" height="100%">
+   395→                      <AreaChart data={revenueChart.map(p => ({ hour: p.hour, revenue: p.value }))} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
+   396→                        <defs>
+   397→                          <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
+   398→                            <stop offset="5%" stopColor="#e8930c" stopOpacity={0.2} />
+   399→                            <stop offset="95%" stopColor="#e8930c" stopOpacity={0} />
+   400→                          </linearGradient>
+   401→                        </defs>
+   402→                        <XAxis dataKey="hour" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+   403→                        <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
+   404→                        <Tooltip
+   405→                          contentStyle={{ fontSize: 12, borderRadius: 10, border: '0.5px solid var(--border)', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', background: 'var(--card)' }}
+   406→                          formatter={(val: number) => [formatPKR(val), 'Revenue']}
+   407→                        />
+   408→                        <Area type="monotone" dataKey="revenue" stroke="#e8930c" strokeWidth={2} fill="url(#salesGradient)" />
+   409→                      </AreaChart>
+   410→                    </ResponsiveContainer>
+   411→                  </div>
+   412→                ) : (
+   413→                  <div className="h-52 flex items-center justify-center text-muted-foreground text-[13px]">
+   414→                    No hourly data available
+   415→                  </div>
+   416→                )}
+   417→              </div>
+   418→
+   419→              {/* Payment Methods Donut */}
+   420→              <div className="macos-card p-4">
+   421→                <p className="text-[13px] font-semibold text-foreground mb-1">Payment Methods</p>
+   422→                <p className="text-[11px] text-muted-foreground mb-3">Breakdown by method</p>
+   423→                {paymentMethods.length > 0 ? (
+   424→                  <>
+   425→                    <div className="h-44">
+   426→                      <ResponsiveContainer width="100%" height="100%">
+   427→                        <PieChart>
+   428→                          <Pie
+   429→                            data={paymentMethods}
+   430→                            dataKey="value"
+   431→                            nameKey="name"
+   432→                            cx="50%"
+   433→                            cy="50%"
+   434→                            innerRadius={42}
+   435→                            outerRadius={62}
+   436→                            paddingAngle={3}
+   437→                            strokeWidth={0}
+   438→                          >
+   439→                            {paymentMethods.map((entry, index) => (
+   440→                              <Cell key={index} fill={entry.color} />
+   441→                            ))}
+   442→                          </Pie>
+   443→                          <Tooltip
+   444→                            contentStyle={{ fontSize: 12, borderRadius: 10, border: '0.5px solid var(--border)', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', background: 'var(--card)' }}
+   445→                            formatter={(val: number) => [formatPKR(val), 'Revenue']}
+   446→                          />
+   447→                        </PieChart>
+   448→                      </ResponsiveContainer>
+   449→                    </div>
+   450→                    {/* Payment method legend */}
+   451→                    <div className="space-y-2 mt-2">
+   452→                      {paymentMethods.map((pm) => {
+   453→                        const total = paymentMethods.reduce((s, p) => s + p.value, 0)
+   454→                        const pct = total > 0 ? ((pm.value / total) * 100).toFixed(0) : '0'
+   455→                        const icons: Record<string, React.ReactNode> = {
+   456→                          Cash: <Banknote className="size-3.5" style={{ color: pm.color }} />,
+   457→                          Card: <CreditCard className="size-3.5" style={{ color: pm.color }} />,
+   458→                          'Fleet card': <Wallet className="size-3.5" style={{ color: pm.color }} />,
+   459→                          'Fleet Card': <Wallet className="size-3.5" style={{ color: pm.color }} />,
+   460→                          Mobile: <Smartphone className="size-3.5" style={{ color: pm.color }} />,
+   461→                        }
+   462→                        return (
+   463→                          <div key={pm.name} className="flex items-center justify-between">
+   464→                            <div className="flex items-center gap-2">
+   465→                              {icons[pm.name] || <Wallet className="size-3.5" style={{ color: pm.color }} />}
+   466→                              <span className="text-[12px] text-foreground">{pm.name}</span>
+   467→                            </div>
+   468→                            <div className="flex items-center gap-2">
+   469→                              <span className="text-[12px] font-medium text-foreground">{pct}%</span>
+   470→                              <span className="text-[11px] text-muted-foreground">({pm.count})</span>
+   471→                            </div>
+   472→                          </div>
+   473→                        )
+   474→                      })}
+   475→                    </div>
+   476→                  </>
+   477→                ) : (
+   478→                  <div className="h-44 flex items-center justify-center text-muted-foreground text-[13px]">
+   479→                    No payment data
+   480→                  </div>
+   481→                )}
+   482→              </div>
+   483→            </div>
+   484→          </motion.div>
+   485→        )}
+   486→
+   487→        {activeTab === 'transactions' && (
+   488→          <motion.div
+   489→            key="transactions"
+   490→            initial={{ opacity: 0, y: 6 }}
+   491→            animate={{ opacity: 1, y: 0 }}
+   492→            exit={{ opacity: 0, y: -4 }}
+   493→            transition={{ duration: 0.2 }}
+   494→            className="space-y-4"
+   495→          >
+   496→            {/* Quick Stats from payment methods */}
+   497→            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+   498→              {paymentMethods.map((s) => {
+   499→                const icons: Record<string, React.ElementType> = {
+   500→                  Cash: Banknote,
+   501→                  Card: CreditCard,
+   502→                  'Fleet card': Wallet,
+   503→                  'Fleet Card': Wallet,
+   504→                  Mobile: Smartphone,
+   505→                }
+   506→                const Icon = icons[s.name] || Wallet
+   507→                return (
+   508→                  <div key={s.label || s.name} className="macos-card p-3 flex items-center gap-3">
+   509→                    <div className="flex size-8 items-center justify-center rounded-lg" style={{ backgroundColor: `${s.color}15` }}>
+   510→                      <Icon className="size-4" style={{ color: s.color }} />
+   511→                    </div>
+   512→                    <div>
+   513→                      <p className="text-[11px] text-muted-foreground uppercase font-semibold tracking-wide">{s.name} Sales</p>
+   514→                      <p className="text-[13px] font-semibold text-foreground">{formatCompactPKR(s.value)}</p>
+   515→                    </div>
+   516→                  </div>
+   517→                )
+   518→              })}
+   519→            </div>
+   520→
+   521→            {/* Transactions Table */}
+   522→            <div className="macos-card overflow-hidden">
+   523→              <div className="px-4 py-3 border-b border-border/50 flex items-center justify-between">
+   524→                <div>
+   525→                  <p className="text-[13px] font-semibold text-foreground">Recent Transactions</p>
+   526→                  <p className="text-[11px] text-muted-foreground">{fuelings.length} shown · Live feed</p>
+   527→                </div>
+   528→                <button className="macos-btn-secondary gap-1.5">
+   529→                  <Activity className="size-3" />
+   530→                  Export
+   531→                </button>
+   532→              </div>
+   533→              <div className="max-h-96 overflow-y-auto">
+   534→                {fuelings.length > 0 ? (
+   535→                  <table className="macos-table">
+   536→                    <thead>
+   537→                      <tr>
+   538→                        <th>Time</th>
+   539→                        <th>Pump</th>
+   540→                        <th>Fuel</th>
+   541→                        <th className="text-right">Volume (L)</th>
+   542→                        <th className="text-right">Amount</th>
+   543→                        <th>Payment</th>
+   544→                        <th>Vehicle</th>
+   545→                      </tr>
+   546→                    </thead>
+   547→                    <tbody>
+   548→                      {fuelings.map((f, i) => {
+   549→                        const time = f.completedAt
+   550→                          ? new Date(f.completedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+   551→                          : '--:--'
+   552→                        const nozzle = f.nozzle ? `P${f.dispenser?.code || '?'}-N${f.nozzle.nozzleNumber}` : f.dispenser?.name || '?'
+   553→                        const paymentLabel = f.paymentMethod.charAt(0).toUpperCase() + f.paymentMethod.slice(1)
+   554→                        const paymentConfig: Record<string, { bg: string; text: string }> = {
+   555→                          Cash: { bg: 'bg-[#34c759]/10', text: 'text-[#34c759]' },
+   556→                          Card: { bg: 'bg-teal-500/10', text: 'text-teal-600 dark:text-teal-400' },
+   557→                          'Fleet card': { bg: 'bg-[#ff9f0a]/10', text: 'text-[#ff9f0a]' },
+   558→                          'Fleet Card': { bg: 'bg-[#ff9f0a]/10', text: 'text-[#ff9f0a]' },
+   559→                          Mobile: { bg: 'bg-[#ff3b30]/10', text: 'text-[#ff3b30]' },
+   560→                        }
+   561→                        const pc = paymentConfig[paymentLabel] || { bg: 'bg-secondary', text: 'text-secondary-foreground' }
+   562→                        return (
+   563→                          <motion.tr
+   564→                            key={f.id}
+   565→                            initial={{ opacity: 0 }}
+   566→                            animate={{ opacity: 1 }}
+   567→                            transition={{ duration: 0.15, delay: i * 0.02 }}
+   568→                          >
+   569→                            <td className="font-mono text-[12px]">{time}</td>
+   570→                            <td className="font-medium text-[12px]">{nozzle}</td>
+   571→                            <td>
+   572→                              <span className="macos-pill bg-teal-500/10 text-teal-600 dark:text-teal-400">{f.fuelType}</span>
+   573→                            </td>
+   574→                            <td className="text-right font-mono">{f.volume.toFixed(1)}</td>
+   575→                            <td className="text-right font-semibold">{formatPKR(f.totalAmount)}</td>
+   576→                            <td>
+   577→                              <span className={`macos-pill ${pc.bg} ${pc.text}`}>{paymentLabel}</span>
+   578→                            </td>
+   579→                            <td className="text-[12px] text-muted-foreground font-mono">{f.vehiclePlate || '—'}</td>
+   580→                          </motion.tr>
+   581→                        )
+   582→                      })}
+   583→                    </tbody>
+   584→                  </table>
+   585→                ) : (
+   586→                  <div className="p-6 text-center text-muted-foreground text-[13px]">
+   587→                    No transactions found
+   588→                  </div>
+   589→                )}
+   590→              </div>
+   591→            </div>
+   592→          </motion.div>
+   593→        )}
+   594→
+   595→        {activeTab === 'shift' && (
+   596→          <motion.div
+   597→            key="shift"
+   598→            initial={{ opacity: 0, y: 6 }}
+   599→            animate={{ opacity: 1, y: 0 }}
+   600→            exit={{ opacity: 0, y: -4 }}
+   601→            transition={{ duration: 0.2 }}
+   602→            className="space-y-4"
+   603→          >
+   604→            {/* Current Shift Card */}
+   605→            <div className="macos-card p-5 border-l-[3px] border-l-teal-500">
+   606→              {shiftInfo ? (
+   607→                <>
+   608→                  <div className="flex items-start justify-between mb-4">
+   609→                    <div className="flex items-center gap-3">
+   610→                      <div className="flex size-10 items-center justify-center rounded-xl bg-teal-500/10">
+   611→                        <UserCircle className="size-5 text-teal-500" />
+   612→                      </div>
+   613→                      <div>
+   614→                        <p className="text-[15px] font-semibold text-foreground">{shiftInfo.name} — In Progress</p>
+   615→                        <p className="text-[12px] text-muted-foreground">Operated by {shiftInfo.attendant}</p>
+   616→                      </div>
+   617→                    </div>
+   618→                    <div className="flex items-center gap-1.5">
+   619→                      <div className="macos-status-dot macos-status-online" />
+   620→                      <span className="text-[11px] font-medium text-[#34c759]">Active</span>
+   621→                    </div>
+   622→                  </div>
+   623→
+   624→                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+   625→                    {[
+   626→                      { label: 'Start Time', value: new Date(shiftInfo.openedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }), icon: Clock },
+   627→                      { label: 'Total Sales', value: formatCompactPKR(shiftInfo.sales), icon: DollarSign },
+   628→                      { label: 'Fuel Sales', value: formatCompactPKR(shiftInfo.fuelSales), icon: Fuel },
+   629→                      { label: 'Transactions', value: shiftInfo.transactionCount.toString(), icon: Receipt },
+   630→                    ].map((item) => (
+   631→                      <div key={item.label}>
+   632→                        <div className="flex items-center gap-1.5 mb-1">
+   633→                          <item.icon className="size-3 text-muted-foreground" />
+   634→                          <p className="text-[11px] text-muted-foreground uppercase font-semibold tracking-wide">{item.label}</p>
+   635→                        </div>
+   636→                        <p className="text-[16px] font-bold text-foreground">{item.value}</p>
+   637→                      </div>
+   638→                    ))}
+   639→                  </div>
+   640→
+   641→                  <div className="mt-4 pt-4 border-t border-border/50 flex items-center gap-3 flex-wrap">
+   642→                    <div className="flex items-center gap-1.5">
+   643→                      <Banknote className="size-3.5 text-muted-foreground" />
+   644→                      <span className="text-[11px] text-muted-foreground">Cash Sales:</span>
+   645→                      <span className="text-[12px] font-medium text-foreground">{formatPKR(shiftInfo.cashSales)}</span>
+   646→                    </div>
+   647→                    <div className="flex items-center gap-1.5">
+   648→                      <CreditCard className="size-3.5 text-muted-foreground" />
+   649→                      <span className="text-[11px] text-muted-foreground">Card Sales:</span>
+   650→                      <span className="text-[12px] font-medium text-foreground">{formatPKR(shiftInfo.cardSales)}</span>
+   651→                    </div>
+   652→                    <div className="flex items-center gap-1.5">
+   653→                      <Wallet className="size-3.5 text-muted-foreground" />
+   654→                      <span className="text-[11px] text-muted-foreground">Fleet Sales:</span>
+   655→                      <span className="text-[12px] font-medium text-foreground">{formatPKR(shiftInfo.fleetSales)}</span>
+   656→                    </div>
+   657→                    <div className="flex-1" />
+   658→                    <button className="macos-btn gap-1.5">
+   659→                      <Timer className="size-3.5" />
+   660→                      Close Shift
+   661→                    </button>
+   662→                    <button className="macos-btn-secondary gap-1.5">
+   663→                      <Activity className="size-3.5" />
+   664→                      Reconcile
+   665→                    </button>
+   666→                  </div>
+   667→                </>
+   668→              ) : (
+   669→                <div className="text-center py-6">
+   670→                  <Clock className="size-8 text-muted-foreground mx-auto mb-2" />
+   671→                  <p className="text-[13px] font-semibold text-foreground">No Active Shift</p>
+   672→                  <p className="text-[11px] text-muted-foreground mt-1">Start a new shift to begin tracking sales</p>
+   673→                </div>
+   674→              )}
+   675→            </div>
+   676→
+   677→            {/* Shift Performance */}
+   678→            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+   679→              {/* Hourly breakdown */}
+   680→              <div className="macos-card p-4">
+   681→                <p className="text-[13px] font-semibold text-foreground mb-1">Shift Hourly Breakdown</p>
+   682→                <p className="text-[11px] text-muted-foreground mb-3">Revenue per hour this shift</p>
+   683→                {revenueChart.length > 0 ? (
+   684→                  <div className="h-48">
+   685→                    <ResponsiveContainer width="100%" height="100%">
+   686→                      <BarChart data={revenueChart.map(p => ({ hour: p.hour, revenue: p.value }))} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
+   687→                        <XAxis dataKey="hour" tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+   688→                        <YAxis tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
+   689→                        <Tooltip
+   690→                          contentStyle={{ fontSize: 12, borderRadius: 10, border: '0.5px solid var(--border)', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', background: 'var(--card)' }}
+   691→                          formatter={(val: number) => [formatPKR(val), 'Revenue']}
+   692→                        />
+   693→                        <Bar dataKey="revenue" fill="#e8930c" radius={[4, 4, 0, 0]} />
+   694→                      </BarChart>
+   695→                    </ResponsiveContainer>
+   696→                  </div>
+   697→                ) : (
+   698→                  <div className="h-48 flex items-center justify-center text-muted-foreground text-[13px]">
+   699→                    No hourly data available
+   700→                  </div>
+   701→                )}
+   702→              </div>
+   703→
+   704→              {/* Payment method split for shift */}
+   705→              <div className="macos-card p-4">
+   706→                <p className="text-[13px] font-semibold text-foreground mb-1">Payment Distribution</p>
+   707→                <p className="text-[11px] text-muted-foreground mb-3">This shift&apos;s payment breakdown</p>
+   708→                {paymentMethods.length > 0 ? (
+   709→                  <div className="space-y-3">
+   710→                    {paymentMethods.map((pm) => {
+   711→                      const total = paymentMethods.reduce((s, p) => s + p.value, 0)
+   712→                      const pct = total > 0 ? ((pm.value / total) * 100).toFixed(1) : '0'
+   713→                      return (
+   714→                        <div key={pm.name} className="space-y-1.5">
+   715→                          <div className="flex items-center justify-between">
+   716→                            <span className="text-[12px] font-medium text-foreground">{pm.name}</span>
+   717→                            <div className="flex items-center gap-2">
+   718→                              <span className="text-[12px] text-muted-foreground">{formatCompactPKR(pm.value)}</span>
+   719→                              <span className="text-[11px] font-semibold text-foreground w-10 text-right">{pct}%</span>
+   720→                            </div>
+   721→                          </div>
+   722→                          <div className="h-1.5 rounded-full bg-black/[0.04] dark:bg-white/[0.06] overflow-hidden">
+   723→                            <motion.div
+   724→                              initial={{ width: 0 }}
+   725→                              animate={{ width: `${pct}%` }}
+   726→                              transition={{ duration: 0.5 }}
+   727→                              className="h-full rounded-full"
+   728→                              style={{ backgroundColor: pm.color }}
+   729→                            />
+   730→                          </div>
+   731→                        </div>
+   732→                      )
+   733→                    })}
+   734→                  </div>
+   735→                ) : (
+   736→                  <div className="h-48 flex items-center justify-center text-muted-foreground text-[13px]">
+   737→                    No payment data available
+   738→                  </div>
+   739→                )}
+   740→              </div>
+   741→            </div>
+   742→          </motion.div>
+   743→        )}
+   744→
+   745→        {activeTab === 'analytics' && (
+   746→          <motion.div
+   747→            key="analytics"
+   748→            initial={{ opacity: 0, y: 6 }}
+   749→            animate={{ opacity: 1, y: 0 }}
+   750→            exit={{ opacity: 0, y: -4 }}
+   751→            transition={{ duration: 0.2 }}
+   752→            className="space-y-4"
+   753→          >
+   754→            {/* Revenue by Fuel Type */}
+   755→            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+   756→              {/* Fuel Type Bar */}
+   757→              <div className="macos-card p-4">
+   758→                <p className="text-[13px] font-semibold text-foreground mb-1">Revenue by Fuel Type</p>
+   759→                <p className="text-[11px] text-muted-foreground mb-3">Today&apos;s sales distribution</p>
+   760→                {fuelBreakdown.length > 0 ? (
+   761→                  <div className="h-48">
+   762→                    <ResponsiveContainer width="100%" height="100%">
+   763→                      <BarChart
+   764→                        data={fuelBreakdown.map((f) => ({ name: f.type.split(' ')[0], revenue: f.revenue, fill: getFuelColor(f.type) }))}
+   765→                        margin={{ top: 4, right: 4, left: -10, bottom: 0 }}
+   766→                      >
+   767→                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+   768→                        <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
+   769→                        <Tooltip
+   770→                          contentStyle={{ fontSize: 12, borderRadius: 10, border: '0.5px solid var(--border)', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', background: 'var(--card)' }}
+   771→                          formatter={(val: number) => [formatPKR(val), 'Revenue']}
+   772→                        />
+   773→                        <Bar dataKey="revenue" radius={[6, 6, 0, 0]}>
+   774→                          {fuelBreakdown.map((f, idx) => (
+   775→                            <Cell key={idx} fill={getFuelColor(f.type)} />
+   776→                          ))}
+   777→                        </Bar>
+   778→                      </BarChart>
+   779→                    </ResponsiveContainer>
+   780→                  </div>
+   781→                ) : (
+   782→                  <div className="h-48 flex items-center justify-center text-muted-foreground text-[13px]">
+   783→                    No fuel data available
+   784→                  </div>
+   785→                )}
+   786→              </div>
+   787→
+   788→              {/* Insights Panel */}
+   789→              <div className="macos-card p-4">
+   790→                <p className="text-[13px] font-semibold text-foreground mb-1">Sales Insights</p>
+   791→                <p className="text-[11px] text-muted-foreground mb-3">AI-powered observations</p>
+   792→                <div className="macos-group">
+   793→                  {fuelBreakdown.length > 0 ? (
+   794→                    <>
+   795→                      {/* Top fuel type */}
+   796→                      {(() => {
+   797→                        const topFuel = [...fuelBreakdown].sort((a, b) => b.revenue - a.revenue)[0]
+   798→                        return (
+   799→                          <motion.div
+   800→                            initial={{ opacity: 0, x: -6 }}
+   801→                            animate={{ opacity: 1, x: 0 }}
+   802→                            transition={{ duration: 0.2 }}
+   803→                            className="macos-group-item flex items-center gap-3 py-3"
+   804→                          >
+   805→                            <div className="flex size-8 items-center justify-center rounded-lg shrink-0" style={{ backgroundColor: `${getFuelColor(topFuel.type)}15` }}>
+   806→                              <Fuel className="size-4" style={{ color: getFuelColor(topFuel.type) }} />
+   807→                            </div>
+   808→                            <div className="flex-1 min-w-0">
+   809→                              <p className="text-[12px] font-medium text-foreground">Top Fuel</p>
+   810→                              <p className="text-[11px] text-muted-foreground">{totalRevenue > 0 ? ((topFuel.revenue / totalRevenue) * 100).toFixed(1) : 0}% of total revenue today</p>
+   811→                            </div>
+   812→                            <span className="text-[13px] font-semibold text-foreground shrink-0">{topFuel.type}</span>
+   813→                            <ChevronRight className="size-4 text-muted-foreground shrink-0" />
+   814→                          </motion.div>
+   815→                        )
+   816→                      })()}
+   817→                      {/* Peak hour */}
+   818→                      {revenueChart.length > 0 && (() => {
+   819→                        const peak = revenueChart.reduce((max, p) => p.value > max.value ? p : max, revenueChart[0])
+   820→                        return (
+   821→                          <motion.div
+   822→                            initial={{ opacity: 0, x: -6 }}
+   823→                            animate={{ opacity: 1, x: 0 }}
+   824→                            transition={{ duration: 0.2, delay: 0.06 }}
+   825→                            className="macos-group-item flex items-center gap-3 py-3"
+   826→                          >
+   827→                            <div className="flex size-8 items-center justify-center rounded-lg shrink-0 bg-[#34c759]15">
+   828→                              <TrendingUp className="size-4 text-[#34c759]" />
+   829→                            </div>
+   830→                            <div className="flex-1 min-w-0">
+   831→                              <p className="text-[12px] font-medium text-foreground">Peak Hour</p>
+   832→                              <p className="text-[11px] text-muted-foreground">{formatCompactPKR(peak.value)} revenue</p>
+   833→                            </div>
+   834→                            <span className="text-[13px] font-semibold text-foreground shrink-0">{peak.hour}</span>
+   835→                            <ChevronRight className="size-4 text-muted-foreground shrink-0" />
+   836→                          </motion.div>
+   837→                        )
+   838→                      })()}
+   839→                      {/* Total volume */}
+   840→                      <motion.div
+   841→                        initial={{ opacity: 0, x: -6 }}
+   842→                        animate={{ opacity: 1, x: 0 }}
+   843→                        transition={{ duration: 0.2, delay: 0.12 }}
+   844→                        className="macos-group-item flex items-center gap-3 py-3"
+   845→                      >
+   846→                        <div className="flex size-8 items-center justify-center rounded-lg shrink-0 bg-teal-500/10">
+   847→                          <DollarSign className="size-4 text-teal-500" />
+   848→                        </div>
+   849→                        <div className="flex-1 min-w-0">
+   850→                          <p className="text-[12px] font-medium text-foreground">Avg Transaction</p>
+   851→                          <p className="text-[11px] text-muted-foreground">{totalTransactions} transactions today</p>
+   852→                        </div>
+   853→                        <span className="text-[13px] font-semibold text-foreground shrink-0">{formatPKR(avgTransaction)}</span>
+   854→                        <ChevronRight className="size-4 text-muted-foreground shrink-0" />
+   855→                      </motion.div>
+   856→                    </>
+   857→                  ) : (
+   858→                    <div className="p-4 text-center text-muted-foreground text-[13px]">
+   859→                      No analytics data available yet
+   860→                    </div>
+   861→                  )}
+   862→                </div>
+   863→              </div>
+   864→            </div>
+   865→          </motion.div>
+   866→        )}
+   867→      </AnimatePresence>
+   868→    </div>
+   869→  )
+   870→}
+   871→

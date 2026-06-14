@@ -1,0 +1,1078 @@
+     1→generator client {
+     2→  provider = "prisma-client-js"
+     3→}
+     4→
+     5→datasource db {
+     6→  provider = "sqlite"
+     7→  url      = env("DATABASE_URL")
+     8→}
+     9→
+    10→// =====================================================
+    11→// TENANT & ORGANIZATION
+    12→// =====================================================
+    13→
+    14→model Tenant {
+    15→  id            String   @id @default(cuid())
+    16→  name          String
+    17→  slug          String   @unique
+    18→  logo          String?
+    19→  primaryColor  String   @default("#f59e0b")
+    20→  address       String?
+    21→  city          String?
+    22→  country       String?
+    23→  phone         String?
+    24→  email         String?
+    25→  subscription  String   @default("starter")
+    26→  taxId         String?
+    27→  registrationNumber String?
+    28→  isActive      Boolean  @default(true)
+    29→  createdAt     DateTime @default(now())
+    30→  updatedAt     DateTime @updatedAt
+    31→
+    32→  stations       Station[]
+    33→  users          User[]
+    34→  fleetAccounts  FleetAccount[]
+    35→  customers      Customer[]
+    36→  fuelCards      FuelCard[]
+    37→  suppliers      Supplier[]
+    38→  notifications  Notification[]
+    39→  promotions     Promotion[]
+    40→  loyaltyRules   LoyaltyRule[]
+    41→}
+    42→
+    43→model Station {
+    44→  id            String   @id @default(cuid())
+    45→  tenantId      String
+    46→  name          String
+    47→  code          String
+    48→  address       String?
+    49→  city          String?
+    50→  region        String?
+    51→  country       String?
+    52→  phone         String?
+    53→  email         String?
+    54→  latitude      Float?
+    55→  longitude     Float?
+    56→  isActive      Boolean  @default(true)
+    57→  stationType   String   @default("fuel") // fuel, cng, ev, hybrid
+    58→  operatingHours String?
+    59→  timezone      String   @default("Asia/Karachi")
+    60→  currency      String   @default("PKR")
+    61→  taxRate       Float    @default(0)
+    62→  createdAt     DateTime @default(now())
+    63→  updatedAt     DateTime @updatedAt
+    64→
+    65→  tenant             Tenant             @relation(fields: [tenantId], references: [id])
+    66→  tanks              Tank[]
+    67→  dispensers         Dispenser[]
+    68→  shifts             Shift[]
+    69→  employees          Employee[]
+    70→  priceBoards        PriceBoard[]
+    71→  deliveries         FuelDelivery[]
+    72→  retailProducts     RetailProduct[]
+    73→  lubricantProducts  LubricantProduct[]
+    74→  evChargers         EVCharger[]
+    75→  cngDispensers      CNGDispenser[]
+    76→  anprCameras        ANPRCamera[]
+    77→  rfidReaders        RFIDReader[]
+    78→  retailTransactions RetailTransaction[]
+    79→  transactions       Transaction[]
+    80→  expenses           Expense[]
+    81→  maintenanceRecords MaintenanceRecord[]
+    82→  aiAlerts           AIAlert[]
+    83→  chargingSessions   ChargingSession[]
+    84→  carWashSessions    CarWashSession[]
+    85→  environmentalAlerts EnvironmentalAlert[]
+    86→  dailyReports       DailyReport[]
+    87→  meterRecords       MeterRecord[]
+    88→  supplierInvoices   SupplierInvoice[]
+    89→  purchaseOrders     PurchaseOrder[]
+    90→  tankCalibrations   TankCalibration[]
+    91→  lotterySales       LotterySale[]
+    92→  promotions         PromotionUsage[]
+    93→  payrollRecords     PayrollRecord[]
+    94→  leaveRequests      LeaveRequest[]
+    95→  vaporRecoveryReadings VaporRecoveryReading[]
+    96→}
+    97→
+    98→model User {
+    99→  id          String   @id @default(cuid())
+   100→  tenantId    String
+   101→  email       String   @unique
+   102→  name        String
+   103→  role        String   @default("viewer") // superadmin, admin, manager, operator, cashier, attendant, viewer
+   104→  avatar      String?
+   105→  isActive    Boolean  @default(true)
+   106→  lastLogin   DateTime?
+   107→  createdAt   DateTime @default(now())
+   108→  updatedAt   DateTime @updatedAt
+   109→
+   110→  tenant     Tenant     @relation(fields: [tenantId], references: [id])
+   111→  auditLogs  AuditLog[]
+   112→}
+   113→
+   114→// =====================================================
+   115→// FORECOURT - DISPENSERS, NOZZLES, PUMPS
+   116→// =====================================================
+   117→
+   118→model Dispenser {
+   119→  id                String   @id @default(cuid())
+   120→  stationId         String
+   121→  name              String
+   122→  code              String
+   123→  manufacturer      String?  // tatsuno, gilbarco, wayne, tokheim, etc.
+   124→  model             String?
+   125→  serialNumber      String?
+   126→  controllerType    String?  // pts, fusion, doms, hectronic, etc.
+   127→  communicationType String?  // tcpip, rs232, rs485, serial, ethernet
+   128→  ipAddress         String?
+   129→  port              Int?
+   130→  pumpLane          Int      @default(1)
+   131→  status            String   @default("idle") // idle, fueling, stopped, error, locked, maintenance
+   132→  isActive          Boolean  @default(true)
+   133→  lastCommunication DateTime?
+   134→  createdAt         DateTime @default(now())
+   135→  updatedAt         DateTime @updatedAt
+   136→
+   137→  station   Station   @relation(fields: [stationId], references: [id])
+   138→  nozzles   Nozzle[]
+   139→  fuelings   Fueling[]
+   140→}
+   141→
+   142→model Nozzle {
+   143→  id              String   @id @default(cuid())
+   144→  dispenserId     String
+   145→  nozzleNumber    Int
+   146→  fuelType        String
+   147→  fuelGrade       String?
+   148→  meterReading    Float    @default(0)
+   149→  previousReading Float    @default(0)
+   150→  totalizer       Float    @default(0)
+   151→  calibrationDate DateTime?
+   152→  calibrationFactor Float  @default(1.0)
+   153→  status          String   @default("idle")
+   154→  isActive        Boolean  @default(true)
+   155→  lastCalibration DateTime?
+   156→  createdAt       DateTime @default(now())
+   157→  updatedAt       DateTime @updatedAt
+   158→
+   159→  dispenser        Dispenser         @relation(fields: [dispenserId], references: [id])
+   160→  fuelings         Fueling[]
+   161→  maintenanceRecords MaintenanceRecord[]
+   162→  meterRecords     MeterRecord[]
+   163→}
+   164→
+   165→// =====================================================
+   166→// TANK & WET STOCK MANAGEMENT
+   167→// =====================================================
+   168→
+   169→model Tank {
+   170→  id              String   @id @default(cuid())
+   171→  stationId       String
+   172→  name            String
+   173→  code            String
+   174→  capacity        Float
+   175→  currentLevel    Float    @default(0)
+   176→  waterLevel      Float    @default(0)
+   177→  temperature     Float    @default(0)
+   178→  density         Float?
+   179→  fuelType        String
+   180→  atgType         String?
+   181→  atgIpAddress    String?
+   182→  atgPort         Int?
+   183→  status          String   @default("normal")
+   184→  lastReading     DateTime?
+   185→  createdAt       DateTime @default(now())
+   186→  updatedAt       DateTime @updatedAt
+   187→
+   188→  station          Station           @relation(fields: [stationId], references: [id])
+   189→  deliveries       FuelDelivery[]
+   190→  tankReadings     TankReading[]
+   191→  reconciliations  Reconciliation[]
+   192→  calibrations     TankCalibration[]
+   193→}
+   194→
+   195→model TankReading {
+   196→  id          String   @id @default(cuid())
+   197→  tankId      String
+   198→  level       Float
+   199→  volume      Float
+   200→  waterLevel  Float
+   201→  temperature Float
+   202→  density     Float?
+   203→  readingType String   @default("automatic")
+   204→  readingAt   DateTime @default(now())
+   205→  createdAt   DateTime @default(now())
+   206→
+   207→  tank        Tank     @relation(fields: [tankId], references: [id])
+   208→}
+   209→
+   210→model FuelDelivery {
+   211→  id              String   @id @default(cuid())
+   212→  stationId       String
+   213→  tankId          String
+   214→  supplierId      String?
+   215→  supplierName    String
+   216→  tankerNumber    String?
+   217→  driverName      String?
+   218→  expectedVolume  Float
+   219→  actualVolume    Float    @default(0)
+   220→  density         Float?
+   221→  temperature     Float?
+   222→  productType     String
+   223→  status          String   @default("pending") // pending, arriving, unloading, completed, discrepancy
+   224→  deliveryDate    DateTime
+   225→  completedAt     DateTime?
+   226→  notes           String?
+   227→  variance        Float?
+   228→  invoiceNumber   String?
+   229→  costPerUnit     Float?
+   230→  totalCost       Float?
+   231→  createdAt       DateTime @default(now())
+   232→  updatedAt       DateTime @updatedAt
+   233→
+   234→  station     Station          @relation(fields: [stationId], references: [id])
+   235→  tank        Tank             @relation(fields: [tankId], references: [id])
+   236→  supplier    Supplier?        @relation(fields: [supplierId], references: [id])
+   237→}
+   238→
+   239→model Reconciliation {
+   240→  id                  String   @id @default(cuid())
+   241→  tankId              String
+   242→  stationId           String
+   243→  date                DateTime
+   244→  openingStock        Float
+   245→  deliveries          Float    @default(0)
+   246→  sales               Float    @default(0)
+   247→  closingStock        Float
+   248→  bookStock           Float
+   249→  actualStock         Float
+   250→  variance            Float
+   251→  variancePercentage  Float
+   252→  status              String   @default("pending") // pending, reviewed, approved
+   253→  reviewedBy          String?
+   254→  notes               String?
+   255→  createdAt           DateTime @default(now())
+   256→  updatedAt           DateTime @updatedAt
+   257→
+   258→  tank        Tank     @relation(fields: [tankId], references: [id])
+   259→}
+   260→
+   261→model TankCalibration {
+   262→  id              String   @id @default(cuid())
+   263→  stationId       String
+   264→  tankId          String
+   265→  calibrationDate DateTime
+   266→  calibratedBy    String?
+   267→  certificateNumber String?
+   268→  volumeTable     String   // JSON string of height->volume mapping
+   269→  notes           String?
+   270→  createdAt       DateTime @default(now())
+   271→
+   272→  station        Station   @relation(fields: [stationId], references: [id])
+   273→  tank           Tank      @relation(fields: [tankId], references: [id])
+   274→}
+   275→
+   276→model MeterRecord {
+   277→  id              String   @id @default(cuid())
+   278→  stationId       String
+   279→  nozzleId        String
+   280→  shiftId         String?
+   281→  readingStart    Float
+   282→  readingEnd      Float?
+   283→  volumeDispensed Float?
+   284→  recordedAt      DateTime @default(now())
+   285→  createdAt       DateTime @default(now())
+   286→
+   287→  station         Station  @relation(fields: [stationId], references: [id])
+   288→  nozzle          Nozzle   @relation(fields: [nozzleId], references: [id])
+   289→}
+   290→
+   291→// =====================================================
+   292→// FUEL SALES & SHIFT MANAGEMENT
+   293→// =====================================================
+   294→
+   295→model Fueling {
+   296→  id              String   @id @default(cuid())
+   297→  stationId       String
+   298→  dispenserId     String
+   299→  nozzleId        String
+   300→  shiftId         String?
+   301→  fuelType        String
+   302→  volume          Float
+   303→  pricePerUnit    Float
+   304→  totalAmount     Float
+   305→  paymentMethod   String   @default("cash")
+   306→  meterStart      Float
+   307→  meterEnd        Float
+   308→  attendantId     String?
+   309→  vehiclePlate    String?
+   310→  rfidTag         String?
+   311→  fleetAccountId  String?
+   312→  customerId      String?
+   313→  loyaltyPoints   Int      @default(0)
+   314→  status          String   @default("completed")
+   315→  startedAt       DateTime
+   316→  completedAt     DateTime?
+   317→  createdAt       DateTime @default(now())
+   318→
+   319→  dispenser     Dispenser     @relation(fields: [dispenserId], references: [id])
+   320→  nozzle       Nozzle        @relation(fields: [nozzleId], references: [id])
+   321→  shift        Shift?        @relation(fields: [shiftId], references: [id])
+   322→  attendant    Employee?     @relation(fields: [attendantId], references: [id])
+   323→  fleetAccount FleetAccount? @relation(fields: [fleetAccountId], references: [id])
+   324→  customer     Customer?     @relation(fields: [customerId], references: [id])
+   325→}
+   326→
+   327→model Shift {
+   328→  id              String   @id @default(cuid())
+   329→  stationId       String
+   330→  shiftNumber     Int
+   331→  attendantId     String?
+   332→  supervisorId    String?
+   333→  openedAt        DateTime
+   334→  closedAt        DateTime?
+   335→  openingCash     Float    @default(0)
+   336→  closingCash     Float?
+   337→  expectedCash    Float?
+   338→  cashVariance    Float?
+   339→  totalSales      Float    @default(0)
+   340→  totalVolume     Float    @default(0)
+   341→  fuelSales       Float    @default(0)
+   342→  retailSales     Float    @default(0)
+   343→  cardSales       Float    @default(0)
+   344→  fleetSales      Float    @default(0)
+   345→  creditSales     Float    @default(0)
+   346→  cashSales       Float    @default(0)
+   347→  transactionCount Int     @default(0)
+   348→  status          String   @default("open") // open, closed, reconciled
+   349→  notes           String?
+   350→  createdAt       DateTime @default(now())
+   351→  updatedAt       DateTime @updatedAt
+   352→
+   353→  station            Station            @relation(fields: [stationId], references: [id])
+   354→  fuelings           Fueling[]
+   355→  attendant          Employee?          @relation("ShiftAttendant", fields: [attendantId], references: [id])
+   356→  supervisor         Employee?          @relation("ShiftSupervisor", fields: [supervisorId], references: [id])
+   357→  retailTransactions RetailTransaction[]
+   358→}
+   359→
+   360→// =====================================================
+   361→// FLEET & RFID
+   362→// =====================================================
+   363→
+   364→model FleetAccount {
+   365→  id              String   @id @default(cuid())
+   366→  tenantId        String
+   367→  companyName     String
+   368→  contactPerson   String?
+   369→  phone           String?
+   370→  email           String?
+   371→  address         String?
+   372→  creditLimit     Float    @default(0)
+   373→  currentBalance  Float    @default(0)
+   374→  dailyLimit      Float?
+   375→  monthlyLimit    Float?
+   376→  fuelTypes       String?
+   377→  status          String   @default("active")
+   378→  paymentTerms    String?  // net15, net30, cod, prepaid
+   379→  taxExempt       Boolean  @default(false)
+   380→  createdAt       DateTime @default(now())
+   381→  updatedAt       DateTime @updatedAt
+   382→
+   383→  tenant       Tenant      @relation(fields: [tenantId], references: [id])
+   384→  vehicles     Vehicle[]
+   385→  drivers      Driver[]
+   386→  fuelCards    FuelCard[]
+   387→  fuelings     Fueling[]
+   388→}
+   389→
+   390→model Vehicle {
+   391→  id              String   @id @default(cuid())
+   392→  fleetAccountId  String
+   393→  plateNumber     String
+   394→  make            String?
+   395→  model           String?
+   396→  year            Int?
+   397→  vehicleType     String?
+   398→  rfidTag         String?
+   399→  fuelType        String?
+   400→  tankCapacity    Float?
+   401→  dailyLimit      Float?
+   402→  odometer        Float?
+   403→  isActive        Boolean  @default(true)
+   404→  createdAt       DateTime @default(now())
+   405→  updatedAt       DateTime @updatedAt
+   406→
+   407→  fleetAccount    FleetAccount @relation(fields: [fleetAccountId], references: [id])
+   408→}
+   409→
+   410→model Driver {
+   411→  id              String   @id @default(cuid())
+   412→  fleetAccountId  String
+   413→  name            String
+   414→  licenseNumber   String?
+   415→  phone           String?
+   416→  rfidCard        String?
+   417→  isActive        Boolean  @default(true)
+   418→  createdAt       DateTime @default(now())
+   419→  updatedAt       DateTime @updatedAt
+   420→
+   421→  fleetAccount    FleetAccount @relation(fields: [fleetAccountId], references: [id])
+   422→}
+   423→
+   424→model FuelCard {
+   425→  id              String   @id @default(cuid())
+   426→  tenantId        String
+   427→  cardNumber      String   @unique
+   428→  fleetAccountId  String?
+   429→  cardType        String   @default("fleet")
+   430→  rfidTag         String?
+   431→  pin             String?
+   432→  dailyLimit      Float?
+   433→  monthlyLimit    Float?
+   434→  balance         Float    @default(0)
+   435→  isActive        Boolean  @default(true)
+   436→  expiryDate      DateTime?
+   437→  createdAt       DateTime @default(now())
+   438→  updatedAt       DateTime @updatedAt
+   439→
+   440→  tenant       Tenant      @relation(fields: [tenantId], references: [id])
+   441→  fleetAccount FleetAccount? @relation(fields: [fleetAccountId], references: [id])
+   442→}
+   443→
+   444→model RFIDReader {
+   445→  id          String   @id @default(cuid())
+   446→  stationId   String
+   447→  name        String
+   448→  code        String
+   449→  readerType  String   @default("vehicle")
+   450→  ipAddress   String?
+   451→  port        Int?
+   452→  status      String   @default("online")
+   453→  isActive    Boolean  @default(true)
+   454→  createdAt   DateTime @default(now())
+   455→  updatedAt   DateTime @updatedAt
+   456→
+   457→  station     Station   @relation(fields: [stationId], references: [id])
+   458→}
+   459→
+   460→model ANPRCamera {
+   461→  id          String   @id @default(cuid())
+   462→  stationId   String
+   463→  name        String
+   464→  code        String
+   465→  ipAddress   String?
+   466→  port        Int?
+   467→  location    String?
+   468→  status      String   @default("online")
+   469→  isActive    Boolean  @default(true)
+   470→  createdAt   DateTime @default(now())
+   471→  updatedAt   DateTime @updatedAt
+   472→
+   473→  station     Station   @relation(fields: [stationId], references: [id])
+   474→}
+   475→
+   476→// =====================================================
+   477→// PRICE MANAGEMENT
+   478→// =====================================================
+   479→
+   480→model FuelPrice {
+   481→  id            String   @id @default(cuid())
+   482→  tenantId      String
+   483→  stationId     String?
+   484→  fuelType      String
+   485→  fuelGrade     String?
+   486→  pricePerUnit  Float
+   487→  previousPrice Float?
+   488→  currency      String   @default("PKR")
+   489→  effectiveFrom DateTime
+   490→  effectiveTo   DateTime?
+   491→  status        String   @default("active")
+   492→  updatedBy     String?
+   493→  isGovernment  Boolean  @default(false)
+   494→  scheduledAt   DateTime?
+   495→  createdAt     DateTime @default(now())
+   496→  updatedAt     DateTime @updatedAt
+   497→}
+   498→
+   499→model PriceBoard {
+   500→  id          String   @id @default(cuid())
+   501→  stationId   String
+   502→  name        String
+   503→  boardType   String   @default("led")
+   504→  ipAddress   String?
+   505→  port        Int?
+   506→  status      String   @default("online")
+   507→  isActive    Boolean  @default(true)
+   508→  lastUpdate  DateTime?
+   509→  createdAt   DateTime @default(now())
+   510→  updatedAt   DateTime @updatedAt
+   511→
+   512→  station     Station   @relation(fields: [stationId], references: [id])
+   513→}
+   514→
+   515→// =====================================================
+   516→// RETAIL STORE & SERVICES
+   517→// =====================================================
+   518→
+   519→model RetailProduct {
+   520→  id          String   @id @default(cuid())
+   521→  stationId   String
+   522→  name        String
+   523→  sku         String?
+   524→  category    String?
+   525→  barcode     String?
+   526→  price       Float
+   527→  costPrice   Float?
+   528→  stockQty    Int      @default(0)
+   529→  minStock    Int      @default(5)
+   530→  maxStock    Int      @default(100)
+   531→  unit        String   @default("piece")
+   532→  supplierId  String?
+   533→  reorderPoint Int     @default(10)
+   534→  isActive    Boolean  @default(true)
+   535→  createdAt   DateTime @default(now())
+   536→  updatedAt   DateTime @updatedAt
+   537→
+   538→  station     Station   @relation(fields: [stationId], references: [id])
+   539→}
+   540→
+   541→model RetailTransaction {
+   542→  id             String   @id @default(cuid())
+   543→  stationId      String
+   544→  shiftId        String?
+   545→  totalAmount    Float
+   546→  paymentMethod  String   @default("cash")
+   547→  items          String   // JSON string of items
+   548→  posTerminal    String?
+   549→  discountAmount Float    @default(0)
+   550→  loyaltyPointsUsed Int   @default(0)
+   551→  status         String   @default("completed")
+   552→  createdAt      DateTime @default(now())
+   553→
+   554→  station        Station  @relation(fields: [stationId], references: [id])
+   555→  shift          Shift?   @relation(fields: [shiftId], references: [id])
+   556→}
+   557→
+   558→model LubricantProduct {
+   559→  id          String   @id @default(cuid())
+   560→  stationId   String
+   561→  name        String
+   562→  brand       String?
+   563→  viscosity   String?
+   564→  category    String?
+   565→  price       Float
+   566→  costPrice   Float?
+   567→  stockQty    Int      @default(0)
+   568→  minStock    Int      @default(5)
+   569→  isActive    Boolean  @default(true)
+   570→  createdAt   DateTime @default(now())
+   571→  updatedAt   DateTime @updatedAt
+   572→
+   573→  station     Station   @relation(fields: [stationId], references: [id])
+   574→}
+   575→
+   576→model CarWashSession {
+   577→  id          String   @id @default(cuid())
+   578→  stationId   String
+   579→  shiftId     String?
+   580→  vehiclePlate String?
+   581→  washType    String   // basic, premium, deluxe
+   582→  amount      Float
+   583→  paymentMethod String @default("cash")
+   584→  status      String   @default("completed")
+   585→  startedAt   DateTime @default(now())
+   586→  completedAt DateTime?
+   587→  createdAt   DateTime @default(now())
+   588→
+   589→  station     Station   @relation(fields: [stationId], references: [id])
+   590→}
+   591→
+   592→model LotterySale {
+   593→  id          String   @id @default(cuid())
+   594→  stationId   String
+   595→  shiftId     String?
+   596→  gameType    String   // scratch, draw, online
+   597→  ticketCount Int      @default(1)
+   598→  saleAmount  Float
+   599→  commission  Float    @default(0)
+   600→  status      String   @default("completed")
+   601→  createdAt   DateTime @default(now())
+   602→
+   603→  station     Station   @relation(fields: [stationId], references: [id])
+   604→}
+   605→
+   606→// =====================================================
+   607→// SUPPLIER & PROCUREMENT
+   608→// =====================================================
+   609→
+   610→model Supplier {
+   611→  id              String   @id @default(cuid())
+   612→  tenantId        String
+   613→  name            String
+   614→  code            String?
+   615→  contactPerson   String?
+   616→  phone           String?
+   617→  email           String?
+   618→  address         String?
+   619→  city            String?
+   620→  category        String   // fuel, lubricant, retail, maintenance, other
+   621→  paymentTerms    String?
+   622→  taxId           String?
+   623→  isActive        Boolean  @default(true)
+   624→  createdAt       DateTime @default(now())
+   625→  updatedAt       DateTime @updatedAt
+   626→
+   627→  tenant          Tenant          @relation(fields: [tenantId], references: [id])
+   628→  deliveries      FuelDelivery[]
+   629→  invoices        SupplierInvoice[]
+   630→  purchaseOrders  PurchaseOrder[]
+   631→}
+   632→
+   633→model SupplierInvoice {
+   634→  id              String   @id @default(cuid())
+   635→  stationId       String
+   636→  supplierId      String
+   637→  invoiceNumber   String
+   638→  invoiceDate     DateTime
+   639→  dueDate         DateTime?
+   640→  totalAmount     Float
+   641→  taxAmount       Float    @default(0)
+   642→  netAmount       Float
+   643→  status          String   @default("pending") // pending, approved, paid, overdue, cancelled
+   644→  paidAmount      Float    @default(0)
+   645→  paidDate        DateTime?
+   646→  notes           String?
+   647→  createdAt       DateTime @default(now())
+   648→  updatedAt       DateTime @updatedAt
+   649→
+   650→  station         Station   @relation(fields: [stationId], references: [id])
+   651→  supplier        Supplier  @relation(fields: [supplierId], references: [id])
+   652→}
+   653→
+   654→model PurchaseOrder {
+   655→  id              String   @id @default(cuid())
+   656→  stationId       String
+   657→  supplierId      String
+   658→  poNumber        String
+   659→  orderDate       DateTime
+   660→  expectedDate    DateTime?
+   661→  items           String   // JSON string of line items
+   662→  totalAmount     Float
+   663→  status          String   @default("draft") // draft, submitted, approved, received, cancelled
+   664→  approvedBy      String?
+   665→  notes           String?
+   666→  createdAt       DateTime @default(now())
+   667→  updatedAt       DateTime @updatedAt
+   668→
+   669→  station         Station   @relation(fields: [stationId], references: [id])
+   670→  supplier        Supplier  @relation(fields: [supplierId], references: [id])
+   671→}
+   672→
+   673→// =====================================================
+   674→// EV & CNG
+   675→// =====================================================
+   676→
+   677→model EVCharger {
+   678→  id              String   @id @default(cuid())
+   679→  stationId       String
+   680→  name            String
+   681→  code            String
+   682→  connectorType   String   @default("type2")
+   683→  maxPowerKw      Float    @default(50)
+   684→  status          String   @default("available")
+   685→  currentSession  String?
+   686→  isActive        Boolean  @default(true)
+   687→  createdAt       DateTime @default(now())
+   688→  updatedAt       DateTime @updatedAt
+   689→
+   690→  station     Station      @relation(fields: [stationId], references: [id])
+   691→  sessions    ChargingSession[]
+   692→}
+   693→
+   694→model ChargingSession {
+   695→  id              String   @id @default(cuid())
+   696→  chargerId       String
+   697→  stationId       String
+   698→
+   699→  station         Station  @relation(fields: [stationId], references: [id])
+   700→  vehiclePlate    String?
+   701→  energyKwh       Float    @default(0)
+   702→  durationMinutes Int      @default(0)
+   703→  pricePerKwh     Float
+   704→  totalAmount     Float    @default(0)
+   705→  paymentMethod   String   @default("cash")
+   706→  status          String   @default("active")
+   707→  startedAt       DateTime
+   708→  completedAt     DateTime?
+   709→  createdAt       DateTime @default(now())
+   710→
+   711→  evCharger   EVCharger @relation(fields: [chargerId], references: [id])
+   712→}
+   713→
+   714→model CNGDispenser {
+   715→  id              String   @id @default(cuid())
+   716→  stationId       String
+   717→  name            String
+   718→  code            String
+   719→  pressure        Float?
+   720→  status          String   @default("idle")
+   721→  isActive        Boolean  @default(true)
+   722→  createdAt       DateTime @default(now())
+   723→  updatedAt       DateTime @updatedAt
+   724→
+   725→  station     Station   @relation(fields: [stationId], references: [id])
+   726→}
+   727→
+   728→// =====================================================
+   729→// EMPLOYEE MANAGEMENT
+   730→// =====================================================
+   731→
+   732→model Employee {
+   733→  id              String   @id @default(cuid())
+   734→  stationId       String
+   735→  name            String
+   736→  employeeId      String?
+   737→  role            String   @default("attendant")
+   738→  phone           String?
+   739→  email           String?
+   740→  hireDate        DateTime?
+   741→  salary          Float?
+   742→  commissionRate  Float    @default(0)
+   743→  status          String   @default("active")
+   744→  avatar          String?
+   745→  createdAt       DateTime @default(now())
+   746→  updatedAt       DateTime @updatedAt
+   747→
+   748→  station        Station         @relation(fields: [stationId], references: [id])
+   749→  shifts         Shift[]              @relation("ShiftAttendant")
+   750→  supervisedShifts Shift[]              @relation("ShiftSupervisor")
+   751→  fuelings       Fueling[]
+   752→  attendance     Attendance[]
+   753→  payrollRecords PayrollRecord[]
+   754→  leaveRequests  LeaveRequest[]
+   755→}
+   756→
+   757→model Attendance {
+   758→  id          String   @id @default(cuid())
+   759→  employeeId  String
+   760→  stationId   String
+   761→  checkIn     DateTime
+   762→  checkOut    DateTime?
+   763→  status      String   @default("present") // present, absent, late, half_day
+   764→  hoursWorked Float?
+   765→  notes       String?
+   766→  createdAt   DateTime @default(now())
+   767→
+   768→  employee    Employee  @relation(fields: [employeeId], references: [id])
+   769→}
+   770→
+   771→model PayrollRecord {
+   772→  id              String   @id @default(cuid())
+   773→  stationId       String
+   774→  employeeId      String
+   775→  periodStart     DateTime
+   776→  periodEnd       DateTime
+   777→  baseSalary      Float
+   778→  overtimeHours   Float    @default(0)
+   779→  overtimePay     Float    @default(0)
+   780→  commissions     Float    @default(0)
+   781→  deductions      Float    @default(0)
+   782→  taxDeductions   Float    @default(0)
+   783→  netPay          Float
+   784→  status          String   @default("pending") // pending, approved, paid
+   785→  paidDate        DateTime?
+   786→  createdAt       DateTime @default(now())
+   787→  updatedAt       DateTime @updatedAt
+   788→
+   789→  station         Station   @relation(fields: [stationId], references: [id])
+   790→  employee        Employee  @relation(fields: [employeeId], references: [id])
+   791→}
+   792→
+   793→model LeaveRequest {
+   794→  id              String   @id @default(cuid())
+   795→  stationId       String
+   796→  employeeId      String
+   797→  leaveType       String   // annual, sick, personal, unpaid
+   798→  startDate       DateTime
+   799→  endDate         DateTime
+   800→  reason          String?
+   801→  status          String   @default("pending") // pending, approved, rejected
+   802→  approvedBy      String?
+   803→  createdAt       DateTime @default(now())
+   804→  updatedAt       DateTime @updatedAt
+   805→
+   806→  station         Station   @relation(fields: [stationId], references: [id])
+   807→  employee        Employee  @relation(fields: [employeeId], references: [id])
+   808→}
+   809→
+   810→// =====================================================
+   811→// CRM & LOYALTY
+   812→// =====================================================
+   813→
+   814→model Customer {
+   815→  id              String   @id @default(cuid())
+   816→  tenantId        String
+   817→  name            String
+   818→  phone           String?
+   819→  email           String?
+   820→  loyaltyPoints   Int      @default(0)
+   821→  membershipTier  String   @default("basic")
+   822→  totalSpent      Float    @default(0)
+   823→  totalVisits     Int      @default(0)
+   824→  lastVisit       DateTime?
+   825→  isActive        Boolean  @default(true)
+   826→  createdAt       DateTime @default(now())
+   827→  updatedAt       DateTime @updatedAt
+   828→
+   829→  tenant       Tenant     @relation(fields: [tenantId], references: [id])
+   830→  fuelings     Fueling[]
+   831→}
+   832→
+   833→model LoyaltyRule {
+   834→  id              String   @id @default(cuid())
+   835→  tenantId        String
+   836→  name            String
+   837→  pointsPerUnit   Float    @default(1)
+   838→  fuelType        String?  // null = all fuel types
+   839→  minimumPurchase Float?
+   840→  bonusMultiplier Float    @default(1)
+   841→  isActive        Boolean  @default(true)
+   842→  validFrom       DateTime?
+   843→  validTo         DateTime?
+   844→  createdAt       DateTime @default(now())
+   845→  updatedAt       DateTime @updatedAt
+   846→
+   847→  tenant       Tenant     @relation(fields: [tenantId], references: [id])
+   848→}
+   849→
+   850→model Promotion {
+   851→  id              String   @id @default(cuid())
+   852→  tenantId        String
+   853→  name            String
+   854→  description     String?
+   855→  discountType    String   // percentage, fixed, bogo
+   856→  discountValue   Float
+   857→  applicableTo    String   // fuel, retail, car_wash, all
+   858→  fuelType        String?
+   859→  minimumPurchase Float?
+   860→  validFrom       DateTime
+   861→  validTo         DateTime
+   862→  isActive        Boolean  @default(true)
+   863→  createdAt       DateTime @default(now())
+   864→  updatedAt       DateTime @updatedAt
+   865→
+   866→  tenant         Tenant           @relation(fields: [tenantId], references: [id])
+   867→  usage          PromotionUsage[]
+   868→}
+   869→
+   870→model PromotionUsage {
+   871→  id              String   @id @default(cuid())
+   872→  stationId       String
+   873→  promotionId     String
+   874→  customerName    String?
+   875→  discountAmount  Float
+   876→  createdAt       DateTime @default(now())
+   877→
+   878→  station         Station    @relation(fields: [stationId], references: [id])
+   879→  promotion       Promotion  @relation(fields: [promotionId], references: [id])
+   880→}
+   881→
+   882→// =====================================================
+   883→// FINANCE & ACCOUNTING
+   884→// =====================================================
+   885→
+   886→model Transaction {
+   887→  id              String   @id @default(cuid())
+   888→  stationId       String
+   889→  tenantId        String
+   890→
+   891→  station         Station  @relation(fields: [stationId], references: [id])
+   892→  type            String
+   893→  category        String
+   894→  amount          Float
+   895→  description     String?
+   896→  referenceNumber String?
+   897→  paymentMethod   String   @default("cash")
+   898→  status          String   @default("completed")
+   899→  date            DateTime
+   900→  createdAt       DateTime @default(now())
+   901→  updatedAt       DateTime @updatedAt
+   902→}
+   903→
+   904→model Expense {
+   905→  id              String   @id @default(cuid())
+   906→  stationId       String
+   907→
+   908→  station         Station  @relation(fields: [stationId], references: [id])
+   909→  category        String
+   910→  amount          Float
+   911→  description     String?
+   912→  vendor          String?
+   913→  receiptNumber   String?
+   914→  date            DateTime
+   915→  approvedBy      String?
+   916→  status          String   @default("pending")
+   917→  createdAt       DateTime @default(now())
+   918→  updatedAt       DateTime @updatedAt
+   919→}
+   920→
+   921→// =====================================================
+   922→// MAINTENANCE
+   923→// =====================================================
+   924→
+   925→model MaintenanceRecord {
+   926→  id              String   @id @default(cuid())
+   927→  stationId       String
+   928→  equipmentType   String
+   929→  equipmentId     String
+   930→  nozzleId        String?
+   931→
+   932→  station         Station  @relation(fields: [stationId], references: [id])
+   933→  type            String
+   934→  description     String
+   935→  technician      String?
+   936→  cost            Float    @default(0)
+   937→  status          String   @default("scheduled")
+   938→  scheduledDate   DateTime
+   939→  completedDate   DateTime?
+   940→  notes           String?
+   941→  createdAt       DateTime @default(now())
+   942→  updatedAt       DateTime @updatedAt
+   943→
+   944→  nozzle       Nozzle?   @relation(fields: [nozzleId], references: [id])
+   945→}
+   946→
+   947→// =====================================================
+   948→// ENVIRONMENTAL COMPLIANCE
+   949→// =====================================================
+   950→
+   951→model EnvironmentalAlert {
+   952→  id              String   @id @default(cuid())
+   953→  stationId       String
+   954→  alertType       String   // leak, spill, vapor, water_intrusion, overfill, epa_violation
+   955→  severity        String   @default("warning")
+   956→  tankId          String?
+   957→  description     String
+   958→  epaCode         String?
+   959→  isReportable    Boolean  @default(false)
+   960→  isResolved      Boolean  @default(false)
+   961→  resolvedAt      DateTime?
+   962→  reportedToAgency Boolean @default(false)
+   963→  createdAt       DateTime @default(now())
+   964→  updatedAt       DateTime @updatedAt
+   965→
+   966→  station         Station  @relation(fields: [stationId], references: [id])
+   967→}
+   968→
+   969→model VaporRecoveryReading {
+   970→  id              String   @id @default(cuid())
+   971→  stationId       String
+   972→  tankId          String?
+   973→  vaporPressure   Float
+   974→  recoveryRate    Float?
+   975→  status          String   @default("normal") // normal, warning, violation
+   976→  readingAt       DateTime @default(now())
+   977→  createdAt       DateTime @default(now())
+   978→
+   979→  station         Station  @relation(fields: [stationId], references: [id])
+   980→}
+   981→
+   982→// =====================================================
+   983→// NOTIFICATIONS
+   984→// =====================================================
+   985→
+   986→model Notification {
+   987→  id          String   @id @default(cuid())
+   988→  tenantId    String
+   989→  stationId   String?
+   990→  title       String
+   991→  message     String
+   992→  type        String   // alert, info, warning, system, shift, delivery
+   993→  priority    String   @default("normal") // low, normal, high, urgent
+   994→  isRead      Boolean  @default(false)
+   995→  readAt      DateTime?
+   996→  actionUrl   String?
+   997→  createdAt   DateTime @default(now())
+   998→
+   999→  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  1000→}
+  1001→
+  1002→// =====================================================
+  1003→// DAILY REPORTS
+  1004→// =====================================================
+  1005→
+  1006→model DailyReport {
+  1007→  id              String   @id @default(cuid())
+  1008→  stationId       String
+  1009→  reportDate      DateTime
+  1010→  totalRevenue    Float    @default(0)
+  1011→  fuelRevenue     Float    @default(0)
+  1012→  retailRevenue   Float    @default(0)
+  1013→  totalVolume     Float    @default(0)
+  1014→  transactionCount Int     @default(0)
+  1015→  averageTicket   Float    @default(0)
+  1016→  cashVariance    Float    @default(0)
+  1017→  fuelVariance    Float    @default(0)
+  1018→  expenses        Float    @default(0)
+  1019→  netProfit       Float    @default(0)
+  1020→  createdAt       DateTime @default(now())
+  1021→
+  1022→  station         Station  @relation(fields: [stationId], references: [id])
+  1023→}
+  1024→
+  1025→// =====================================================
+  1026→// AUDIT & SECURITY
+  1027→// =====================================================
+  1028→
+  1029→model AuditLog {
+  1030→  id          String   @id @default(cuid())
+  1031→  userId      String?
+  1032→  tenantId    String?
+  1033→  action      String
+  1034→  entity      String
+  1035→  entityId    String?
+  1036→  details     String?
+  1037→  ipAddress   String?
+  1038→  userAgent   String?
+  1039→  createdAt   DateTime @default(now())
+  1040→
+  1041→  user        User?    @relation(fields: [userId], references: [id])
+  1042→}
+  1043→
+  1044→// =====================================================
+  1045→// AI & ANALYTICS
+  1046→// =====================================================
+  1047→
+  1048→model AIAlert {
+  1049→  id          String   @id @default(cuid())
+  1050→  tenantId    String
+  1051→  stationId   String?
+  1052→
+  1053→  station      Station?  @relation(fields: [stationId], references: [id])
+  1054→  alertType   String
+  1055→  severity    String   @default("warning")
+  1056→  title       String
+  1057→  description String?
+  1058→  confidence  Float?
+  1059→  isRead      Boolean  @default(false)
+  1060→  isResolved  Boolean  @default(false)
+  1061→  resolvedAt  DateTime?
+  1062→  createdAt   DateTime @default(now())
+  1063→  updatedAt   DateTime @updatedAt
+  1064→}
+  1065→
+  1066→model AIForecast {
+  1067→  id          String   @id @default(cuid())
+  1068→  tenantId    String
+  1069→  stationId   String
+  1070→  forecastType String
+  1071→  fuelType    String?
+  1072→  predictedValue Float
+  1073→  confidence  Float
+  1074→  periodStart DateTime
+  1075→  periodEnd   DateTime
+  1076→  createdAt   DateTime @default(now())
+  1077→}
+  1078→

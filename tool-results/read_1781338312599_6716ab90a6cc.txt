@@ -1,0 +1,603 @@
+     1→     1→'use client'
+     2→     2→
+     3→     3→import { useState, useEffect, useCallback } from 'react'
+     4→     4→import {
+     5→     5→  Cpu,
+     6→     6→  Wifi,
+     7→     7→  WifiOff,
+     8→     8→  CreditCard,
+     9→     9→  Zap,
+    10→    10→  Camera,
+    11→    11→  Flame,
+    12→    12→  Gauge,
+    13→    13→  CloudSun,
+    14→    14→  Truck,
+    15→    15→  Car,
+    16→    16→  Wind,
+    17→    17→  Fan,
+    18→    18→  FileText,
+    19→    19→  Terminal,
+    20→    20→  RefreshCw,
+    21→    21→  AlertTriangle,
+    22→    22→  CheckCircle2,
+    23→    23→  XCircle,
+    24→    24→  Clock,
+    25→    25→  ArrowUpDown,
+    26→    26→  Filter,
+    27→    27→  Search,
+    28→    28→} from 'lucide-react'
+    29→    29→import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+    30→    30→import { Badge } from '@/components/ui/badge'
+    31→    31→import { Button } from '@/components/ui/button'
+    32→    32→import { Skeleton } from '@/components/ui/skeleton'
+    33→    33→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    34→    34→import { Input } from '@/components/ui/input'
+    35→    35→import {
+    36→    36→  Table,
+    37→    37→  TableBody,
+    38→    38→  TableCell,
+    39→    39→  TableHead,
+    40→    40→  TableHeader,
+    41→    41→  TableRow,
+    42→    42→} from '@/components/ui/table'
+    43→    43→
+    44→    44→// ── Types ──────────────────────────────────────────────
+    45→    45→
+    46→    46→interface DeviceItem {
+    47→    47→  id: string
+    48→    48→  name: string
+    49→    49→  code: string
+    50→    50→  status: string
+    51→    51→  ipAddress?: string | null
+    52→    52→  port?: number | null
+    53→    53→  manufacturer?: string | null
+    54→    54→  model?: string | null
+    55→    55→  communicationType?: string | null
+    56→    56→  isActive: boolean
+    57→    57→  [key: string]: unknown
+    58→    58→}
+    59→    59→
+    60→    60→interface DeviceCategory {
+    61→    61→  key: string
+    62→    62→  label: string
+    63→    63→  icon: React.ElementType
+    64→    64→  count: number
+    65→    65→  online: number
+    66→    66→  offline: number
+    67→    67→}
+    68→    68→
+    69→    69→interface EventLogItem {
+    70→    70→  id: string
+    71→    71→  deviceType: string
+    72→    72→  eventType: string
+    73→    73→  severity: string
+    74→    74→  message: string
+    75→    75→  createdAt: string
+    76→    76→}
+    77→    77→
+    78→    78→interface CommandQueueItem {
+    79→    79→  id: string
+    80→    80→  deviceType: string
+    81→    81→  command: string
+    82→    82→  priority: string
+    83→    83→  status: string
+    84→    84→  retryCount: number
+    85→    85→  maxRetries: number
+    86→    86→  createdAt: string
+    87→    87→}
+    88→    88→
+    89→    89→interface OverviewData {
+    90→    90→  totalDevices: number
+    91→    91→  onlineDevices: number
+    92→    92→  offlineDevices: number
+    93→    93→  criticalEvents: number
+    94→    94→  categories: DeviceCategory[]
+    95→    95→}
+    96→    96→
+    97→    97→// ── Status Config ──────────────────────────────────────
+    98→    98→
+    99→    99→const STATUS_BADGE: Record<string, { variant: 'default' | 'secondary' | 'outline' | 'destructive'; className: string }> = {
+   100→   100→  online: { variant: 'default', className: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/25 hover:bg-emerald-500/20' },
+   101→   101→  active: { variant: 'default', className: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/25 hover:bg-emerald-500/20' },
+   102→   102→  running: { variant: 'default', className: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/25 hover:bg-emerald-500/20' },
+   103→   103→  recording: { variant: 'default', className: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/25 hover:bg-emerald-500/20' },
+   104→   104→  normal: { variant: 'default', className: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/25 hover:bg-emerald-500/20' },
+   105→   105→  connected: { variant: 'default', className: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/25 hover:bg-emerald-500/20' },
+   106→   106→  offline: { variant: 'secondary', className: 'bg-slate-500/15 text-slate-500 border-slate-500/25' },
+   107→   107→  standby: { variant: 'secondary', className: 'bg-slate-500/15 text-slate-500 border-slate-500/25' },
+   108→   108→  disconnected: { variant: 'secondary', className: 'bg-slate-500/15 text-slate-500 border-slate-500/25' },
+   109→   109→  error: { variant: 'destructive', className: 'bg-red-500/15 text-red-600 border-red-500/25' },
+   110→   110→  fault: { variant: 'destructive', className: 'bg-red-500/15 text-red-600 border-red-500/25' },
+   111→   111→  critical: { variant: 'destructive', className: 'bg-red-500/15 text-red-600 border-red-500/25' },
+   112→   112→  alarm: { variant: 'destructive', className: 'bg-red-500/15 text-red-600 border-red-500/25' },
+   113→   113→  maintenance: { variant: 'outline', className: 'bg-amber-500/15 text-amber-600 border-amber-500/25' },
+   114→   114→  warning: { variant: 'outline', className: 'bg-amber-500/15 text-amber-600 border-amber-500/25' },
+   115→   115→  busy: { variant: 'outline', className: 'bg-amber-500/15 text-amber-600 border-amber-500/25' },
+   116→   116→  test: { variant: 'outline', className: 'bg-amber-500/15 text-amber-600 border-amber-500/25' },
+   117→   117→  idle: { variant: 'outline', className: 'bg-blue-500/15 text-blue-600 border-blue-500/25' },
+   118→   118→  washing: { variant: 'outline', className: 'bg-blue-500/15 text-blue-600 border-blue-500/25' },
+   119→   119→  parked: { variant: 'outline', className: 'bg-blue-500/15 text-blue-600 border-blue-500/25' },
+   120→   120→  moving: { variant: 'outline', className: 'bg-blue-500/15 text-blue-600 border-blue-500/25' },
+   121→   121→  suppressed: { variant: 'outline', className: 'bg-slate-500/15 text-slate-500 border-slate-500/25' },
+   122→   122→}
+   123→   123→
+   124→   124→const SEVERITY_BADGE: Record<string, string> = {
+   125→   125→  critical: 'bg-red-500/15 text-red-600 border-red-500/25',
+   126→   126→  error: 'bg-red-500/15 text-red-600 border-red-500/25',
+   127→   127→  warning: 'bg-amber-500/15 text-amber-600 border-amber-500/25',
+   128→   128→  info: 'bg-blue-500/15 text-blue-600 border-blue-500/25',
+   129→   129→}
+   130→   130→
+   131→   131→const COMMAND_STATUS_BADGE: Record<string, string> = {
+   132→   132→  queued: 'bg-amber-500/15 text-amber-600 border-amber-500/25',
+   133→   133→  sent: 'bg-blue-500/15 text-blue-600 border-blue-500/25',
+   134→   134→  acknowledged: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/25',
+   135→   135→  failed: 'bg-red-500/15 text-red-600 border-red-500/25',
+   136→   136→  timeout: 'bg-red-500/15 text-red-600 border-red-500/25',
+   137→   137→}
+   138→   138→
+   139→   139→const DEVICE_TAB_CONFIG = [
+   140→   140→  { key: 'forecourt_controller', label: 'Controllers', icon: Cpu },
+   141→   141→  { key: 'payment_terminal', label: 'Payments', icon: CreditCard },
+   142→   142→  { key: 'generator', label: 'Generator', icon: Zap },
+   143→   143→  { key: 'surveillance_camera', label: 'Surveillance', icon: Camera },
+   144→   144→  { key: 'fire_alarm', label: 'Fire Alarm', icon: Flame },
+   145→   145→  { key: 'utility_meter', label: 'Meters', icon: Gauge },
+   146→   146→  { key: 'weather_station', label: 'Weather', icon: CloudSun },
+   147→   147→  { key: 'tanker_tracker', label: 'Tanker Tracking', icon: Truck },
+   148→   148→  { key: 'car_wash', label: 'Car Wash', icon: Car },
+   149→   149→  { key: 'air_compressor', label: 'Air & Vacuum', icon: Wind },
+   150→   150→]
+   151→   151→
+   152→   152→const CATEGORY_ICONS: Record<string, React.ElementType> = {
+   153→   153→  forecourt_controller: Cpu,
+   154→   154→  payment_terminal: CreditCard,
+   155→   155→  generator: Zap,
+   156→   156→  surveillance_camera: Camera,
+   157→   157→  fire_alarm: Flame,
+   158→   158→  utility_meter: Gauge,
+   159→   159→  weather_station: CloudSun,
+   160→   160→  tanker_tracker: Truck,
+   161→   161→  car_wash: Car,
+   162→   162→  air_compressor: Wind,
+   163→   163→  vacuum_station: Fan,
+   164→   164→}
+   165→   165→
+   166→   166→function getStatusBadge(status: string) {
+   167→   167→  const cfg = STATUS_BADGE[status] || STATUS_BADGE.offline
+   168→   168→  return <Badge variant={cfg.variant} className={`text-[10px] px-1.5 py-0 ${cfg.className}`}>{status}</Badge>
+   169→   169→}
+   170→   170→
+   171→   171→function LoadingSkeleton() {
+   172→   172→  return (
+   173→   173→    <div className="space-y-4">
+   174→   174→      {Array.from({ length: 4 }).map((_, i) => (
+   175→   175→        <Card key={i}><CardContent className="p-4"><Skeleton className="h-20 w-full" /></CardContent></Card>
+   176→   176→      ))}
+   177→   177→    </div>
+   178→   178→  )
+   179→   179→}
+   180→   180→
+   181→   181→// ── Main Component ─────────────────────────────────────
+   182→   182→
+   183→   183→export default function DeviceIntegrationModule() {
+   184→   184→  const [overview, setOverview] = useState<OverviewData | null>(null)
+   185→   185→  const [devices, setDevices] = useState<DeviceItem[]>([])
+   186→   186→  const [eventLogs, setEventLogs] = useState<EventLogItem[]>([])
+   187→   187→  const [commandQueue, setCommandQueue] = useState<CommandQueueItem[]>([])
+   188→   188→  const [loading, setLoading] = useState(true)
+   189→   189→  const [deviceLoading, setDeviceLoading] = useState(false)
+   190→   190→  const [activeTab, setActiveTab] = useState('overview')
+   191→   191→  const [severityFilter, setSeverityFilter] = useState('all')
+   192→   192→  const [searchQuery, setSearchQuery] = useState('')
+   193→   193→
+   194→   194→  const fetchOverview = useCallback(async () => {
+   195→   195→    try {
+   196→   196→      const res = await fetch('/api/devices')
+   197→   197→      if (!res.ok) throw new Error('Failed to fetch')
+   198→   198→      const data = await res.json()
+   199→   199→
+   200→   200→      const categories: DeviceCategory[] = (data.types || []).map((t: { key: string; label: string; count: number; byStatus?: Record<string, number> }) => ({
+   201→   201→        key: t.key,
+   202→   202→        label: t.label,
+   203→   203→        icon: CATEGORY_ICONS[t.key] || Cpu,
+   204→   204→        count: t.count,
+   205→   205→        online: (t.byStatus?.online || 0) + (t.byStatus?.active || 0) + (t.byStatus?.running || 0) + (t.byStatus?.normal || 0),
+   206→   206→        offline: (t.byStatus?.offline || 0) + (t.byStatus?.standby || 0) + (t.byStatus?.disconnected || 0),
+   207→   207→      }))
+   208→   208→
+   209→   209→      const totalDevices = categories.reduce((s: number, c: DeviceCategory) => s + c.count, 0)
+   210→   210→      const onlineDevices = categories.reduce((s: number, c: DeviceCategory) => s + c.online, 0)
+   211→   211→      const offlineDevices = categories.reduce((s: number, c: DeviceCategory) => s + c.offline, 0)
+   212→   212→
+   213→   213→      setOverview({ totalDevices, onlineDevices, offlineDevices, criticalEvents: 0, categories })
+   214→   214→    } catch {
+   215→   215→      setOverview({ totalDevices: 0, onlineDevices: 0, offlineDevices: 0, criticalEvents: 0, categories: [] })
+   216→   216→    } finally {
+   217→   217→      setLoading(false)
+   218→   218→    }
+   219→   219→  }, [])
+   220→   220→
+   221→   221→  const fetchDevices = useCallback(async (type: string) => {
+   222→   222→    setDeviceLoading(true)
+   223→   223→    try {
+   224→   224→      const res = await fetch(`/api/devices?type=${type}`)
+   225→   225→      if (!res.ok) throw new Error('Failed to fetch')
+   226→   226→      const data = await res.json()
+   227→   227→      setDevices(data.devices || [])
+   228→   228→    } catch {
+   229→   229→      setDevices([])
+   230→   230→    } finally {
+   231→   231→      setDeviceLoading(false)
+   232→   232→    }
+   233→   233→  }, [])
+   234→   234→
+   235→   235→  const fetchEventLogs = useCallback(async () => {
+   236→   236→    try {
+   237→   237→      const res = await fetch('/api/devices?type=event_logs')
+   238→   238→      if (!res.ok) throw new Error('Failed to fetch')
+   239→   239→      const data = await res.json()
+   240→   240→      setEventLogs(data.eventLogs || [])
+   241→   241→    } catch {
+   242→   242→      setEventLogs([])
+   243→   243→    }
+   244→   244→  }, [])
+   245→   245→
+   246→   246→  const fetchCommandQueue = useCallback(async () => {
+   247→   247→    try {
+   248→   248→      const res = await fetch('/api/devices?type=command_queue')
+   249→   249→      if (!res.ok) throw new Error('Failed to fetch')
+   250→   250→      const data = await res.json()
+   251→   251→      setCommandQueue(data.commandQueue || [])
+   252→   252→    } catch {
+   253→   253→      setCommandQueue([])
+   254→   254→    }
+   255→   255→  }, [])
+   256→   256→
+   257→   257→  useEffect(() => {
+   258→   258→    fetchOverview()
+   259→   259→  }, [fetchOverview])
+   260→   260→
+   261→   261→  useEffect(() => {
+   262→   262→    if (activeTab === 'event-log') fetchEventLogs()
+   263→   263→    if (activeTab === 'command-queue') fetchCommandQueue()
+   264→   264→    if (activeTab !== 'overview' && activeTab !== 'event-log' && activeTab !== 'command-queue') {
+   265→   265→      fetchDevices(activeTab)
+   266→   266→    }
+   267→   267→  }, [activeTab, fetchDevices, fetchEventLogs, fetchCommandQueue])
+   268→   268→
+   269→   269→  const filteredEvents = eventLogs
+   270→   270→    .filter(e => severityFilter === 'all' || e.severity === severityFilter)
+   271→   271→    .filter(e => !searchQuery || e.message.toLowerCase().includes(searchQuery.toLowerCase()))
+   272→   272→
+   273→   273→  // ── Render ─────────────────────────────────────────
+   274→   274→
+   275→   275→  if (loading) return <LoadingSkeleton />
+   276→   276→
+   277→   277→  return (
+   278→   278→    <div className="space-y-4">
+   279→   279→      <Tabs value={activeTab} onValueChange={setActiveTab}>
+   280→   280→        <div className="overflow-x-auto pb-1">
+   281→   281→          <TabsList className="h-9 w-max gap-0.5 bg-muted/50">
+   282→   282→            <TabsTrigger value="overview" className="text-xs px-3 h-7 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">
+   283→   283→              Overview
+   284→   284→            </TabsTrigger>
+   285→   285→            {DEVICE_TAB_CONFIG.map(dt => (
+   286→   286→              <TabsTrigger key={dt.key} value={dt.key} className="text-xs px-3 h-7 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">
+   287→   287→                {dt.label}
+   288→   288→              </TabsTrigger>
+   289→   289→            ))}
+   290→   290→            <TabsTrigger value="event-log" className="text-xs px-3 h-7 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">
+   291→   291→              Event Log
+   292→   292→            </TabsTrigger>
+   293→   293→            <TabsTrigger value="command-queue" className="text-xs px-3 h-7 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">
+   294→   294→              Command Queue
+   295→   295→            </TabsTrigger>
+   296→   296→          </TabsList>
+   297→   297→        </div>
+   298→   298→
+   299→   299→        {/* Overview Tab */}
+   300→   300→        <TabsContent value="overview" className="mt-4 space-y-4">
+   301→   301→          {/* KPI Cards */}
+   302→   302→          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   303→   303→            <Card className="bg-card border rounded-lg">
+   304→   304→              <CardContent className="p-4">
+   305→   305→                <div className="flex items-center justify-between">
+   306→   306→                  <div>
+   307→   307→                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Total Devices</p>
+   308→   308→                    <p className="text-2xl font-bold mt-0.5">{overview?.totalDevices || 0}</p>
+   309→   309→                  </div>
+   310→   310→                  <div className="size-9 rounded-lg bg-amber-500/10 flex items-center justify-center">
+   311→   311→                    <Cpu className="size-4 text-amber-500" />
+   312→   312→                  </div>
+   313→   313→                </div>
+   314→   314→              </CardContent>
+   315→   315→            </Card>
+   316→   316→            <Card className="bg-card border rounded-lg">
+   317→   317→              <CardContent className="p-4">
+   318→   318→                <div className="flex items-center justify-between">
+   319→   319→                  <div>
+   320→   320→                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Online</p>
+   321→   321→                    <p className="text-2xl font-bold mt-0.5 text-emerald-600">{overview?.onlineDevices || 0}</p>
+   322→   322→                  </div>
+   323→   323→                  <div className="size-9 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+   324→   324→                    <Wifi className="size-4 text-emerald-500" />
+   325→   325→                  </div>
+   326→   326→                </div>
+   327→   327→              </CardContent>
+   328→   328→            </Card>
+   329→   329→            <Card className="bg-card border rounded-lg">
+   330→   330→              <CardContent className="p-4">
+   331→   331→                <div className="flex items-center justify-between">
+   332→   332→                  <div>
+   333→   333→                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Offline</p>
+   334→   334→                    <p className="text-2xl font-bold mt-0.5 text-slate-500">{overview?.offlineDevices || 0}</p>
+   335→   335→                  </div>
+   336→   336→                  <div className="size-9 rounded-lg bg-slate-500/10 flex items-center justify-center">
+   337→   337→                    <WifiOff className="size-4 text-slate-500" />
+   338→   338→                  </div>
+   339→   339→                </div>
+   340→   340→              </CardContent>
+   341→   341→            </Card>
+   342→   342→            <Card className="bg-card border rounded-lg">
+   343→   343→              <CardContent className="p-4">
+   344→   344→                <div className="flex items-center justify-between">
+   345→   345→                  <div>
+   346→   346→                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Critical Events</p>
+   347→   347→                    <p className="text-2xl font-bold mt-0.5 text-red-600">{overview?.criticalEvents || 0}</p>
+   348→   348→                  </div>
+   349→   349→                  <div className="size-9 rounded-lg bg-red-500/10 flex items-center justify-center">
+   350→   350→                    <AlertTriangle className="size-4 text-red-500" />
+   351→   351→                  </div>
+   352→   352→                </div>
+   353→   353→              </CardContent>
+   354→   354→            </Card>
+   355→   355→          </div>
+   356→   356→
+   357→   357→          {/* Device Categories Grid */}
+   358→   358→          <div>
+   359→   359→            <h3 className="text-sm font-semibold mb-3">Device Categories</h3>
+   360→   360→            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+   361→   361→              {overview?.categories.map(cat => {
+   362→   362→                const Icon = cat.icon
+   363→   363→                return (
+   364→   364→                  <Card key={cat.key} className="bg-card border rounded-lg hover:border-amber-500/30 transition-colors cursor-pointer" onClick={() => setActiveTab(cat.key)}>
+   365→   365→                    <CardContent className="p-4">
+   366→   366→                      <div className="flex items-start justify-between">
+   367→   367→                        <div className="flex items-center gap-3">
+   368→   368→                          <div className="size-9 rounded-lg bg-amber-500/10 flex items-center justify-center">
+   369→   369→                            <Icon className="size-4 text-amber-500" />
+   370→   370→                          </div>
+   371→   371→                          <div>
+   372→   372→                            <p className="text-sm font-medium">{cat.label}</p>
+   373→   373→                            <p className="text-[10px] text-muted-foreground">{cat.count} devices</p>
+   374→   374→                          </div>
+   375→   375→                        </div>
+   376→   376→                      </div>
+   377→   377→                      <div className="flex gap-2 mt-3">
+   378→   378→                        <Badge variant="default" className="text-[9px] px-1.5 py-0 bg-emerald-500/15 text-emerald-600 border-emerald-500/25">
+   379→   379→                          {cat.online} online
+   380→   380→                        </Badge>
+   381→   381→                        <Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-slate-500/15 text-slate-500 border-slate-500/25">
+   382→   382→                          {cat.offline} offline
+   383→   383→                        </Badge>
+   384→   384→                      </div>
+   385→   385→                    </CardContent>
+   386→   386→                  </Card>
+   387→   387→                )
+   388→   388→              })}
+   389→   389→            </div>
+   390→   390→          </div>
+   391→   391→        </TabsContent>
+   392→   392→
+   393→   393→        {/* Device Type Tabs */}
+   394→   394→        {DEVICE_TAB_CONFIG.map(dt => (
+   395→   395→          <TabsContent key={dt.key} value={dt.key} className="mt-4 space-y-4">
+   396→   396→            <div className="flex items-center justify-between">
+   397→   397→              <div className="flex items-center gap-2">
+   398→   398→                <dt.icon className="size-4 text-amber-500" />
+   399→   399→                <h3 className="text-sm font-semibold">{dt.label}</h3>
+   400→   400→                <Badge variant="outline" className="text-[9px] px-1.5 py-0">{devices.length} devices</Badge>
+   401→   401→              </div>
+   402→   402→              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => fetchDevices(dt.key)}>
+   403→   403→                <RefreshCw className="size-3 mr-1" /> Refresh
+   404→   404→              </Button>
+   405→   405→            </div>
+   406→   406→            {deviceLoading ? (
+   407→   407→              <LoadingSkeleton />
+   408→   408→            ) : devices.length === 0 ? (
+   409→   409→              <Card className="bg-card border rounded-lg">
+   410→   410→                <CardContent className="p-8 text-center">
+   411→   411→                  <Cpu className="size-8 mx-auto text-muted-foreground/40" />
+   412→   412→                  <p className="text-sm text-muted-foreground mt-2">No {dt.label.toLowerCase()} found</p>
+   413→   413→                </CardContent>
+   414→   414→              </Card>
+   415→   415→            ) : (
+   416→   416→              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+   417→   417→                {devices.map(device => (
+   418→   418→                  <Card key={device.id} className="bg-card border rounded-lg">
+   419→   419→                    <CardContent className="p-4">
+   420→   420→                      <div className="flex items-start justify-between mb-2">
+   421→   421→                        <div>
+   422→   422→                          <p className="text-sm font-medium">{device.name}</p>
+   423→   423→                          <p className="text-[10px] text-muted-foreground">{device.code}</p>
+   424→   424→                        </div>
+   425→   425→                        {getStatusBadge(device.status)}
+   426→   426→                      </div>
+   427→   427→                      <div className="space-y-1.5 mt-3 text-xs text-muted-foreground">
+   428→   428→                        {device.ipAddress && (
+   429→   429→                          <div className="flex justify-between">
+   430→   430→                            <span>IP Address</span>
+   431→   431→                            <span className="font-mono text-foreground">{device.ipAddress}:{device.port || ''}</span>
+   432→   432→                          </div>
+   433→   433→                        )}
+   434→   434→                        {device.manufacturer && (
+   435→   435→                          <div className="flex justify-between">
+   436→   436→                            <span>Manufacturer</span>
+   437→   437→                            <span className="text-foreground">{device.manufacturer}</span>
+   438→   438→                          </div>
+   439→   439→                        )}
+   440→   440→                        {device.model && (
+   441→   441→                          <div className="flex justify-between">
+   442→   442→                            <span>Model</span>
+   443→   443→                            <span className="text-foreground">{device.model}</span>
+   444→   444→                          </div>
+   445→   445→                        )}
+   446→   446→                        {device.communicationType && (
+   447→   447→                          <div className="flex justify-between">
+   448→   448→                            <span>Comm Type</span>
+   449→   449→                            <span className="text-foreground">{device.communicationType}</span>
+   450→   450→                          </div>
+   451→   451→                        )}
+   452→   452→                      </div>
+   453→   453→                      <div className="flex gap-2 mt-3">
+   454→   454→                        <Button size="sm" variant="outline" className="h-6 text-[10px] px-2">
+   455→   455→                          <Terminal className="size-3 mr-1" /> Command
+   456→   456→                        </Button>
+   457→   457→                        <Button size="sm" variant="outline" className="h-6 text-[10px] px-2">
+   458→   458→                          <FileText className="size-3 mr-1" /> Logs
+   459→   459→                        </Button>
+   460→   460→                      </div>
+   461→   461→                    </CardContent>
+   462→   462→                  </Card>
+   463→   463→                ))}
+   464→   464→              </div>
+   465→   465→            )}
+   466→   466→          </TabsContent>
+   467→   467→        ))}
+   468→   468→
+   469→   469→        {/* Event Log Tab */}
+   470→   470→        <TabsContent value="event-log" className="mt-4 space-y-4">
+   471→   471→          <div className="flex items-center justify-between gap-3 flex-wrap">
+   472→   472→            <h3 className="text-sm font-semibold">Device Event Log</h3>
+   473→   473→            <div className="flex items-center gap-2">
+   474→   474→              <div className="relative">
+   475→   475→                <Search className="absolute left-2 top-1/2 size-3 -translate-y-1/2 text-muted-foreground" />
+   476→   476→                <Input placeholder="Search events..." className="h-7 w-48 pl-7 text-xs" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+   477→   477→              </div>
+   478→   478→              <div className="flex items-center gap-1">
+   479→   479→                <Filter className="size-3 text-muted-foreground" />
+   480→   480→                {['all', 'critical', 'error', 'warning', 'info'].map(s => (
+   481→   481→                  <Button key={s} size="sm" variant={severityFilter === s ? 'default' : 'outline'} className={`h-6 text-[10px] px-2 ${severityFilter === s ? 'bg-amber-500 hover:bg-amber-600' : ''}`} onClick={() => setSeverityFilter(s)}>
+   482→   482→                    {s.charAt(0).toUpperCase() + s.slice(1)}
+   483→   483→                  </Button>
+   484→   484→                ))}
+   485→   485→              </div>
+   486→   486→              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={fetchEventLogs}>
+   487→   487→                <RefreshCw className="size-3 mr-1" /> Refresh
+   488→   488→              </Button>
+   489→   489→            </div>
+   490→   490→          </div>
+   491→   491→          <Card className="bg-card border rounded-lg">
+   492→   492→            <CardContent className="p-0">
+   493→   493→              <div className="max-h-96 overflow-y-auto">
+   494→   494→                <Table>
+   495→   495→                  <TableHeader>
+   496→   496→                    <TableRow>
+   497→   497→                      <TableHead className="text-[10px] h-8">Time</TableHead>
+   498→   498→                      <TableHead className="text-[10px]">Device Type</TableHead>
+   499→   499→                      <TableHead className="text-[10px]">Event</TableHead>
+   500→   500→                      <TableHead className="text-[10px]">Severity</TableHead>
+   501→   501→                      <TableHead className="text-[10px]">Message</TableHead>
+   502→   502→                    </TableRow>
+   503→   503→                  </TableHeader>
+   504→   504→                  <TableBody>
+   505→   505→                    {filteredEvents.length === 0 ? (
+   506→   506→                      <TableRow>
+   507→   507→                        <TableCell colSpan={5} className="text-center text-xs text-muted-foreground py-8">
+   508→   508→                          No event logs found
+   509→   509→                        </TableCell>
+   510→   510→                      </TableRow>
+   511→   511→                    ) : (
+   512→   512→                      filteredEvents.map(log => (
+   513→   513→                        <TableRow key={log.id}>
+   514→   514→                          <TableCell className="text-[10px] font-mono whitespace-nowrap">{new Date(log.createdAt).toLocaleString()}</TableCell>
+   515→   515→                          <TableCell className="text-[10px]">{log.deviceType}</TableCell>
+   516→   516→                          <TableCell className="text-[10px]">{log.eventType}</TableCell>
+   517→   517→                          <TableCell>
+   518→   518→                            <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${SEVERITY_BADGE[log.severity] || SEVERITY_BADGE.info}`}>
+   519→   519→                              {log.severity}
+   520→   520→                            </Badge>
+   521→   521→                          </TableCell>
+   522→   522→                          <TableCell className="text-[10px] max-w-[200px] truncate">{log.message}</TableCell>
+   523→   523→                        </TableRow>
+   524→   524→                      ))
+   525→   525→                    )}
+   526→   526→                  </TableBody>
+   527→   527→                </Table>
+   528→   528→              </div>
+   529→   529→            </CardContent>
+   530→   530→          </Card>
+   531→   531→        </TabsContent>
+   532→   532→
+   533→   533→        {/* Command Queue Tab */}
+   534→   534→        <TabsContent value="command-queue" className="mt-4 space-y-4">
+   535→   535→          <div className="flex items-center justify-between">
+   536→   536→            <h3 className="text-sm font-semibold">Command Queue</h3>
+   537→   537→            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={fetchCommandQueue}>
+   538→   538→              <RefreshCw className="size-3 mr-1" /> Refresh
+   539→   539→            </Button>
+   540→   540→          </div>
+   541→   541→          <Card className="bg-card border rounded-lg">
+   542→   542→            <CardContent className="p-0">
+   543→   543→              <div className="max-h-96 overflow-y-auto">
+   544→   544→                <Table>
+   545→   545→                  <TableHeader>
+   546→   546→                    <TableRow>
+   547→   547→                      <TableHead className="text-[10px] h-8">Time</TableHead>
+   548→   548→                      <TableHead className="text-[10px]">Device Type</TableHead>
+   549→   549→                      <TableHead className="text-[10px]">Command</TableHead>
+   550→   550→                      <TableHead className="text-[10px]">Priority</TableHead>
+   551→   551→                      <TableHead className="text-[10px]">Status</TableHead>
+   552→   552→                      <TableHead className="text-[10px]">Retry</TableHead>
+   553→   553→                      <TableHead className="text-[10px]">Actions</TableHead>
+   554→   554→                    </TableRow>
+   555→   555→                  </TableHeader>
+   556→   556→                  <TableBody>
+   557→   557→                    {commandQueue.length === 0 ? (
+   558→   558→                      <TableRow>
+   559→   559→                        <TableCell colSpan={7} className="text-center text-xs text-muted-foreground py-8">
+   560→   560→                          No commands in queue
+   561→   561→                        </TableCell>
+   562→   562→                      </TableRow>
+   563→   563→                    ) : (
+   564→   564→                      commandQueue.map(cmd => (
+   565→   565→                        <TableRow key={cmd.id}>
+   566→   566→                          <TableCell className="text-[10px] font-mono whitespace-nowrap">{new Date(cmd.createdAt).toLocaleString()}</TableCell>
+   567→   567→                          <TableCell className="text-[10px]">{cmd.deviceType}</TableCell>
+   568→   568→                          <TableCell className="text-[10px] font-mono">{cmd.command}</TableCell>
+   569→   569→                          <TableCell>
+   570→   570→                            <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${cmd.priority === 'urgent' ? 'bg-red-500/15 text-red-600 border-red-500/25' : cmd.priority === 'high' ? 'bg-amber-500/15 text-amber-600 border-amber-500/25' : 'bg-blue-500/15 text-blue-600 border-blue-500/25'}`}>
+   571→   571→                              {cmd.priority}
+   572→   572→                            </Badge>
+   573→   573→                          </TableCell>
+   574→   574→                          <TableCell>
+   575→   575→                            <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${COMMAND_STATUS_BADGE[cmd.status] || ''}`}>
+   576→   576→                              {cmd.status}
+   577→   577→                            </Badge>
+   578→   578→                          </TableCell>
+   579→   579→                          <TableCell className="text-[10px]">{cmd.retryCount}/{cmd.maxRetries}</TableCell>
+   580→   580→                          <TableCell>
+   581→   581→                            <div className="flex gap-1">
+   582→   582→                              <Button size="sm" variant="outline" className="h-5 text-[9px] px-1.5" disabled={cmd.status === 'acknowledged'}>
+   583→   583→                                <XCircle className="size-2.5 mr-0.5" /> Cancel
+   584→   584→                              </Button>
+   585→   585→                              <Button size="sm" variant="outline" className="h-5 text-[9px] px-1.5" disabled={cmd.status !== 'failed' && cmd.status !== 'timeout'}>
+   586→   586→                                <RefreshCw className="size-2.5 mr-0.5" /> Retry
+   587→   587→                              </Button>
+   588→   588→                            </div>
+   589→   589→                          </TableCell>
+   590→   590→                        </TableRow>
+   591→   591→                      ))
+   592→   592→                    )}
+   593→   593→                  </TableBody>
+   594→   594→                </Table>
+   595→   595→              </div>
+   596→   596→            </CardContent>
+   597→   597→          </Card>
+   598→   598→        </TabsContent>
+   599→   599→      </Tabs>
+   600→   600→    </div>
+   601→   601→  )
+   602→   602→}
+   603→   603→

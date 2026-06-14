@@ -1,0 +1,690 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useCallback } from 'react'
+     4→import { motion } from 'framer-motion'
+     5→import {
+     6→  Building2, Package, Key, FileText, CreditCard, RefreshCw,
+     7→  CheckCircle2, XCircle, Clock, AlertTriangle, Activity,
+     8→  Zap, Users, Monitor, Cloud, ChevronRight, Shield,
+     9→  ArrowUpDown, Calendar, Download, Copy, ExternalLink,
+    10→  Loader2,
+    11→} from 'lucide-react'
+    12→import { Badge } from '@/components/ui/badge'
+    13→import { Button } from '@/components/ui/button'
+    14→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    15→import { useAppStore } from '@/stores/app-store'
+    16→
+    17→// ── Types ──────────────────────────────────────
+    18→
+    19→interface OMSClient {
+    20→  id: string
+    21→  omsClientId: string
+    22→  companyName: string
+    23→  registrationDate: string
+    24→  subscriptionPlan: string
+    25→  licenseKey: string
+    26→  licenseStatus: string
+    27→  licensedModules: string | null
+    28→  maxStations: number
+    29→  maxUsers: number
+    30→  maxDevices: number
+    31→  currentStations: number
+    32→  currentUsers: number
+    33→  currentDevices: number
+    34→  billingCycle: string
+    35→  basePrice: number
+    36→  perStationPrice: number
+    37→  perUserPrice: number
+    38→  totalMonthly: number
+    39→  currency: string
+    40→  lastSyncAt: string | null
+    41→  syncStatus: string
+    42→  syncErrors: string | null
+    43→  isActive: boolean
+    44→  packages: OMSPackage[]
+    45→  invoices: OMSInvoice[]
+    46→  payments: OMSPayment[]
+    47→  syncLogs: OMSSyncLog[]
+    48→  licenses: OMSLicense[]
+    49→}
+    50→
+    51→interface OMSPackage {
+    52→  id: string
+    53→  packageName: string
+    54→  description: string | null
+    55→  modules: string // JSON array
+    56→  stationLimit: number
+    57→  userLimit: number
+    58→  deviceLimit: number
+    59→  price: number
+    60→  currency: string
+    61→  billingCycle: string
+    62→  isCustom: boolean
+    63→  isActive: boolean
+    64→}
+    65→
+    66→interface OMSInvoice {
+    67→  id: string
+    68→  invoiceNumber: string
+    69→  invoiceDate: string
+    70→  dueDate: string
+    71→  subtotal: number
+    72→  taxAmount: number
+    73→  totalAmount: number
+    74→  status: string
+    75→  paidAmount: number
+    76→  paidDate: string | null
+    77→  items: string // JSON
+    78→  notes: string | null
+    79→}
+    80→
+    81→interface OMSPayment {
+    82→  id: string
+    83→  amount: number
+    84→  paymentMethod: string
+    85→  paymentDate: string
+    86→  reference: string | null
+    87→}
+    88→
+    89→interface OMSSyncLog {
+    90→  id: string
+    91→  syncType: string
+    92→  direction: string
+    93→  status: string
+    94→  payload: string | null
+    95→  response: string | null
+    96→  errorMessage: string | null
+    97→  syncedAt: string
+    98→}
+    99→
+   100→interface OMSLicense {
+   101→  id: string
+   102→  licenseKey: string
+   103→  moduleKey: string
+   104→  moduleName: string
+   105→  is_enabled: boolean
+   106→  validFrom: string
+   107→  validTo: string | null
+   108→  maxUsage: number | null
+   109→  currentUsage: number
+   110→  status: string
+   111→}
+   112→
+   113→interface ApexFlowData {
+   114→  tenant: { id: string; name: string; slug: string }
+   115→  omsClient: OMSClient
+   116→}
+   117→
+   118→// ── Helpers ──────────────────────────────────────
+   119→
+   120→function formatPKR(amount: number) {
+   121→  return `PKR ${amount.toLocaleString('en-PK')}`
+   122→}
+   123→
+   124→const SYNC_STATUS_MAP: Record<string, { dot: string; label: string }> = {
+   125→  synced: { dot: 'macos-status-online', label: 'Synced' },
+   126→  syncing: { dot: 'macos-status-warning', label: 'Syncing' },
+   127→  pending: { dot: 'macos-status-warning', label: 'Pending' },
+   128→  error: { dot: 'macos-status-error', label: 'Error' },
+   129→}
+   130→
+   131→const DIRECTION_MAP: Record<string, { icon: React.ElementType; color: string; label: string }> = {
+   132→  outbound: { icon: ArrowUpDown, color: 'text-emerald-600 dark:text-emerald-400', label: 'Up' },
+   133→  inbound: { icon: ArrowUpDown, color: 'text-sky-600 dark:text-sky-400', label: 'Down' },
+   134→  both: { icon: RefreshCw, color: 'text-teal-600 dark:text-teal-400', label: 'Both' },
+   135→  up: { icon: ArrowUpDown, color: 'text-emerald-600 dark:text-emerald-400', label: 'Up' },
+   136→  down: { icon: ArrowUpDown, color: 'text-sky-600 dark:text-sky-400', label: 'Down' },
+   137→}
+   138→
+   139→const INVOICE_STATUS: Record<string, string> = {
+   140→  paid: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
+   141→  pending: 'bg-teal-500/10 text-teal-600 border-teal-500/20',
+   142→  overdue: 'bg-red-500/10 text-red-600 border-red-500/20',
+   143→  cancelled: 'bg-slate-500/10 text-slate-600 border-slate-500/20',
+   144→  partial: 'bg-teal-500/10 text-teal-600 border-teal-500/20',
+   145→}
+   146→
+   147→// ── Component ──────────────────────────────────────
+   148→
+   149→export default function ApexFlowOMSModule() {
+   150→  const [activeTab, setActiveTab] = useState('client')
+   151→  const [data, setData] = useState<ApexFlowData | null>(null)
+   152→  const [loading, setLoading] = useState(true)
+   153→  const [error, setError] = useState<string | null>(null)
+   154→  const [syncing, setSyncing] = useState(false)
+   155→
+   156→  const fetchData = useCallback(async () => {
+   157→    setLoading(true)
+   158→    setError(null)
+   159→    try {
+   160→      const res = await fetch('/api/apexflow')
+   161→      if (!res.ok) {
+   162→        const errData = await res.json().catch(() => ({}))
+   163→        throw new Error(errData.error || 'Failed to fetch OMS data')
+   164→      }
+   165→      const json = await res.json()
+   166→      setData(json)
+   167→    } catch (err) {
+   168→      setError(err instanceof Error ? err.message : 'Failed to load OMS data')
+   169→    } finally {
+   170→      setLoading(false)
+   171→    }
+   172→  }, [])
+   173→
+   174→  useEffect(() => {
+   175→    fetchData()
+   176→  }, [fetchData])
+   177→
+   178→  const handleSync = async () => {
+   179→    if (!data?.omsClient || syncing) return
+   180→    setSyncing(true)
+   181→    try {
+   182→      await fetch('/api/apexflow', {
+   183→        method: 'POST',
+   184→        headers: { 'Content-Type': 'application/json' },
+   185→        body: JSON.stringify({
+   186→          action: 'sync_client',
+   187→          omsClientId: data.omsClient.id,
+   188→          syncType: 'full',
+   189→          direction: 'both',
+   190→        }),
+   191→      })
+   192→      // Refresh data after sync
+   193→      await fetchData()
+   194→    } catch (err) {
+   195→      // Silent fail for sync
+   196→    } finally {
+   197→      setSyncing(false)
+   198→    }
+   199→  }
+   200→
+   201→  // Loading state
+   202→  if (loading) {
+   203→    return (
+   204→      <div className="space-y-4">
+   205→        <div className="macos-card p-5 animate-pulse">
+   206→          <div className="flex items-start gap-4">
+   207→            <div className="size-14 rounded-2xl bg-muted" />
+   208→            <div className="flex-1">
+   209→              <div className="h-5 bg-muted rounded w-64 mb-2" />
+   210→              <div className="h-3 bg-muted rounded w-32" />
+   211→            </div>
+   212→          </div>
+   213→        </div>
+   214→        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   215→          {[1, 2, 3, 4].map((i) => (
+   216→            <div key={i} className="macos-card p-4 animate-pulse">
+   217→              <div className="h-3 bg-muted rounded w-16 mb-2" />
+   218→              <div className="h-6 bg-muted rounded w-24" />
+   219→            </div>
+   220→          ))}
+   221→        </div>
+   222→      </div>
+   223→    )
+   224→  }
+   225→
+   226→  // Error state
+   227→  if (error || !data) {
+   228→    return (
+   229→      <div className="macos-card p-12 flex flex-col items-center justify-center text-muted-foreground">
+   230→        <AlertTriangle className="size-10 mb-3 text-teal-500" />
+   231→        <p className="text-[13px] font-medium">Failed to load OMS data</p>
+   232→        <p className="text-[11px] mt-1">{error || 'No OMS client configured'}</p>
+   233→        <button onClick={fetchData} className="macos-btn mt-4 text-[12px] flex items-center gap-1.5">
+   234→          <RefreshCw className="size-3" /> Retry
+   235→        </button>
+   236→      </div>
+   237→    )
+   238→  }
+   239→
+   240→  const client = data.omsClient
+   241→  const clientPackages = client.packages || []
+   242→  const clientInvoices = client.invoices || []
+   243→  const clientSyncLogs = client.syncLogs || []
+   244→  const clientLicenses = client.licenses || []
+   245→
+   246→  // Compute sync stats from logs
+   247→  const successLogs = clientSyncLogs.filter(l => l.status === 'success')
+   248→  const errorLogs = clientSyncLogs.filter(l => l.status === 'error')
+   249→  const totalRecords = clientSyncLogs.length
+   250→  const avgDuration = totalRecords > 0 ? '—' : '—'
+   251→  const errorRate = totalRecords > 0 ? `${Math.round((errorLogs.length / totalRecords) * 1000) / 10}%` : '0%'
+   252→
+   253→  return (
+   254→    <div className="space-y-4">
+   255→      <div className="flex justify-end">
+   256→        <button
+   257→          onClick={handleSync}
+   258→          disabled={syncing}
+   259→          className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1"
+   260→        >
+   261→          {syncing ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}
+   262→          {syncing ? 'Syncing...' : 'Sync Now'}
+   263→        </button>
+   264→      </div>
+   265→
+   266→      <Tabs value={activeTab} onValueChange={setActiveTab}>
+   267→        <div className="overflow-x-auto pb-1">
+   268→          <TabsList className="h-8 w-max gap-0.5 bg-muted/50">
+   269→            <TabsTrigger value="client" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Client Info</TabsTrigger>
+   270→            <TabsTrigger value="subscription" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Subscription</TabsTrigger>
+   271→            <TabsTrigger value="sync" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Sync Status</TabsTrigger>
+   272→            <TabsTrigger value="licenses" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Licenses</TabsTrigger>
+   273→            <TabsTrigger value="invoices" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Invoices</TabsTrigger>
+   274→          </TabsList>
+   275→        </div>
+   276→
+   277→        {/* ── Client Info ── */}
+   278→        <TabsContent value="client" className="mt-4 space-y-4">
+   279→          <div className="macos-card p-5">
+   280→            <div className="flex items-start gap-4">
+   281→              <div className="size-14 rounded-2xl bg-teal-500/10 flex items-center justify-center shrink-0">
+   282→                <Building2 className="size-7 text-teal-500" />
+   283→              </div>
+   284→              <div className="flex-1 min-w-0">
+   285→                <div className="flex items-center gap-3 mb-1">
+   286→                  <h2 className="text-[15px] font-semibold">{client.companyName}</h2>
+   287→                  <div className="flex items-center gap-1.5">
+   288→                    <div className={`macos-status-dot ${client.isActive ? 'macos-status-online' : 'macos-status-offline'}`} />
+   289→                    <span className={`text-[11px] font-medium ${client.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+   290→                      {client.isActive ? 'Active' : 'Inactive'}
+   291→                    </span>
+   292→                  </div>
+   293→                </div>
+   294→                <p className="text-[11px] text-muted-foreground font-mono">{client.omsClientId}</p>
+   295→              </div>
+   296→              <Badge variant="outline" className="text-[10px] px-2 py-0.5 bg-teal-500/10 text-teal-600 border-teal-500/20 font-semibold capitalize">
+   297→                {client.subscriptionPlan}
+   298→              </Badge>
+   299→            </div>
+   300→          </div>
+   301→
+   302→          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   303→            {[
+   304→              { label: 'Stations', value: `${client.currentStations}/${client.maxStations}`, icon: Building2, accent: '#e8930c' },
+   305→              { label: 'Users', value: `${client.currentUsers}/${client.maxUsers}`, icon: Users, accent: '#34c759' },
+   306→              { label: 'Devices', value: `${client.currentDevices}/${client.maxDevices}`, icon: Monitor, accent: '#ff9f0a' },
+   307→              { label: 'Monthly Cost', value: formatPKR(client.totalMonthly), icon: CreditCard, accent: '#e8930c' },
+   308→            ].map((stat) => (
+   309→              <div key={stat.label} className="macos-card p-4">
+   310→                <div className="flex items-center justify-between">
+   311→                  <div>
+   312→                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">{stat.label}</p>
+   313→                    <p className="text-lg font-bold mt-0.5" style={{ color: stat.accent }}>{stat.value}</p>
+   314→                  </div>
+   315→                  <div className="size-8 rounded-[10px] flex items-center justify-center" style={{ backgroundColor: `${stat.accent}12` }}>
+   316→                    <stat.icon className="size-4" style={{ color: stat.accent }} />
+   317→                  </div>
+   318→                </div>
+   319→              </div>
+   320→            ))}
+   321→          </div>
+   322→
+   323→          <div className="macos-section-header">Account Details</div>
+   324→          <div className="macos-group">
+   325→            <div className="macos-group-item">
+   326→              <div className="flex justify-between text-[13px]">
+   327→                <span className="text-muted-foreground">Client ID</span>
+   328→                <span className="font-medium font-mono">{client.omsClientId}</span>
+   329→              </div>
+   330→            </div>
+   331→            <div className="macos-group-item">
+   332→              <div className="flex justify-between text-[13px]">
+   333→                <span className="text-muted-foreground">License Key</span>
+   334→                <div className="flex items-center gap-2">
+   335→                  <code className="text-[12px] font-mono bg-muted/50 px-2 py-0.5 rounded">{client.licenseKey}</code>
+   336→                  <button className="text-muted-foreground hover:text-foreground transition-colors" title="Copy key" onClick={() => navigator.clipboard?.writeText(client.licenseKey)}>
+   337→                    <Copy className="size-3" />
+   338→                  </button>
+   339→                </div>
+   340→              </div>
+   341→            </div>
+   342→            <div className="macos-group-item">
+   343→              <div className="flex justify-between text-[13px]">
+   344→                <span className="text-muted-foreground">License Status</span>
+   345→                <div className="flex items-center gap-1.5">
+   346→                  <div className={`macos-status-dot ${client.licenseStatus === 'active' ? 'macos-status-online' : client.licenseStatus === 'suspended' ? 'macos-status-warning' : 'macos-status-error'}`} />
+   347→                  <span className="font-medium capitalize">{client.licenseStatus}</span>
+   348→                </div>
+   349→              </div>
+   350→            </div>
+   351→            <div className="macos-group-item">
+   352→              <div className="flex justify-between text-[13px]">
+   353→                <span className="text-muted-foreground">Registration Date</span>
+   354→                <span className="font-medium">{new Date(client.registrationDate).toLocaleDateString('en-PK', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+   355→              </div>
+   356→            </div>
+   357→            <div className="macos-group-item">
+   358→              <div className="flex justify-between text-[13px]">
+   359→                <span className="text-muted-foreground">Billing Cycle</span>
+   360→                <span className="font-medium capitalize">{client.billingCycle}</span>
+   361→              </div>
+   362→            </div>
+   363→            <div className="macos-group-item">
+   364→              <div className="flex justify-between text-[13px]">
+   365→                <span className="text-muted-foreground">Last Sync</span>
+   366→                <span className="font-medium">{client.lastSyncAt ? new Date(client.lastSyncAt).toLocaleString() : 'Never'}</span>
+   367→              </div>
+   368→            </div>
+   369→            <div className="macos-group-item">
+   370→              <div className="flex justify-between text-[13px]">
+   371→                <span className="text-muted-foreground">Sync Status</span>
+   372→                <div className="flex items-center gap-1.5">
+   373→                  <div className={`macos-status-dot ${SYNC_STATUS_MAP[client.syncStatus]?.dot || 'macos-status-offline'}`} />
+   374→                  <span className="font-medium">{SYNC_STATUS_MAP[client.syncStatus]?.label || client.syncStatus}</span>
+   375→                </div>
+   376→              </div>
+   377→            </div>
+   378→          </div>
+   379→        </TabsContent>
+   380→
+   381→        {/* ── Subscription / Packages ── */}
+   382→        <TabsContent value="subscription" className="mt-4 space-y-4">
+   383→          <div className="macos-section-header">Subscription Packages</div>
+   384→          {clientPackages.length === 0 ? (
+   385→            <div className="macos-card p-12 flex flex-col items-center justify-center text-muted-foreground">
+   386→              <Package className="size-10 mb-3 opacity-20" />
+   387→              <p className="text-[13px] font-medium">No packages configured</p>
+   388→              <p className="text-[11px]">Packages will appear here once set up in the OMS</p>
+   389→            </div>
+   390→          ) : (
+   391→            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+   392→              {clientPackages.map((pkg, i) => {
+   393→                const isCurrentPlan = pkg.packageName.toLowerCase() === client.subscriptionPlan.toLowerCase()
+   394→                let modules: string[] = []
+   395→                try { modules = JSON.parse(pkg.modules) } catch { modules = [pkg.modules] }
+   396→                return (
+   397→                  <motion.div
+   398→                    key={pkg.id}
+   399→                    initial={{ opacity: 0, y: 8 }}
+   400→                    animate={{ opacity: 1, y: 0 }}
+   401→                    transition={{ delay: i * 0.08 }}
+   402→                    className={`macos-card p-5 relative ${isCurrentPlan ? 'ring-2 ring-teal-500/40' : ''}`}
+   403→                  >
+   404→                    <div className="text-center mb-4">
+   405→                      <h3 className="text-[15px] font-semibold">{pkg.packageName}</h3>
+   406→                      <p className="text-[11px] text-muted-foreground mt-1">{pkg.description || 'Subscription package'}</p>
+   407→                    </div>
+   408→
+   409→                    <div className="text-center mb-4">
+   410→                      <span className="text-2xl font-bold" style={{ color: '#e8930c' }}>{formatPKR(pkg.price)}</span>
+   411→                      <span className="text-[11px] text-muted-foreground">/{pkg.billingCycle || 'month'}</span>
+   412→                    </div>
+   413→
+   414→                    <div className="macos-group mb-4">
+   415→                      <div className="macos-group-item">
+   416→                        <div className="flex justify-between text-[12px]">
+   417→                          <span className="text-muted-foreground">Station Limit</span>
+   418→                          <span className="font-semibold">{pkg.stationLimit}</span>
+   419→                        </div>
+   420→                      </div>
+   421→                      <div className="macos-group-item">
+   422→                        <div className="flex justify-between text-[12px]">
+   423→                          <span className="text-muted-foreground">User Limit</span>
+   424→                          <span className="font-semibold">{pkg.userLimit}</span>
+   425→                        </div>
+   426→                      </div>
+   427→                      <div className="macos-group-item">
+   428→                        <div className="flex justify-between text-[12px]">
+   429→                          <span className="text-muted-foreground">Device Limit</span>
+   430→                          <span className="font-semibold">{pkg.deviceLimit}</span>
+   431→                        </div>
+   432→                      </div>
+   433→                    </div>
+   434→
+   435→                    {modules.length > 0 && (
+   436→                      <div className="space-y-1.5 mb-4">
+   437→                        {modules.map(mod => (
+   438→                          <div key={mod} className="flex items-center gap-1.5 text-[12px]">
+   439→                            <CheckCircle2 className="size-3 text-emerald-500 shrink-0" />
+   440→                            <span>{mod}</span>
+   441→                          </div>
+   442→                        ))}
+   443→                      </div>
+   444→                    )}
+   445→
+   446→                    <button
+   447→                      className={`w-full text-[12px] py-2 rounded-lg font-medium transition-all ${
+   448→                        isCurrentPlan
+   449→                          ? 'bg-teal-500/10 text-teal-600 border border-teal-500/20 cursor-default'
+   450→                          : 'macos-btn-secondary'
+   451→                      }`}
+   452→                      disabled={isCurrentPlan}
+   453→                    >
+   454→                      {isCurrentPlan ? 'Current Plan' : 'Upgrade'}
+   455→                    </button>
+   456→                  </motion.div>
+   457→                )
+   458→              })}
+   459→            </div>
+   460→          )}
+   461→        </TabsContent>
+   462→
+   463→        {/* ── Sync Status ── */}
+   464→        <TabsContent value="sync" className="mt-4 space-y-4">
+   465→          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   466→            {[
+   467→              { label: 'Sync Status', value: SYNC_STATUS_MAP[client.syncStatus]?.label || client.syncStatus, icon: Cloud, accent: client.syncStatus === 'synced' ? '#34c759' : client.syncStatus === 'error' ? '#ff3b30' : '#ff9f0a', detail: client.lastSyncAt ? `Last: ${new Date(client.lastSyncAt).toLocaleTimeString()}` : 'Never synced' },
+   468→              { label: 'Total Syncs', value: clientSyncLogs.length.toString(), icon: Activity, accent: '#e8930c', detail: `${successLogs.length} successful` },
+   469→              { label: 'Error Rate', value: errorRate, icon: Zap, accent: errorRate === '0%' ? '#34c759' : '#ff3b30', detail: `${errorLogs.length} errors` },
+   470→              { label: 'Sync Errors', value: client.syncErrors || 'None', icon: AlertTriangle, accent: client.syncErrors ? '#ff3b30' : '#34c759', detail: client.syncErrors ? 'Needs attention' : 'All clear' },
+   471→            ].map((stat) => (
+   472→              <div key={stat.label} className="macos-card p-4">
+   473→                <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">{stat.label}</p>
+   474→                <p className="text-xl font-bold mt-0.5" style={{ color: stat.accent }}>{stat.value}</p>
+   475→                <p className="text-[11px] text-muted-foreground mt-0.5">{stat.detail}</p>
+   476→              </div>
+   477→            ))}
+   478→          </div>
+   479→
+   480→          <div className="macos-section-header">Sync Logs</div>
+   481→          {clientSyncLogs.length === 0 ? (
+   482→            <div className="macos-card p-12 flex flex-col items-center justify-center text-muted-foreground">
+   483→              <Activity className="size-10 mb-3 opacity-20" />
+   484→              <p className="text-[13px] font-medium">No sync logs yet</p>
+   485→              <p className="text-[11px]">Logs will appear here after the first sync</p>
+   486→            </div>
+   487→          ) : (
+   488→            <div className="macos-card overflow-hidden">
+   489→              <div className="max-h-[380px] overflow-y-auto">
+   490→                <table className="macos-table">
+   491→                  <thead>
+   492→                    <tr>
+   493→                      <th>Time</th>
+   494→                      <th>Type</th>
+   495→                      <th>Direction</th>
+   496→                      <th>Status</th>
+   497→                    </tr>
+   498→                  </thead>
+   499→                  <tbody>
+   500→                    {clientSyncLogs.map(log => {
+   501→                      const dir = DIRECTION_MAP[log.direction] || DIRECTION_MAP.outbound
+   502→                      const DirIcon = dir?.icon || ArrowUpDown
+   503→                      return (
+   504→                        <tr key={log.id}>
+   505→                          <td className="text-[12px] font-mono text-muted-foreground whitespace-nowrap">{new Date(log.syncedAt).toLocaleTimeString()}</td>
+   506→                          <td className="text-[13px] font-medium capitalize">{log.syncType.replace(/_/g, ' ')}</td>
+   507→                          <td>
+   508→                            <div className="flex items-center gap-1.5">
+   509→                              <DirIcon className={`size-3 ${dir?.color}`} />
+   510→                              <span className={`text-[11px] font-medium ${dir?.color}`}>{dir?.label}</span>
+   511→                            </div>
+   512→                          </td>
+   513→                          <td>
+   514→                            {log.status === 'success' ? (
+   515→                              <div className="flex items-center gap-1.5">
+   516→                                <CheckCircle2 className="size-3.5 text-emerald-500" />
+   517→                                <span className="text-[12px] text-emerald-600 dark:text-emerald-400">Success</span>
+   518→                              </div>
+   519→                            ) : log.status === 'error' ? (
+   520→                              <div className="flex items-center gap-1.5">
+   521→                                <XCircle className="size-3.5 text-red-500" />
+   522→                                <span className="text-[12px] text-red-600 dark:text-red-400">Error</span>
+   523→                              </div>
+   524→                            ) : (
+   525→                              <div className="flex items-center gap-1.5">
+   526→                                <Clock className="size-3.5 text-teal-500" />
+   527→                                <span className="text-[12px] text-teal-600 dark:text-teal-400 capitalize">{log.status}</span>
+   528→                              </div>
+   529→                            )}
+   530→                          </td>
+   531→                        </tr>
+   532→                      )
+   533→                    })}
+   534→                  </tbody>
+   535→                </table>
+   536→              </div>
+   537→            </div>
+   538→          )}
+   539→        </TabsContent>
+   540→
+   541→        {/* ── License Management ── */}
+   542→        <TabsContent value="licenses" className="mt-4 space-y-4">
+   543→          <div className="macos-card p-5">
+   544→            <div className="flex items-start gap-4">
+   545→              <div className="size-10 rounded-[10px] bg-teal-500/10 flex items-center justify-center shrink-0">
+   546→                <Key className="size-5 text-teal-500" />
+   547→              </div>
+   548→              <div className="flex-1">
+   549→                <h3 className="text-[13px] font-semibold">License Key</h3>
+   550→                <div className="flex items-center gap-2 mt-1">
+   551→                  <code className="text-[12px] font-mono bg-muted/50 px-2 py-0.5 rounded">{client.licenseKey}</code>
+   552→                  <button className="text-muted-foreground hover:text-foreground transition-colors" title="Copy key" onClick={() => navigator.clipboard?.writeText(client.licenseKey)}>
+   553→                    <Copy className="size-3" />
+   554→                  </button>
+   555→                </div>
+   556→                <div className="flex items-center gap-3 mt-2">
+   557→                  <Badge variant="outline" className={`text-[10px] px-2 py-0 font-semibold ${
+   558→                    client.licenseStatus === 'active'
+   559→                      ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+   560→                      : client.licenseStatus === 'suspended'
+   561→                      ? 'bg-teal-500/10 text-teal-600 border-teal-500/20'
+   562→                      : 'bg-red-500/10 text-red-600 border-red-500/20'
+   563→                  }`}>
+   564→                    {client.licenseStatus === 'active' && <CheckCircle2 className="size-2.5 mr-1" />}
+   565→                    {client.licenseStatus === 'suspended' && <AlertTriangle className="size-2.5 mr-1" />}
+   566→                    <span className="capitalize">{client.licenseStatus}</span>
+   567→                  </Badge>
+   568→                </div>
+   569→              </div>
+   570→            </div>
+   571→          </div>
+   572→
+   573→          <div className="macos-section-header">Module Licenses</div>
+   574→          {clientLicenses.length === 0 ? (
+   575→            <div className="macos-card p-12 flex flex-col items-center justify-center text-muted-foreground">
+   576→              <Shield className="size-10 mb-3 opacity-20" />
+   577→              <p className="text-[13px] font-medium">No module licenses</p>
+   578→              <p className="text-[11px]">Licenses will appear here once assigned</p>
+   579→            </div>
+   580→          ) : (
+   581→            <div className="macos-card overflow-hidden">
+   582→              <div className="max-h-[350px] overflow-y-auto">
+   583→                <table className="macos-table">
+   584→                  <thead>
+   585→                    <tr>
+   586→                      <th>Module</th>
+   587→                      <th>Status</th>
+   588→                      <th>Valid To</th>
+   589→                      <th>Usage</th>
+   590→                      <th>Usage Bar</th>
+   591→                    </tr>
+   592→                  </thead>
+   593→                  <tbody>
+   594→                    {clientLicenses.map(lic => {
+   595→                      const maxU = lic.maxUsage || 50
+   596→                      const pct = Math.round((lic.currentUsage / maxU) * 100)
+   597→                      return (
+   598→                        <tr key={lic.id}>
+   599→                          <td className="text-[13px] font-medium">{lic.moduleName}</td>
+   600→                          <td>
+   601→                            <div className="flex items-center gap-1.5">
+   602→                              <div className={`macos-status-dot ${lic.status === 'active' ? 'macos-status-online' : lic.status === 'expired' ? 'macos-status-error' : 'macos-status-offline'}`} />
+   603→                              <span className={`text-[11px] font-medium capitalize ${
+   604→                                lic.status === 'active' ? 'text-emerald-600 dark:text-emerald-400' :
+   605→                                lic.status === 'expired' ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'
+   606→                              }`}>{lic.status}</span>
+   607→                            </div>
+   608→                          </td>
+   609→                          <td className="text-[12px] text-muted-foreground">
+   610→                            {lic.validTo ? new Date(lic.validTo).toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Perpetual'}
+   611→                          </td>
+   612→                          <td className="text-[13px]">{lic.currentUsage}/{maxU}</td>
+   613→                          <td>
+   614→                            <div className="flex items-center gap-2">
+   615→                              <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
+   616→                                <div
+   617→                                  className="h-full rounded-full"
+   618→                                  style={{
+   619→                                    width: `${pct}%`,
+   620→                                    backgroundColor: pct > 80 ? '#ff3b30' : pct > 60 ? '#ff9f0a' : '#34c759'
+   621→                                  }}
+   622→                                />
+   623→                              </div>
+   624→                              <span className="text-[11px] text-muted-foreground">{pct}%</span>
+   625→                            </div>
+   626→                          </td>
+   627→                        </tr>
+   628→                      )
+   629→                    })}
+   630→                  </tbody>
+   631→                </table>
+   632→              </div>
+   633→            </div>
+   634→          )}
+   635→        </TabsContent>
+   636→
+   637→        {/* ── Invoices ── */}
+   638→        <TabsContent value="invoices" className="mt-4 space-y-3">
+   639→          <div className="flex items-center justify-between">
+   640→            <div className="macos-section-header">Billing History</div>
+   641→            <button className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+   642→              <Download className="size-3" /> Export
+   643→            </button>
+   644→          </div>
+   645→          {clientInvoices.length === 0 ? (
+   646→            <div className="macos-card p-12 flex flex-col items-center justify-center text-muted-foreground">
+   647→              <FileText className="size-10 mb-3 opacity-20" />
+   648→              <p className="text-[13px] font-medium">No invoices yet</p>
+   649→              <p className="text-[11px]">Invoices will appear here once billing is set up</p>
+   650→            </div>
+   651→          ) : (
+   652→            <div className="macos-card overflow-hidden">
+   653→              <div className="max-h-[380px] overflow-y-auto">
+   654→                <table className="macos-table">
+   655→                  <thead>
+   656→                    <tr>
+   657→                      <th>Invoice</th>
+   658→                      <th>Date</th>
+   659→                      <th>Amount</th>
+   660→                      <th>Due Date</th>
+   661→                      <th>Status</th>
+   662→                      <th>Paid On</th>
+   663→                    </tr>
+   664→                  </thead>
+   665→                  <tbody>
+   666→                    {clientInvoices.map(inv => (
+   667→                      <tr key={inv.id}>
+   668→                        <td className="text-[13px] font-mono font-medium text-teal-600 dark:text-teal-400">{inv.invoiceNumber}</td>
+   669→                        <td className="text-[12px] text-muted-foreground">{new Date(inv.invoiceDate).toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' })}</td>
+   670→                        <td className="text-[13px] font-semibold">{formatPKR(inv.totalAmount)}</td>
+   671→                        <td className="text-[12px] text-muted-foreground">{new Date(inv.dueDate).toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' })}</td>
+   672→                        <td>
+   673→                          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-semibold capitalize ${INVOICE_STATUS[inv.status] || INVOICE_STATUS.pending}`}>
+   674→                            {inv.status}
+   675→                          </Badge>
+   676→                        </td>
+   677→                        <td className="text-[12px] text-muted-foreground">{inv.paidDate ? new Date(inv.paidDate).toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' }) : '-'}</td>
+   678→                      </tr>
+   679→                    ))}
+   680→                  </tbody>
+   681→                </table>
+   682→              </div>
+   683→            </div>
+   684→          )}
+   685→        </TabsContent>
+   686→      </Tabs>
+   687→    </div>
+   688→  )
+   689→}
+   690→

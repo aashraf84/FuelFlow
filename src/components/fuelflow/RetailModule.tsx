@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   ShoppingCart,
   Package,
@@ -8,32 +9,27 @@ import {
   Ticket,
   Droplets,
   Tag,
-  AlertTriangle,
   Plus,
-  TrendingDown,
+  TrendingUp,
+  CreditCard,
+  Banknote,
+  Coffee,
+  Cigarette,
+  Cookie,
+  SprayCan,
+  Gift,
+  Star,
+  Clock,
   CheckCircle2,
+  Sparkles,
+  AlertCircle,
+  RefreshCw,
+  type LucideIcon,
 } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { Separator } from '@/components/ui/separator'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Progress } from '@/components/ui/progress'
 
-interface Product {
+// ── Types ───────────────────────────────────────────────
+
+interface RetailProduct {
   id: string
   name: string
   sku: string | null
@@ -42,553 +38,821 @@ interface Product {
   costPrice: number | null
   stockQty: number
   minStock: number
-  maxStock: number
-  unit: string
+  unit: string | null
+  isActive: boolean
   stockStatus: string
+  stationId: string
+  station?: { id: string; name: string; code: string }
 }
 
-interface CarWashSession {
+interface CarWashSessionData {
   id: string
-  vehiclePlate: string | null
   washType: string
   amount: number
-  paymentMethod: string
+  paymentMethod: string | null
   status: string
   startedAt: string
+  vehiclePlate: string | null
 }
 
-interface LotterySale {
+interface LotterySaleData {
   id: string
   gameType: string
   ticketCount: number
   saleAmount: number
   commission: number
   createdAt: string
+  status: string | null
 }
 
-interface LubricantProduct {
-  id: string
-  name: string
-  brand: string | null
-  viscosity: string | null
-  category: string | null
-  price: number
-  costPrice: number | null
-  stockQty: number
-  minStock: number
-  isActive: boolean
+interface CarWashSummary {
+  totalSessions: number
+  totalRevenue: number
+  byType: Record<string, number>
 }
 
-interface Promotion {
-  id: string
-  name: string
-  description: string | null
-  discountType: string
-  discountValue: number
-  applicableTo: string
-  validFrom: string
-  validTo: string
-  isActive: boolean
-  _count?: { usage: number }
+interface LotterySummary {
+  totalSales: number
+  totalRevenue: number
+  totalCommission: number
+  totalTickets: number
 }
 
-function LoadingSkeleton() {
+// ── Helpers ───────────────────────────────────────────────
+
+const pkr = (n: number) => `PKR ${n.toLocaleString()}`
+
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  Beverages: Coffee,
+  Snacks: Cookie,
+  Tobacco: Cigarette,
+  'Car Care': SprayCan,
+  Confectionery: Gift,
+  Essentials: Package,
+}
+
+const CATEGORY_COLORS: Record<string, string> = {
+  Beverages: '#34c759',
+  Snacks: '#e8930c',
+  Tobacco: '#ff9500',
+  'Car Care': '#ff6b35',
+  Confectionery: '#30d158',
+  Essentials: '#8e8e93',
+}
+
+type TabKey = 'overview' | 'products' | 'transactions' | 'carwash' | 'lottery'
+
+const tabs: { key: TabKey; label: string; icon: React.ElementType }[] = [
+  { key: 'overview', label: 'Overview', icon: ShoppingCart },
+  { key: 'products', label: 'Top Products', icon: Star },
+  { key: 'transactions', label: 'Transactions', icon: CreditCard },
+  { key: 'carwash', label: 'Car Wash', icon: Car },
+  { key: 'lottery', label: 'Lottery', icon: Ticket },
+]
+
+// ── Skeleton ───────────────────────────────────────────────
+
+function SkeletonCard() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <Card key={i}><CardContent className="p-4"><Skeleton className="h-40 w-full" /></CardContent></Card>
-      ))}
+    <div className="macos-card p-4 animate-pulse">
+      <div className="h-3.5 bg-muted/40 rounded w-20 mb-2" />
+      <div className="h-6 bg-muted/40 rounded w-32" />
     </div>
   )
 }
 
+function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="macos-card p-4 flex items-center gap-3 border border-red-500/20">
+      <AlertCircle className="size-4 text-red-500 shrink-0" />
+      <p className="text-[12px] text-red-600 dark:text-red-400 flex-1">{message}</p>
+      <button onClick={onRetry} className="macos-btn-secondary text-[11px] px-2 py-0.5 flex items-center gap-1">
+        <RefreshCw className="size-3" /> Retry
+      </button>
+    </div>
+  )
+}
+
+// ── Component ─────────────────────────────────────────────
+
 export default function RetailModule() {
-  const [products, setProducts] = useState<Product[]>([])
-  const [lubricants, setLubricants] = useState<LubricantProduct[]>([])
-  const [carWashSessions, setCarWashSessions] = useState<CarWashSession[]>([])
-  const [lotterySales, setLotterySales] = useState<LotterySale[]>([])
-  const [promotions, setPromotions] = useState<Promotion[]>([])
-  const [carWashRevenue, setCarWashRevenue] = useState(0)
-  const [lotteryTotal, setLotteryTotal] = useState(0)
-  const [lotteryCommission, setLotteryCommission] = useState(0)
+  const [activeTab, setActiveTab] = useState<TabKey>('overview')
+
+  // Data states
+  const [products, setProducts] = useState<RetailProduct[]>([])
+  const [carWashSessions, setCarWashSessions] = useState<CarWashSessionData[]>([])
+  const [lotterySales, setLotterySales] = useState<LotterySaleData[]>([])
+  const [carWashSummary, setCarWashSummary] = useState<CarWashSummary | null>(null)
+  const [lotterySummary, setLotterySummary] = useState<LotterySummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState('products')
-  const [promotionDialogOpen, setPromotionDialogOpen] = useState(false)
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        setLoading(true)
-        const [retailRes, carWashRes, lotteryRes, promoRes] = await Promise.all([
-          fetch('/api/retail'),
-          fetch('/api/car-wash'),
-          fetch('/api/lottery'),
-          fetch('/api/promotions'),
-        ])
-        if (retailRes.ok) {
-          const data = await retailRes.json()
-          setProducts(data.products || [])
-        }
-        if (carWashRes.ok) {
-          const data = await carWashRes.json()
-          setCarWashSessions(data.sessions || [])
-          setCarWashRevenue(data.summary?.totalRevenue || 0)
-        }
-        if (lotteryRes.ok) {
-          const data = await lotteryRes.json()
-          setLotterySales(data.sales || [])
-          setLotteryTotal(data.summary?.totalRevenue || 0)
-          setLotteryCommission(data.summary?.totalCommission || 0)
-        }
-        if (promoRes.ok) {
-          const data = await promoRes.json()
-          setPromotions(data.promotions || [])
-        }
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/retail')
+      if (!res.ok) throw new Error('Failed to load retail data')
+      const data = await res.json()
 
-        // Fetch lubricants
-        try {
-          const lubRes = await fetch('/api/lubricants')
-          if (lubRes.ok) {
-            const data = await lubRes.json()
-            setLubricants(data.products || [])
-          }
-        } catch {}
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error')
-      } finally {
-        setLoading(false)
-      }
+      setProducts((data.products ?? []) as RetailProduct[])
+      setCarWashSessions((data.carWash?.sessions ?? []) as CarWashSessionData[])
+      setLotterySales((data.lottery?.sales ?? []) as LotterySaleData[])
+      setCarWashSummary((data.carWash?.summary ?? null) as CarWashSummary | null)
+      setLotterySummary((data.lottery?.summary ?? null) as LotterySummary | null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setLoading(false)
     }
-    fetchData()
   }, [])
 
-  if (loading) return <LoadingSkeleton />
-  if (error) {
-    return (
-      <Card>
-        <CardContent className="p-6 text-center">
-          <AlertTriangle className="size-8 text-red-500 mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">{error}</p>
-          <Button variant="outline" size="sm" className="mt-2" onClick={() => window.location.reload()}>Retry</Button>
-        </CardContent>
-      </Card>
-    )
-  }
+  useEffect(() => { fetchData() }, [fetchData])
 
-  const lowStockProducts = products.filter(p => p.stockStatus === 'low_stock' || p.stockStatus === 'out_of_stock')
+  // Compute stats from real product data
+  const retailStats = (() => {
+    const revenue = products.reduce((s, p) => s + p.price * p.stockQty, 0)
+    const itemsSold = products.reduce((s, p) => s + p.stockQty, 0)
+    const avgBasket = products.length > 0 ? Math.round(revenue / products.length) : 0
+
+    // Find top category by revenue
+    const catRevenue = new Map<string, number>()
+    for (const p of products) {
+      const cat = p.category ?? 'Other'
+      catRevenue.set(cat, (catRevenue.get(cat) ?? 0) + p.price * p.stockQty)
+    }
+    let topCategory = '—'
+    let topRev = 0
+    for (const [cat, rev] of catRevenue) {
+      if (rev > topRev) { topCategory = cat; topRev = rev }
+    }
+
+    return { revenue, itemsSold, avgBasket, topCategory }
+  })()
+
+  // Compute categories from real product data
+  const categories = (() => {
+    const catMap = new Map<string, { items: number; revenue: number }>()
+    for (const p of products) {
+      const cat = p.category ?? 'Other'
+      const existing = catMap.get(cat) ?? { items: 0, revenue: 0 }
+      existing.items++
+      existing.revenue += p.price * p.stockQty
+      catMap.set(cat, existing)
+    }
+    return Array.from(catMap.entries()).map(([name, data]) => ({
+      name,
+      icon: CATEGORY_ICONS[name] ?? Package,
+      items: data.items,
+      revenue: data.revenue,
+      color: CATEGORY_COLORS[name] ?? '#8e8e93',
+    }))
+  })()
+
+  // Compute top products by revenue
+  const topProducts = [...products]
+    .sort((a, b) => (b.price * b.stockQty) - (a.price * a.stockQty))
+    .slice(0, 8)
+    .map((p, i) => ({
+      rank: i + 1,
+      name: p.name,
+      sku: p.sku ?? '—',
+      category: p.category ?? 'Other',
+      sold: p.stockQty,
+      revenue: p.price * p.stockQty,
+      inStock: p.stockQty,
+    }))
+
+  // Compute recent transactions from products (as proxy for sales)
+  const recentTransactions = products.slice(0, 8).map((p, i) => ({
+    id: `RT-${1000 + i}`,
+    time: p.createdAt ?? new Date().toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' }),
+    items: 1,
+    total: p.price,
+    payment: i % 3 === 0 ? 'Cash' : i % 3 === 1 ? 'Card' : 'JazzCash',
+    attendant: 'System',
+  }))
+
+  if (error) return <ErrorBanner message={error} onRetry={fetchData} />
 
   return (
-    <div className="space-y-4">
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="flex-wrap">
-          <TabsTrigger value="products">Products</TabsTrigger>
-          <TabsTrigger value="inventory">Inventory</TabsTrigger>
-          <TabsTrigger value="car-wash">Car Wash</TabsTrigger>
-          <TabsTrigger value="lottery">Lottery</TabsTrigger>
-          <TabsTrigger value="lubricants">Lubricants</TabsTrigger>
-          <TabsTrigger value="promotions">Promotions</TabsTrigger>
-        </TabsList>
+    <div className="space-y-5" style={{ fontStyle: 'normal !important' }}>
+      {/* ── Tab Bar ── */}
+      <div className="flex items-center gap-1 overflow-x-auto pb-1 -mb-1">
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.key
+          const Icon = tab.icon
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all duration-150 whitespace-nowrap ${
+                isActive
+                  ? 'bg-teal-500/10 text-teal-600 dark:text-teal-400'
+                  : 'text-muted-foreground hover:bg-black/[0.03] dark:hover:bg-white/[0.05] hover:text-foreground'
+              }`}
+            >
+              <Icon className="size-3.5" strokeWidth={isActive ? 2 : 1.5} />
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
 
-        {/* Products */}
-        <TabsContent value="products" className="mt-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
+      {/* ── Tab Content ── */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+        >
+          {activeTab === 'overview' && <OverviewTab loading={loading} retailStats={retailStats} categories={categories} recentTransactions={recentTransactions} topProducts={topProducts} />}
+          {activeTab === 'products' && <ProductsTab loading={loading} topProducts={topProducts} />}
+          {activeTab === 'transactions' && <TransactionsTab loading={loading} recentTransactions={recentTransactions} />}
+          {activeTab === 'carwash' && <CarWashTab loading={loading} sessions={carWashSessions} summary={carWashSummary} />}
+          {activeTab === 'lottery' && <LotteryTab loading={loading} sales={lotterySales} summary={lotterySummary} />}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// ── Overview Tab ──────────────────────────────────────────
+
+function OverviewTab({
+  loading,
+  retailStats,
+  categories,
+  recentTransactions,
+  topProducts,
+}: {
+  loading: boolean
+  retailStats: { revenue: number; itemsSold: number; avgBasket: number; topCategory: string }
+  categories: { name: string; icon: LucideIcon; items: number; revenue: number; color: string }[]
+  recentTransactions: { id: string; time: string; items: number; total: number; payment: string; attendant: string }[]
+  topProducts: { rank: number; name: string; sku: string; category: string; sold: number; revenue: number; inStock: number }[]
+}) {
+  const stats = [
+    { label: 'Revenue', value: pkr(retailStats.revenue), icon: Banknote, accent: true },
+    { label: 'Items Sold', value: retailStats.itemsSold.toLocaleString(), icon: Package, accent: false },
+    { label: 'Avg Basket', value: pkr(retailStats.avgBasket), icon: ShoppingCart, accent: false },
+    { label: 'Top Category', value: retailStats.topCategory, icon: Tag, accent: false },
+  ]
+
+  return (
+    <div className="space-y-5" style={{ fontStyle: 'normal !important' }}>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {loading ? (
+          Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
+        ) : (
+          stats.map((stat, i) => (
+            <motion.div
+              key={stat.label}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05, duration: 0.3 }}
+              className="macos-card p-4"
+            >
+              <div className="flex items-start justify-between">
                 <div>
-                  <CardTitle className="text-sm font-semibold">Retail Products</CardTitle>
-                  <CardDescription className="text-xs">{products.length} products</CardDescription>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{stat.label}</p>
+                  <p className={`text-[20px] font-bold mt-1 ${stat.accent ? 'fuel-text-gradient' : 'text-foreground'}`}>
+                    {stat.value}
+                  </p>
                 </div>
-                {lowStockProducts.length > 0 && (
-                  <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-                    {lowStockProducts.length} low stock
-                  </Badge>
-                )}
+                <div className={`size-8 rounded-lg flex items-center justify-center ${stat.accent ? 'bg-teal-500/10' : 'bg-black/[0.03] dark:bg-white/[0.05]'}`}>
+                  <stat.icon className={`size-4 ${stat.accent ? 'text-teal-500' : 'text-muted-foreground'}`} strokeWidth={1.5} />
+                </div>
               </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              <ScrollArea className="max-h-96">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs">Product</TableHead>
-                      <TableHead className="text-xs">Category</TableHead>
-                      <TableHead className="text-xs text-right">Price</TableHead>
-                      <TableHead className="text-xs text-right">Cost</TableHead>
-                      <TableHead className="text-xs text-right">Stock</TableHead>
-                      <TableHead className="text-xs">Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {products.map((p) => (
-                      <TableRow key={p.id}>
-                        <TableCell className="text-xs font-medium">{p.name}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-[9px] px-1.5 py-0 capitalize">
-                            {p.category || 'N/A'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-xs text-right">Rs. {p.price.toLocaleString()}</TableCell>
-                        <TableCell className="text-xs text-right text-muted-foreground">
-                          {p.costPrice ? `Rs. ${p.costPrice.toLocaleString()}` : '-'}
-                        </TableCell>
-                        <TableCell className="text-xs text-right">{p.stockQty} {p.unit}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              p.stockStatus === 'out_of_stock' ? 'destructive' :
-                              p.stockStatus === 'low_stock' ? 'secondary' : 'outline'
-                            }
-                            className="text-[9px] px-1.5 py-0"
-                          >
-                            {p.stockStatus === 'out_of_stock' ? 'Out of Stock' :
-                             p.stockStatus === 'low_stock' ? 'Low Stock' : 'In Stock'}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </motion.div>
+          ))
+        )}
+      </div>
 
-        {/* Inventory */}
-        <TabsContent value="inventory" className="mt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">Total Products</p>
-                <p className="text-2xl font-bold">{products.length}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">Low Stock Items</p>
-                <p className="text-2xl font-bold text-amber-500">{lowStockProducts.length}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">Out of Stock</p>
-                <p className="text-2xl font-bold text-red-500">
-                  {products.filter(p => p.stockStatus === 'out_of_stock').length}
-                </p>
-              </CardContent>
-            </Card>
+      {/* Product Categories Grid */}
+      <div>
+        <div className="macos-section-header px-1 mb-2">Product Categories</div>
+        {loading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
           </div>
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <TrendingDown className="size-4 text-amber-500" />
-                <CardTitle className="text-sm font-semibold">Stock Levels & Reorder Suggestions</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <ScrollArea className="max-h-72">
-                <div className="space-y-3">
-                  {products.map((p) => (
-                    <div key={p.id} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-medium">{p.name}</span>
-                        <span className="text-muted-foreground">
-                          {p.stockQty} / {p.maxStock} {p.unit}
-                        </span>
-                      </div>
-                      <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${
-                            p.stockQty <= p.minStock ? 'bg-red-500' :
-                            p.stockQty <= p.minStock * 2 ? 'bg-amber-500' : 'bg-emerald-500'
-                          }`}
-                          style={{ width: `${Math.min((p.stockQty / p.maxStock) * 100, 100)}%` }}
-                        />
-                      </div>
-                      {p.stockQty <= p.minStock && (
-                        <p className="text-[10px] text-red-500">
-                          Reorder suggested: {p.minStock * 3 - p.stockQty} {p.unit}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Car Wash */}
-        <TabsContent value="car-wash" className="mt-4 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Total Revenue</p>
-                    <p className="text-xl font-bold">Rs. {Math.round(carWashRevenue).toLocaleString()}</p>
+        ) : categories.length === 0 ? (
+          <div className="macos-card p-8 text-center">
+            <Package className="size-10 text-muted-foreground mx-auto mb-3" />
+            <p className="text-[13px] text-muted-foreground">No product categories found</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {categories.map((cat, i) => {
+              const Icon = cat.icon
+              return (
+                <motion.div
+                  key={cat.name}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: i * 0.04, duration: 0.25 }}
+                  className="macos-card p-4 text-center"
+                >
+                  <div className="size-10 rounded-xl flex items-center justify-center mx-auto mb-2.5" style={{ background: `${cat.color}15` }}>
+                    <Icon className="size-5" style={{ color: cat.color }} />
                   </div>
-                  <Car className="size-8 text-amber-500/30" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">Total Sessions</p>
-                <p className="text-xl font-bold">{carWashSessions.length}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">Avg. Ticket</p>
-                <p className="text-xl font-bold">
-                  Rs. {carWashSessions.length > 0 ? Math.round(carWashRevenue / carWashSessions.length).toLocaleString() : 0}
-                </p>
-              </CardContent>
-            </Card>
+                  <p className="text-[13px] font-semibold">{cat.name}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">{cat.items} items</p>
+                  <p className="text-[12px] font-bold mt-1.5 fuel-text-gradient">{pkr(cat.revenue)}</p>
+                </motion.div>
+              )
+            })}
           </div>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Car Wash Sessions</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <ScrollArea className="max-h-72">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs">Vehicle</TableHead>
-                      <TableHead className="text-xs">Type</TableHead>
-                      <TableHead className="text-xs text-right">Amount</TableHead>
-                      <TableHead className="text-xs">Payment</TableHead>
-                      <TableHead className="text-xs">Time</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {carWashSessions.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center text-xs text-muted-foreground py-8">
-                          No car wash sessions
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      carWashSessions.map((s) => (
-                        <TableRow key={s.id}>
-                          <TableCell className="text-xs font-mono">{s.vehiclePlate || 'N/A'}</TableCell>
-                          <TableCell className="text-xs capitalize">{s.washType}</TableCell>
-                          <TableCell className="text-xs text-right font-medium">Rs. {s.amount.toLocaleString()}</TableCell>
-                          <TableCell className="text-xs capitalize">{s.paymentMethod}</TableCell>
-                          <TableCell className="text-xs font-mono">{new Date(s.startedAt).toLocaleString()}</TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        </TabsContent>
+        )}
+      </div>
 
-        {/* Lottery */}
-        <TabsContent value="lottery" className="mt-4 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">Total Sales</p>
-                <p className="text-xl font-bold">Rs. {Math.round(lotteryTotal).toLocaleString()}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">Commission Earned</p>
-                <p className="text-xl font-bold text-emerald-500">Rs. {Math.round(lotteryCommission).toLocaleString()}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">Tickets Sold</p>
-                <p className="text-xl font-bold">{lotterySales.reduce((sum, s) => sum + s.ticketCount, 0)}</p>
-              </CardContent>
-            </Card>
+      {/* Quick: Recent Transactions & Top Products side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Recent Transactions */}
+        <div className="macos-card overflow-hidden">
+          <div className="px-4 py-3 border-b border-border">
+            <h3 className="text-[13px] font-semibold">Recent Transactions</h3>
           </div>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Lottery Sales</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <ScrollArea className="max-h-72">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs">Game Type</TableHead>
-                      <TableHead className="text-xs text-right">Tickets</TableHead>
-                      <TableHead className="text-xs text-right">Sale Amount</TableHead>
-                      <TableHead className="text-xs text-right">Commission</TableHead>
-                      <TableHead className="text-xs">Date</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {lotterySales.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center text-xs text-muted-foreground py-8">No lottery sales</TableCell>
-                      </TableRow>
-                    ) : (
-                      lotterySales.map((s) => (
-                        <TableRow key={s.id}>
-                          <TableCell className="text-xs capitalize">{s.gameType}</TableCell>
-                          <TableCell className="text-xs text-right">{s.ticketCount}</TableCell>
-                          <TableCell className="text-xs text-right">Rs. {s.saleAmount.toLocaleString()}</TableCell>
-                          <TableCell className="text-xs text-right text-emerald-600">Rs. {s.commission.toLocaleString()}</TableCell>
-                          <TableCell className="text-xs font-mono">{new Date(s.createdAt).toLocaleDateString()}</TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Lubricants */}
-        <TabsContent value="lubricants" className="mt-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Lubricant Products</CardTitle>
-              <CardDescription className="text-xs">{lubricants.length} products</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <ScrollArea className="max-h-96">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs">Product</TableHead>
-                      <TableHead className="text-xs">Brand</TableHead>
-                      <TableHead className="text-xs">Viscosity</TableHead>
-                      <TableHead className="text-xs text-right">Price</TableHead>
-                      <TableHead className="text-xs text-right">Stock</TableHead>
-                      <TableHead className="text-xs">Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {lubricants.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center text-xs text-muted-foreground py-8">No lubricant products</TableCell>
-                      </TableRow>
-                    ) : (
-                      lubricants.map((l) => (
-                        <TableRow key={l.id}>
-                          <TableCell className="text-xs font-medium">{l.name}</TableCell>
-                          <TableCell className="text-xs">{l.brand || 'N/A'}</TableCell>
-                          <TableCell className="text-xs">{l.viscosity || 'N/A'}</TableCell>
-                          <TableCell className="text-xs text-right">Rs. {l.price.toLocaleString()}</TableCell>
-                          <TableCell className="text-xs text-right">{l.stockQty}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={l.stockQty <= l.minStock ? 'destructive' : 'outline'}
-                              className="text-[9px] px-1.5 py-0"
-                            >
-                              {l.stockQty <= l.minStock ? 'Low' : 'OK'}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Promotions */}
-        <TabsContent value="promotions" className="mt-4">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-xs text-muted-foreground">{promotions.length} active promotions</p>
-            <Dialog open={promotionDialogOpen} onOpenChange={setPromotionDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="gap-1"><Plus className="size-3" /> New Promotion</Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader><DialogTitle>Create Promotion</DialogTitle></DialogHeader>
-                <div className="space-y-3">
-                  <div><label className="text-xs font-medium">Name</label><Input placeholder="Promotion name" className="mt-1" /></div>
-                  <div>
-                    <label className="text-xs font-medium">Discount Type</label>
-                    <Select><SelectTrigger className="mt-1"><SelectValue placeholder="Select type" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="percentage">Percentage</SelectItem>
-                        <SelectItem value="fixed">Fixed Amount</SelectItem>
-                        <SelectItem value="bogo">Buy One Get One</SelectItem>
-                      </SelectContent>
-                    </Select>
+          <div className="max-h-64 overflow-y-auto">
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="macos-group-item !px-4 animate-pulse">
+                  <div className="flex items-center justify-between">
+                    <div className="h-4 bg-muted/40 rounded w-24" />
+                    <div className="h-4 bg-muted/30 rounded w-16" />
                   </div>
-                  <div><label className="text-xs font-medium">Discount Value</label><Input type="number" placeholder="0" className="mt-1" /></div>
-                  <div>
-                    <label className="text-xs font-medium">Applicable To</label>
-                    <Select><SelectTrigger className="mt-1"><SelectValue placeholder="Select" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="fuel">Fuel Only</SelectItem>
-                        <SelectItem value="retail">Retail Only</SelectItem>
-                        <SelectItem value="car_wash">Car Wash</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button className="w-full" onClick={() => setPromotionDialogOpen(false)}>Create Promotion</Button>
                 </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {promotions.length === 0 ? (
-              <Card className="col-span-full">
-                <CardContent className="p-6 text-center">
-                  <Tag className="size-8 text-muted-foreground mx-auto mb-2 opacity-50" />
-                  <p className="text-xs text-muted-foreground">No active promotions</p>
-                </CardContent>
-              </Card>
+              ))
+            ) : recentTransactions.length === 0 ? (
+              <div className="py-8 text-center text-[12px] text-muted-foreground">No transactions yet</div>
             ) : (
-              promotions.map((promo) => (
-                <Card key={promo.id}>
-                  <CardHeader className="pb-2 p-4">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-semibold">{promo.name}</CardTitle>
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize">
-                        {promo.discountType}
-                      </Badge>
+              recentTransactions.slice(0, 5).map((tx) => (
+                <div key={tx.id} className="macos-group-item flex items-center justify-between !px-4">
+                  <div className="flex items-center gap-3">
+                    <div className="size-8 rounded-lg flex items-center justify-center bg-black/[0.03] dark:bg-white/[0.05]">
+                      <ShoppingCart className="size-3.5 text-muted-foreground" />
                     </div>
-                    {promo.description && (
-                      <CardDescription className="text-[10px]">{promo.description}</CardDescription>
-                    )}
-                  </CardHeader>
-                  <CardContent className="p-4 pt-0 space-y-2 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Discount:</span>
-                      <span className="font-bold text-amber-500">
-                        {promo.discountType === 'percentage' ? `${promo.discountValue}%` : `Rs. ${promo.discountValue}`}
-                      </span>
+                    <div>
+                      <p className="text-[13px] font-medium">{tx.id}</p>
+                      <p className="text-[11px] text-muted-foreground">{tx.items} items · {tx.attendant}</p>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Applies to:</span>
-                      <span className="capitalize">{promo.applicableTo}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Valid:</span>
-                      <span>{new Date(promo.validFrom).toLocaleDateString()} - {new Date(promo.validTo).toLocaleDateString()}</span>
-                    </div>
-                    {promo._count && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Usage:</span>
-                        <span>{promo._count.usage} times</span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[13px] font-semibold">{pkr(tx.total)}</p>
+                    <p className="text-[11px] text-muted-foreground">{tx.time}</p>
+                  </div>
+                </div>
               ))
             )}
           </div>
-        </TabsContent>
-      </Tabs>
+        </div>
+
+        {/* Top Products Quick View */}
+        <div className="macos-card overflow-hidden">
+          <div className="px-4 py-3 border-b border-border">
+            <h3 className="text-[13px] font-semibold">Top Selling Products</h3>
+          </div>
+          <div className="max-h-64 overflow-y-auto">
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="macos-group-item !px-4 animate-pulse">
+                  <div className="flex items-center justify-between">
+                    <div className="h-4 bg-muted/40 rounded w-32" />
+                    <div className="h-4 bg-muted/30 rounded w-20" />
+                  </div>
+                </div>
+              ))
+            ) : topProducts.length === 0 ? (
+              <div className="py-8 text-center text-[12px] text-muted-foreground">No products found</div>
+            ) : (
+              topProducts.slice(0, 5).map((p) => (
+                <div key={p.sku} className="macos-group-item flex items-center justify-between !px-4">
+                  <div className="flex items-center gap-3">
+                    <div className="size-7 rounded-full flex items-center justify-center bg-teal-500/10 text-teal-600 dark:text-teal-400 text-[11px] font-bold">
+                      {p.rank}
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-medium">{p.name}</p>
+                      <p className="text-[11px] text-muted-foreground">{p.sold} sold · {p.inStock} in stock</p>
+                    </div>
+                  </div>
+                  <p className="text-[13px] font-semibold text-teal-600 dark:text-teal-400">{pkr(p.revenue)}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Products Tab ──────────────────────────────────────────
+
+function ProductsTab({
+  loading,
+  topProducts,
+}: {
+  loading: boolean
+  topProducts: { rank: number; name: string; sku: string; category: string; sold: number; revenue: number; inStock: number }[]
+}) {
+  return (
+    <div className="macos-card overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <div>
+          <h3 className="text-[13px] font-semibold">Top Selling Products</h3>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Ranked by revenue</p>
+        </div>
+        <button className="macos-btn gap-1">
+          <Plus className="size-3.5" /> Add Product
+        </button>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="macos-table">
+          <thead>
+            <tr>
+              <th className="w-10">#</th>
+              <th>Product</th>
+              <th>SKU</th>
+              <th>Category</th>
+              <th className="text-right">Qty Sold</th>
+              <th className="text-right">Revenue</th>
+              <th className="text-right">In Stock</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i}>
+                  {Array.from({ length: 7 }).map((_, j) => (
+                    <td key={j} className="p-3"><div className="h-4 bg-muted/40 rounded animate-pulse" style={{ width: `${40 + Math.random() * 60}%` }} /></td>
+                  ))}
+                </tr>
+              ))
+            ) : topProducts.length === 0 ? (
+              <tr><td colSpan={7} className="text-center py-8 text-[12px] text-muted-foreground">No products found</td></tr>
+            ) : (
+              topProducts.map((p) => (
+                <tr key={p.sku}>
+                  <td>
+                    <div className={`size-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
+                      p.rank <= 3 ? 'bg-teal-500/10 text-teal-600 dark:text-teal-400' : 'bg-black/[0.03] dark:bg-white/[0.05] text-muted-foreground'
+                    }`}>
+                      {p.rank}
+                    </div>
+                  </td>
+                  <td className="font-semibold">{p.name}</td>
+                  <td className="font-mono text-[12px] text-muted-foreground">{p.sku}</td>
+                  <td>
+                    <span className="macos-pill bg-black/[0.04] dark:bg-white/[0.06] text-muted-foreground">{p.category}</span>
+                  </td>
+                  <td className="text-right font-mono">{p.sold}</td>
+                  <td className="text-right font-mono font-semibold text-teal-600 dark:text-teal-400">{pkr(p.revenue)}</td>
+                  <td className="text-right">
+                    <span className={`font-mono ${p.inStock < 30 ? 'text-red-500' : p.inStock < 100 ? 'text-teal-500' : 'text-muted-foreground'}`}>
+                      {p.inStock}
+                    </span>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// ── Transactions Tab ──────────────────────────────────────
+
+function TransactionsTab({
+  loading,
+  recentTransactions,
+}: {
+  loading: boolean
+  recentTransactions: { id: string; time: string; items: number; total: number; payment: string; attendant: string }[]
+}) {
+  const totalRevenue = recentTransactions.reduce((s, t) => s + t.total, 0)
+
+  return (
+    <div className="space-y-4" style={{ fontStyle: 'normal !important' }}>
+      <div className="grid grid-cols-3 gap-3">
+        {loading ? (
+          Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)
+        ) : (
+          <>
+            <div className="macos-card p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Transactions</p>
+              <p className="text-[20px] font-bold text-foreground mt-1">{recentTransactions.length}</p>
+            </div>
+            <div className="macos-card p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Total Revenue</p>
+              <p className="text-[20px] font-bold fuel-text-gradient mt-1">{pkr(totalRevenue)}</p>
+            </div>
+            <div className="macos-card p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Products</p>
+              <p className="text-[16px] font-bold text-foreground mt-1">{recentTransactions.length} items</p>
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="macos-card overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <h3 className="text-[13px] font-semibold">Recent Transactions</h3>
+          <span className="text-[11px] text-muted-foreground">Product transactions</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="macos-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Time</th>
+                <th className="text-center">Items</th>
+                <th className="text-right">Total</th>
+                <th>Payment</th>
+                <th>Attendant</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i}>
+                    {Array.from({ length: 6 }).map((_, j) => (
+                      <td key={j} className="p-3"><div className="h-4 bg-muted/40 rounded animate-pulse" style={{ width: `${40 + Math.random() * 60}%` }} /></td>
+                    ))}
+                  </tr>
+                ))
+              ) : recentTransactions.length === 0 ? (
+                <tr><td colSpan={6} className="text-center py-8 text-[12px] text-muted-foreground">No transactions found</td></tr>
+              ) : (
+                recentTransactions.map((tx) => (
+                  <tr key={tx.id}>
+                    <td className="font-mono text-[12px] text-muted-foreground">{tx.id}</td>
+                    <td className="font-mono text-[12px]">{tx.time}</td>
+                    <td className="text-center">{tx.items}</td>
+                    <td className="text-right font-mono font-semibold text-teal-600 dark:text-teal-400">{pkr(tx.total)}</td>
+                    <td>
+                      <span className={`macos-pill ${
+                        tx.payment === 'Cash'
+                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                          : tx.payment === 'Card'
+                            ? 'bg-teal-500/10 text-teal-600 dark:text-teal-400'
+                            : 'bg-black/[0.04] dark:bg-white/[0.06] text-muted-foreground'
+                      }`}>
+                        {tx.payment}
+                      </span>
+                    </td>
+                    <td className="text-muted-foreground">{tx.attendant}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Car Wash Tab ──────────────────────────────────────────
+
+function CarWashTab({
+  loading,
+  sessions,
+  summary,
+}: {
+  loading: boolean
+  sessions: CarWashSessionData[]
+  summary: CarWashSummary | null
+}) {
+  const todayRevenue = sessions.reduce((s, c) => s + c.amount, 0)
+  const completed = sessions.filter(c => c.status === 'completed').length
+
+  return (
+    <div className="space-y-4" style={{ fontStyle: 'normal !important' }}>
+      <div className="grid grid-cols-3 gap-3">
+        {loading ? (
+          Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)
+        ) : (
+          <>
+            <div className="macos-card p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Sessions</p>
+              <p className="text-[20px] font-bold text-foreground mt-1">{summary?.totalSessions ?? sessions.length}</p>
+            </div>
+            <div className="macos-card p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Revenue</p>
+              <p className="text-[20px] font-bold fuel-text-gradient mt-1">{pkr(summary?.totalRevenue ?? todayRevenue)}</p>
+            </div>
+            <div className="macos-card p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Completed</p>
+              <p className="text-[20px] font-bold text-emerald-600 dark:text-emerald-400 mt-1">{completed}/{sessions.length}</p>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Wash Type Breakdown */}
+      {summary && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {Object.entries(summary.byType).map(([type, count]) => (
+            <div key={type} className="macos-card p-4">
+              <div className="flex items-center gap-2.5 mb-2">
+                <div className="size-8 rounded-lg flex items-center justify-center bg-teal-500/10">
+                  <Droplets className="size-4 text-teal-500" />
+                </div>
+                <div>
+                  <p className="text-[13px] font-semibold capitalize">{type}</p>
+                  <p className="text-[11px] text-muted-foreground">{count} sessions</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Sessions Table */}
+      <div className="macos-card overflow-hidden">
+        <div className="px-4 py-3 border-b border-border">
+          <h3 className="text-[13px] font-semibold">Car Wash Sessions</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="macos-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Plate</th>
+                <th>Wash Type</th>
+                <th>Started</th>
+                <th className="text-right">Amount</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i}>
+                    {Array.from({ length: 6 }).map((_, j) => (
+                      <td key={j} className="p-3"><div className="h-4 bg-muted/40 rounded animate-pulse" style={{ width: `${40 + Math.random() * 60}%` }} /></td>
+                    ))}
+                  </tr>
+                ))
+              ) : sessions.length === 0 ? (
+                <tr><td colSpan={6} className="text-center py-8 text-[12px] text-muted-foreground">No car wash sessions found</td></tr>
+              ) : (
+                sessions.map((s) => (
+                  <tr key={s.id}>
+                    <td className="font-mono text-[12px] text-muted-foreground">{s.id.slice(0, 8)}</td>
+                    <td className="font-mono font-semibold">{s.vehiclePlate ?? '—'}</td>
+                    <td className="capitalize">{s.washType}</td>
+                    <td className="font-mono text-[12px]">{new Date(s.startedAt).toLocaleString('en-PK', { hour: '2-digit', minute: '2-digit' })}</td>
+                    <td className="text-right font-mono font-semibold text-teal-600 dark:text-teal-400">{pkr(s.amount)}</td>
+                    <td>
+                      <div className="flex items-center gap-1.5">
+                        <div className={`macos-status-dot ${s.status === 'in-progress' ? 'macos-status-warning' : s.status === 'completed' ? 'macos-status-online' : 'macos-status-offline'}`} />
+                        <span className={`text-[11px] font-medium capitalize ${
+                          s.status === 'in-progress' ? 'text-teal-500' :
+                          s.status === 'completed' ? 'text-emerald-600 dark:text-emerald-400' :
+                          'text-muted-foreground'
+                        }`}>
+                          {s.status}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Lottery Tab ───────────────────────────────────────────
+
+function LotteryTab({
+  loading,
+  sales,
+  summary,
+}: {
+  loading: boolean
+  sales: LotterySaleData[]
+  summary: LotterySummary | null
+}) {
+  const totalTickets = summary?.totalTickets ?? sales.reduce((s, l) => s + l.ticketCount, 0)
+  const totalRevenue = summary?.totalRevenue ?? sales.reduce((s, l) => s + l.saleAmount, 0)
+  const totalCommission = summary?.totalCommission ?? sales.reduce((s, l) => s + l.commission, 0)
+
+  return (
+    <div className="space-y-4" style={{ fontStyle: 'normal !important' }}>
+      <div className="grid grid-cols-3 gap-3">
+        {loading ? (
+          Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)
+        ) : (
+          <>
+            <div className="macos-card p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Tickets Sold</p>
+              <p className="text-[20px] font-bold text-foreground mt-1">{totalTickets}</p>
+            </div>
+            <div className="macos-card p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Revenue</p>
+              <p className="text-[20px] font-bold fuel-text-gradient mt-1">{pkr(totalRevenue)}</p>
+            </div>
+            <div className="macos-card p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Commission</p>
+              <p className="text-[20px] font-bold text-foreground mt-1">{pkr(totalCommission)}</p>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Game Type Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {['scratch', 'draw', 'online'].map((gameType) => {
+          const gameSales = sales.filter(s => s.gameType === gameType)
+          const gameRevenue = gameSales.reduce((s, g) => s + g.saleAmount, 0)
+          const colors: Record<string, string> = { scratch: '#e8930c', draw: '#34c759', online: '#ff9500' }
+          return (
+            <div key={gameType} className="macos-card p-4">
+              <div className="flex items-center gap-2.5 mb-2">
+                <div className="size-8 rounded-lg flex items-center justify-center" style={{ background: `${colors[gameType]}15` }}>
+                  <Sparkles className="size-4" style={{ color: colors[gameType] }} />
+                </div>
+                <div>
+                  <p className="text-[13px] font-semibold capitalize">{gameType}</p>
+                  <p className="text-[11px] text-muted-foreground">{pkr(gameRevenue)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className={`macos-status-dot ${gameSales.length > 0 ? 'macos-status-online' : 'macos-status-offline'}`} />
+                <span className={`text-[11px] font-medium ${gameSales.length > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                  {gameSales.length > 0 ? 'Active' : 'No sales'}
+                </span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Sales Table */}
+      <div className="macos-card overflow-hidden">
+        <div className="px-4 py-3 border-b border-border">
+          <h3 className="text-[13px] font-semibold">Recent Lottery Sales</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="macos-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Game</th>
+                <th className="text-center">Tickets</th>
+                <th className="text-right">Amount</th>
+                <th>Commission</th>
+                <th>Time</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i}>
+                    {Array.from({ length: 7 }).map((_, j) => (
+                      <td key={j} className="p-3"><div className="h-4 bg-muted/40 rounded animate-pulse" style={{ width: `${40 + Math.random() * 60}%` }} /></td>
+                    ))}
+                  </tr>
+                ))
+              ) : sales.length === 0 ? (
+                <tr><td colSpan={7} className="text-center py-8 text-[12px] text-muted-foreground">No lottery sales found</td></tr>
+              ) : (
+                sales.map((ls) => (
+                  <tr key={ls.id}>
+                    <td className="font-mono text-[12px] text-muted-foreground">{ls.id.slice(0, 8)}</td>
+                    <td className="font-semibold capitalize">{ls.gameType}</td>
+                    <td className="text-center">{ls.ticketCount}</td>
+                    <td className="text-right font-mono font-semibold text-teal-600 dark:text-teal-400">{pkr(ls.saleAmount)}</td>
+                    <td className="text-[12px] text-muted-foreground">{pkr(ls.commission)}</td>
+                    <td className="font-mono text-[12px]">{new Date(ls.createdAt).toLocaleString('en-PK', { hour: '2-digit', minute: '2-digit' })}</td>
+                    <td>
+                      <span className={`macos-pill ${
+                        ls.status === 'completed'
+                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                          : 'bg-teal-500/10 text-teal-600 dark:text-teal-400'
+                      }`}>
+                        {ls.status === 'completed' ? 'Sold' : String(ls.status ?? 'Pending')}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   )
 }

@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // =====================================================
@@ -38,6 +39,28 @@ model Tenant {
   notifications  Notification[]
   promotions     Promotion[]
   loyaltyRules   LoyaltyRule[]
+  omsClient      OMSClient?
+  glAccounts     GLAccount[]
+  journalEntries JournalEntry[]
+  accountsReceivable AccountReceivable[]
+  accountsPayable AccountPayable[]
+  taxConfigs     TaxConfig[]
+  loyaltyTransactions LoyaltyTransaction[]
+  giftCards      GiftCard[]
+  customerComplaints CustomerComplaint[]
+  reportTemplates ReportTemplate[]
+  scheduledReports ScheduledReport[]
+  apiKeys        APIKey[]
+  webhookEndpoints WebhookEndpoint[]
+  dispenserProfiles DispenserProfile[]
+  atgProfiles    ATGProfile[]
+  controllerProfiles ControllerProfile[]
+  hardwareCatalog HardwareCatalog[]
+  securityAlerts SecurityAlert[]
+  backupRecords  BackupRecord[]
+  encryptionKeys EncryptionKey[]
+  rbacPermissions RBACPermission[]
+  serialKeys      SerialKey[]
 }
 
 model Station {
@@ -93,22 +116,76 @@ model Station {
   payrollRecords     PayrollRecord[]
   leaveRequests      LeaveRequest[]
   vaporRecoveryReadings VaporRecoveryReading[]
+  forecourtControllers  ForecourtController[]
+  paymentTerminals      PaymentTerminal[]
+  generators            Generator[]
+  surveillanceCameras   SurveillanceCamera[]
+  fireAlarmSystems      FireAlarmSystem[]
+  utilityMeters         UtilityMeter[]
+  weatherStations       WeatherStation[]
+  tankerTrackers        TankerTracker[]
+  carWashSystems        CarWashSystem[]
+  airCompressors        AirCompressor[]
+  vacuumStations        VacuumStation[]
+  deviceEventLogs       DeviceEventLog[]
+  deviceCommandQueues   DeviceCommandQueue[]
+  fuelTransfers         FuelTransfer[]
+  theftAlerts           TheftAlert[]
+  shrinkageRecords      ShrinkageRecord[]
+  cashDrawers           CashDrawer[]
+  safeDrops             SafeDrop[]
+  cngCompressors        CNGCompressor[]
+  cngStorages           CNGStorage[]
+  nozzleEvents          NozzleEvent[]
+  shiftHandovers        ShiftHandover[]
+  commProtocols         CommProtocol[]
+  commLogs              CommLog[]
+  journalEntries        JournalEntry[]
+  serialKeys            SerialKey[]
 }
 
 model User {
-  id          String   @id @default(cuid())
-  tenantId    String
-  email       String   @unique
-  name        String
-  role        String   @default("viewer") // superadmin, admin, manager, operator, cashier, attendant, viewer
-  avatar      String?
-  isActive    Boolean  @default(true)
-  lastLogin   DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  tenantId     String
+  email        String   @unique
+  name         String
+  passwordHash String?
+  role         String   @default("viewer") // superadmin, admin, manager, operator, cashier, attendant, viewer
+  avatar       String?
+  isActive     Boolean  @default(true)
+  isDemo       Boolean  @default(false) // Demo accounts have view-only rights
+  lastLogin    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   tenant     Tenant     @relation(fields: [tenantId], references: [id])
-  auditLogs  AuditLog[]
+  auditLogs      AuditLog[]
+  sessions       SecuritySession[]
+}
+
+// =====================================================
+// SERIAL KEY - DEVICE REGISTRATION
+// =====================================================
+
+model SerialKey {
+  id              String    @id @default(cuid())
+  key             String    @unique
+  tenantId        String?   // Assigned to tenant after activation
+  stationId       String?   // Assigned to station after activation
+  status          String    @default("inactive") // inactive, active, expired, revoked
+  plan            String    @default("starter") // starter, professional, enterprise
+  maxStations     Int       @default(1)
+  maxDispensers   Int       @default(8)
+  maxUsers        Int       @default(5)
+  activatedAt     DateTime?
+  expiresAt       DateTime?
+  hardwareBinding String?   // Hardware fingerprint for device binding
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  tenant  Tenant?  @relation(fields: [tenantId], references: [id])
+  station Station? @relation(fields: [stationId], references: [id])
 }
 
 // =====================================================
@@ -116,27 +193,39 @@ model User {
 // =====================================================
 
 model Dispenser {
-  id                String   @id @default(cuid())
-  stationId         String
-  name              String
-  code              String
-  manufacturer      String?  // tatsuno, gilbarco, wayne, tokheim, etc.
-  model             String?
-  serialNumber      String?
-  controllerType    String?  // pts, fusion, doms, hectronic, etc.
-  communicationType String?  // tcpip, rs232, rs485, serial, ethernet
-  ipAddress         String?
-  port              Int?
-  pumpLane          Int      @default(1)
-  status            String   @default("idle") // idle, fueling, stopped, error, locked, maintenance
-  isActive          Boolean  @default(true)
-  lastCommunication DateTime?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                     String   @id @default(cuid())
+  stationId              String
+  name                   String
+  code                   String
+  manufacturer           String?  // tatsuno, gilbarco, wayne, tokheim, bennett, petrotec, scheidt_bachmann, etc.
+  model                  String?
+  serialNumber           String?
+  controllerType         String?  // pts, fusion, doms, hectronic, etc.
+  forecourtControllerId  String?  // Links to ForecourtController - ERP never talks directly to pump
+  communicationType      String?  // tcpip, rs232, rs485, serial, ethernet
+  ipAddress              String?
+  port                   Int?
+  pumpLane               Int      @default(1)
+  pumpAddress            Int?     // Logical address on the controller bus (1-32)
+  protocol               String?  // ifsf, patrius, dfs, wayne-dart, gilbarco-g-site, proprietary
+  nozzleCount            Int      @default(2)
+  flowRate               Float?   // L/min max flow rate
+  supportedFuels         String?  // JSON: ["petrol", "diesel", "premium", "hsd"]
+  firmwareVersion        String?
+  lastMeterReading       Float    @default(0)
+  status                 String   @default("idle") // idle, fueling, stopped, error, locked, maintenance, offline, authorized
+  isActive               Boolean  @default(true)
+  lastCommunication      DateTime?
+  installedDate          DateTime?
+  warrantyExpiry         DateTime?
+  configJson             String?  // Extended vendor-specific config
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
-  station   Station   @relation(fields: [stationId], references: [id])
-  nozzles   Nozzle[]
-  fuelings   Fueling[]
+  station              Station              @relation(fields: [stationId], references: [id])
+  forecourtController  ForecourtController? @relation(fields: [forecourtControllerId], references: [id])
+  nozzles              Nozzle[]
+  fuelings              Fueling[]
 }
 
 model Nozzle {
@@ -160,6 +249,7 @@ model Nozzle {
   fuelings         Fueling[]
   maintenanceRecords MaintenanceRecord[]
   meterRecords     MeterRecord[]
+  nozzleEvents     NozzleEvent[]
 }
 
 // =====================================================
@@ -190,6 +280,9 @@ model Tank {
   tankReadings     TankReading[]
   reconciliations  Reconciliation[]
   calibrations     TankCalibration[]
+  transfersFrom    FuelTransfer[]  @relation("TransferFrom")
+  transfersTo      FuelTransfer[]  @relation("TransferTo")
+  shrinkageRecords ShrinkageRecord[]
 }
 
 model TankReading {
@@ -1042,6 +1135,1384 @@ model AuditLog {
 }
 
 // =====================================================
+// DEVICE INTEGRATION & CONFIGURATION
+// =====================================================
+
+model ForecourtController {
+  id                String   @id @default(cuid())
+  stationId         String
+  name              String
+  code              String
+  controllerType    String   // pts, fusion, doms, hectronic, tokheim, wayne, gilbarco
+  manufacturer      String?
+  model             String?
+  serialNumber      String?
+  firmwareVersion   String?
+  communicationType String   @default("tcpip") // tcpip, rs232, rs485, serial, ethernet
+  ipAddress         String?
+  port              Int?
+  baudRate          Int?
+  comPort           String?  // for serial: COM1, /dev/ttyS0, etc.
+  protocol          String?  // ifsf, patrius, dfs, wayne-dart, gilbarco-g-site
+  pollingInterval   Int      @default(1000) // ms
+  timeout           Int      @default(5000) // ms
+  maxDispensers     Int      @default(32)
+  connectedDispensers Int    @default(0)
+  status            String   @default("offline") // online, offline, error, maintenance
+  lastHeartbeat     DateTime?
+  lastCommunication DateTime?
+  isActive          Boolean  @default(true)
+  configJson        String?  // JSON for vendor-specific config
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  station           Station  @relation(fields: [stationId], references: [id])
+  dispensers        Dispenser[]
+  eventLogs         DeviceEventLog[]
+  commandQueue      DeviceCommandQueue[]
+  configs           DeviceConfig[]
+}
+
+// =====================================================
+// CONTROLLER PROFILES - CATALOG OF SUPPORTED FORECOURT CONTROLLERS
+// =====================================================
+
+model ControllerProfile {
+  id                  String   @id @default(cuid())
+  tenantId            String?
+  manufacturer        String   // pts, doms, fusion, hectronic, tokheim, wayne, gilbarco, scheidt_bachmann, franklin, opw
+  modelName           String   // e.g. "PTS Over_Controller", "DOMS DC", "Fusion FCM-6"
+  controllerType      String   // pts, fusion, doms, hectronic, tokheim, wayne, gilbarco, site_controller, fcc
+  supportedProtocols  String?  // JSON: ["ifsf", "patrius", "dfs", "wayne-dart", "gilbarco-g-site"]
+  supportedDispensers String?  // JSON: list of dispenser manufacturers/brands this controller supports
+  maxDispensers       Int      @default(32)
+  maxNozzlesPerPump   Int      @default(4)
+  communicationTypes  String?  // JSON: ["tcpip", "rs232", "rs485", "serial", "ethernet", "mqtt"]
+  defaultPort         Int?
+  defaultBaudRate     Int?
+  defaultPollingMs    Int?
+  features            String?  // JSON: ["authorize", "stop", "nozzle_status", "sales_data", "meter_values", "price_change", "pump_errors", "tank_levels", "preset", "lock"]
+  atgSupport          Boolean  @default(false)
+  atgBrands           String?  // JSON: list of ATG brands supported
+  paymentIntegration  Boolean  @default(false)
+  mqttSupport         Boolean  @default(false)
+  firmwareUrl         String?
+  configTemplate      String?  // JSON config template
+  documentationUrl    String?
+  notes               String?
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  tenant              Tenant?  @relation(fields: [tenantId], references: [id])
+}
+
+// =====================================================
+// HARDWARE CATALOG - UNIFIED SEARCHABLE HARDWARE DATABASE
+// =====================================================
+
+model HardwareCatalog {
+  id                String   @id @default(cuid())
+  tenantId          String?
+  category          String   // dispenser, controller, atg, payment_terminal, generator, camera, fire_alarm, utility_meter, weather_station, price_board, rfid, anpr
+  manufacturer      String
+  modelName         String
+  modelCode         String?  // Short code like "GSITE-EC"
+  hardwareType      String?  // Sub-type within category
+  description       String?
+  specifications    String?  // JSON: key spec pairs
+  supportedFuels    String?  // JSON (for dispensers): ["petrol", "diesel", "premium", "hsd"]
+  communicationTypes String? // JSON: ["tcpip", "rs232", "rs485", "mqtt"]
+  protocols         String?  // JSON: ["ifsf", "patrius", "iso8583"]
+  maxNozzles        Int?
+  flowRate          Float?   // L/min (for dispensers)
+  powerRequirement  String?  // e.g. "220V AC 50Hz"
+  operatingTemp     String?  // e.g. "-40°C to +60°C"
+  certification     String?  // e.g. "OIML R117, MID 2014/32/EU"
+  imageUrl          String?
+  documentationUrl  String?
+  firmwareUrl       String?
+  configTemplate    String?  // JSON config template for this hardware
+  compatibleControllers String? // JSON: list of controller types this dispenser works with
+  compatibleATGs    String?  // JSON: list of ATG brands
+  isVerified        Boolean  @default(false) // Verified by FuelFlow team
+  popularity        Int      @default(0) // Search ranking
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant            Tenant?  @relation(fields: [tenantId], references: [id])
+}
+
+model PaymentTerminal {
+  id              String   @id @default(cuid())
+  stationId       String
+  name            String
+  code            String
+  terminalType    String   // pos, eftpos, mpos, self_checkout, pay_at_pump
+  manufacturer    String?  // ingenico, verifone, pax, nexgo, castles
+  model           String?
+  serialNumber    String?
+  firmwareVersion String?
+  communicationType String @default("tcpip")
+  ipAddress       String?
+  port            Int?
+  comPort         String?
+  protocol        String?  // iso8583, nac, tms, ompi
+  merchantId      String?
+  terminalId      String?
+  supportedCards  String?  // JSON: visa, mastercard, unionpay, jcb
+  supportedMethods String? // JSON: emv, contactless, nfc, qr, mobile
+  shiftId         String?
+  status          String   @default("offline") // online, offline, error, busy, maintenance
+  lastTransaction DateTime?
+  transactionCount Int     @default(0)
+  isActive        Boolean  @default(true)
+  configJson      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  station         Station  @relation(fields: [stationId], references: [id])
+  eventLogs       DeviceEventLog[]
+  commandQueue    DeviceCommandQueue[]
+  configs         DeviceConfig[]
+}
+
+model Generator {
+  id              String   @id @default(cuid())
+  stationId       String
+  name            String
+  code            String
+  manufacturer    String?  // cummins, caterpillar, perkins, honda, generac
+  model           String?
+  serialNumber    String?
+  fuelType        String   @default("diesel") // diesel, petrol, gas, dual_fuel
+  capacityKva     Float
+  currentLoadKva  Float    @default(0)
+  fuelLevel       Float    @default(100) // percentage
+  runHours        Float    @default(0)
+  voltage         Float?
+  frequency       Float?
+  oilPressure     Float?
+  coolantTemp     Float?
+  communicationType String @default("tcpip")
+  ipAddress       String?
+  port            Int?
+  comPort         String?
+  protocol        String?  // modbus, snmp, opcua
+  autoStart       Boolean  @default(true)
+  autoTransfer    Boolean  @default(true)
+  status          String   @default("standby") // running, standby, fault, maintenance, offline
+  lastStartedAt   DateTime?
+  lastStoppedAt   DateTime?
+  nextServiceDate DateTime?
+  isActive        Boolean  @default(true)
+  configJson      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  station         Station  @relation(fields: [stationId], references: [id])
+  eventLogs       DeviceEventLog[]
+  commandQueue    DeviceCommandQueue[]
+  configs         DeviceConfig[]
+}
+
+model SurveillanceCamera {
+  id              String   @id @default(cuid())
+  stationId       String
+  name            String
+  code            String
+  cameraType      String   // dome, bullet, ptz, license_plate, thermal
+  manufacturer    String?  // hikvision, dahua, axis, bosch, hanwha
+  model           String?
+  serialNumber    String?
+  firmwareVersion String?
+  resolution      String?  // 1080p, 4k, 5mp, 8mp
+  location        String?  // forecourt, entrance, exit, store, office, tank_farm
+  ipAddress       String?
+  port            Int?
+  rtspUrl         String?
+  httpUrl         String?
+  onvifSupported  Boolean  @default(false)
+  ptzEnabled      Boolean  @default(false)
+  nightVision     Boolean  @default(false)
+  recordingEnabled Boolean @default(true)
+  storageDays     Int      @default(30)
+  analyticsEnabled Boolean @default(false)
+  analyticsType   String?  // motion, face, plate, crowd, intrusion
+  status          String   @default("offline") // online, offline, error, recording, idle
+  lastRecordingAt DateTime?
+  isActive        Boolean  @default(true)
+  configJson      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  station         Station  @relation(fields: [stationId], references: [id])
+  eventLogs       DeviceEventLog[]
+  commandQueue    DeviceCommandQueue[]
+  configs         DeviceConfig[]
+}
+
+model FireAlarmSystem {
+  id              String   @id @default(cuid())
+  stationId       String
+  name            String
+  code            String
+  systemType      String   // conventional, addressable, analog_addressable, wireless
+  manufacturer    String?  // honeywell, siemens, notifier, morley, simplex
+  model           String?
+  serialNumber    String?
+  firmwareVersion String?
+  zoneCount       Int      @default(1)
+  detectorCount   Int      @default(0)
+  communicationType String @default("tcpip")
+  ipAddress       String?
+  port            Int?
+  comPort         String?
+  protocol        String?  // modbus, bacnet, proprietary
+  suppressionType String?  // foam, water, gas, dry_chemical
+  autoSuppress    Boolean  @default(false)
+  linkedToDispensers Boolean @default(true)
+  linkedToTanks   Boolean  @default(true)
+  status          String   @default("offline") // normal, alarm, fault, test, offline, suppressed
+  lastAlarmAt     DateTime?
+  lastTestDate    DateTime?
+  nextTestDate    DateTime?
+  isActive        Boolean  @default(true)
+  configJson      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  station         Station  @relation(fields: [stationId], references: [id])
+  eventLogs       DeviceEventLog[]
+  commandQueue    DeviceCommandQueue[]
+  configs         DeviceConfig[]
+}
+
+model UtilityMeter {
+  id              String   @id @default(cuid())
+  stationId       String
+  name            String
+  code            String
+  meterType       String   // electricity, water, gas, solar
+  manufacturer    String?  // abb, siemens, schneider, landis_gyr, kamstrup
+  model           String?
+  serialNumber    String?
+  meterNumber     String?  // utility provider meter number
+  firmwareVersion String?
+  communicationType String @default("tcpip")
+  ipAddress       String?
+  port            Int?
+  comPort         String?
+  protocol        String?  // modbus, dnp3, dlms, mqtt
+  currentReading  Float    @default(0)
+  previousReading Float    @default(0)
+  consumption     Float    @default(0)
+  unit            String   @default("kwh") // kwh, gallons, cubic_meters, therms
+  peakDemand      Float?
+  powerFactor     Float?
+  billingCycle    String?
+  tariffRate      Float?
+  status          String   @default("offline") // online, offline, error, maintenance
+  lastReading     DateTime?
+  isActive        Boolean  @default(true)
+  configJson      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  station         Station  @relation(fields: [stationId], references: [id])
+  eventLogs       DeviceEventLog[]
+  commandQueue    DeviceCommandQueue[]
+  configs         DeviceConfig[]
+}
+
+model WeatherStation {
+  id              String   @id @default(cuid())
+  stationId       String
+  name            String
+  code            String
+  manufacturer    String?  // davis, vaisala, campbell, oregon
+  model           String?
+  serialNumber    String?
+  firmwareVersion String?
+  communicationType String @default("tcpip")
+  ipAddress       String?
+  port            Int?
+  comPort         String?
+  protocol        String?  // modbus, mqtt, http
+  temperature     Float?
+  humidity        Float?
+  windSpeed       Float?
+  windDirection   String?
+  pressure        Float?
+  rainfall        Float?
+  uvIndex         Float?
+  visibility      Float?
+  dewPoint        Float?
+  status          String   @default("offline") // online, offline, error, maintenance
+  lastReading     DateTime?
+  isActive        Boolean  @default(true)
+  configJson      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  station         Station  @relation(fields: [stationId], references: [id])
+  eventLogs       DeviceEventLog[]
+  commandQueue    DeviceCommandQueue[]
+  configs         DeviceConfig[]
+}
+
+model TankerTracker {
+  id              String   @id @default(cuid())
+  stationId       String
+  name            String
+  code            String
+  trackerType     String   // gps, gps_gsm, gps_satellite, beacons
+  manufacturer    String?  // teltonika, queclink, calamp, sierra_wireless
+  model           String?
+  serialNumber    String?
+  simCardNumber   String?
+  imei            String?
+  communicationType String @default("gsm")
+  ipAddress       String?
+  port            Int?
+  protocol        String?  // gt06, h02, t800, osmand
+  latitude        Float?
+  longitude       Float?
+  speed           Float?
+  heading         Float?
+  altitude        Float?
+  odometer        Float?
+  fuelLevel       Float?
+  ignitionStatus  Boolean  @default(false)
+  doorStatus      Boolean  @default(false)
+  geofenceEnabled Boolean  @default(true)
+  geofenceRadius  Float    @default(500) // meters
+  lastLocationAt  DateTime?
+  status          String   @default("offline") // online, offline, moving, parked, idle, sos
+  isActive        Boolean  @default(true)
+  configJson      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  station         Station  @relation(fields: [stationId], references: [id])
+  eventLogs       DeviceEventLog[]
+  commandQueue    DeviceCommandQueue[]
+  configs         DeviceConfig[]
+}
+
+model CarWashSystem {
+  id              String   @id @default(cuid())
+  stationId       String
+  name            String
+  code            String
+  systemType      String   // automatic, self_serve, touchless, tunnel
+  manufacturer    String?  // washtec, otto christ, ryko, pdq, istobal
+  model           String?
+  serialNumber    String?
+  firmwareVersion String?
+  communicationType String @default("tcpip")
+  ipAddress       String?
+  port            Int?
+  comPort         String?
+  protocol        String?  // modbus, proprietary, ocpp
+  bayCount        Int      @default(1)
+  currentBay      Int      @default(1)
+  waterPressure   Float?
+  waterTemp       Float?
+  chemicalLevel   Float?
+  waxLevel        Float?
+  dailyCount      Int      @default(0)
+  monthlyCount    Int      @default(0)
+  revenueToday    Float    @default(0)
+  status          String   @default("idle") // idle, washing, drying, fault, maintenance, offline
+  lastWashAt      DateTime?
+  nextServiceDate DateTime?
+  isActive        Boolean  @default(true)
+  configJson      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  station         Station  @relation(fields: [stationId], references: [id])
+  eventLogs       DeviceEventLog[]
+  commandQueue    DeviceCommandQueue[]
+  configs         DeviceConfig[]
+}
+
+model AirCompressor {
+  id              String   @id @default(cuid())
+  stationId       String
+  name            String
+  code            String
+  manufacturer    String?  // atlas_copco, ingersoll_rand, kaeser, sullair
+  model           String?
+  serialNumber    String?
+  communicationType String @default("tcpip")
+  ipAddress       String?
+  port            Int?
+  comPort         String?
+  protocol        String?  // modbus, mqtt
+  pressure        Float?   // PSI
+  maxPressure     Float    @default(150) // PSI
+  tankCapacity    Float?   // gallons
+  motorStatus     String   @default("off") // on, off, fault
+  runHours        Float    @default(0)
+  coinOperated    Boolean  @default(true)
+  pricePerUse     Float    @default(20)
+  dailyUsage      Int      @default(0)
+  revenueToday    Float    @default(0)
+  status          String   @default("idle") // idle, running, fault, maintenance, offline
+  lastUsedAt      DateTime?
+  isActive        Boolean  @default(true)
+  configJson      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  station         Station  @relation(fields: [stationId], references: [id])
+  eventLogs       DeviceEventLog[]
+  commandQueue    DeviceCommandQueue[]
+  configs         DeviceConfig[]
+}
+
+model VacuumStation {
+  id              String   @id @default(cuid())
+  stationId       String
+  name            String
+  code            String
+  manufacturer    String?
+  model           String?
+  serialNumber    String?
+  communicationType String @default("tcpip")
+  ipAddress       String?
+  port            Int?
+  comPort         String?
+  protocol        String?  // modbus, mqtt
+  motorStatus     String   @default("off")
+  suctionPower    Float?
+  coinOperated    Boolean  @default(true)
+  pricePerUse     Float    @default(30)
+  dailyUsage      Int      @default(0)
+  revenueToday    Float    @default(0)
+  runHours        Float    @default(0)
+  status          String   @default("idle") // idle, running, fault, maintenance, offline
+  lastUsedAt      DateTime?
+  isActive        Boolean  @default(true)
+  configJson      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  station         Station  @relation(fields: [stationId], references: [id])
+  eventLogs       DeviceEventLog[]
+  commandQueue    DeviceCommandQueue[]
+  configs         DeviceConfig[]
+}
+
+model DeviceConfig {
+  id          String   @id @default(cuid())
+  deviceType  String   // forecourt_controller, payment_terminal, generator, surveillance_camera, fire_alarm, utility_meter, weather_station, tanker_tracker, car_wash, air_compressor, vacuum_station, dispenser, tank, rfid_reader, anpr_camera, ev_charger, cng_dispenser, price_board
+  deviceId    String
+  configKey   String
+  configValue String
+  dataType    String   @default("string") // string, number, boolean, json
+  description String?
+  isEditable  Boolean  @default(true)
+  updatedBy   String?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  // Polymorphic relations - only one will be used based on deviceType
+  forecourtController  ForecourtController?  @relation(fields: [deviceId], references: [id], map: "DeviceConfig_fc_fkey")
+  paymentTerminal      PaymentTerminal?      @relation(fields: [deviceId], references: [id], map: "DeviceConfig_pt_fkey")
+  generator            Generator?            @relation(fields: [deviceId], references: [id], map: "DeviceConfig_gen_fkey")
+  surveillanceCamera   SurveillanceCamera?   @relation(fields: [deviceId], references: [id], map: "DeviceConfig_sc_fkey")
+  fireAlarmSystem      FireAlarmSystem?      @relation(fields: [deviceId], references: [id], map: "DeviceConfig_fa_fkey")
+  utilityMeter         UtilityMeter?         @relation(fields: [deviceId], references: [id], map: "DeviceConfig_um_fkey")
+  weatherStation       WeatherStation?       @relation(fields: [deviceId], references: [id], map: "DeviceConfig_ws_fkey")
+  tankerTracker        TankerTracker?        @relation(fields: [deviceId], references: [id], map: "DeviceConfig_tt_fkey")
+  carWashSystem        CarWashSystem?        @relation(fields: [deviceId], references: [id], map: "DeviceConfig_cw_fkey")
+  airCompressor        AirCompressor?        @relation(fields: [deviceId], references: [id], map: "DeviceConfig_ac_fkey")
+  vacuumStation        VacuumStation?        @relation(fields: [deviceId], references: [id], map: "DeviceConfig_vs_fkey")
+}
+
+model DeviceEventLog {
+  id          String   @id @default(cuid())
+  stationId   String
+  deviceType  String   // forecourt_controller, payment_terminal, generator, etc.
+  deviceId    String
+  eventType   String   // status_change, command, alarm, reading, error, heartbeat
+  severity    String   @default("info") // info, warning, error, critical
+  message     String
+  dataJson    String?  // JSON payload of the event
+  createdAt   DateTime @default(now())
+
+  station               Station               @relation(fields: [stationId], references: [id])
+  forecourtController   ForecourtController?  @relation(fields: [deviceId], references: [id], map: "DeviceEventLog_fc_fkey")
+  paymentTerminal      PaymentTerminal?      @relation(fields: [deviceId], references: [id], map: "DeviceEventLog_pt_fkey")
+  generator            Generator?            @relation(fields: [deviceId], references: [id], map: "DeviceEventLog_gen_fkey")
+  surveillanceCamera   SurveillanceCamera?   @relation(fields: [deviceId], references: [id], map: "DeviceEventLog_sc_fkey")
+  fireAlarmSystem      FireAlarmSystem?      @relation(fields: [deviceId], references: [id], map: "DeviceEventLog_fa_fkey")
+  utilityMeter         UtilityMeter?         @relation(fields: [deviceId], references: [id], map: "DeviceEventLog_um_fkey")
+  weatherStation       WeatherStation?       @relation(fields: [deviceId], references: [id], map: "DeviceEventLog_ws_fkey")
+  tankerTracker        TankerTracker?        @relation(fields: [deviceId], references: [id], map: "DeviceEventLog_tt_fkey")
+  carWashSystem        CarWashSystem?        @relation(fields: [deviceId], references: [id], map: "DeviceEventLog_cw_fkey")
+  airCompressor        AirCompressor?        @relation(fields: [deviceId], references: [id], map: "DeviceEventLog_ac_fkey")
+  vacuumStation        VacuumStation?        @relation(fields: [deviceId], references: [id], map: "DeviceEventLog_vs_fkey")
+}
+
+model DeviceCommandQueue {
+  id          String   @id @default(cuid())
+  stationId   String
+  deviceType  String
+  deviceId    String
+  command     String
+  parameters  String?  // JSON
+  priority    String   @default("normal") // low, normal, high, urgent
+  status      String   @default("queued") // queued, sent, acknowledged, failed, timeout
+  sentAt      DateTime?
+  acknowledgedAt DateTime?
+  responseJson String?
+  retryCount  Int      @default(0)
+  maxRetries  Int      @default(3)
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  station               Station               @relation(fields: [stationId], references: [id])
+  forecourtController   ForecourtController?  @relation(fields: [deviceId], references: [id], map: "DeviceCmdQ_fc_fkey")
+  paymentTerminal      PaymentTerminal?      @relation(fields: [deviceId], references: [id], map: "DeviceCmdQ_pt_fkey")
+  generator            Generator?            @relation(fields: [deviceId], references: [id], map: "DeviceCmdQ_gen_fkey")
+  surveillanceCamera   SurveillanceCamera?   @relation(fields: [deviceId], references: [id], map: "DeviceCmdQ_sc_fkey")
+  fireAlarmSystem      FireAlarmSystem?      @relation(fields: [deviceId], references: [id], map: "DeviceCmdQ_fa_fkey")
+  utilityMeter         UtilityMeter?         @relation(fields: [deviceId], references: [id], map: "DeviceCmdQ_um_fkey")
+  weatherStation       WeatherStation?       @relation(fields: [deviceId], references: [id], map: "DeviceCmdQ_ws_fkey")
+  tankerTracker        TankerTracker?        @relation(fields: [deviceId], references: [id], map: "DeviceCmdQ_tt_fkey")
+  carWashSystem        CarWashSystem?        @relation(fields: [deviceId], references: [id], map: "DeviceCmdQ_cw_fkey")
+  airCompressor        AirCompressor?        @relation(fields: [deviceId], references: [id], map: "DeviceCmdQ_ac_fkey")
+  vacuumStation        VacuumStation?        @relation(fields: [deviceId], references: [id], map: "DeviceCmdQ_vs_fkey")
+}
+
+// =====================================================
+// APEXFLOW OMS INTEGRATION & SAAS ADMINISTRATION
+// =====================================================
+
+model OMSClient {
+  id              String   @id @default(cuid())
+  tenantId        String   @unique
+  omsClientId     String   @unique
+  companyName     String
+  registrationDate DateTime @default(now())
+  subscriptionPlan String  @default("starter") // starter, professional, enterprise, custom
+  licenseKey      String   @unique
+  licenseStatus   String   @default("active") // active, suspended, expired, cancelled
+  licensedModules String?  // JSON array of enabled module keys
+  maxStations     Int      @default(1)
+  maxUsers        Int      @default(5)
+  maxDevices      Int      @default(10)
+  currentStations Int      @default(0)
+  currentUsers    Int      @default(0)
+  currentDevices  Int      @default(0)
+  billingCycle    String   @default("monthly") // monthly, quarterly, annually
+  basePrice       Float    @default(0)
+  perStationPrice Float    @default(0)
+  perUserPrice    Float    @default(0)
+  totalMonthly    Float    @default(0)
+  currency        String   @default("PKR")
+  lastSyncAt      DateTime?
+  syncStatus      String   @default("pending") // pending, synced, error
+  syncErrors      String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  packages        OMSPackage[]
+  invoices        OMSInvoice[]
+  payments        OMSPayment[]
+  syncLogs        OMSSyncLog[]
+  licenses        OMSLicense[]
+}
+
+model OMSPackage {
+  id              String   @id @default(cuid())
+  omsClientId     String
+  packageName     String
+  description     String?
+  modules         String   // JSON array
+  stationLimit    Int
+  userLimit       Int
+  deviceLimit     Int
+  price           Float
+  currency        String   @default("PKR")
+  billingCycle    String   @default("monthly")
+  isCustom        Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  omsClient       OMSClient @relation(fields: [omsClientId], references: [id])
+}
+
+model OMSInvoice {
+  id              String   @id @default(cuid())
+  omsClientId     String
+  invoiceNumber   String   @unique
+  invoiceDate     DateTime
+  dueDate         DateTime
+  subtotal        Float
+  taxAmount       Float    @default(0)
+  totalAmount     Float
+  status          String   @default("pending") // pending, paid, overdue, cancelled
+  paidAmount      Float    @default(0)
+  paidDate        DateTime?
+  items           String   // JSON line items
+  notes           String?
+  omsSyncId       String?  // OMS invoice reference
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  omsClient       OMSClient @relation(fields: [omsClientId], references: [id])
+}
+
+model OMSPayment {
+  id              String   @id @default(cuid())
+  omsClientId     String
+  invoiceId       String?
+  amount          Float
+  paymentMethod   String   @default("bank_transfer") // bank_transfer, card, cheque, online, cash
+  referenceNumber String?
+  transactionId   String?
+  status          String   @default("completed") // pending, completed, failed, refunded
+  paymentDate     DateTime @default(now())
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  omsClient       OMSClient @relation(fields: [omsClientId], references: [id])
+}
+
+model OMSSyncLog {
+  id              String   @id @default(cuid())
+  omsClientId     String
+  syncType        String   // client_registration, subscription, license, invoice, payment, module_control, user_sync
+  direction       String   @default("outbound") // inbound, outbound
+  status          String   @default("pending") // pending, success, error
+  payload         String?  // JSON
+  response        String?  // JSON
+  errorMessage    String?
+  syncedAt        DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  omsClient       OMSClient @relation(fields: [omsClientId], references: [id])
+}
+
+model OMSLicense {
+  id              String   @id @default(cuid())
+  omsClientId     String
+  licenseKey      String   @unique
+  moduleKey       String
+  moduleName      String
+  is_enabled      Boolean  @default(true)
+  validFrom       DateTime
+  validTo         DateTime?
+  maxUsage        Int?
+  currentUsage    Int      @default(0)
+  status          String   @default("active") // active, disabled, expired
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  omsClient       OMSClient @relation(fields: [omsClientId], references: [id])
+}
+
+// =====================================================
+// SECURITY CENTER
+// =====================================================
+
+model SecuritySession {
+  id              String   @id @default(cuid())
+  userId          String
+  tenantId        String?
+  tokenHash       String?
+  ipAddress       String?
+  userAgent       String?
+  deviceInfo      String?
+  loginAt         DateTime @default(now())
+  lastActivityAt  DateTime @default(now())
+  logoutAt        DateTime?
+  status          String   @default("active") // active, expired, revoked
+  expiresAt       DateTime?
+  createdAt       DateTime @default(now())
+
+  user            User     @relation(fields: [userId], references: [id])
+}
+
+model RBACPermission {
+  id              String   @id @default(cuid())
+  tenantId        String?
+  role            String   // superadmin, admin, manager, operator, cashier, attendant, viewer
+  module          String
+  action          String   // read, write, delete, approve, configure
+  isAllowed       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant?  @relation(fields: [tenantId], references: [id])
+}
+
+model SecurityAlert {
+  id              String   @id @default(cuid())
+  tenantId        String?
+  stationId       String?
+  alertType       String   // unauthorized_access, brute_force, suspicious_activity, data_breach, permission_violation, device_tampering
+  severity        String   @default("warning") // info, warning, error, critical
+  title           String
+  description     String?
+  sourceIp        String?
+  targetEntity    String?
+  targetEntityId  String?
+  isResolved      Boolean  @default(false)
+  resolvedAt      DateTime?
+  resolvedBy      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant?  @relation(fields: [tenantId], references: [id])
+}
+
+model BackupRecord {
+  id              String   @id @default(cuid())
+  tenantId        String?
+  stationId       String?
+  backupType      String   @default("full") // full, incremental, differential
+  status          String   @default("pending") // pending, in_progress, completed, failed
+  fileSize        Float?   // MB
+  fileKey         String?  // storage path/key
+  startedAt       DateTime?
+  completedAt     DateTime?
+  duration        Int?     // seconds
+  checksum        String?
+  isRestorable    Boolean  @default(true)
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  tenant          Tenant?  @relation(fields: [tenantId], references: [id])
+}
+
+model EncryptionKey {
+  id              String   @id @default(cuid())
+  tenantId        String?
+  keyType         String   @default("aes256") // aes256, rsa2048, aes128
+  keyReference    String
+  isActive        Boolean  @default(true)
+  rotatedAt       DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime @default(now())
+
+  tenant          Tenant?  @relation(fields: [tenantId], references: [id])
+}
+
+// =====================================================
+// COMMUNICATION LAYER & PROTOCOLS
+// =====================================================
+
+model CommProtocol {
+  id              String   @id @default(cuid())
+  stationId       String
+  name            String
+  protocolType    String   // ifsf, patrius, dfs, wayne_dart, gilbarco_gsite, modbus, mqtt, ocpp, iso8583, nac, tms, ompi, dlms, dnp3, bacnet, snmp, opcua
+  version         String?
+  transportType   String   // tcp, udp, serial, rs232, rs485, ethernet, mqtt, http
+  hostOrPort      String?  // IP:port or COM port
+  baudRate        Int?
+  dataBits        Int?     @default(8)
+  stopBits        Int?     @default(1)
+  parity          String?  @default("none") // none, odd, even
+  heartbeatInterval Int?   @default(30) // seconds
+  timeout         Int?     @default(5) // seconds
+  retryCount      Int?     @default(3)
+  pollInterval    Int?     @default(1000) // ms
+  configJson      String?  // Protocol-specific config
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  station         Station  @relation(fields: [stationId], references: [id])
+  connections     CommConnection[]
+}
+
+model CommConnection {
+  id              String   @id @default(cuid())
+  stationId       String
+  protocolId      String
+  name            String
+  deviceType      String   // dispenser, tank_atg, controller, pos, price_board, rfid, anpr, ev_charger, cng_dispenser, payment_terminal
+  deviceId        String?  // Reference to actual device
+  connectionState String   @default("disconnected") // connected, disconnected, error, timeout
+  lastConnectedAt DateTime?
+  lastMessageAt   DateTime?
+  messagesSent    Int      @default(0)
+  messagesReceived Int     @default(0)
+  errors          Int      @default(0)
+  latencyMs       Int?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  protocol        CommProtocol @relation(fields: [protocolId], references: [id])
+}
+
+model CommLog {
+  id              String   @id @default(cuid())
+  stationId       String
+  connectionId    String?
+  protocolId      String?
+  direction       String   // inbound, outbound
+  messageType     String   // request, response, event, heartbeat, error, command
+  rawData         String?  // Hex or raw bytes
+  parsedData      String?  // JSON parsed
+  deviceId        String?
+  deviceType      String?
+  isSuccess       Boolean  @default(true)
+  errorMessage    String?
+  durationMs      Int?
+  createdAt       DateTime @default(now())
+
+  station         Station  @relation(fields: [stationId], references: [id])
+}
+
+// =====================================================
+// DISPENSER MANUFACTURER PROFILES
+// =====================================================
+
+model DispenserProfile {
+  id              String   @id @default(cuid())
+  tenantId        String?
+  manufacturer    String   // tatsuno, tatsuno_sunny, tatsuno_benc, tatsuno_korea, gilbarco, wayne, tokheim, bennett, petrotec, censtar, sanki, zhejiang_datian, hectronic, scheidt_bachmann, hongyang, eaglestar
+  modelName       String
+  pumpTypes       String?  // JSON: single_hose, dual_hose, multi_product, high_flow
+  supportedFuels  String?  // JSON: petrol, diesel, premium, hsd
+  maxNozzles      Int      @default(2)
+  flowRate        Float?   // L/min
+  protocol        String?  // ifsf, patrius, proprietary
+  communicationTypes String? // JSON: tcpip, rs232, rs485
+  defaultPort     Int?
+  defaultBaudRate Int?
+  defaultPolling  Int?     // ms
+  firmwareUrl     String?
+  configTemplate  String?  // JSON config template
+  notes           String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant?  @relation(fields: [tenantId], references: [id])
+}
+
+// =====================================================
+// ATG PROFILES
+// =====================================================
+
+model ATGProfile {
+  id              String   @id @default(cuid())
+  tenantId        String?
+  manufacturer    String   // veeder_root, opw, franklin, hectronic, gilbarco
+  modelName       String
+  atgType         String   // magnetostrictive, capacitive, ultrasonic, radar
+  probeTypes      String?  // JSON: magnetostrictive, capacitive
+  maxProbes       Int      @default(8)
+  communicationTypes String? // JSON
+  protocol        String?
+  defaultPort     Int?
+  defaultBaudRate Int?
+  features        String?  // JSON: leak_detection, overfill, water_detection, temperature
+  configTemplate  String?
+  notes           String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant?  @relation(fields: [tenantId], references: [id])
+}
+
+// =====================================================
+// FUEL TRANSFERS & ADVANCED WET STOCK
+// =====================================================
+
+model FuelTransfer {
+  id              String   @id @default(cuid())
+  stationId       String
+  fromTankId      String?
+  toTankId        String?
+  fuelType        String
+  volume          Float
+  reason          String   // tank_maintenance, stock_rebalance, emergency, overflow_prevention
+  status          String   @default("pending") // pending, approved, in_progress, completed, cancelled
+  approvedBy      String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  variance        Float?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  station         Station  @relation(fields: [stationId], references: [id])
+  fromTank        Tank?    @relation("TransferFrom", fields: [fromTankId], references: [id])
+  toTank          Tank?    @relation("TransferTo", fields: [toTankId], references: [id])
+}
+
+model TheftAlert {
+  id              String   @id @default(cuid())
+  stationId       String
+  tankId          String?
+  dispenserId     String?
+  nozzleId        String?
+  detectionType   String   // meter_manipulation, unauthorized_fueling, variance_exceeded, after_hours, volume_anomaly
+  severity        String   @default("critical") // warning, critical
+  estimatedVolume Float?
+  estimatedLoss   Float?   // PKR
+  evidence        String?  // JSON evidence data
+  isInvestigated  Boolean  @default(false)
+  investigatedBy  String?
+  investigationNotes String?
+  isConfirmed     Boolean?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  station         Station  @relation(fields: [stationId], references: [id])
+}
+
+model ShrinkageRecord {
+  id              String   @id @default(cuid())
+  stationId       String
+  tankId          String
+  periodStart     DateTime
+  periodEnd       DateTime
+  openingStock    Float
+  deliveries      Float    @default(0)
+  salesVolume     Float    @default(0)
+  expectedClosing Float
+  actualClosing   Float
+  shrinkage       Float
+  shrinkagePercent Float
+  temperatureVariance Float?
+  densityVariance Float?
+  cause           String?  // evaporation, temperature, measurement_error, leak, theft, unknown
+  isReviewed      Boolean  @default(false)
+  reviewedBy      String?
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  station         Station  @relation(fields: [stationId], references: [id])
+  tank            Tank     @relation(fields: [tankId], references: [id])
+}
+
+// =====================================================
+// ADVANCED FINANCE - GL, AR, AP, TAX
+// =====================================================
+
+model GLAccount {
+  id              String   @id @default(cuid())
+  tenantId        String
+  accountCode     String
+  accountName     String
+  accountType     String   // asset, liability, equity, revenue, expense
+  subType         String?  // current_asset, fixed_asset, current_liability, etc.
+  parentAccountId String?
+  balance         Float    @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model JournalEntry {
+  id              String   @id @default(cuid())
+  tenantId        String
+  stationId       String?
+  entryNumber     String
+  entryDate       DateTime
+  description     String?
+  referenceType   String?  // fueling, retail, expense, delivery, invoice, payment
+  referenceId     String?
+  totalDebit      Float    @default(0)
+  totalCredit     Float    @default(0)
+  status          String   @default("draft") // draft, posted, reversed
+  postedAt        DateTime?
+  postedBy        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  station         Station? @relation(fields: [stationId], references: [id])
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  lines           JournalLine[]
+}
+
+model JournalLine {
+  id              String   @id @default(cuid())
+  journalEntryId  String
+  glAccountId     String
+  debit           Float    @default(0)
+  credit          Float    @default(0)
+  description     String?
+  createdAt       DateTime @default(now())
+
+  journalEntry    JournalEntry @relation(fields: [journalEntryId], references: [id])
+}
+
+model AccountReceivable {
+  id              String   @id @default(cuid())
+  tenantId        String
+  stationId       String?
+  customerId      String?  // Fleet account or customer
+  invoiceNumber   String?
+  amount          Float
+  paidAmount      Float    @default(0)
+  balance         Float
+  dueDate         DateTime
+  status          String   @default("open") // open, partial, paid, overdue, written_off
+  agingDays       Int      @default(0)
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model AccountPayable {
+  id              String   @id @default(cuid())
+  tenantId        String
+  stationId       String?
+  supplierId      String?
+  invoiceNumber   String?
+  amount          Float
+  paidAmount      Float    @default(0)
+  balance         Float
+  dueDate         DateTime
+  status          String   @default("open") // open, partial, paid, overdue
+  agingDays       Int      @default(0)
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model TaxConfig {
+  id              String   @id @default(cuid())
+  tenantId        String
+  taxName         String
+  taxType         String   // sales_tax, fuel_levy, excise_duty, gst, vat, withholding
+  rate            Float    // percentage
+  applicableTo    String   // fuel, retail, all
+  fuelType        String?
+  isCompound      Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  effectiveFrom   DateTime
+  effectiveTo     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model CashDrawer {
+  id              String   @id @default(cuid())
+  stationId       String
+  shiftId         String?
+  drawerNumber    String
+  openingBalance  Float    @default(0)
+  cashSales       Float    @default(0)
+  cardSales       Float    @default(0)
+  otherReceipts   Float    @default(0)
+  safeDrops       Float    @default(0)
+  cashPayments    Float    @default(0)
+  closingBalance  Float?
+  variance        Float?
+  status          String   @default("open") // open, closed, counted
+  lastCountedAt   DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  station         Station  @relation(fields: [stationId], references: [id])
+}
+
+model SafeDrop {
+  id              String   @id @default(cuid())
+  stationId       String
+  shiftId         String?
+  drawerId        String?
+  amount          Float
+  reason          String?
+  performedBy     String?
+  witnessedBy     String?
+  createdAt       DateTime @default(now())
+
+  station         Station  @relation(fields: [stationId], references: [id])
+}
+
+// =====================================================
+// LOYALTY ENGINE & CRM ADVANCED
+// =====================================================
+
+model LoyaltyTransaction {
+  id              String   @id @default(cuid())
+  tenantId        String
+  customerId      String
+  stationId       String?
+  pointsEarned    Int      @default(0)
+  pointsRedeemed  Int      @default(0)
+  balanceAfter    Int
+  transactionType String   // earn, redeem, bonus, expiry, adjustment
+  referenceType   String?  // fueling, retail, promotion, manual
+  referenceId     String?
+  description     String?
+  createdAt       DateTime @default(now())
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model GiftCard {
+  id              String   @id @default(cuid())
+  tenantId        String
+  cardNumber      String   @unique
+  initialBalance  Float
+  currentBalance  Float
+  currency        String   @default("PKR")
+  purchaserName   String?
+  recipientName   String?
+  isActivated     Boolean  @default(false)
+  activatedAt     DateTime?
+  expiryDate      DateTime?
+  lastUsedAt      DateTime?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model CustomerComplaint {
+  id              String   @id @default(cuid())
+  tenantId        String
+  stationId       String?
+  customerId      String?
+  complainantName String
+  complainantPhone String?
+  category        String   // fuel_quality, service, pricing, equipment, billing, safety, other
+  priority        String   @default("normal") // low, normal, high, urgent
+  description     String
+  status          String   @default("open") // open, investigating, resolved, closed, escalated
+  assignedTo      String?
+  resolution      String?
+  resolvedAt      DateTime?
+  followUpDate    DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+// =====================================================
+// CNG COMPRESSOR & STORAGE
+// =====================================================
+
+model CNGCompressor {
+  id              String   @id @default(cuid())
+  stationId       String
+  name            String
+  code            String
+  manufacturer    String?
+  model           String?
+  serialNumber    String?
+  communicationType String @default("tcpip")
+  ipAddress       String?
+  port            Int?
+  protocol        String?
+  stages          Int      @default(3)
+  inputPressure   Float?
+  outputPressure  Float?
+  currentPressure Float?
+  temperature     Float?
+  motorStatus     String   @default("off") // on, off, fault
+  runHours        Float    @default(0)
+  gasConsumption  Float?
+  isActive        Boolean  @default(true)
+  status          String   @default("idle") // idle, compressing, fault, maintenance, offline
+  lastServiceDate DateTime?
+  nextServiceDate DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  station         Station  @relation(fields: [stationId], references: [id])
+}
+
+model CNGStorage {
+  id              String   @id @default(cuid())
+  stationId       String
+  name            String
+  code            String
+  storageType     String   @default("cascade") // cascade, buffer, high_pressure
+  capacity        Float    // cubic meters
+  currentLevel    Float    @default(0)
+  pressure        Float?
+  maxPressure     Float?
+  temperature     Float?
+  status          String   @default("normal") // normal, low, critical, offline
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  station         Station  @relation(fields: [stationId], references: [id])
+}
+
+// =====================================================
+// REPORT BUILDER & SCHEDULER
+// =====================================================
+
+model ReportTemplate {
+  id              String   @id @default(cuid())
+  tenantId        String
+  name            String
+  description     String?
+  reportType      String   // daily_sales, shift_summary, fuel_variance, wet_stock, financial, compliance, custom
+  category        String?  // operations, finance, compliance, management
+  dataSource      String   // JSON: tables and joins
+  columns         String   // JSON: column definitions
+  filters         String?  // JSON: filter definitions
+  groupBy         String?  // JSON
+  sortBy          String?  // JSON
+  chartType       String?  // bar, line, pie, table
+  isSystem        Boolean  @default(false)
+  isPublic        Boolean  @default(false)
+  createdBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model ScheduledReport {
+  id              String   @id @default(cuid())
+  tenantId        String
+  reportTemplateId String
+  scheduleType    String   // daily, weekly, monthly, quarterly
+  scheduleTime    String?  // "09:00"
+  scheduleDay     Int?     // day of week/month
+  recipients      String   // JSON array of emails
+  format          String   @default("pdf") // pdf, excel, csv
+  lastRunAt       DateTime?
+  nextRunAt       DateTime?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+// =====================================================
+// API KEYS & WEBHOOKS
+// =====================================================
+
+model APIKey {
+  id              String   @id @default(cuid())
+  tenantId        String
+  keyHash         String   @unique
+  keyPrefix       String   // first 8 chars for identification
+  name            String
+  permissions     String?  // JSON: allowed endpoints
+  allowedIPs      String?  // JSON: IP whitelist
+  rateLimit       Int      @default(1000) // requests per hour
+  usageCount      Int      @default(0)
+  lastUsedAt      DateTime?
+  expiresAt       DateTime?
+  isActive        Boolean  @default(true)
+  createdBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model WebhookEndpoint {
+  id              String   @id @default(cuid())
+  tenantId        String
+  url             String
+  name            String
+  events          String   // JSON array of event types
+  secret          String?
+  isActive        Boolean  @default(true)
+  lastTriggeredAt DateTime?
+  successCount    Int      @default(0)
+  failureCount    Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  deliveries      WebhookDelivery[]
+}
+
+model WebhookDelivery {
+  id              String   @id @default(cuid())
+  webhookId       String
+  event           String
+  payload         String   // JSON
+  statusCode      Int?
+  response        String?
+  isSuccess       Boolean  @default(false)
+  retryCount      Int      @default(0)
+  deliveredAt     DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  webhook         WebhookEndpoint @relation(fields: [webhookId], references: [id])
+}
+
+// =====================================================
+// NOZZLE MONITORING & ADVANCED EVENTS
+// =====================================================
+
+model NozzleEvent {
+  id              String   @id @default(cuid())
+  stationId       String
+  nozzleId        String
+  eventType       String   // nozzle_up, nozzle_down, fueling_start, fueling_end, unauthorized, lock, unlock, disable, enable, error
+  volume          Float?
+  meterReading    Float?
+  fuelType        String?
+  attendantId     String?
+  vehiclePlate    String?
+  rfidTag         String?
+  isAuthorized    Boolean  @default(true)
+  dataJson        String?
+  createdAt       DateTime @default(now())
+
+  station         Station  @relation(fields: [stationId], references: [id])
+  nozzle          Nozzle   @relation(fields: [nozzleId], references: [id])
+}
+
+// =====================================================
+// SHIFT HANDOVER
+// =====================================================
+
+model ShiftHandover {
+  id              String   @id @default(cuid())
+  stationId       String
+  fromShiftId     String
+  toShiftId       String
+  fromAttendantId String
+  toAttendantId   String
+  cashHandedOver  Float
+  cashExpected    Float
+  cashVariance    Float
+  pumpReadings    String?  // JSON: nozzle readings at handover
+  openIssues      String?  // JSON
+  notes           String?
+  status          String   @default("pending") // pending, accepted, disputed
+  acceptedAt      DateTime?
+  createdAt       DateTime @default(now())
+
+  station         Station  @relation(fields: [stationId], references: [id])
+}
+
+// =====================================================
 // AI & ANALYTICS
 // =====================================================
 
@@ -1074,4 +2545,251 @@ model AIForecast {
   periodStart DateTime
   periodEnd   DateTime
   createdAt   DateTime @default(now())
+}
+
+// =====================================================
+// OWNER MODULE — ERP Vendor Management Console
+// =====================================================
+
+model OwnerClient {
+  id              String   @id @default(cuid())
+  companyName     String
+  slug            String   @unique
+  contactPerson   String
+  email           String
+  phone           String
+  address         String?
+  city            String?
+  state           String?
+  country         String   @default("Pakistan")
+  postalCode      String?
+  website         String?
+  taxId           String?
+  registrationNumber String?
+  logo            String?
+  industry        String?
+  notes           String?
+  status          String   @default("active")  // active, suspended, churned, trial
+  databaseUrl     String?  // Full connection URL to the tenant's dedicated Neon database
+  databaseName    String?  // Name of the tenant's dedicated database (e.g., ff_tenant_abc123)
+  databaseStatus  String   @default("pending")  // pending, provisioning, active, error, suspended
+  onboardedAt     DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  subscriptions   ClientSubscription[]
+  invoices        Invoice[]
+  quotations      Quotation[]
+  licenseKeys     LicenseKey[]
+  devices         ClientDevice[]
+  tenantDatabase  TenantDatabase?
+}
+
+// =====================================================
+// MULTI-TENANT DATABASE TRACKING
+// =====================================================
+
+model TenantDatabase {
+  id              String   @id @default(cuid())
+  clientId        String   @unique
+  databaseName    String   @unique  // e.g., ff_tenant_abc123
+  databaseUrl     String   // Full connection URL (pooler)
+  directUrl       String   // Direct connection URL (for migrations)
+  status          String   @default("pending")  // pending, provisioning, provisioning_schema, active, error, suspended, deleted
+  neonBranchId    String?  // Neon branch ID if applicable
+  schemaVersion   String?  // Track which schema version is deployed
+  lastMigratedAt  DateTime?
+  totalSize       String?  // Human-readable database size
+  tableCount      Int      @default(0)
+  rowCounts       String?  // JSON: { "stations": 5, "users": 12, ... }
+  errorMessage    String?
+  provisionedAt   DateTime?
+  activatedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  client          OwnerClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+model SubscriptionPlan {
+  id              String   @id @default(cuid())
+  name            String   @unique  // Starter, Professional, Enterprise
+  slug            String   @unique
+  description     String?
+  priceMonthly    Float
+  priceAnnual     Float
+  currency        String   @default("PKR")
+  maxStations     Int      @default(1)
+  maxDispensers   Int      @default(4)
+  maxUsers        Int      @default(5)
+  maxDevices      Int      @default(10)
+  features        String   // JSON string of features list
+  isPopular       Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  subscriptions   ClientSubscription[]
+  licenseKeys     LicenseKey[]
+}
+
+model ClientSubscription {
+  id              String   @id @default(cuid())
+  clientId        String
+  planId          String
+  status          String   @default("active")  // active, past_due, cancelled, trial, expired
+  billingCycle    String   @default("monthly")  // monthly, annual
+  startDate       DateTime
+  endDate         DateTime?
+  trialEnd        DateTime?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  cancelledAt     DateTime?
+  autoRenew       Boolean  @default(true)
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  client          OwnerClient      @relation(fields: [clientId], references: [id])
+  plan            SubscriptionPlan @relation(fields: [planId], references: [id])
+  invoices        Invoice[]
+}
+
+model Invoice {
+  id              String   @id @default(cuid())
+  invoiceNumber   String   @unique
+  clientId        String
+  subscriptionId  String?
+  status          String   @default("draft")  // draft, sent, paid, partial, overdue, cancelled
+  issueDate       DateTime
+  dueDate         DateTime
+  paidDate        DateTime?
+  subtotal        Float
+  taxRate         Float    @default(0)
+  taxAmount       Float    @default(0)
+  discountRate    Float    @default(0)
+  discountAmount  Float    @default(0)
+  total           Float
+  paidAmount      Float    @default(0)
+  balanceDue      Float
+  currency        String   @default("PKR")
+  notes           String?
+  terms           String?
+  pdfUrl          String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  client          OwnerClient         @relation(fields: [clientId], references: [id])
+  subscription    ClientSubscription? @relation(fields: [subscriptionId], references: [id])
+  items           InvoiceItem[]
+  payments        InvoicePayment[]
+}
+
+model InvoiceItem {
+  id              String   @id @default(cuid())
+  invoiceId       String
+  description     String
+  quantity        Float    @default(1)
+  unitPrice       Float
+  amount          Float
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  invoice         Invoice  @relation(fields: [invoiceId], references: [id])
+}
+
+model InvoicePayment {
+  id              String   @id @default(cuid())
+  invoiceId       String
+  amount          Float
+  method          String   // cash, bank_transfer, card, cheque, online
+  reference       String?
+  paidAt          DateTime @default(now())
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  invoice         Invoice  @relation(fields: [invoiceId], references: [id])
+}
+
+model Quotation {
+  id              String   @id @default(cuid())
+  quotationNumber String   @unique
+  clientId        String?
+  clientName      String
+  clientEmail     String?
+  clientPhone     String?
+  clientAddress   String?
+  status          String   @default("draft")  // draft, sent, accepted, rejected, expired, converted
+  issueDate       DateTime
+  validUntil      DateTime
+  subtotal        Float
+  taxRate         Float    @default(0)
+  taxAmount       Float    @default(0)
+  discountRate    Float    @default(0)
+  discountAmount  Float    @default(0)
+  total           Float
+  currency        String   @default("PKR")
+  notes           String?
+  terms           String?
+  internalNotes   String?
+  pdfUrl          String?
+  convertedInvoiceId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  client          OwnerClient?  @relation(fields: [clientId], references: [id])
+  items           QuotationItem[]
+}
+
+model QuotationItem {
+  id              String   @id @default(cuid())
+  quotationId     String
+  description     String
+  quantity        Float    @default(1)
+  unitPrice       Float
+  amount          Float
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  quotation       Quotation @relation(fields: [quotationId], references: [id])
+}
+
+model LicenseKey {
+  id              String   @id @default(cuid())
+  key             String   @unique
+  clientId        String?
+  planId          String?
+  status          String   @default("available")  // available, assigned, revoked, expired
+  maxStations     Int      @default(1)
+  maxDispensers   Int      @default(4)
+  maxUsers        Int      @default(5)
+  assignedAt      DateTime?
+  revokedAt       DateTime?
+  expiresAt       DateTime?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  client          OwnerClient?      @relation(fields: [clientId], references: [id])
+  plan            SubscriptionPlan? @relation(fields: [planId], references: [id])
+}
+
+model ClientDevice {
+  id              String   @id @default(cuid())
+  clientId        String
+  deviceName      String
+  deviceType      String   // pos, dispenser_controller, atg, payment_terminal, scanner, other
+  serialNumber    String?
+  macAddress      String?
+  ipAddress       String?
+  location        String?
+  status          String   @default("active")  // active, inactive, maintenance
+  activatedAt     DateTime @default(now())
+  lastSeenAt      DateTime?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  client          OwnerClient @relation(fields: [clientId], references: [id])
 }

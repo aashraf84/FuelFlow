@@ -1,0 +1,2002 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useCallback } from 'react'
+     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→import {
+     6→  Cpu, Wifi, WifiOff, CreditCard, Zap, Camera, Flame, Gauge,
+     7→  CloudSun, Truck, Car, Wind, Fan, FileText, Terminal, RefreshCw,
+     8→  AlertTriangle, CheckCircle2, XCircle, Clock, ArrowUpDown, Filter,
+     9→  Search, Plus, Settings, Pencil, Trash2, ChevronDown, ChevronRight,
+    10→  ChevronUp, Activity, Server, Monitor, Shield, Radio, Link2,
+    11→  Send, Command, Eye, Lock, Unlock, Play, Square, RotateCcw,
+    12→  Thermometer, Droplets, Battery, Signal, HardDrive, Database,
+    13→  Plug, Cable, LayoutGrid, List, Verified, Info, Wrench,
+    14→  Fuel, GaugeCircle, RadioTower, Cable as CableIcon, Receipt,
+    15→} from 'lucide-react'
+    16→import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+    17→import { Badge } from '@/components/ui/badge'
+    18→import { Button } from '@/components/ui/button'
+    19→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    20→import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+    21→import { Input } from '@/components/ui/input'
+    22→import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+    23→import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+    24→import { ScrollArea } from '@/components/ui/scroll-area'
+    25→import { Separator } from '@/components/ui/separator'
+    26→import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+    27→import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+    28→import { Textarea } from '@/components/ui/textarea'
+    29→import { Label } from '@/components/ui/label'
+    30→import { Switch } from '@/components/ui/switch'
+    31→import { Progress } from '@/components/ui/progress'
+    32→
+    33→// ═══════════════════════════════════════════════════════
+    34→// TYPES
+    35→// ═══════════════════════════════════════════════════════
+    36→
+    37→interface ForecourtController {
+    38→  id: string; name: string; code: string; controllerType: string; manufacturer?: string | null
+    39→  model?: string | null; serialNumber?: string | null; firmwareVersion?: string | null
+    40→  communicationType: string; ipAddress?: string | null; port?: number | null; baudRate?: number | null
+    41→  comPort?: string | null; protocol?: string | null; pollingInterval: number; timeout: number
+    42→  maxDispensers: number; connectedDispensers: number; status: string; lastHeartbeat?: string | null
+    43→  lastCommunication?: string | null; isActive: boolean; dispensers?: Dispenser[]; eventLogs?: DeviceEventLog[]
+    44→}
+    45→
+    46→interface Dispenser {
+    47→  id: string; name: string; code: string; manufacturer?: string | null; model?: string | null
+    48→  serialNumber?: string | null; controllerType?: string | null; forecourtControllerId?: string | null
+    49→  communicationType?: string | null; ipAddress?: string | null; port?: number | null
+    50→  pumpLane: number; pumpAddress?: number | null; protocol?: string | null; nozzleCount: number
+    51→  flowRate?: number | null; supportedFuels?: string | null; firmwareVersion?: string | null
+    52→  lastMeterReading: number; status: string; lastCommunication?: string | null
+    53→  isActive: boolean; forecourtController?: { id: string; name: string; controllerType: string; status: string } | null
+    54→  nozzles?: NozzleData[]; recentFuelings?: FuelingData[]
+    55→}
+    56→
+    57→interface NozzleData { id: string; nozzleNumber: number; fuelType: string; status: string; totalVolume?: number }
+    58→
+    59→interface FuelingData { id: string; volume: number; amount: number; fuelType: string; createdAt: string }
+    60→
+    61→interface TankATG {
+    62→  id: string; name: string; code: string; capacity: number; currentLevel: number
+    63→  waterLevel: number; temperature: number; fuelType: string; atgType?: string | null
+    64→  atgIpAddress?: string | null; atgPort?: number | null; status: string
+    65→  tankReadings?: { level: number; volume: number; temperature: number; readingAt: string }[]
+    66→}
+    67→
+    68→interface PaymentTerminal {
+    69→  id: string; name: string; code: string; terminalType: string; manufacturer?: string | null
+    70→  model?: string | null; serialNumber?: string | null; firmwareVersion?: string | null
+    71→  communicationType: string; ipAddress?: string | null; port?: number | null
+    72→  protocol?: string | null; merchantId?: string | null; terminalId?: string | null
+    73→  status: string; isActive: boolean; transactionCount: number
+    74→}
+    75→
+    76→interface GenericDevice {
+    77→  id: string; name: string; code: string; manufacturer?: string | null; model?: string | null
+    78→  serialNumber?: string | null; status: string; isActive: boolean; ipAddress?: string | null
+    79→  port?: number | null; protocol?: string | null; communicationType?: string | null
+    80→  [key: string]: unknown
+    81→}
+    82→
+    83→interface DeviceEventLog {
+    84→  id: string; deviceType: string; deviceId: string; eventType: string
+    85→  severity: string; message: string; createdAt: string; dataJson?: string | null
+    86→}
+    87→
+    88→interface DeviceCommand {
+    89→  id: string; deviceType: string; deviceId: string; command: string
+    90→  parameters?: string | null; priority: string; status: string
+    91→  sentAt?: string | null; acknowledgedAt?: string | null; responseJson?: string | null
+    92→  retryCount: number; createdAt: string
+    93→}
+    94→
+    95→interface CatalogItem {
+    96→  id: string; manufacturer: string; modelName: string; protocol?: string | null
+    97→  verified?: boolean; [key: string]: unknown
+    98→}
+    99→
+   100→interface DispenserProfile {
+   101→  id: string; manufacturer: string; modelName: string; maxNozzles: number
+   102→  flowRate?: number | null; protocol?: string | null; supportedFuels?: string | null
+   103→  pumpTypes?: string | null; communicationTypes?: string | null
+   104→}
+   105→
+   106→interface ControllerProfile {
+   107→  id: string; manufacturer: string; modelName: string; controllerType: string
+   108→  supportedProtocols?: string | null; maxDispensers: number; maxNozzlesPerPump: number
+   109→  communicationTypes?: string | null; defaultPort?: number | null; defaultBaudRate?: number | null
+   110→  defaultPollingMs?: number | null; features?: string | null
+   111→}
+   112→
+   113→interface ATGProfile {
+   114→  id: string; manufacturer: string; modelName: string; atgType: string
+   115→  maxProbes: number; protocol?: string | null; features?: string | null
+   116→}
+   117→
+   118→// ═══════════════════════════════════════════════════════
+   119→// CONSTANTS
+   120→// ═══════════════════════════════════════════════════════
+   121→
+   122→const PROTOCOLS = ['IFSF', 'Patrius', 'DFS', 'Wayne DART', 'Gilbarco G-Site', 'MODBUS', 'ONVIF', 'ISO 8583', 'NAC', 'TMS', 'OMPI']
+   123→const COMM_TYPES = ['TCP/IP', 'RS232', 'RS485', 'Ethernet', 'MQTT']
+   124→const DISPENSER_MANUFACTURERS = ['Gilbarco (Veeder-Root)', 'Wayne', 'Tatsuno', 'Tokheim', 'Bennett', 'Petrotec', 'Scheidt & Bachmann']
+   125→const CONTROLLER_TYPES = [
+   126→  { value: 'pts', label: 'PTS Over_Controller' }, { value: 'doms', label: 'DOMS DC' },
+   127→  { value: 'fusion', label: 'Fusion FCM' }, { value: 'hectronic', label: 'Hectronic FCC' },
+   128→  { value: 'wayne', label: 'Wayne Site Controller' }, { value: 'gilbarco', label: 'Gilbarco G-Site' },
+   129→  { value: 'tokheim', label: 'Tokheim TC-400' }, { value: 'scheidt_bachmann', label: 'Scheidt & Bachmann FMP' },
+   130→]
+   131→const TERMINAL_TYPES = ['POS', 'EFTPOS', 'mPOS', 'Self-Checkout', 'Pay at Pump']
+   132→const TERMINAL_MANUFACTURERS = ['Ingenico', 'Verifone', 'PAX', 'Nexgo', 'Castles']
+   133→const FUEL_TYPES = ['Petrol (RON-92)', 'Petrol (RON-95)', 'Petrol (RON-97)', 'Diesel (HSD)', 'Premium Diesel', 'CNG', 'LPG']
+   134→
+   135→const CONTROLLER_COMMANDS = ['AUTHORIZE_PUMP', 'STOP_PUMP', 'READ_STATUS', 'CHANGE_PRICE', 'LOCK_PUMP', 'UNLOCK_PUMP', 'RESET_PUMP', 'READ_METER', 'READ_SALES', 'SET_PRESET']
+   136→const TERMINAL_COMMANDS = ['INITIATE_PAYMENT', 'REFUND', 'RECONCILE', 'SETTLE', 'TEST']
+   137→const GENERATOR_COMMANDS = ['START', 'STOP', 'TEST', 'READ_STATUS']
+   138→const CAMERA_COMMANDS = ['PTZ_MOVE', 'SNAPSHOT', 'START_RECORDING']
+   139→const FIRE_ALARM_COMMANDS = ['TEST_ZONE', 'RESET_ZONE', 'ACKNOWLEDGE_ALARM']
+   140→
+   141→const STATUS_COLORS: Record<string, string> = {
+   142→  online: 'bg-emerald-500', running: 'bg-emerald-500', idle: 'bg-emerald-500',
+   143→  normal: 'bg-emerald-500', recording: 'bg-emerald-500', standby: 'bg-amber-500',
+   144→  washing: 'bg-emerald-500', fueling: 'bg-amber-500', authorized: 'bg-amber-500',
+   145→  busy: 'bg-amber-500', moving: 'bg-amber-500', parked: 'bg-amber-500',
+   146→  offline: 'bg-gray-500', error: 'bg-red-500', fault: 'bg-red-500',
+   147→  alarm: 'bg-red-500', locked: 'bg-red-500', stopped: 'bg-red-500',
+   148→  maintenance: 'bg-amber-500', test: 'bg-amber-500',
+   149→}
+   150→
+   151→const STATUS_TEXT_COLORS: Record<string, string> = {
+   152→  online: 'text-emerald-400', running: 'text-emerald-400', idle: 'text-emerald-400',
+   153→  normal: 'text-emerald-400', recording: 'text-emerald-400', standby: 'text-amber-400',
+   154→  offline: 'text-gray-400', error: 'text-red-400', fault: 'text-red-400',
+   155→  alarm: 'text-red-400', locked: 'text-red-400', stopped: 'text-red-400',
+   156→  maintenance: 'text-amber-400', fueling: 'text-amber-400',
+   157→}
+   158→
+   159→const SEVERITY_STYLES: Record<string, { bg: string; text: string; border: string }> = {
+   160→  info: { bg: 'bg-sky-500/10', text: 'text-sky-400', border: 'border-sky-500/30' },
+   161→  warning: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30' },
+   162→  error: { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/30' },
+   163→  critical: { bg: 'bg-red-600/20', text: 'text-red-300', border: 'border-red-600/50' },
+   164→}
+   165→
+   166→// ═══════════════════════════════════════════════════════
+   167→// HELPERS
+   168→// ═══════════════════════════════════════════════════════
+   169→
+   170→const API = '/api/hardware'
+   171→
+   172→async function fetchApi(action: string, params?: Record<string, string>) {
+   173→  const url = new URL(API, window.location.origin)
+   174→  url.searchParams.set('action', action)
+   175→  if (params) Object.entries(params).forEach(([k, v]) => { if (v) url.searchParams.set(k, v) })
+   176→  const res = await fetch(url.toString())
+   177→  if (!res.ok) throw new Error(`API error: ${res.status}`)
+   178→  return res.json()
+   179→}
+   180→
+   181→async function postApi(action: string, body: Record<string, unknown>) {
+   182→  const res = await fetch(API, {
+   183→    method: 'POST',
+   184→    headers: { 'Content-Type': 'application/json' },
+   185→    body: JSON.stringify({ action, ...body }),
+   186→  })
+   187→  if (!res.ok) throw new Error(`API error: ${res.status}`)
+   188→  return res.json()
+   189→}
+   190→
+   191→async function deleteApi(action: string, id: string) {
+   192→  const url = new URL(API, window.location.origin)
+   193→  url.searchParams.set('action', action)
+   194→  url.searchParams.set('id', id)
+   195→  const res = await fetch(url.toString(), { method: 'DELETE' })
+   196→  if (!res.ok) throw new Error(`API error: ${res.status}`)
+   197→  return res.json()
+   198→}
+   199→
+   200→function StatusDot({ status }: { status: string }) {
+   201→  return <span className={`inline-block w-2 h-2 rounded-full ${STATUS_COLORS[status] ?? 'bg-gray-500'} ${status === 'alarm' || status === 'error' || status === 'fault' ? 'animate-pulse' : ''}`} />
+   202→}
+   203→
+   204→function StatusBadge({ status }: { status: string }) {
+   205→  return (
+   206→    <Badge variant="outline" className={`${STATUS_TEXT_COLORS[status] ?? 'text-gray-400'} border-current/30 text-xs`}>
+   207→      <StatusDot status={status} /> <span className="ml-1 capitalize">{status}</span>
+   208→    </Badge>
+   209→  )
+   210→}
+   211→
+   212→function SeverityBadge({ severity }: { severity: string }) {
+   213→  const s = SEVERITY_STYLES[severity] ?? SEVERITY_STYLES.info
+   214→  return (
+   215→    <Badge variant="outline" className={`${s.bg} ${s.text} ${s.border} text-xs ${severity === 'critical' ? 'animate-pulse' : ''}`}>
+   216→      {severity.toUpperCase()}
+   217→    </Badge>
+   218→  )
+   219→}
+   220→
+   221→function formatTime(dateStr?: string | null) {
+   222→  if (!dateStr) return '—'
+   223→  const d = new Date(dateStr)
+   224→  return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+   225→}
+   226→
+   227→function timeAgo(dateStr?: string | null) {
+   228→  if (!dateStr) return 'Never'
+   229→  const diff = Date.now() - new Date(dateStr).getTime()
+   230→  if (diff < 60000) return 'Just now'
+   231→  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`
+   232→  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`
+   233→  return `${Math.floor(diff / 86400000)}d ago`
+   234→}
+   235→
+   236→const fadeIn = { initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -8 } }
+   237→
+   238→// ═══════════════════════════════════════════════════════
+   239→// MAIN COMPONENT
+   240→// ═══════════════════════════════════════════════════════
+   241→
+   242→export default function DeviceIntegrationModule() {
+   243→  const [activeTab, setActiveTab] = useState('overview')
+   244→  const [loading, setLoading] = useState(true)
+   245→  const [refreshKey, setRefreshKey] = useState(0)
+   246→
+   247→  // ── Overview Data ──
+   248→  const [overview, setOverview] = useState<Record<string, { total: number; online: number; offline: number; error: number; items: unknown[] }> & { recentEvents?: DeviceEventLog[]; activeCommands?: DeviceCommand[] } | null>(null)
+   249→
+   250→  // ── Controllers ──
+   251→  const [controllers, setControllers] = useState<ForecourtController[]>([])
+   252→  const [selectedController, setSelectedController] = useState<ForecourtController | null>(null)
+   253→  const [controllerSheetOpen, setControllerSheetOpen] = useState(false)
+   254→  const [addControllerOpen, setAddControllerOpen] = useState(false)
+   255→  const [editControllerOpen, setEditControllerOpen] = useState(false)
+   256→  const [expandedControllers, setExpandedControllers] = useState<Set<string>>(new Set())
+   257→  const [controllerProfiles, setControllerProfiles] = useState<ControllerProfile[]>([])
+   258→
+   259→  // ── Dispensers ──
+   260→  const [dispensers, setDispensers] = useState<Dispenser[]>([])
+   261→  const [selectedDispenser, setSelectedDispenser] = useState<Dispenser | null>(null)
+   262→  const [dispenserSheetOpen, setDispenserSheetOpen] = useState(false)
+   263→  const [addDispenserOpen, setAddDispenserOpen] = useState(false)
+   264→  const [dispenserProfiles, setDispenserProfiles] = useState<DispenserProfile[]>([])
+   265→  const [dispenserManufacturerFilter, setDispenserManufacturerFilter] = useState('all')
+   266→  const [dispenserStatusFilter, setDispenserStatusFilter] = useState('all')
+   267→  const [dispenserControllerFilter, setDispenserControllerFilter] = useState('all')
+   268→
+   269→  // ── ATG ──
+   270→  const [atgTanks, setAtgTanks] = useState<TankATG[]>([])
+   271→  const [atgProfiles, setAtgProfiles] = useState<ATGProfile[]>([])
+   272→
+   273→  // ── Payment Terminals ──
+   274→  const [paymentTerminals, setPaymentTerminals] = useState<PaymentTerminal[]>([])
+   275→  const [addTerminalOpen, setAddTerminalOpen] = useState(false)
+   276→  const [editTerminal, setEditTerminal] = useState<PaymentTerminal | null>(null)
+   277→
+   278→  // ── Other Devices ──
+   279→  const [generators, setGenerators] = useState<GenericDevice[]>([])
+   280→  const [cameras, setCameras] = useState<GenericDevice[]>([])
+   281→  const [fireAlarms, setFireAlarms] = useState<GenericDevice[]>([])
+   282→  const [utilityMeters, setUtilityMeters] = useState<GenericDevice[]>([])
+   283→  const [weatherStations, setWeatherStations] = useState<GenericDevice[]>([])
+   284→  const [tankerTrackers, setTankerTrackers] = useState<GenericDevice[]>([])
+   285→  const [carWashes, setCarWashes] = useState<GenericDevice[]>([])
+   286→  const [airCompressors, setAirCompressors] = useState<GenericDevice[]>([])
+   287→  const [vacuumStations, setVacuumStations] = useState<GenericDevice[]>([])
+   288→  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['generators']))
+   289→
+   290→  // ── Commands ──
+   291→  const [commands, setCommands] = useState<DeviceCommand[]>([])
+   292→  const [commandDeviceType, setCommandDeviceType] = useState('forecourt_controller')
+   293→  const [commandDeviceId, setCommandDeviceId] = useState('')
+   294→  const [commandName, setCommandName] = useState('')
+   295→  const [commandParams, setCommandParams] = useState('')
+   296→
+   297→  // ── Events ──
+   298→  const [events, setEvents] = useState<DeviceEventLog[]>([])
+   299→  const [eventDeviceTypeFilter, setEventDeviceTypeFilter] = useState('all')
+   300→  const [eventSeverityFilter, setEventSeverityFilter] = useState('all')
+   301→
+   302→  // ── Catalog ──
+   303→  const [catalogData, setCatalogData] = useState<Record<string, CatalogItem[]> | null>(null)
+   304→  const [catalogCategory, setCatalogCategory] = useState('all')
+   305→  const [catalogSearch, setCatalogSearch] = useState('')
+   306→  const [catalogView, setCatalogView] = useState<'grid' | 'list'>('grid')
+   307→
+   308→  // ── Connection Test ──
+   309→  const [testResult, setTestResult] = useState<{ success: boolean; latency: number; message: string } | null>(null)
+   310→  const [testing, setTesting] = useState(false)
+   311→
+   312→  // ═══════════════════════════════════════════════════
+   313→  // DATA FETCHING
+   314→  // ═══════════════════════════════════════════════════
+   315→
+   316→  const fetchOverview = useCallback(async () => {
+   317→    try {
+   318→      const data = await fetchApi('overview')
+   319→      setOverview(data)
+   320→    } catch (e) { console.error('Overview fetch error:', e) }
+   321→  }, [])
+   322→
+   323→  const fetchControllers = useCallback(async () => {
+   324→    try {
+   325→      const data = await fetchApi('controllers')
+   326→      setControllers(Array.isArray(data) ? data : data.controllers ?? [])
+   327→    } catch (e) { console.error('Controllers fetch error:', e) }
+   328→  }, [])
+   329→
+   330→  const fetchDispensers = useCallback(async () => {
+   331→    try {
+   332→      const data = await fetchApi('dispensers')
+   333→      setDispensers(Array.isArray(data) ? data : data.dispensers ?? [])
+   334→    } catch (e) { console.error('Dispensers fetch error:', e) }
+   335→  }, [])
+   336→
+   337→  const fetchATGs = useCallback(async () => {
+   338→    try {
+   339→      const data = await fetchApi('atgs')
+   340→      setAtgTanks(data.tanks ?? [])
+   341→      setAtgProfiles(data.atgProfiles ?? [])
+   342→    } catch (e) { console.error('ATG fetch error:', e) }
+   343→  }, [])
+   344→
+   345→  const fetchPaymentTerminals = useCallback(async () => {
+   346→    try {
+   347→      const data = await fetchApi('payment_terminals')
+   348→      setPaymentTerminals(Array.isArray(data) ? data : data.terminals ?? [])
+   349→    } catch (e) { console.error('Terminals fetch error:', e) }
+   350→  }, [])
+   351→
+   352→  const fetchOtherDevices = useCallback(async () => {
+   353→    try {
+   354→      const [g, c, f, u, w, t, cw, ac, vs] = await Promise.all([
+   355→        fetchApi('generators'), fetchApi('cameras'), fetchApi('fire_alarms'),
+   356→        fetchApi('utility_meters'), fetchApi('weather_stations'), fetchApi('tanker_trackers'),
+   357→        fetchApi('car_washes'), fetchApi('air_compressors'), fetchApi('vacuum_stations'),
+   358→      ])
+   359→      setGenerators(g.devices ?? (Array.isArray(g) ? g : [])); setCameras(c.devices ?? (Array.isArray(c) ? c : [])); setFireAlarms(f.devices ?? (Array.isArray(f) ? f : [])); setUtilityMeters(u.devices ?? (Array.isArray(u) ? u : []))
+   360→      setWeatherStations(w.devices ?? (Array.isArray(w) ? w : [])); setTankerTrackers(t.devices ?? (Array.isArray(t) ? t : [])); setCarWashes(cw.devices ?? (Array.isArray(cw) ? cw : []))
+   361→      setAirCompressors(ac.devices ?? (Array.isArray(ac) ? ac : [])); setVacuumStations(vs.devices ?? (Array.isArray(vs) ? vs : []))
+   362→    } catch (e) { console.error('Other devices fetch error:', e) }
+   363→  }, [])
+   364→
+   365→  const fetchCommands = useCallback(async () => {
+   366→    try {
+   367→      const data = await fetchApi('commands')
+   368→      setCommands(Array.isArray(data) ? data : data.commands ?? [])
+   369→    } catch (e) { console.error('Commands fetch error:', e) }
+   370→  }, [])
+   371→
+   372→  const fetchEvents = useCallback(async () => {
+   373→    try {
+   374→      const data = await fetchApi('events', {
+   375→        ...(eventDeviceTypeFilter !== 'all' ? { deviceType: eventDeviceTypeFilter } : {}),
+   376→        ...(eventSeverityFilter !== 'all' ? { severity: eventSeverityFilter } : {}),
+   377→      })
+   378→      setEvents(Array.isArray(data) ? data : data.logs ?? [])
+   379→    } catch (e) { console.error('Events fetch error:', e) }
+   380→  }, [eventDeviceTypeFilter, eventSeverityFilter])
+   381→
+   382→  const fetchCatalog = useCallback(async () => {
+   383→    try {
+   384→      const data = await fetchApi('catalog', { category: catalogCategory })
+   385→      setCatalogData(Array.isArray(data) ? { all: data } : data.items ? { [catalogCategory]: data.items } : data)
+   386→    } catch (e) { console.error('Catalog fetch error:', e) }
+   387→  }, [catalogCategory])
+   388→
+   389→  const fetchProfiles = useCallback(async () => {
+   390→    try {
+   391→      const [cp, dp] = await Promise.all([fetchApi('controller_profiles'), fetchApi('dispenser_profiles')])
+   392→      setControllerProfiles(Array.isArray(cp) ? cp : cp.profiles ?? [])
+   393→      setDispenserProfiles(Array.isArray(dp) ? dp : dp.profiles ?? [])
+   394→    } catch (e) { console.error('Profiles fetch error:', e) }
+   395→  }, [])
+   396→
+   397→  // ── Initial Load & Tab Switching ──
+   398→  useEffect(() => {
+   399→    const loadAll = async () => {
+   400→      setLoading(true)
+   401→      await Promise.all([fetchOverview(), fetchProfiles()])
+   402→      setLoading(false)
+   403→    }
+   404→    loadAll()
+   405→  }, [fetchOverview, fetchProfiles, refreshKey])
+   406→
+   407→  useEffect(() => {
+   408→    const fetchers: Record<string, () => Promise<void>> = {
+   409→      overview: fetchOverview, catalog: fetchCatalog, controllers: fetchControllers,
+   410→      dispensers: fetchDispensers, atg: fetchATGs, payment: fetchPaymentTerminals,
+   411→      other: fetchOtherDevices, commands: fetchCommands, events: fetchEvents,
+   412→    }
+   413→    const fn = fetchers[activeTab]
+   414→    if (fn) fn()
+   415→  }, [activeTab, fetchOverview, fetchCatalog, fetchControllers, fetchDispensers, fetchATGs, fetchPaymentTerminals, fetchOtherDevices, fetchCommands, fetchEvents])
+   416→
+   417→  // Auto-refresh every 30 seconds
+   418→  useEffect(() => {
+   419→    const interval = setInterval(() => {
+   420→      if (activeTab === 'overview') fetchOverview()
+   421→      else if (activeTab === 'controllers') fetchControllers()
+   422→      else if (activeTab === 'dispensers') fetchDispensers()
+   423→      else if (activeTab === 'commands') fetchCommands()
+   424→    }, 30000)
+   425→    return () => clearInterval(interval)
+   426→  }, [activeTab, fetchOverview, fetchControllers, fetchDispensers, fetchCommands])
+   427→
+   428→  // ── Connection Test ──
+   429→  const handleTestConnection = useCallback(async (id: string, deviceType: string) => {
+   430→    setTesting(true); setTestResult(null)
+   431→    try {
+   432→      const result = await fetchApi('test_connection', { id, deviceType })
+   433→      setTestResult(result)
+   434→    } catch { setTestResult({ success: false, latency: 0, message: 'Connection failed' }) }
+   435→    setTesting(false)
+   436→  }, [])
+   437→
+   438→  // ── Send Command ──
+   439→  const handleSendCommand = useCallback(async () => {
+   440→    if (!commandDeviceId || !commandName) return
+   441→    try {
+   442→      await postApi('send_command', {
+   443→        deviceType: commandDeviceType, deviceId: commandDeviceId,
+   444→        command: commandName, parameters: commandParams || undefined,
+   445→      })
+   446→      setCommandName(''); setCommandParams('')
+   447→      fetchCommands()
+   448→    } catch (e) { console.error('Send command error:', e) }
+   449→  }, [commandDeviceType, commandDeviceId, commandName, commandParams, fetchCommands])
+   450→
+   451→  // ── Quick Action ──
+   452→  const handleQuickAction = useCallback(async (deviceType: string, deviceId: string, command: string) => {
+   453→    try {
+   454→      await postApi('send_command', { deviceType, deviceId, command, priority: 'high' })
+   455→      fetchCommands()
+   456→    } catch (e) { console.error('Quick action error:', e) }
+   457→  }, [fetchCommands])
+   458→
+   459→  // ── Toggle Section ──
+   460→  const toggleSection = (section: string) => {
+   461→    setExpandedSections(prev => {
+   462→      const next = new Set(prev)
+   463→      if (next.has(section)) next.delete(section); else next.add(section)
+   464→      return next
+   465→    })
+   466→  }
+   467→
+   468→  const toggleController = (id: string) => {
+   469→    setExpandedControllers(prev => {
+   470→      const next = new Set(prev)
+   471→      if (next.has(id)) next.delete(id); else next.add(id)
+   472→      return next
+   473→    })
+   474→  }
+   475→
+   476→  // ═══════════════════════════════════════════════════
+   477→  // FILTERED DATA
+   478→  // ═══════════════════════════════════════════════════
+   479→
+   480→  const filteredDispensers = dispensers.filter(d => {
+   481→    if (dispenserManufacturerFilter !== 'all' && d.manufacturer !== dispenserManufacturerFilter) return false
+   482→    if (dispenserStatusFilter !== 'all' && d.status !== dispenserStatusFilter) return false
+   483→    if (dispenserControllerFilter === 'assigned' && !d.forecourtControllerId) return false
+   484→    if (dispenserControllerFilter === 'unassigned' && d.forecourtControllerId) return false
+   485→    return true
+   486→  })
+   487→
+   488→  const filteredEvents = events.filter(e => {
+   489→    if (eventDeviceTypeFilter !== 'all' && e.deviceType !== eventDeviceTypeFilter) return false
+   490→    if (eventSeverityFilter !== 'all' && e.severity !== eventSeverityFilter) return false
+   491→    return true
+   492→  })
+   493→
+   494→  // ═══════════════════════════════════════════════════
+   495→  // RENDER HELPERS
+   496→  // ═══════════════════════════════════════════════════
+   497→
+   498→  const renderOtherDeviceSection = (
+   499→    key: string, label: string, icon: React.ElementType, items: GenericDevice[],
+   500→    createAction: string, updateAction: string, deleteAction: string,
+   501→    extraFields?: { key: string; label: string; type?: string }[]
+   502→  ) => {
+   503→    const Icon = icon
+   504→    const isExpanded = expandedSections.has(key)
+   505→    return (
+   506→      <div key={key} className="border border-border/40 rounded-lg">
+   507→        <button onClick={() => toggleSection(key)} className="flex items-center justify-between w-full p-4 hover:bg-muted/30 transition-colors">
+   508→          <div className="flex items-center gap-3">
+   509→            <Icon className="w-5 h-5 text-amber-500" />
+   510→            <span className="font-semibold">{label}</span>
+   511→            <Badge variant="outline" className="text-xs">{items.length}</Badge>
+   512→            <span className="text-xs text-emerald-400">{items.filter(i => ['online', 'running', 'idle', 'recording', 'normal', 'standby', 'washing'].includes(i.status)).length} online</span>
+   513→          </div>
+   514→          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+   515→        </button>
+   516→        <AnimatePresence>
+   517→          {isExpanded && (
+   518→            <motion.div {...fadeIn} className="p-4 pt-0">
+   519→              <div className="flex justify-end mb-3">
+   520→                <Dialog>
+   521→                  <DialogTrigger asChild>
+   522→                    <Button size="sm" className="bg-amber-600 hover:bg-amber-700"><Plus className="w-3 h-3 mr-1" /> Add {label.slice(0, -1)}</Button>
+   523→                  </DialogTrigger>
+   524→                  <DialogContent className="bg-gray-900 border-border/50">
+   525→                    <DialogHeader><DialogTitle>Add {label.slice(0, -1)}</DialogTitle></DialogHeader>
+   526→                    <form onSubmit={async (e) => {
+   527→                      e.preventDefault()
+   528→                      const fd = new FormData(e.currentTarget)
+   529→                      const body: Record<string, unknown> = {
+   530→                        name: fd.get('name') as string, code: (fd.get('name') as string)?.toUpperCase().replace(/\s+/g, '_'),
+   531→                        manufacturer: fd.get('manufacturer') as string, model: fd.get('model') as string,
+   532→                        serialNumber: fd.get('serialNumber') as string,
+   533→                        ipAddress: fd.get('ipAddress') as string,
+   534→                        port: fd.get('port') ? parseInt(fd.get('port') as string) : null,
+   535→                        protocol: fd.get('protocol') as string,
+   536→                      }
+   537→                      if (extraFields) extraFields.forEach(f => { const v = fd.get(f.key); body[f.key] = f.type === 'number' && v ? parseFloat(v as string) : v })
+   538→                      await postApi(createAction, body)
+   539→                      fetchOtherDevices()
+   540→                      ;(e.target as HTMLFormElement).reset()
+   541→                    }} className="space-y-3">
+   542→                      <div className="grid grid-cols-2 gap-3">
+   543→                        <div><Label>Name</Label><Input name="name" required className="bg-gray-800 border-border/50" /></div>
+   544→                        <div><Label>Manufacturer</Label><Input name="manufacturer" className="bg-gray-800 border-border/50" /></div>
+   545→                        <div><Label>Model</Label><Input name="model" className="bg-gray-800 border-border/50" /></div>
+   546→                        <div><Label>Serial #</Label><Input name="serialNumber" className="bg-gray-800 border-border/50" /></div>
+   547→                        <div><Label>IP Address</Label><Input name="ipAddress" className="bg-gray-800 border-border/50" /></div>
+   548→                        <div><Label>Port</Label><Input name="port" type="number" className="bg-gray-800 border-border/50" /></div>
+   549→                        <div><Label>Protocol</Label><Input name="protocol" className="bg-gray-800 border-border/50" /></div>
+   550→                        {extraFields?.map(f => (
+   551→                          <div key={f.key}><Label>{f.label}</Label><Input name={f.key} type={f.type ?? 'text'} className="bg-gray-800 border-border/50" /></div>
+   552→                        ))}
+   553→                      </div>
+   554→                      <Button type="submit" className="w-full bg-amber-600 hover:bg-amber-700">Create</Button>
+   555→                    </form>
+   556→                  </DialogContent>
+   557→                </Dialog>
+   558→              </div>
+   559→              {items.length === 0 ? (
+   560→                <div className="text-center py-6 text-muted-foreground text-sm">No {label.toLowerCase()} configured</div>
+   561→              ) : (
+   562→                <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
+   563→                  {items.map(item => (
+   564→                    <div key={item.id} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg border border-border/30">
+   565→                      <div className="flex items-center gap-3">
+   566→                        <StatusDot status={item.status} />
+   567→                        <div>
+   568→                          <p className="text-sm font-medium">{item.name}</p>
+   569→                          <p className="text-xs text-muted-foreground">{item.manufacturer ?? '—'} {item.model ?? ''}</p>
+   570→                        </div>
+   571→                      </div>
+   572→                      <div className="flex items-center gap-2">
+   573→                        <span className="text-xs text-muted-foreground">{item.ipAddress ?? 'No IP'}</span>
+   574→                        <StatusBadge status={item.status} />
+   575→                        <Button variant="ghost" size="sm" onClick={() => deleteApi(deleteAction, item.id).then(fetchOtherDevices)}>
+   576→                          <Trash2 className="w-3 h-3 text-red-400" />
+   577→                        </Button>
+   578→                      </div>
+   579→                    </div>
+   580→                  ))}
+   581→                </div>
+   582→              )}
+   583→            </motion.div>
+   584→          )}
+   585→        </AnimatePresence>
+   586→      </div>
+   587→    )
+   588→  }
+   589→
+   590→  // ═══════════════════════════════════════════════════
+   591→  // TAB 1: OVERVIEW DASHBOARD
+   592→  // ═══════════════════════════════════════════════════
+   593→
+   594→  const renderOverview = () => {
+   595→    if (!overview) return <div className="flex items-center justify-center py-20"><RefreshCw className="w-6 h-6 animate-spin text-amber-500" /></div>
+   596→    const cats = [
+   597→      { key: 'controllers', label: 'Controllers', icon: Server, data: overview.controllers },
+   598→      { key: 'dispensers', label: 'Dispensers', icon: Fuel, data: overview.dispensers },
+   599→      { key: 'atgs', label: 'ATGs', icon: Droplets, data: overview.atgs },
+   600→      { key: 'paymentTerminals', label: 'Payment', icon: CreditCard, data: overview.paymentTerminals },
+   601→      { key: 'generators', label: 'Generators', icon: Zap, data: overview.generators },
+   602→      { key: 'cameras', label: 'Cameras', icon: Camera, data: overview.cameras },
+   603→      { key: 'fireAlarms', label: 'Fire Alarms', icon: Flame, data: overview.fireAlarms },
+   604→      { key: 'utilityMeters', label: 'Meters', icon: Gauge, data: overview.utilityMeters },
+   605→      { key: 'weatherStations', label: 'Weather', icon: CloudSun, data: overview.weatherStations },
+   606→      { key: 'tankerTrackers', label: 'Trackers', icon: Truck, data: overview.tankerTrackers },
+   607→      { key: 'carWashes', label: 'Car Wash', icon: Car, data: overview.carWashes },
+   608→      { key: 'airCompressors', label: 'Air Comp.', icon: Wind, data: overview.airCompressors },
+   609→      { key: 'vacuumStations', label: 'Vacuum', icon: Fan, data: overview.vacuumStations },
+   610→    ]
+   611→
+   612→    const statusCards = [
+   613→      { label: 'Controllers Online', value: overview.controllers?.online ?? 0, total: overview.controllers?.total ?? 0, icon: Server, color: 'text-emerald-400' },
+   614→      { label: 'Dispensers Active', value: overview.dispensers?.online ?? 0, total: overview.dispensers?.total ?? 0, icon: Fuel, color: 'text-amber-400' },
+   615→      { label: 'ATGs Connected', value: overview.atgs?.online ?? 0, total: overview.atgs?.total ?? 0, icon: Droplets, color: 'text-sky-400' },
+   616→      { label: 'Alerts Today', value: overview.recentEvents?.filter(e => e.severity === 'error' || e.severity === 'critical').length ?? 0, total: null, icon: AlertTriangle, color: 'text-red-400' },
+   617→    ]
+   618→
+   619→    return (
+   620→      <motion.div {...fadeIn} className="space-y-6">
+   621→        {/* Status Cards */}
+   622→        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+   623→          {statusCards.map((sc, i) => (
+   624→            <motion.div key={sc.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+   625→              <Card className="bg-gray-900/80 border-border/40">
+   626→                <CardContent className="p-4">
+   627→                  <div className="flex items-center justify-between mb-2">
+   628→                    <sc.icon className={`w-5 h-5 ${sc.color}`} />
+   629→                    <span className="text-2xl font-bold">{sc.value}</span>
+   630→                  </div>
+   631→                  <p className="text-xs text-muted-foreground">{sc.label}</p>
+   632→                  {sc.total !== null && <Progress value={(sc.value / Math.max(sc.total, 1)) * 100} className="h-1 mt-2" />}
+   633→                </CardContent>
+   634→              </Card>
+   635→            </motion.div>
+   636→          ))}
+   637→        </div>
+   638→
+   639→        {/* Quick Actions */}
+   640→        <div className="flex flex-wrap gap-3">
+   641→          <Button size="sm" className="bg-amber-600 hover:bg-amber-700" onClick={() => { setActiveTab('controllers'); setAddControllerOpen(true) }}>
+   642→            <Plus className="w-3 h-3 mr-1" /> Add Controller
+   643→          </Button>
+   644→          <Button size="sm" variant="outline" onClick={() => { setActiveTab('dispensers'); setAddDispenserOpen(true) }}>
+   645→            <Plus className="w-3 h-3 mr-1" /> Add Dispenser
+   646→          </Button>
+   647→          <Button size="sm" variant="outline" onClick={() => setActiveTab('catalog')}>
+   648→            <Search className="w-3 h-3 mr-1" /> Search Hardware
+   649→          </Button>
+   650→          <Button size="sm" variant="outline" onClick={() => setRefreshKey(k => k + 1)}>
+   651→            <RefreshCw className="w-3 h-3 mr-1" /> Refresh
+   652→          </Button>
+   653→        </div>
+   654→
+   655→        {/* Device Category Grid */}
+   656→        <Card className="bg-gray-900/80 border-border/40">
+   657→          <CardHeader className="pb-3">
+   658→            <CardTitle className="text-base flex items-center gap-2"><Activity className="w-4 h-4 text-amber-500" /> Device Status Grid</CardTitle>
+   659→          </CardHeader>
+   660→          <CardContent>
+   661→            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+   662→              {cats.map(c => (
+   663→                <div key={c.key} className="p-3 rounded-lg border border-border/30 bg-muted/20 hover:bg-muted/40 transition-colors cursor-pointer" onClick={() => setActiveTab(c.key === 'controllers' ? 'controllers' : c.key === 'dispensers' ? 'dispensers' : c.key === 'atgs' ? 'atg' : c.key === 'paymentTerminals' ? 'payment' : 'other')}>
+   664→                  <div className="flex items-center gap-2 mb-2">
+   665→                    <c.icon className="w-4 h-4 text-amber-500" />
+   666→                    <span className="text-xs font-medium">{c.label}</span>
+   667→                  </div>
+   668→                  <div className="flex items-center gap-2">
+   669→                    <span className="text-lg font-bold">{c.data?.total ?? 0}</span>
+   670→                    <div className="flex gap-1">
+   671→                      <span className="text-[10px] text-emerald-400">●{c.data?.online ?? 0}</span>
+   672→                      <span className="text-[10px] text-gray-400">●{c.data?.offline ?? 0}</span>
+   673→                      {((c.data?.error ?? 0) > 0) && <span className="text-[10px] text-red-400">●{c.data?.error}</span>}
+   674→                    </div>
+   675→                  </div>
+   676→                </div>
+   677→              ))}
+   678→            </div>
+   679→          </CardContent>
+   680→        </Card>
+   681→
+   682→        {/* Controller Connectivity Map */}
+   683→        <Card className="bg-gray-900/80 border-border/40">
+   684→          <CardHeader className="pb-3">
+   685→            <CardTitle className="text-base flex items-center gap-2"><RadioTower className="w-4 h-4 text-amber-500" /> Controller → Dispenser Map</CardTitle>
+   686→          </CardHeader>
+   687→          <CardContent>
+   688→            <div className="space-y-3 max-h-64 overflow-y-auto custom-scrollbar">
+   689→              {(controllers.length > 0 ? controllers : (overview.controllers?.items as ForecourtController[]) ?? []).map((ctrl) => (
+   690→                <div key={ctrl.id} className="flex items-start gap-3 p-3 rounded-lg border border-border/30 bg-muted/10">
+   691→                  <div className="flex flex-col items-center">
+   692→                    <Server className="w-5 h-5 text-amber-500" />
+   693→                    <StatusDot status={ctrl.status} />
+   694→                  </div>
+   695→                  <div className="flex-1">
+   696→                    <p className="text-sm font-medium">{ctrl.name}</p>
+   697→                    <p className="text-xs text-muted-foreground">{ctrl.controllerType} · {ctrl.ipAddress ?? 'No IP'}</p>
+   698→                    <div className="flex flex-wrap gap-1 mt-1">
+   699→                      {(ctrl.dispensers ?? []).map(d => (
+   700→                        <TooltipProvider key={d.id}>
+   701→                          <Tooltip>
+   702→                            <TooltipTrigger>
+   703→                              <Badge variant="outline" className={`text-[10px] ${STATUS_TEXT_COLORS[d.status] ?? 'text-gray-400'}`}>
+   704→                                {d.name} ({d.pumpAddress ?? '?'})
+   705→                              </Badge>
+   706→                            </TooltipTrigger>
+   707→                            <TooltipContent>{d.name} — {d.status} — {d.manufacturer ?? 'Unknown'}</TooltipContent>
+   708→                          </Tooltip>
+   709→                        </TooltipProvider>
+   710→                      ))}
+   711→                      {!ctrl.dispensers?.length && <span className="text-xs text-muted-foreground">No dispensers</span>}
+   712→                    </div>
+   713→                  </div>
+   714→                  <Badge variant="outline" className="text-xs">{ctrl.connectedDispensers}/{ctrl.maxDispensers}</Badge>
+   715→                </div>
+   716→              ))}
+   717→              {controllers.length === 0 && !(overview.controllers?.items?.length) && <div className="text-center py-4 text-muted-foreground text-sm">No controllers configured</div>}
+   718→            </div>
+   719→          </CardContent>
+   720→        </Card>
+   721→
+   722→        {/* Recent Events & Active Commands */}
+   723→        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   724→          <Card className="bg-gray-900/80 border-border/40">
+   725→            <CardHeader className="pb-3">
+   726→              <CardTitle className="text-base flex items-center gap-2"><FileText className="w-4 h-4 text-amber-500" /> Recent Events</CardTitle>
+   727→            </CardHeader>
+   728→            <CardContent>
+   729→              <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
+   730→                {(overview.recentEvents ?? []).map(ev => (
+   731→                  <div key={ev.id} className="flex items-start gap-2 p-2 rounded border border-border/20 bg-muted/10">
+   732→                    <SeverityBadge severity={ev.severity} />
+   733→                    <div className="flex-1 min-w-0">
+   734→                      <p className="text-xs truncate">{ev.message}</p>
+   735→                      <p className="text-[10px] text-muted-foreground">{ev.deviceType} · {timeAgo(ev.createdAt)}</p>
+   736→                    </div>
+   737→                  </div>
+   738→                ))}
+   739→                {!(overview.recentEvents?.length) && <div className="text-center py-4 text-muted-foreground text-sm">No recent events</div>}
+   740→              </div>
+   741→            </CardContent>
+   742→          </Card>
+   743→
+   744→          <Card className="bg-gray-900/80 border-border/40">
+   745→            <CardHeader className="pb-3">
+   746→              <CardTitle className="text-base flex items-center gap-2"><Command className="w-4 h-4 text-amber-500" /> Active Commands</CardTitle>
+   747→            </CardHeader>
+   748→            <CardContent>
+   749→              <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
+   750→                {(overview.activeCommands ?? []).map(cmd => (
+   751→                  <div key={cmd.id} className="flex items-center justify-between p-2 rounded border border-border/20 bg-muted/10">
+   752→                    <div>
+   753→                      <p className="text-xs font-medium">{cmd.command}</p>
+   754→                      <p className="text-[10px] text-muted-foreground">{cmd.deviceType} · {cmd.priority}</p>
+   755→                    </div>
+   756→                    <Badge variant="outline" className={`text-[10px] ${cmd.status === 'queued' ? 'text-amber-400' : cmd.status === 'sent' ? 'text-sky-400' : cmd.status === 'acknowledged' ? 'text-emerald-400' : 'text-red-400'}`}>
+   757→                      {cmd.status}
+   758→                    </Badge>
+   759→                  </div>
+   760→                ))}
+   761→                {!(overview.activeCommands?.length) && <div className="text-center py-4 text-muted-foreground text-sm">No active commands</div>}
+   762→              </div>
+   763→            </CardContent>
+   764→          </Card>
+   765→        </div>
+   766→      </motion.div>
+   767→    )
+   768→  }
+   769→
+   770→  // ═══════════════════════════════════════════════════
+   771→  // TAB 2: HARDWARE CATALOG
+   772→  // ═══════════════════════════════════════════════════
+   773→
+   774→  const renderCatalog = () => {
+   775→    const categories = ['all', 'dispenser', 'controller', 'atg', 'payment_terminal', 'generator', 'camera', 'fire_alarm']
+   776→    let items: CatalogItem[] = []
+   777→    if (catalogData) {
+   778→      if (catalogCategory === 'all') {
+   779→        items = Object.values(catalogData).flat()
+   780→      } else {
+   781→        items = catalogData[catalogCategory] ?? []
+   782→      }
+   783→    }
+   784→    if (catalogSearch) {
+   785→      const q = catalogSearch.toLowerCase()
+   786→      items = items.filter(i => i.modelName?.toLowerCase().includes(q) || i.manufacturer?.toLowerCase().includes(q))
+   787→    }
+   788→
+   789→    return (
+   790→      <motion.div {...fadeIn} className="space-y-4">
+   791→        <div className="flex flex-col sm:flex-row gap-3">
+   792→          <div className="relative flex-1">
+   793→            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+   794→            <Input placeholder="Search hardware catalog..." value={catalogSearch} onChange={e => setCatalogSearch(e.target.value)} className="pl-9 bg-gray-900 border-border/50" />
+   795→          </div>
+   796→          <Select value={catalogCategory} onValueChange={setCatalogCategory}>
+   797→            <SelectTrigger className="w-48 bg-gray-900 border-border/50"><SelectValue placeholder="Category" /></SelectTrigger>
+   798→            <SelectContent>{categories.map(c => <SelectItem key={c} value={c} className="capitalize">{c === 'all' ? 'All Categories' : c.replace(/_/g, ' ')}</SelectItem>)}</SelectContent>
+   799→          </Select>
+   800→          <div className="flex gap-1">
+   801→            <Button variant={catalogView === 'grid' ? 'default' : 'outline'} size="sm" onClick={() => setCatalogView('grid')}><LayoutGrid className="w-4 h-4" /></Button>
+   802→            <Button variant={catalogView === 'list' ? 'default' : 'outline'} size="sm" onClick={() => setCatalogView('list')}><List className="w-4 h-4" /></Button>
+   803→          </div>
+   804→        </div>
+   805→
+   806→        {catalogView === 'grid' ? (
+   807→          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   808→            {items.map((item, i) => (
+   809→              <motion.div key={item.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.02 }}>
+   810→                <Card className="bg-gray-900/80 border-border/40 hover:border-amber-500/30 transition-colors">
+   811→                  <CardContent className="p-4">
+   812→                    <div className="flex items-start justify-between mb-3">
+   813→                      <div className="flex items-center gap-2">
+   814→                        <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
+   815→                          <HardDrive className="w-5 h-5 text-amber-500" />
+   816→                        </div>
+   817→                        <div>
+   818→                          <p className="text-sm font-semibold">{item.modelName}</p>
+   819→                          <p className="text-xs text-muted-foreground capitalize">{item.manufacturer?.replace(/_/g, ' ')}</p>
+   820→                        </div>
+   821→                      </div>
+   822→                      {item.verified && <Verified className="w-4 h-4 text-emerald-400" />}
+   823→                    </div>
+   824→                    <div className="space-y-1 mb-3">
+   825→                      {item.protocol && <p className="text-xs text-muted-foreground">Protocol: <span className="text-foreground">{item.protocol}</span></p>}
+   826→                      {item.maxNozzles && <p className="text-xs text-muted-foreground">Max Nozzles: <span className="text-foreground">{item.maxNozzles}</span></p>}
+   827→                      {item.flowRate && <p className="text-xs text-muted-foreground">Flow Rate: <span className="text-foreground">{item.flowRate} L/min</span></p>}
+   828→                      {item.maxDispensers && <p className="text-xs text-muted-foreground">Max Dispensers: <span className="text-foreground">{item.maxDispensers}</span></p>}
+   829→                      {item.capacityKva && <p className="text-xs text-muted-foreground">Capacity: <span className="text-foreground">{item.capacityKva} kVA</span></p>}
+   830→                      {item.cameraType && <p className="text-xs text-muted-foreground">Type: <span className="text-foreground capitalize">{item.cameraType}</span></p>}
+   831→                    </div>
+   832→                    <Button size="sm" className="w-full bg-amber-600 hover:bg-amber-700" onClick={() => {
+   833→                      if (catalogCategory === 'controller' || item.controllerType) setActiveTab('controllers')
+   834→                      else if (catalogCategory === 'dispenser') setActiveTab('dispensers')
+   835→                      else if (catalogCategory === 'atg') setActiveTab('atg')
+   836→                      else if (catalogCategory === 'payment_terminal') setActiveTab('payment')
+   837→                    }}>
+   838→                      <Plus className="w-3 h-3 mr-1" /> Add to Station
+   839→                    </Button>
+   840→                  </CardContent>
+   841→                </Card>
+   842→              </motion.div>
+   843→            ))}
+   844→          </div>
+   845→        ) : (
+   846→          <Card className="bg-gray-900/80 border-border/40">
+   847→            <Table>
+   848→              <TableHeader>
+   849→                <TableRow>
+   850→                  <TableHead>Manufacturer</TableHead>
+   851→                  <TableHead>Model</TableHead>
+   852→                  <TableHead>Protocol</TableHead>
+   853→                  <TableHead>Specs</TableHead>
+   854→                  <TableHead>Verified</TableHead>
+   855→                  <TableHead></TableHead>
+   856→                </TableRow>
+   857→              </TableHeader>
+   858→              <TableBody>
+   859→                {items.map(item => (
+   860→                  <TableRow key={item.id}>
+   861→                    <TableCell className="capitalize text-sm">{item.manufacturer?.replace(/_/g, ' ')}</TableCell>
+   862→                    <TableCell className="font-medium">{item.modelName}</TableCell>
+   863→                    <TableCell><Badge variant="outline" className="text-xs">{item.protocol ?? '—'}</Badge></TableCell>
+   864→                    <TableCell className="text-xs text-muted-foreground">
+   865→                      {item.maxNozzles ? `${item.maxNozzles} nozzles` : item.maxDispensers ? `${item.maxDispensers} pumps` : item.capacityKva ? `${item.capacityKva} kVA` : '—'}
+   866→                    </TableCell>
+   867→                    <TableCell>{item.verified ? <Verified className="w-4 h-4 text-emerald-400" /> : <span className="text-xs text-muted-foreground">No</span>}</TableCell>
+   868→                    <TableCell><Button size="sm" variant="outline"><Plus className="w-3 h-3" /></Button></TableCell>
+   869→                  </TableRow>
+   870→                ))}
+   871→              </TableBody>
+   872→            </Table>
+   873→          </Card>
+   874→        )}
+   875→        {items.length === 0 && <div className="text-center py-12 text-muted-foreground">No catalog items found</div>}
+   876→      </motion.div>
+   877→    )
+   878→  }
+   879→
+   880→  // ═══════════════════════════════════════════════════
+   881→  // TAB 3: FORECOURT CONTROLLERS
+   882→  // ═══════════════════════════════════════════════════
+   883→
+   884→  const renderControllers = () => (
+   885→    <motion.div {...fadeIn} className="space-y-4">
+   886→      <div className="flex justify-between items-center">
+   887→        <div><h3 className="text-lg font-semibold">Forecourt Controllers</h3><p className="text-xs text-muted-foreground">ERP → Controller → Pump architecture</p></div>
+   888→        <Dialog open={addControllerOpen} onOpenChange={setAddControllerOpen}>
+   889→          <DialogTrigger asChild>
+   890→            <Button className="bg-amber-600 hover:bg-amber-700"><Plus className="w-4 h-4 mr-2" /> Add Controller</Button>
+   891→          </DialogTrigger>
+   892→          <DialogContent className="bg-gray-900 border-border/50 max-w-lg">
+   893→            <DialogHeader><DialogTitle>Add Forecourt Controller</DialogTitle></DialogHeader>
+   894→            <form onSubmit={async (e) => {
+   895→              e.preventDefault()
+   896→              const fd = new FormData(e.currentTarget)
+   897→              await postApi('create_controller', {
+   898→                name: fd.get('name') as string,
+   899→                controllerType: fd.get('controllerType') as string,
+   900→                manufacturer: fd.get('manufacturer') as string,
+   901→                model: fd.get('model') as string,
+   902→                serialNumber: fd.get('serialNumber') as string,
+   903→                communicationType: fd.get('communicationType') as string,
+   904→                ipAddress: fd.get('ipAddress') as string,
+   905→                port: fd.get('port') ? parseInt(fd.get('port') as string) : null,
+   906→                baudRate: fd.get('baudRate') ? parseInt(fd.get('baudRate') as string) : null,
+   907→                comPort: fd.get('comPort') as string,
+   908→                protocol: fd.get('protocol') as string,
+   909→                pollingInterval: fd.get('pollingInterval') ? parseInt(fd.get('pollingInterval') as string) : 1000,
+   910→                timeout: fd.get('timeout') ? parseInt(fd.get('timeout') as string) : 5000,
+   911→                maxDispensers: fd.get('maxDispensers') ? parseInt(fd.get('maxDispensers') as string) : 32,
+   912→              })
+   913→              setAddControllerOpen(false)
+   914→              fetchControllers()
+   915→            }} className="space-y-3">
+   916→              <div className="grid grid-cols-2 gap-3">
+   917→                <div><Label>Name *</Label><Input name="name" required className="bg-gray-800 border-border/50" /></div>
+   918→                <div><Label>Controller Type *</Label>
+   919→                  <Select name="controllerType" defaultValue="pts">
+   920→                    <SelectTrigger className="bg-gray-800 border-border/50"><SelectValue /></SelectTrigger>
+   921→                    <SelectContent>{CONTROLLER_TYPES.map(ct => <SelectItem key={ct.value} value={ct.value}>{ct.label}</SelectItem>)}</SelectContent>
+   922→                  </Select>
+   923→                </div>
+   924→                <div><Label>Manufacturer</Label><Input name="manufacturer" className="bg-gray-800 border-border/50" /></div>
+   925→                <div><Label>Model</Label><Input name="model" className="bg-gray-800 border-border/50" /></div>
+   926→                <div><Label>Serial #</Label><Input name="serialNumber" className="bg-gray-800 border-border/50" /></div>
+   927→                <div><Label>Communication *</Label>
+   928→                  <Select name="communicationType" defaultValue="tcpip">
+   929→                    <SelectTrigger className="bg-gray-800 border-border/50"><SelectValue /></SelectTrigger>
+   930→                    <SelectContent>{COMM_TYPES.map(ct => <SelectItem key={ct} value={ct.toLowerCase().replace(/\//g, '')}>{ct}</SelectItem>)}</SelectContent>
+   931→                  </Select>
+   932→                </div>
+   933→                <div><Label>IP Address</Label><Input name="ipAddress" placeholder="192.168.1.100" className="bg-gray-800 border-border/50" /></div>
+   934→                <div><Label>Port</Label><Input name="port" type="number" placeholder="5000" className="bg-gray-800 border-border/50" /></div>
+   935→                <div><Label>Baud Rate</Label><Input name="baudRate" type="number" placeholder="9600" className="bg-gray-800 border-border/50" /></div>
+   936→                <div><Label>COM Port</Label><Input name="comPort" placeholder="COM1" className="bg-gray-800 border-border/50" /></div>
+   937→                <div><Label>Protocol *</Label>
+   938→                  <Select name="protocol" defaultValue="ifsf">
+   939→                    <SelectTrigger className="bg-gray-800 border-border/50"><SelectValue /></SelectTrigger>
+   940→                    <SelectContent>{PROTOCOLS.map(p => <SelectItem key={p} value={p.toLowerCase().replace(/\s+/g, '-')}>{p}</SelectItem>)}</SelectContent>
+   941→                  </Select>
+   942→                </div>
+   943→                <div><Label>Polling (ms)</Label><Input name="pollingInterval" type="number" defaultValue="1000" className="bg-gray-800 border-border/50" /></div>
+   944→                <div><Label>Timeout (ms)</Label><Input name="timeout" type="number" defaultValue="5000" className="bg-gray-800 border-border/50" /></div>
+   945→                <div><Label>Max Dispensers</Label><Input name="maxDispensers" type="number" defaultValue="32" className="bg-gray-800 border-border/50" /></div>
+   946→              </div>
+   947→              <Button type="submit" className="w-full bg-amber-600 hover:bg-amber-700">Create Controller</Button>
+   948→            </form>
+   949→          </DialogContent>
+   950→        </Dialog>
+   951→      </div>
+   952→
+   953→      <Card className="bg-gray-900/80 border-border/40">
+   954→        <Table>
+   955→          <TableHeader>
+   956→            <TableRow>
+   957→              <TableHead className="w-8"></TableHead>
+   958→              <TableHead>Name</TableHead>
+   959→              <TableHead>Type</TableHead>
+   960→              <TableHead>IP</TableHead>
+   961→              <TableHead>Protocol</TableHead>
+   962→              <TableHead>Status</TableHead>
+   963→              <TableHead>Pumps</TableHead>
+   964→              <TableHead>Heartbeat</TableHead>
+   965→              <TableHead></TableHead>
+   966→            </TableRow>
+   967→          </TableHeader>
+   968→          <TableBody>
+   969→            {controllers.map(ctrl => (
+   970→              <>
+   971→                <TableRow key={ctrl.id} className="cursor-pointer hover:bg-muted/20" onClick={() => toggleController(ctrl.id)}>
+   972→                  <TableCell>{expandedControllers.has(ctrl.id) ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}</TableCell>
+   973→                  <TableCell className="font-medium">{ctrl.name}</TableCell>
+   974→                  <TableCell className="text-xs capitalize">{ctrl.controllerType}</TableCell>
+   975→                  <TableCell className="text-xs font-mono">{ctrl.ipAddress ?? '—'}</TableCell>
+   976→                  <TableCell><Badge variant="outline" className="text-xs">{ctrl.protocol?.toUpperCase() ?? '—'}</Badge></TableCell>
+   977→                  <TableCell><StatusBadge status={ctrl.status} /></TableCell>
+   978→                  <TableCell className="text-xs">{ctrl.connectedDispensers}/{ctrl.maxDispensers}</TableCell>
+   979→                  <TableCell className="text-xs text-muted-foreground">{timeAgo(ctrl.lastHeartbeat)}</TableCell>
+   980→                  <TableCell>
+   981→                    <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+   982→                      <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" onClick={() => { setSelectedController(ctrl); setControllerSheetOpen(true) }}><Eye className="w-3 h-3" /></Button></TooltipTrigger><TooltipContent>Details</TooltipContent></Tooltip></TooltipProvider>
+   983→                      <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" onClick={() => { setSelectedController(ctrl); setEditControllerOpen(true) }}><Pencil className="w-3 h-3" /></Button></TooltipTrigger><TooltipContent>Edit</TooltipContent></Tooltip></TooltipProvider>
+   984→                      <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" onClick={() => postApi('deactivate_controller', { id: ctrl.id }).then(fetchControllers)}><Trash2 className="w-3 h-3 text-red-400" /></Button></TooltipTrigger><TooltipContent>Deactivate</TooltipContent></Tooltip></TooltipProvider>
+   985→                    </div>
+   986→                  </TableCell>
+   987→                </TableRow>
+   988→                {expandedControllers.has(ctrl.id) && (ctrl.dispensers ?? []).length > 0 && (
+   989→                  <TableRow key={`${ctrl.id}-dispensers`}>
+   990→                    <TableCell colSpan={9} className="bg-muted/10 p-0">
+   991→                      <div className="p-3 pl-10">
+   992→                        <p className="text-xs text-muted-foreground mb-2">Connected Dispensers:</p>
+   993→                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+   994→                          {(ctrl.dispensers ?? []).map(d => (
+   995→                            <div key={d.id} className="flex items-center gap-2 p-2 rounded border border-border/20 bg-muted/20">
+   996→                              <StatusDot status={d.status} />
+   997→                              <div>
+   998→                                <p className="text-xs font-medium">{d.name}</p>
+   999→                                <p className="text-[10px] text-muted-foreground">Addr: {d.pumpAddress ?? '?'} · {d.manufacturer ?? '—'}</p>
+  1000→                              </div>
+  1001→                            </div>
+  1002→                          ))}
+  1003→                        </div>
+  1004→                      </div>
+  1005→                    </TableCell>
+  1006→                  </TableRow>
+  1007→                )}
+  1008→              </>
+  1009→            ))}
+  1010→            {controllers.length === 0 && (
+  1011→              <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No controllers configured</TableCell></TableRow>
+  1012→            )}
+  1013→          </TableBody>
+  1014→        </Table>
+  1015→      </Card>
+  1016→
+  1017→      {/* Controller Detail Sheet */}
+  1018→      <Sheet open={controllerSheetOpen} onOpenChange={setControllerSheetOpen}>
+  1019→        <SheetContent className="bg-gray-900 border-border/50 w-full sm:max-w-xl overflow-y-auto">
+  1020→          {selectedController && (
+  1021→            <>
+  1022→              <SheetHeader>
+  1023→                <SheetTitle className="flex items-center gap-2">
+  1024→                  <Server className="w-5 h-5 text-amber-500" /> {selectedController.name}
+  1025→                  <StatusBadge status={selectedController.status} />
+  1026→                </SheetTitle>
+  1027→              </SheetHeader>
+  1028→              <div className="mt-6 space-y-6">
+  1029→                {/* Connection Settings */}
+  1030→                <div>
+  1031→                  <h4 className="text-sm font-semibold mb-3 flex items-center gap-2"><Cable className="w-4 h-4 text-amber-500" /> Connection Settings</h4>
+  1032→                  <div className="grid grid-cols-2 gap-2 text-xs">
+  1033→                    <div className="p-2 rounded bg-muted/20"><span className="text-muted-foreground">IP:</span> <span className="font-mono">{selectedController.ipAddress ?? '—'}</span></div>
+  1034→                    <div className="p-2 rounded bg-muted/20"><span className="text-muted-foreground">Port:</span> {selectedController.port ?? '—'}</div>
+  1035→                    <div className="p-2 rounded bg-muted/20"><span className="text-muted-foreground">Baud Rate:</span> {selectedController.baudRate ?? '—'}</div>
+  1036→                    <div className="p-2 rounded bg-muted/20"><span className="text-muted-foreground">COM Port:</span> {selectedController.comPort ?? '—'}</div>
+  1037→                    <div className="p-2 rounded bg-muted/20"><span className="text-muted-foreground">Protocol:</span> {selectedController.protocol?.toUpperCase() ?? '—'}</div>
+  1038→                    <div className="p-2 rounded bg-muted/20"><span className="text-muted-foreground">Comm Type:</span> {selectedController.communicationType}</div>
+  1039→                    <div className="p-2 rounded bg-muted/20"><span className="text-muted-foreground">Polling:</span> {selectedController.pollingInterval}ms</div>
+  1040→                    <div className="p-2 rounded bg-muted/20"><span className="text-muted-foreground">Timeout:</span> {selectedController.timeout}ms</div>
+  1041→                  </div>
+  1042→                </div>
+  1043→
+  1044→                <Separator />
+  1045→
+  1046→                {/* Connection Test */}
+  1047→                <div>
+  1048→                  <div className="flex items-center gap-3">
+  1049→                    <Button size="sm" variant="outline" disabled={testing} onClick={() => handleTestConnection(selectedController.id, 'forecourt_controller')}>
+  1050→                      {testing ? <RefreshCw className="w-3 h-3 mr-1 animate-spin" /> : <Signal className="w-3 h-3 mr-1" />} Test Connection
+  1051→                    </Button>
+  1052→                    {testResult && (
+  1053→                      <span className={`text-xs ${testResult.success ? 'text-emerald-400' : 'text-red-400'}`}>
+  1054→                        {testResult.message} {testResult.success && `(${testResult.latency}ms)`}
+  1055→                      </span>
+  1056→                    )}
+  1057→                  </div>
+  1058→                </div>
+  1059→
+  1060→                <Separator />
+  1061→
+  1062→                {/* Connected Dispensers */}
+  1063→                <div>
+  1064→                  <h4 className="text-sm font-semibold mb-3 flex items-center gap-2"><Fuel className="w-4 h-4 text-amber-500" /> Connected Dispensers ({selectedController.dispensers?.length ?? 0})</h4>
+  1065→                  <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+  1066→                    {(selectedController.dispensers ?? []).map(d => (
+  1067→                      <div key={d.id} className="flex items-center justify-between p-2 rounded border border-border/20 bg-muted/10">
+  1068→                        <div className="flex items-center gap-2">
+  1069→                          <StatusDot status={d.status} />
+  1070→                          <span className="text-xs font-medium">{d.name}</span>
+  1071→                          <span className="text-[10px] text-muted-foreground">Addr {d.pumpAddress ?? '?'}</span>
+  1072→                        </div>
+  1073→                        <div className="flex gap-1">
+  1074→                          <Button variant="ghost" size="sm" onClick={() => handleQuickAction('forecourt_controller', selectedController.id, 'AUTHORIZE_PUMP')}><Play className="w-3 h-3 text-emerald-400" /></Button>
+  1075→                          <Button variant="ghost" size="sm" onClick={() => handleQuickAction('forecourt_controller', selectedController.id, 'STOP_PUMP')}><Square className="w-3 h-3 text-red-400" /></Button>
+  1076→                        </div>
+  1077→                      </div>
+  1078→                    ))}
+  1079→                    {!(selectedController.dispensers?.length) && <p className="text-xs text-muted-foreground">No dispensers connected</p>}
+  1080→                  </div>
+  1081→                </div>
+  1082→
+  1083→                <Separator />
+  1084→
+  1085→                {/* Command Interface */}
+  1086→                <div>
+  1087→                  <h4 className="text-sm font-semibold mb-3 flex items-center gap-2"><Command className="w-4 h-4 text-amber-500" /> Quick Commands</h4>
+  1088→                  <div className="grid grid-cols-3 gap-2">
+  1089→                    {CONTROLLER_COMMANDS.map(cmd => (
+  1090→                      <Button key={cmd} size="sm" variant="outline" className="text-xs" onClick={() => handleQuickAction('forecourt_controller', selectedController.id, cmd)}>
+  1091→                        {cmd.replace(/_/g, ' ')}
+  1092→                      </Button>
+  1093→                    ))}
+  1094→                  </div>
+  1095→                </div>
+  1096→
+  1097→                <Separator />
+  1098→
+  1099→                {/* Recent Events */}
+  1100→                <div>
+  1101→                  <h4 className="text-sm font-semibold mb-3 flex items-center gap-2"><FileText className="w-4 h-4 text-amber-500" /> Recent Events</h4>
+  1102→                  <div className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar">
+  1103→                    {(selectedController.eventLogs ?? []).map(ev => (
+  1104→                      <div key={ev.id} className="flex items-start gap-2 p-2 rounded border border-border/10 bg-muted/5">
+  1105→                        <SeverityBadge severity={ev.severity} />
+  1106→                        <div>
+  1107→                          <p className="text-xs">{ev.message}</p>
+  1108→                          <p className="text-[10px] text-muted-foreground">{timeAgo(ev.createdAt)}</p>
+  1109→                        </div>
+  1110→                      </div>
+  1111→                    ))}
+  1112→                    {!(selectedController.eventLogs?.length) && <p className="text-xs text-muted-foreground">No recent events</p>}
+  1113→                  </div>
+  1114→                </div>
+  1115→              </div>
+  1116→            </>
+  1117→          )}
+  1118→        </SheetContent>
+  1119→      </Sheet>
+  1120→
+  1121→      {/* Edit Controller Dialog */}
+  1122→      <Dialog open={editControllerOpen} onOpenChange={setEditControllerOpen}>
+  1123→        <DialogContent className="bg-gray-900 border-border/50 max-w-lg">
+  1124→          <DialogHeader><DialogTitle>Edit Controller</DialogTitle></DialogHeader>
+  1125→          {selectedController && (
+  1126→            <form onSubmit={async (e) => {
+  1127→              e.preventDefault()
+  1128→              const fd = new FormData(e.currentTarget)
+  1129→              await postApi('update_controller', {
+  1130→                id: selectedController.id,
+  1131→                name: fd.get('name') as string,
+  1132→                ipAddress: fd.get('ipAddress') as string,
+  1133→                port: fd.get('port') ? parseInt(fd.get('port') as string) : null,
+  1134→                baudRate: fd.get('baudRate') ? parseInt(fd.get('baudRate') as string) : null,
+  1135→                protocol: fd.get('protocol') as string,
+  1136→                pollingInterval: fd.get('pollingInterval') ? parseInt(fd.get('pollingInterval') as string) : undefined,
+  1137→                timeout: fd.get('timeout') ? parseInt(fd.get('timeout') as string) : undefined,
+  1138→              })
+  1139→              setEditControllerOpen(false)
+  1140→              fetchControllers()
+  1141→            }} className="space-y-3">
+  1142→              <div className="grid grid-cols-2 gap-3">
+  1143→                <div><Label>Name</Label><Input name="name" defaultValue={selectedController.name} className="bg-gray-800 border-border/50" /></div>
+  1144→                <div><Label>IP Address</Label><Input name="ipAddress" defaultValue={selectedController.ipAddress ?? ''} className="bg-gray-800 border-border/50" /></div>
+  1145→                <div><Label>Port</Label><Input name="port" type="number" defaultValue={selectedController.port ?? ''} className="bg-gray-800 border-border/50" /></div>
+  1146→                <div><Label>Baud Rate</Label><Input name="baudRate" type="number" defaultValue={selectedController.baudRate ?? ''} className="bg-gray-800 border-border/50" /></div>
+  1147→                <div><Label>Protocol</Label>
+  1148→                  <Select name="protocol" defaultValue={selectedController.protocol ?? 'ifsf'}>
+  1149→                    <SelectTrigger className="bg-gray-800 border-border/50"><SelectValue /></SelectTrigger>
+  1150→                    <SelectContent>{PROTOCOLS.map(p => <SelectItem key={p} value={p.toLowerCase().replace(/\s+/g, '-')}>{p}</SelectItem>)}</SelectContent>
+  1151→                  </Select>
+  1152→                </div>
+  1153→                <div><Label>Polling (ms)</Label><Input name="pollingInterval" type="number" defaultValue={selectedController.pollingInterval} className="bg-gray-800 border-border/50" /></div>
+  1154→                <div><Label>Timeout (ms)</Label><Input name="timeout" type="number" defaultValue={selectedController.timeout} className="bg-gray-800 border-border/50" /></div>
+  1155→              </div>
+  1156→              <Button type="submit" className="w-full bg-amber-600 hover:bg-amber-700">Update Controller</Button>
+  1157→            </form>
+  1158→          )}
+  1159→        </DialogContent>
+  1160→      </Dialog>
+  1161→    </motion.div>
+  1162→  )
+  1163→
+  1164→  // ═══════════════════════════════════════════════════
+  1165→  // TAB 4: DISPENSER INTEGRATION
+  1166→  // ═══════════════════════════════════════════════════
+  1167→
+  1168→  const renderDispensers = () => (
+  1169→    <motion.div {...fadeIn} className="space-y-4">
+  1170→      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+  1171→        <div><h3 className="text-lg font-semibold">Dispenser Integration</h3><p className="text-xs text-muted-foreground">Managed through Forecourt Controllers</p></div>
+  1172→        <Dialog open={addDispenserOpen} onOpenChange={setAddDispenserOpen}>
+  1173→          <DialogTrigger asChild>
+  1174→            <Button className="bg-amber-600 hover:bg-amber-700"><Plus className="w-4 h-4 mr-2" /> Add Dispenser</Button>
+  1175→          </DialogTrigger>
+  1176→          <DialogContent className="bg-gray-900 border-border/50 max-w-lg max-h-[90vh] overflow-y-auto">
+  1177→            <DialogHeader><DialogTitle>Add Dispenser</DialogTitle></DialogHeader>
+  1178→            <form onSubmit={async (e) => {
+  1179→              e.preventDefault()
+  1180→              const fd = new FormData(e.currentTarget)
+  1181→              await postApi('create_dispenser', {
+  1182→                name: fd.get('name') as string,
+  1183→                manufacturer: fd.get('manufacturer') as string,
+  1184→                model: fd.get('model') as string,
+  1185→                serialNumber: fd.get('serialNumber') as string,
+  1186→                forecourtControllerId: fd.get('forecourtControllerId') as string,
+  1187→                pumpLane: fd.get('pumpLane') ? parseInt(fd.get('pumpLane') as string) : 1,
+  1188→                pumpAddress: fd.get('pumpAddress') ? parseInt(fd.get('pumpAddress') as string) : null,
+  1189→                nozzleCount: fd.get('nozzleCount') ? parseInt(fd.get('nozzleCount') as string) : 2,
+  1190→                protocol: fd.get('protocol') as string,
+  1191→                communicationType: fd.get('communicationType') as string,
+  1192→                ipAddress: fd.get('ipAddress') as string,
+  1193→                port: fd.get('port') ? parseInt(fd.get('port') as string) : null,
+  1194→                flowRate: fd.get('flowRate') ? parseFloat(fd.get('flowRate') as string) : null,
+  1195→              })
+  1196→              setAddDispenserOpen(false)
+  1197→              fetchDispensers()
+  1198→            }} className="space-y-3">
+  1199→              <div className="grid grid-cols-2 gap-3">
+  1200→                <div><Label>Name *</Label><Input name="name" required className="bg-gray-800 border-border/50" /></div>
+  1201→                <div><Label>Manufacturer</Label>
+  1202→                  <Select name="manufacturer">
+  1203→                    <SelectTrigger className="bg-gray-800 border-border/50"><SelectValue placeholder="Select..." /></SelectTrigger>
+  1204→                    <SelectContent>{DISPENSER_MANUFACTURERS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+  1205→                  </Select>
+  1206→                </div>
+  1207→                <div><Label>Model</Label><Input name="model" className="bg-gray-800 border-border/50" /></div>
+  1208→                <div><Label>Serial #</Label><Input name="serialNumber" className="bg-gray-800 border-border/50" /></div>
+  1209→                <div className="col-span-2"><Label>Assign to Controller *</Label>
+  1210→                  <Select name="forecourtControllerId">
+  1211→                    <SelectTrigger className="bg-gray-800 border-border/50"><SelectValue placeholder="Select controller..." /></SelectTrigger>
+  1212→                    <SelectContent>{controllers.map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.controllerType})</SelectItem>)}</SelectContent>
+  1213→                  </Select>
+  1214→                </div>
+  1215→                <div><Label>Pump Lane</Label><Input name="pumpLane" type="number" defaultValue="1" min="1" className="bg-gray-800 border-border/50" /></div>
+  1216→                <div><Label>Pump Address (1-32)</Label><Input name="pumpAddress" type="number" min="1" max="32" className="bg-gray-800 border-border/50" /></div>
+  1217→                <div><Label>Nozzle Count</Label><Input name="nozzleCount" type="number" defaultValue="2" min="1" max="8" className="bg-gray-800 border-border/50" /></div>
+  1218→                <div><Label>Protocol</Label>
+  1219→                  <Select name="protocol" defaultValue="ifsf">
+  1220→                    <SelectTrigger className="bg-gray-800 border-border/50"><SelectValue /></SelectTrigger>
+  1221→                    <SelectContent>{['IFSF', 'Patrius', 'DFS', 'Wayne DART', 'Gilbarco G-Site'].map(p => <SelectItem key={p} value={p.toLowerCase().replace(/\s+/g, '-')}>{p}</SelectItem>)}</SelectContent>
+  1222→                  </Select>
+  1223→                </div>
+  1224→                <div><Label>Communication</Label>
+  1225→                  <Select name="communicationType" defaultValue="tcpip">
+  1226→                    <SelectTrigger className="bg-gray-800 border-border/50"><SelectValue /></SelectTrigger>
+  1227→                    <SelectContent>{COMM_TYPES.map(ct => <SelectItem key={ct} value={ct.toLowerCase().replace(/\//g, '')}>{ct}</SelectItem>)}</SelectContent>
+  1228→                  </Select>
+  1229→                </div>
+  1230→                <div><Label>IP Address</Label><Input name="ipAddress" className="bg-gray-800 border-border/50" /></div>
+  1231→                <div><Label>Port</Label><Input name="port" type="number" className="bg-gray-800 border-border/50" /></div>
+  1232→                <div><Label>Flow Rate (L/min)</Label><Input name="flowRate" type="number" step="0.1" className="bg-gray-800 border-border/50" /></div>
+  1233→              </div>
+  1234→              <Button type="submit" className="w-full bg-amber-600 hover:bg-amber-700">Create Dispenser</Button>
+  1235→            </form>
+  1236→          </DialogContent>
+  1237→        </Dialog>
+  1238→      </div>
+  1239→
+  1240→      {/* Filters */}
+  1241→      <div className="flex flex-wrap gap-3">
+  1242→        <Select value={dispenserManufacturerFilter} onValueChange={setDispenserManufacturerFilter}>
+  1243→          <SelectTrigger className="w-48 bg-gray-900 border-border/50"><SelectValue placeholder="Manufacturer" /></SelectTrigger>
+  1244→          <SelectContent>
+  1245→            <SelectItem value="all">All Manufacturers</SelectItem>
+  1246→            {DISPENSER_MANUFACTURERS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+  1247→          </SelectContent>
+  1248→        </Select>
+  1249→        <Select value={dispenserStatusFilter} onValueChange={setDispenserStatusFilter}>
+  1250→          <SelectTrigger className="w-40 bg-gray-900 border-border/50"><SelectValue placeholder="Status" /></SelectTrigger>
+  1251→          <SelectContent>
+  1252→            <SelectItem value="all">All Status</SelectItem>
+  1253→            <SelectItem value="idle">Idle</SelectItem><SelectItem value="fueling">Fueling</SelectItem>
+  1254→            <SelectItem value="error">Error</SelectItem><SelectItem value="locked">Locked</SelectItem>
+  1255→            <SelectItem value="offline">Offline</SelectItem><SelectItem value="maintenance">Maintenance</SelectItem>
+  1256→          </SelectContent>
+  1257→        </Select>
+  1258→        <Select value={dispenserControllerFilter} onValueChange={setDispenserControllerFilter}>
+  1259→          <SelectTrigger className="w-40 bg-gray-900 border-border/50"><SelectValue placeholder="Controller" /></SelectTrigger>
+  1260→          <SelectContent>
+  1261→            <SelectItem value="all">All</SelectItem>
+  1262→            <SelectItem value="assigned">Assigned</SelectItem>
+  1263→            <SelectItem value="unassigned">Unassigned</SelectItem>
+  1264→          </SelectContent>
+  1265→        </Select>
+  1266→        <Badge variant="outline" className="self-center">{filteredDispensers.length} dispensers</Badge>
+  1267→      </div>
+  1268→
+  1269→      <Card className="bg-gray-900/80 border-border/40">
+  1270→        <ScrollArea className="max-h-[600px]">
+  1271→          <Table>
+  1272→            <TableHeader>
+  1273→              <TableRow>
+  1274→                <TableHead>Name</TableHead>
+  1275→                <TableHead>Manufacturer</TableHead>
+  1276→                <TableHead>Model</TableHead>
+  1277→                <TableHead>Controller</TableHead>
+  1278→                <TableHead>Pump Addr</TableHead>
+  1279→                <TableHead>Nozzles</TableHead>
+  1280→                <TableHead>Status</TableHead>
+  1281→                <TableHead>Last Comm</TableHead>
+  1282→                <TableHead></TableHead>
+  1283→              </TableRow>
+  1284→            </TableHeader>
+  1285→            <TableBody>
+  1286→              {filteredDispensers.map(d => (
+  1287→                <TableRow key={d.id} className="cursor-pointer hover:bg-muted/20" onClick={() => { setSelectedDispenser(d); setDispenserSheetOpen(true) }}>
+  1288→                  <TableCell className="font-medium">{d.name}</TableCell>
+  1289→                  <TableCell className="text-xs">{d.manufacturer ?? '—'}</TableCell>
+  1290→                  <TableCell className="text-xs">{d.model ?? '—'}</TableCell>
+  1291→                  <TableCell className="text-xs">{d.forecourtController?.name ?? <Badge variant="outline" className="text-[10px] text-amber-400">Unassigned</Badge>}</TableCell>
+  1292→                  <TableCell className="text-xs font-mono">{d.pumpAddress ?? '?'}</TableCell>
+  1293→                  <TableCell className="text-xs">{d.nozzleCount}</TableCell>
+  1294→                  <TableCell><StatusBadge status={d.status} /></TableCell>
+  1295→                  <TableCell className="text-xs text-muted-foreground">{timeAgo(d.lastCommunication)}</TableCell>
+  1296→                  <TableCell>
+  1297→                    <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+  1298→                      <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" onClick={() => handleQuickAction('dispenser', d.id, 'AUTHORIZE')}><Play className="w-3 h-3 text-emerald-400" /></Button></TooltipTrigger><TooltipContent>Authorize</TooltipContent></Tooltip></TooltipProvider>
+  1299→                      <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" onClick={() => handleQuickAction('dispenser', d.id, 'STOP')}><Square className="w-3 h-3 text-red-400" /></Button></TooltipTrigger><TooltipContent>Stop</TooltipContent></Tooltip></TooltipProvider>
+  1300→                      <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" onClick={() => handleQuickAction('dispenser', d.id, 'LOCK')}><Lock className="w-3 h-3 text-amber-400" /></Button></TooltipTrigger><TooltipContent>Lock</TooltipContent></Tooltip></TooltipProvider>
+  1301→                      <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" onClick={() => handleQuickAction('dispenser', d.id, 'UNLOCK')}><Unlock className="w-3 h-3 text-sky-400" /></Button></TooltipTrigger><TooltipContent>Unlock</TooltipContent></Tooltip></TooltipProvider>
+  1302→                      <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" onClick={() => handleQuickAction('dispenser', d.id, 'RESET')}><RotateCcw className="w-3 h-3" /></Button></TooltipTrigger><TooltipContent>Reset</TooltipContent></Tooltip></TooltipProvider>
+  1303→                    </div>
+  1304→                  </TableCell>
+  1305→                </TableRow>
+  1306→              ))}
+  1307→              {filteredDispensers.length === 0 && (
+  1308→                <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No dispensers found</TableCell></TableRow>
+  1309→              )}
+  1310→            </TableBody>
+  1311→          </Table>
+  1312→        </ScrollArea>
+  1313→      </Card>
+  1314→
+  1315→      {/* Dispenser Detail Sheet */}
+  1316→      <Sheet open={dispenserSheetOpen} onOpenChange={setDispenserSheetOpen}>
+  1317→        <SheetContent className="bg-gray-900 border-border/50 w-full sm:max-w-xl overflow-y-auto">
+  1318→          {selectedDispenser && (
+  1319→            <>
+  1320→              <SheetHeader>
+  1321→                <SheetTitle className="flex items-center gap-2">
+  1322→                  <Fuel className="w-5 h-5 text-amber-500" /> {selectedDispenser.name}
+  1323→                  <StatusBadge status={selectedDispenser.status} />
+  1324→                </SheetTitle>
+  1325→              </SheetHeader>
+  1326→              <div className="mt-6 space-y-6">
+  1327→                {/* Controller Assignment */}
+  1328→                <div>
+  1329→                  <h4 className="text-sm font-semibold mb-2 flex items-center gap-2"><Link2 className="w-4 h-4 text-amber-500" /> Controller Assignment</h4>
+  1330→                  <div className="p-3 rounded bg-muted/20 border border-border/20">
+  1331→                    {selectedDispenser.forecourtController ? (
+  1332→                      <div className="text-xs">
+  1333→                        <p><span className="text-muted-foreground">Controller:</span> {selectedDispenser.forecourtController.name}</p>
+  1334→                        <p><span className="text-muted-foreground">Type:</span> {selectedDispenser.forecourtController.controllerType}</p>
+  1335→                        <p><span className="text-muted-foreground">Controller Status:</span> <StatusBadge status={selectedDispenser.forecourtController.status} /></p>
+  1336→                      </div>
+  1337→                    ) : (
+  1338→                      <p className="text-xs text-amber-400">⚠ Not assigned to any controller</p>
+  1339→                    )}
+  1340→                  </div>
+  1341→                </div>
+  1342→
+  1343→                <Separator />
+  1344→
+  1345→                {/* Nozzle Configuration */}
+  1346→                <div>
+  1347→                  <h4 className="text-sm font-semibold mb-2 flex items-center gap-2"><Droplets className="w-4 h-4 text-amber-500" /> Nozzle Configuration ({selectedDispenser.nozzleCount})</h4>
+  1348→                  <div className="space-y-1">
+  1349→                    {(selectedDispenser.nozzles ?? []).map(n => (
+  1350→                      <div key={n.id} className="flex items-center justify-between p-2 rounded bg-muted/10 border border-border/10">
+  1351→                        <span className="text-xs">Nozzle {n.nozzleNumber}: {n.fuelType}</span>
+  1352→                        <StatusBadge status={n.status} />
+  1353→                      </div>
+  1354→                    ))}
+  1355→                    {!(selectedDispenser.nozzles?.length) && <p className="text-xs text-muted-foreground">No nozzle data available</p>}
+  1356→                  </div>
+  1357→                </div>
+  1358→
+  1359→                <Separator />
+  1360→
+  1361→                {/* Meter & Firmware */}
+  1362→                <div>
+  1363→                  <h4 className="text-sm font-semibold mb-2 flex items-center gap-2"><Gauge className="w-4 h-4 text-amber-500" /> Meter & Info</h4>
+  1364→                  <div className="grid grid-cols-2 gap-2 text-xs">
+  1365→                    <div className="p-2 rounded bg-muted/20"><span className="text-muted-foreground">Meter Reading:</span> {selectedDispenser.lastMeterReading.toLocaleString()}</div>
+  1366→                    <div className="p-2 rounded bg-muted/20"><span className="text-muted-foreground">Flow Rate:</span> {selectedDispenser.flowRate ?? '—'} L/min</div>
+  1367→                    <div className="p-2 rounded bg-muted/20"><span className="text-muted-foreground">Firmware:</span> {selectedDispenser.firmwareVersion ?? '—'}</div>
+  1368→                    <div className="p-2 rounded bg-muted/20"><span className="text-muted-foreground">Serial:</span> {selectedDispenser.serialNumber ?? '—'}</div>
+  1369→                    <div className="p-2 rounded bg-muted/20"><span className="text-muted-foreground">Pump Lane:</span> {selectedDispenser.pumpLane}</div>
+  1370→                    <div className="p-2 rounded bg-muted/20"><span className="text-muted-foreground">Address:</span> {selectedDispenser.pumpAddress ?? '?'}</div>
+  1371→                  </div>
+  1372→                </div>
+  1373→
+  1374→                <Separator />
+  1375→
+  1376→                {/* Recent Transactions */}
+  1377→                <div>
+  1378→                  <h4 className="text-sm font-semibold mb-2 flex items-center gap-2"><Receipt className="w-4 h-4 text-amber-500" /> Recent Transactions</h4>
+  1379→                  <div className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar">
+  1380→                    {(selectedDispenser.recentFuelings ?? []).map(f => (
+  1381→                      <div key={f.id} className="flex items-center justify-between p-2 rounded bg-muted/10 border border-border/10 text-xs">
+  1382→                        <span>{f.fuelType} — {f.volume.toLocaleString()}L</span>
+  1383→                        <span className="text-amber-400">Rs. {f.amount.toLocaleString()}</span>
+  1384→                        <span className="text-muted-foreground">{timeAgo(f.createdAt)}</span>
+  1385→                      </div>
+  1386→                    ))}
+  1387→                    {!(selectedDispenser.recentFuelings?.length) && <p className="text-xs text-muted-foreground">No recent transactions</p>}
+  1388→                  </div>
+  1389→                </div>
+  1390→
+  1391→                <Separator />
+  1392→
+  1393→                {/* Quick Actions */}
+  1394→                <div>
+  1395→                  <h4 className="text-sm font-semibold mb-2 flex items-center gap-2"><Zap className="w-4 h-4 text-amber-500" /> Quick Actions</h4>
+  1396→                  <div className="grid grid-cols-3 gap-2">
+  1397→                    {['AUTHORIZE', 'STOP', 'LOCK', 'UNLOCK', 'RESET', 'READ_STATUS'].map(cmd => (
+  1398→                      <Button key={cmd} size="sm" variant="outline" className="text-xs" onClick={() => handleQuickAction('dispenser', selectedDispenser.id, cmd)}>
+  1399→                        {cmd.replace(/_/g, ' ')}
+  1400→                      </Button>
+  1401→                    ))}
+  1402→                  </div>
+  1403→                </div>
+  1404→              </div>
+  1405→            </>
+  1406→          )}
+  1407→        </SheetContent>
+  1408→      </Sheet>
+  1409→    </motion.div>
+  1410→  )
+  1411→
+  1412→  // ═══════════════════════════════════════════════════
+  1413→  // TAB 5: ATG INTEGRATION
+  1414→  // ═══════════════════════════════════════════════════
+  1415→
+  1416→  const renderATG = () => (
+  1417→    <motion.div {...fadeIn} className="space-y-4">
+  1418→      <div className="flex justify-between items-center">
+  1419→        <div><h3 className="text-lg font-semibold">ATG Integration</h3><p className="text-xs text-muted-foreground">Automatic Tank Gauging Systems</p></div>
+  1420→      </div>
+  1421→
+  1422→      {/* ATG Profiles */}
+  1423→      <Card className="bg-gray-900/80 border-border/40">
+  1424→        <CardHeader className="pb-3">
+  1425→          <CardTitle className="text-base flex items-center gap-2"><Shield className="w-4 h-4 text-amber-500" /> ATG Profiles Catalog</CardTitle>
+  1426→        </CardHeader>
+  1427→        <CardContent>
+  1428→          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+  1429→            {atgProfiles.map(p => (
+  1430→              <div key={p.id} className="p-3 rounded-lg border border-border/30 bg-muted/20">
+  1431→                <div className="flex items-center gap-2 mb-2">
+  1432→                  <Droplets className="w-4 h-4 text-amber-500" />
+  1433→                  <span className="text-sm font-semibold">{p.modelName}</span>
+  1434→                </div>
+  1435→                <p className="text-xs text-muted-foreground capitalize">{p.manufacturer?.replace(/_/g, ' ')}</p>
+  1436→                <div className="text-xs mt-1 space-y-0.5">
+  1437→                  <p>Type: {p.atgType} · Probes: {p.maxProbes}</p>
+  1438→                  {p.protocol && <p>Protocol: {p.protocol}</p>}
+  1439→                </div>
+  1440→              </div>
+  1441→            ))}
+  1442→          </div>
+  1443→        </CardContent>
+  1444→      </Card>
+  1445→
+  1446→      {/* Tank Readings */}
+  1447→      <Card className="bg-gray-900/80 border-border/40">
+  1448→        <CardHeader className="pb-3">
+  1449→          <CardTitle className="text-base flex items-center gap-2"><Thermometer className="w-4 h-4 text-amber-500" /> Tank ATG Readings</CardTitle>
+  1450→        </CardHeader>
+  1451→        <CardContent>
+  1452→          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  1453→            {atgTanks.map(tank => (
+  1454→              <div key={tank.id} className="p-4 rounded-lg border border-border/30 bg-muted/10">
+  1455→                <div className="flex items-center justify-between mb-3">
+  1456→                  <div>
+  1457→                    <p className="text-sm font-semibold">{tank.name}</p>
+  1458→                    <p className="text-xs text-muted-foreground">{tank.fuelType} · ATG: {tank.atgType ?? 'None'}</p>
+  1459→                  </div>
+  1460→                  <StatusBadge status={tank.status} />
+  1461→                </div>
+  1462→                <div className="mb-3">
+  1463→                  <div className="flex justify-between text-xs mb-1">
+  1464→                    <span>Level</span>
+  1465→                    <span>{tank.currentLevel.toLocaleString()} / {tank.capacity.toLocaleString()} L</span>
+  1466→                  </div>
+  1467→                  <Progress value={(tank.currentLevel / Math.max(tank.capacity, 1)) * 100} className="h-2" />
+  1468→                </div>
+  1469→                <div className="grid grid-cols-3 gap-2 text-xs">
+  1470→                  <div className="p-2 rounded bg-muted/20"><span className="text-muted-foreground">Water:</span> {tank.waterLevel}mm</div>
+  1471→                  <div className="p-2 rounded bg-muted/20"><span className="text-muted-foreground">Temp:</span> {tank.temperature}°C</div>
+  1472→                  <div className="p-2 rounded bg-muted/20"><span className="text-muted-foreground">ATG IP:</span> {tank.atgIpAddress ?? '—'}</div>
+  1473→                </div>
+  1474→                {tank.atgPort && <p className="text-[10px] text-muted-foreground mt-2">ATG Port: {tank.atgPort}</p>}
+  1475→              </div>
+  1476→            ))}
+  1477→            {atgTanks.length === 0 && <div className="col-span-2 text-center py-8 text-muted-foreground">No ATG-configured tanks</div>}
+  1478→          </div>
+  1479→        </CardContent>
+  1480→      </Card>
+  1481→    </motion.div>
+  1482→  )
+  1483→
+  1484→  // ═══════════════════════════════════════════════════
+  1485→  // TAB 6: PAYMENT TERMINALS
+  1486→  // ═══════════════════════════════════════════════════
+  1487→
+  1488→  const renderPaymentTerminals = () => (
+  1489→    <motion.div {...fadeIn} className="space-y-4">
+  1490→      <div className="flex justify-between items-center">
+  1491→        <div><h3 className="text-lg font-semibold">Payment Terminals</h3><p className="text-xs text-muted-foreground">POS, EFTPOS, mPOS, Pay at Pump</p></div>
+  1492→        <Dialog open={addTerminalOpen} onOpenChange={setAddTerminalOpen}>
+  1493→          <DialogTrigger asChild>
+  1494→            <Button className="bg-amber-600 hover:bg-amber-700"><Plus className="w-4 h-4 mr-2" /> Add Terminal</Button>
+  1495→          </DialogTrigger>
+  1496→          <DialogContent className="bg-gray-900 border-border/50 max-w-lg">
+  1497→            <DialogHeader><DialogTitle>Add Payment Terminal</DialogTitle></DialogHeader>
+  1498→            <form onSubmit={async (e) => {
+  1499→              e.preventDefault()
+  1500→              const fd = new FormData(e.currentTarget)
+  1501→              await postApi('create_payment_terminal', {
+  1502→                name: fd.get('name') as string,
+  1503→                terminalType: fd.get('terminalType') as string,
+  1504→                manufacturer: fd.get('manufacturer') as string,
+  1505→                model: fd.get('model') as string,
+  1506→                serialNumber: fd.get('serialNumber') as string,
+  1507→                communicationType: fd.get('communicationType') as string,
+  1508→                ipAddress: fd.get('ipAddress') as string,
+  1509→                port: fd.get('port') ? parseInt(fd.get('port') as string) : null,
+  1510→                protocol: fd.get('protocol') as string,
+  1511→                merchantId: fd.get('merchantId') as string,
+  1512→                terminalId: fd.get('terminalId') as string,
+  1513→              })
+  1514→              setAddTerminalOpen(false)
+  1515→              fetchPaymentTerminals()
+  1516→            }} className="space-y-3">
+  1517→              <div className="grid grid-cols-2 gap-3">
+  1518→                <div><Label>Name *</Label><Input name="name" required className="bg-gray-800 border-border/50" /></div>
+  1519→                <div><Label>Terminal Type *</Label>
+  1520→                  <Select name="terminalType" defaultValue="pos">
+  1521→                    <SelectTrigger className="bg-gray-800 border-border/50"><SelectValue /></SelectTrigger>
+  1522→                    <SelectContent>{TERMINAL_TYPES.map(t => <SelectItem key={t} value={t.toLowerCase().replace(/ /g, '_')}>{t}</SelectItem>)}</SelectContent>
+  1523→                  </Select>
+  1524→                </div>
+  1525→                <div><Label>Manufacturer</Label>
+  1526→                  <Select name="manufacturer">
+  1527→                    <SelectTrigger className="bg-gray-800 border-border/50"><SelectValue placeholder="Select..." /></SelectTrigger>
+  1528→                    <SelectContent>{TERMINAL_MANUFACTURERS.map(m => <SelectItem key={m} value={m.toLowerCase()}>{m}</SelectItem>)}</SelectContent>
+  1529→                  </Select>
+  1530→                </div>
+  1531→                <div><Label>Model</Label><Input name="model" className="bg-gray-800 border-border/50" /></div>
+  1532→                <div><Label>Serial #</Label><Input name="serialNumber" className="bg-gray-800 border-border/50" /></div>
+  1533→                <div><Label>Protocol</Label>
+  1534→                  <Select name="protocol" defaultValue="iso8583">
+  1535→                    <SelectTrigger className="bg-gray-800 border-border/50"><SelectValue /></SelectTrigger>
+  1536→                    <SelectContent>{['ISO 8583', 'NAC', 'TMS', 'OMPI'].map(p => <SelectItem key={p} value={p.toLowerCase().replace(/ /g, '')}>{p}</SelectItem>)}</SelectContent>
+  1537→                  </Select>
+  1538→                </div>
+  1539→                <div><Label>IP Address</Label><Input name="ipAddress" className="bg-gray-800 border-border/50" /></div>
+  1540→                <div><Label>Port</Label><Input name="port" type="number" className="bg-gray-800 border-border/50" /></div>
+  1541→                <div><Label>Merchant ID</Label><Input name="merchantId" className="bg-gray-800 border-border/50" /></div>
+  1542→                <div><Label>Terminal ID</Label><Input name="terminalId" className="bg-gray-800 border-border/50" /></div>
+  1543→              </div>
+  1544→              <Button type="submit" className="w-full bg-amber-600 hover:bg-amber-700">Create Terminal</Button>
+  1545→            </form>
+  1546→          </DialogContent>
+  1547→        </Dialog>
+  1548→      </div>
+  1549→
+  1550→      <Card className="bg-gray-900/80 border-border/40">
+  1551→        <Table>
+  1552→          <TableHeader>
+  1553→            <TableRow>
+  1554→              <TableHead>Name</TableHead>
+  1555→              <TableHead>Type</TableHead>
+  1556→              <TableHead>Manufacturer</TableHead>
+  1557→              <TableHead>Protocol</TableHead>
+  1558→              <TableHead>IP</TableHead>
+  1559→              <TableHead>Status</TableHead>
+  1560→              <TableHead>Transactions</TableHead>
+  1561→              <TableHead></TableHead>
+  1562→            </TableRow>
+  1563→          </TableHeader>
+  1564→          <TableBody>
+  1565→            {paymentTerminals.map(t => (
+  1566→              <TableRow key={t.id}>
+  1567→                <TableCell className="font-medium">{t.name}</TableCell>
+  1568→                <TableCell className="text-xs uppercase">{t.terminalType?.replace(/_/g, ' ')}</TableCell>
+  1569→                <TableCell className="text-xs capitalize">{t.manufacturer ?? '—'}</TableCell>
+  1570→                <TableCell><Badge variant="outline" className="text-xs">{t.protocol?.toUpperCase() ?? '—'}</Badge></TableCell>
+  1571→                <TableCell className="text-xs font-mono">{t.ipAddress ?? '—'}</TableCell>
+  1572→                <TableCell><StatusBadge status={t.status} /></TableCell>
+  1573→                <TableCell className="text-xs">{t.transactionCount}</TableCell>
+  1574→                <TableCell>
+  1575→                  <div className="flex gap-1">
+  1576→                    <Button variant="ghost" size="sm" onClick={() => setEditTerminal(t)}><Pencil className="w-3 h-3" /></Button>
+  1577→                    <Button variant="ghost" size="sm" onClick={() => deleteApi('payment_terminal', t.id).then(fetchPaymentTerminals)}><Trash2 className="w-3 h-3 text-red-400" /></Button>
+  1578→                  </div>
+  1579→                </TableCell>
+  1580→              </TableRow>
+  1581→            ))}
+  1582→            {paymentTerminals.length === 0 && (
+  1583→              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No payment terminals configured</TableCell></TableRow>
+  1584→            )}
+  1585→          </TableBody>
+  1586→        </Table>
+  1587→      </Card>
+  1588→
+  1589→      {/* Edit Terminal Dialog */}
+  1590→      <Dialog open={!!editTerminal} onOpenChange={(open) => { if (!open) setEditTerminal(null) }}>
+  1591→        <DialogContent className="bg-gray-900 border-border/50 max-w-lg">
+  1592→          <DialogHeader><DialogTitle>Edit Payment Terminal</DialogTitle></DialogHeader>
+  1593→          {editTerminal && (
+  1594→            <form onSubmit={async (e) => {
+  1595→              e.preventDefault()
+  1596→              const fd = new FormData(e.currentTarget)
+  1597→              await postApi('update_payment_terminal', {
+  1598→                id: editTerminal.id,
+  1599→                name: fd.get('name') as string,
+  1600→                terminalType: fd.get('terminalType') as string,
+  1601→                manufacturer: fd.get('manufacturer') as string,
+  1602→                model: fd.get('model') as string,
+  1603→                ipAddress: fd.get('ipAddress') as string,
+  1604→                port: fd.get('port') ? parseInt(fd.get('port') as string) : null,
+  1605→                protocol: fd.get('protocol') as string,
+  1606→                merchantId: fd.get('merchantId') as string,
+  1607→                terminalId: fd.get('terminalId') as string,
+  1608→              })
+  1609→              setEditTerminal(null)
+  1610→              fetchPaymentTerminals()
+  1611→            }} className="space-y-3">
+  1612→              <div className="grid grid-cols-2 gap-3">
+  1613→                <div><Label>Name</Label><Input name="name" defaultValue={editTerminal.name} className="bg-gray-800 border-border/50" /></div>
+  1614→                <div><Label>Type</Label>
+  1615→                  <Select name="terminalType" defaultValue={editTerminal.terminalType}>
+  1616→                    <SelectTrigger className="bg-gray-800 border-border/50"><SelectValue /></SelectTrigger>
+  1617→                    <SelectContent>{TERMINAL_TYPES.map(t => <SelectItem key={t} value={t.toLowerCase().replace(/ /g, '_')}>{t}</SelectItem>)}</SelectContent>
+  1618→                  </Select>
+  1619→                </div>
+  1620→                <div><Label>Manufacturer</Label><Input name="manufacturer" defaultValue={editTerminal.manufacturer ?? ''} className="bg-gray-800 border-border/50" /></div>
+  1621→                <div><Label>Model</Label><Input name="model" defaultValue={editTerminal.model ?? ''} className="bg-gray-800 border-border/50" /></div>
+  1622→                <div><Label>IP Address</Label><Input name="ipAddress" defaultValue={editTerminal.ipAddress ?? ''} className="bg-gray-800 border-border/50" /></div>
+  1623→                <div><Label>Port</Label><Input name="port" type="number" defaultValue={editTerminal.port ?? ''} className="bg-gray-800 border-border/50" /></div>
+  1624→                <div><Label>Protocol</Label>
+  1625→                  <Select name="protocol" defaultValue={editTerminal.protocol ?? 'iso8583'}>
+  1626→                    <SelectTrigger className="bg-gray-800 border-border/50"><SelectValue /></SelectTrigger>
+  1627→                    <SelectContent>{['ISO 8583', 'NAC', 'TMS', 'OMPI'].map(p => <SelectItem key={p} value={p.toLowerCase().replace(/ /g, '')}>{p}</SelectItem>)}</SelectContent>
+  1628→                  </Select>
+  1629→                </div>
+  1630→                <div><Label>Merchant ID</Label><Input name="merchantId" defaultValue={editTerminal.merchantId ?? ''} className="bg-gray-800 border-border/50" /></div>
+  1631→              </div>
+  1632→              <Button type="submit" className="w-full bg-amber-600 hover:bg-amber-700">Update Terminal</Button>
+  1633→            </form>
+  1634→          )}
+  1635→        </DialogContent>
+  1636→      </Dialog>
+  1637→    </motion.div>
+  1638→  )
+  1639→
+  1640→  // ═══════════════════════════════════════════════════
+  1641→  // TAB 7: OTHER DEVICES
+  1642→  // ═══════════════════════════════════════════════════
+  1643→
+  1644→  const renderOtherDevices = () => (
+  1645→    <motion.div {...fadeIn} className="space-y-4">
+  1646→      <div><h3 className="text-lg font-semibold">Other Devices</h3><p className="text-xs text-muted-foreground">Generators, cameras, meters, and more</p></div>
+  1647→
+  1648→      {renderOtherDeviceSection('generators', 'Generators', Zap, generators, 'create_generator', 'update_generator', 'delete_generator', [
+  1649→        { key: 'fuelType', label: 'Fuel Type' }, { key: 'capacityKva', label: 'Capacity (kVA)', type: 'number' },
+  1650→      ])}
+  1651→      {renderOtherDeviceSection('cameras', 'Surveillance Cameras', Camera, cameras, 'create_camera', 'update_camera', 'delete_camera', [
+  1652→        { key: 'cameraType', label: 'Camera Type' }, { key: 'resolution', label: 'Resolution' },
+  1653→      ])}
+  1654→      {renderOtherDeviceSection('fire_alarms', 'Fire Alarm Systems', Flame, fireAlarms, 'create_fire_alarm', 'update_fire_alarm', 'delete_fire_alarm', [
+  1655→        { key: 'systemType', label: 'System Type' }, { key: 'zoneCount', label: 'Zone Count', type: 'number' },
+  1656→      ])}
+  1657→      {renderOtherDeviceSection('utility_meters', 'Utility Meters', Gauge, utilityMeters, 'create_utility_meter', 'update_utility_meter', 'delete_utility_meter', [
+  1658→        { key: 'meterType', label: 'Meter Type' }, { key: 'unit', label: 'Unit' },
+  1659→      ])}
+  1660→      {renderOtherDeviceSection('weather_stations', 'Weather Stations', CloudSun, weatherStations, 'create_weather_station', 'update_weather_station', 'delete_weather_station', [])}
+  1661→      {renderOtherDeviceSection('tanker_trackers', 'Tanker Trackers', Truck, tankerTrackers, 'create_tanker_tracker', 'update_tanker_tracker', 'delete_tanker_tracker', [
+  1662→        { key: 'trackerType', label: 'Tracker Type' }, { key: 'imei', label: 'IMEI' },
+  1663→      ])}
+  1664→      {renderOtherDeviceSection('car_washes', 'Car Wash Systems', Car, carWashes, 'create_car_wash', 'update_car_wash', 'delete_car_wash', [
+  1665→        { key: 'systemType', label: 'System Type' }, { key: 'bayCount', label: 'Bay Count', type: 'number' },
+  1666→      ])}
+  1667→      {renderOtherDeviceSection('air_compressors', 'Air Compressors', Wind, airCompressors, 'create_air_compressor', 'update_air_compressor', 'delete_air_compressor', [
+  1668→        { key: 'maxPressure', label: 'Max Pressure (PSI)', type: 'number' },
+  1669→      ])}
+  1670→      {renderOtherDeviceSection('vacuum_stations', 'Vacuum Stations', Fan, vacuumStations, 'create_vacuum_station', 'update_vacuum_station', 'delete_vacuum_station', [])}
+  1671→    </motion.div>
+  1672→  )
+  1673→
+  1674→  // ═══════════════════════════════════════════════════
+  1675→  // TAB 8: COMMANDS & CONTROL
+  1676→  // ═══════════════════════════════════════════════════
+  1677→
+  1678→  const renderCommands = () => {
+  1679→    const deviceTypeOptions = [
+  1680→      { value: 'forecourt_controller', label: 'Forecourt Controller', commands: CONTROLLER_COMMANDS },
+  1681→      { value: 'payment_terminal', label: 'Payment Terminal', commands: TERMINAL_COMMANDS },
+  1682→      { value: 'generator', label: 'Generator', commands: GENERATOR_COMMANDS },
+  1683→      { value: 'surveillance_camera', label: 'Camera', commands: CAMERA_COMMANDS },
+  1684→      { value: 'fire_alarm', label: 'Fire Alarm', commands: FIRE_ALARM_COMMANDS },
+  1685→    ]
+  1686→
+  1687→    const selectedDeviceType = deviceTypeOptions.find(d => d.value === commandDeviceType)
+  1688→    const deviceList = commandDeviceType === 'forecourt_controller' ? controllers
+  1689→      : commandDeviceType === 'payment_terminal' ? paymentTerminals
+  1690→      : commandDeviceType === 'generator' ? generators
+  1691→      : commandDeviceType === 'surveillance_camera' ? cameras
+  1692→      : fireAlarms
+  1693→
+  1694→    return (
+  1695→      <motion.div {...fadeIn} className="space-y-4">
+  1696→        <div><h3 className="text-lg font-semibold">Commands & Control</h3><p className="text-xs text-muted-foreground">Send commands to connected devices</p></div>
+  1697→
+  1698→        {/* Command Interface */}
+  1699→        <Card className="bg-gray-900/80 border-border/40">
+  1700→          <CardHeader className="pb-3">
+  1701→            <CardTitle className="text-base flex items-center gap-2"><Terminal className="w-4 h-4 text-amber-500" /> Command Interface</CardTitle>
+  1702→          </CardHeader>
+  1703→          <CardContent>
+  1704→            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+  1705→              <div>
+  1706→                <Label className="text-xs">Device Type</Label>
+  1707→                <Select value={commandDeviceType} onValueChange={v => { setCommandDeviceType(v); setCommandDeviceId(''); setCommandName('') }}>
+  1708→                  <SelectTrigger className="bg-gray-800 border-border/50"><SelectValue /></SelectTrigger>
+  1709→                  <SelectContent>{deviceTypeOptions.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent>
+  1710→                </Select>
+  1711→              </div>
+  1712→              <div>
+  1713→                <Label className="text-xs">Device</Label>
+  1714→                <Select value={commandDeviceId} onValueChange={setCommandDeviceId}>
+  1715→                  <SelectTrigger className="bg-gray-800 border-border/50"><SelectValue placeholder="Select device..." /></SelectTrigger>
+  1716→                  <SelectContent>{deviceList.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
+  1717→                </Select>
+  1718→              </div>
+  1719→              <div>
+  1720→                <Label className="text-xs">Command</Label>
+  1721→                <Select value={commandName} onValueChange={setCommandName}>
+  1722→                  <SelectTrigger className="bg-gray-800 border-border/50"><SelectValue placeholder="Select command..." /></SelectTrigger>
+  1723→                  <SelectContent>{(selectedDeviceType?.commands ?? []).map(c => <SelectItem key={c} value={c}>{c.replace(/_/g, ' ')}</SelectItem>)}</SelectContent>
+  1724→                </Select>
+  1725→              </div>
+  1726→              <div className="flex items-end gap-2">
+  1727→                <div className="flex-1">
+  1728→                  <Label className="text-xs">Params (JSON)</Label>
+  1729→                  <Input value={commandParams} onChange={e => setCommandParams(e.target.value)} placeholder='{"key":"value"}' className="bg-gray-800 border-border/50 text-xs font-mono" />
+  1730→                </div>
+  1731→                <Button className="bg-amber-600 hover:bg-amber-700" disabled={!commandDeviceId || !commandName} onClick={handleSendCommand}>
+  1732→                  <Send className="w-4 h-4" />
+  1733→                </Button>
+  1734→              </div>
+  1735→            </div>
+  1736→
+  1737→            {/* Quick Command Buttons */}
+  1738→            {selectedDeviceType && commandDeviceId && (
+  1739→              <div className="mt-4">
+  1740→                <p className="text-xs text-muted-foreground mb-2">Quick Commands:</p>
+  1741→                <div className="flex flex-wrap gap-2">
+  1742→                  {selectedDeviceType.commands.map(cmd => (
+  1743→                    <Button key={cmd} size="sm" variant="outline" className="text-xs" onClick={() => { setCommandName(cmd); handleQuickAction(commandDeviceType, commandDeviceId, cmd) }}>
+  1744→                      {cmd.replace(/_/g, ' ')}
+  1745→                    </Button>
+  1746→                  ))}
+  1747→                </div>
+  1748→              </div>
+  1749→            )}
+  1750→          </CardContent>
+  1751→        </Card>
+  1752→
+  1753→        {/* Command Queue */}
+  1754→        <Card className="bg-gray-900/80 border-border/40">
+  1755→          <CardHeader className="pb-3">
+  1756→            <CardTitle className="text-base flex items-center gap-2"><Clock className="w-4 h-4 text-amber-500" /> Command Queue</CardTitle>
+  1757→          </CardHeader>
+  1758→          <CardContent>
+  1759→            <ScrollArea className="max-h-96">
+  1760→              <Table>
+  1761→                <TableHeader>
+  1762→                  <TableRow>
+  1763→                    <TableHead>Command</TableHead>
+  1764→                    <TableHead>Device Type</TableHead>
+  1765→                    <TableHead>Priority</TableHead>
+  1766→                    <TableHead>Status</TableHead>
+  1767→                    <TableHead>Sent</TableHead>
+  1768→                    <TableHead>Created</TableHead>
+  1769→                    <TableHead></TableHead>
+  1770→                  </TableRow>
+  1771→                </TableHeader>
+  1772→                <TableBody>
+  1773→                  {commands.map(cmd => (
+  1774→                    <TableRow key={cmd.id}>
+  1775→                      <TableCell className="font-medium text-xs">{cmd.command.replace(/_/g, ' ')}</TableCell>
+  1776→                      <TableCell className="text-xs capitalize">{cmd.deviceType?.replace(/_/g, ' ')}</TableCell>
+  1777→                      <TableCell>
+  1778→                        <Badge variant="outline" className={`text-[10px] ${cmd.priority === 'urgent' ? 'text-red-400' : cmd.priority === 'high' ? 'text-amber-400' : 'text-gray-400'}`}>
+  1779→                          {cmd.priority}
+  1780→                        </Badge>
+  1781→                      </TableCell>
+  1782→                      <TableCell>
+  1783→                        <Badge variant="outline" className={`text-[10px] ${cmd.status === 'queued' ? 'text-amber-400' : cmd.status === 'sent' ? 'text-sky-400' : cmd.status === 'acknowledged' ? 'text-emerald-400' : 'text-red-400'}`}>
+  1784→                          {cmd.status}
+  1785→                        </Badge>
+  1786→                      </TableCell>
+  1787→                      <TableCell className="text-xs text-muted-foreground">{cmd.sentAt ? formatTime(cmd.sentAt) : '—'}</TableCell>
+  1788→                      <TableCell className="text-xs text-muted-foreground">{timeAgo(cmd.createdAt)}</TableCell>
+  1789→                      <TableCell>
+  1790→                        {cmd.status === 'queued' && (
+  1791→                          <Button variant="ghost" size="sm" onClick={() => deleteApi('command', cmd.id).then(fetchCommands)}>
+  1792→                            <XCircle className="w-3 h-3 text-red-400" />
+  1793→                          </Button>
+  1794→                        )}
+  1795→                      </TableCell>
+  1796→                    </TableRow>
+  1797→                  ))}
+  1798→                  {commands.length === 0 && (
+  1799→                    <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No commands in queue</TableCell></TableRow>
+  1800→                  )}
+  1801→                </TableBody>
+  1802→              </Table>
+  1803→            </ScrollArea>
+  1804→          </CardContent>
+  1805→        </Card>
+  1806→      </motion.div>
+  1807→    )
+  1808→  }
+  1809→
+  1810→  // ═══════════════════════════════════════════════════
+  1811→  // TAB 9: EVENT LOG & DIAGNOSTICS
+  1812→  // ═══════════════════════════════════════════════════
+  1813→
+  1814→  const renderEvents = () => (
+  1815→    <motion.div {...fadeIn} className="space-y-4">
+  1816→      <div className="flex justify-between items-center">
+  1817→        <div><h3 className="text-lg font-semibold">Event Log & Diagnostics</h3><p className="text-xs text-muted-foreground">Real-time device event monitoring</p></div>
+  1818→        <Button variant="outline" size="sm" onClick={() => fetchEvents()}><RefreshCw className="w-3 h-3 mr-1" /> Refresh</Button>
+  1819→      </div>
+  1820→
+  1821→      {/* Filters */}
+  1822→      <div className="flex flex-wrap gap-3">
+  1823→        <Select value={eventDeviceTypeFilter} onValueChange={setEventDeviceTypeFilter}>
+  1824→          <SelectTrigger className="w-48 bg-gray-900 border-border/50"><SelectValue placeholder="Device Type" /></SelectTrigger>
+  1825→          <SelectContent>
+  1826→            <SelectItem value="all">All Device Types</SelectItem>
+  1827→            <SelectItem value="forecourt_controller">Forecourt Controller</SelectItem>
+  1828→            <SelectItem value="dispenser">Dispenser</SelectItem>
+  1829→            <SelectItem value="payment_terminal">Payment Terminal</SelectItem>
+  1830→            <SelectItem value="generator">Generator</SelectItem>
+  1831→            <SelectItem value="surveillance_camera">Camera</SelectItem>
+  1832→            <SelectItem value="fire_alarm">Fire Alarm</SelectItem>
+  1833→            <SelectItem value="utility_meter">Utility Meter</SelectItem>
+  1834→            <SelectItem value="weather_station">Weather Station</SelectItem>
+  1835→          </SelectContent>
+  1836→        </Select>
+  1837→        <Select value={eventSeverityFilter} onValueChange={setEventSeverityFilter}>
+  1838→          <SelectTrigger className="w-40 bg-gray-900 border-border/50"><SelectValue placeholder="Severity" /></SelectTrigger>
+  1839→          <SelectContent>
+  1840→            <SelectItem value="all">All Severities</SelectItem>
+  1841→            <SelectItem value="info">Info</SelectItem>
+  1842→            <SelectItem value="warning">Warning</SelectItem>
+  1843→            <SelectItem value="error">Error</SelectItem>
+  1844→            <SelectItem value="critical">Critical</SelectItem>
+  1845→          </SelectContent>
+  1846→        </Select>
+  1847→        <Badge variant="outline" className="self-center">{filteredEvents.length} events</Badge>
+  1848→      </div>
+  1849→
+  1850→      {/* Events Table */}
+  1851→      <Card className="bg-gray-900/80 border-border/40">
+  1852→        <ScrollArea className="max-h-[600px]">
+  1853→          <Table>
+  1854→            <TableHeader>
+  1855→              <TableRow>
+  1856→                <TableHead>Severity</TableHead>
+  1857→                <TableHead>Type</TableHead>
+  1858→                <TableHead>Event</TableHead>
+  1859→                <TableHead>Message</TableHead>
+  1860→                <TableHead>Time</TableHead>
+  1861→              </TableRow>
+  1862→            </TableHeader>
+  1863→            <TableBody>
+  1864→              {filteredEvents.map(ev => (
+  1865→                <TableRow key={ev.id} className={ev.severity === 'critical' ? 'bg-red-500/5' : ''}>
+  1866→                  <TableCell><SeverityBadge severity={ev.severity} /></TableCell>
+  1867→                  <TableCell className="text-xs capitalize">{ev.deviceType?.replace(/_/g, ' ')}</TableCell>
+  1868→                  <TableCell className="text-xs">{ev.eventType}</TableCell>
+  1869→                  <TableCell className="text-xs max-w-xs truncate">{ev.message}</TableCell>
+  1870→                  <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{formatTime(ev.createdAt)}</TableCell>
+  1871→                </TableRow>
+  1872→              ))}
+  1873→              {filteredEvents.length === 0 && (
+  1874→                <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No events found</TableCell></TableRow>
+  1875→              )}
+  1876→            </TableBody>
+  1877→          </Table>
+  1878→        </ScrollArea>
+  1879→      </Card>
+  1880→
+  1881→      {/* Connection Diagnostics */}
+  1882→      <Card className="bg-gray-900/80 border-border/40">
+  1883→        <CardHeader className="pb-3">
+  1884→          <CardTitle className="text-base flex items-center gap-2"><Activity className="w-4 h-4 text-amber-500" /> Connection Diagnostics</CardTitle>
+  1885→        </CardHeader>
+  1886→        <CardContent>
+  1887→          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  1888→            {/* Controller Status */}
+  1889→            <div>
+  1890→              <h5 className="text-xs font-semibold mb-2 text-muted-foreground">FORECOURT CONTROLLERS</h5>
+  1891→              <div className="space-y-2">
+  1892→                {controllers.map(c => (
+  1893→                  <div key={c.id} className="flex items-center justify-between p-2 rounded border border-border/20 bg-muted/10">
+  1894→                    <div className="flex items-center gap-2">
+  1895→                      <StatusDot status={c.status} />
+  1896→                      <span className="text-xs font-medium">{c.name}</span>
+  1897→                    </div>
+  1898→                    <div className="flex items-center gap-2">
+  1899→                      <span className="text-[10px] text-muted-foreground">{c.ipAddress ?? 'No IP'}</span>
+  1900→                      <Button variant="ghost" size="sm" className="h-6" onClick={() => handleTestConnection(c.id, 'forecourt_controller')}>
+  1901→                        <Signal className="w-3 h-3" />
+  1902→                      </Button>
+  1903→                    </div>
+  1904→                  </div>
+  1905→                ))}
+  1906→                {controllers.length === 0 && <p className="text-xs text-muted-foreground">No controllers</p>}
+  1907→              </div>
+  1908→            </div>
+  1909→
+  1910→            {/* Payment Terminal Status */}
+  1911→            <div>
+  1912→              <h5 className="text-xs font-semibold mb-2 text-muted-foreground">PAYMENT TERMINALS</h5>
+  1913→              <div className="space-y-2">
+  1914→                {paymentTerminals.slice(0, 5).map(t => (
+  1915→                  <div key={t.id} className="flex items-center justify-between p-2 rounded border border-border/20 bg-muted/10">
+  1916→                    <div className="flex items-center gap-2">
+  1917→                      <StatusDot status={t.status} />
+  1918→                      <span className="text-xs font-medium">{t.name}</span>
+  1919→                    </div>
+  1920→                    <span className="text-[10px] text-muted-foreground">{t.ipAddress ?? 'No IP'}</span>
+  1921→                  </div>
+  1922→                ))}
+  1923→                {paymentTerminals.length === 0 && <p className="text-xs text-muted-foreground">No terminals</p>}
+  1924→              </div>
+  1925→            </div>
+  1926→          </div>
+  1927→        </CardContent>
+  1928→      </Card>
+  1929→    </motion.div>
+  1930→  )
+  1931→
+  1932→  // ═══════════════════════════════════════════════════
+  1933→  // MAIN RENDER
+  1934→  // ═══════════════════════════════════════════════════
+  1935→
+  1936→  return (
+  1937→    <div className="h-full flex flex-col">
+  1938→      <style>{`
+  1939→        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+  1940→        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+  1941→        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(245,158,11,0.2); border-radius: 3px; }
+  1942→        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(245,158,11,0.4); }
+  1943→      `}</style>
+  1944→
+  1945→      {/* Header */}
+  1946→      <div className="flex items-center justify-between p-4 border-b border-border/40">
+  1947→        <div className="flex items-center gap-3">
+  1948→          <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+  1949→            <Cpu className="w-4 h-4 text-amber-500" />
+  1950→          </div>
+  1951→          <div>
+  1952→            <h2 className="text-lg font-bold">Device Integration</h2>
+  1953→            <p className="text-xs text-muted-foreground">ERP → Forecourt Controller → Pump Architecture</p>
+  1954→          </div>
+  1955→        </div>
+  1956→        <div className="flex items-center gap-2">
+  1957→          <TooltipProvider>
+  1958→            <Tooltip>
+  1959→              <TooltipTrigger asChild>
+  1960→                <Button variant="outline" size="sm" onClick={() => setRefreshKey(k => k + 1)}>
+  1961→                  <RefreshCw className="w-3 h-3" />
+  1962→                </Button>
+  1963→              </TooltipTrigger>
+  1964→              <TooltipContent>Refresh All Data</TooltipContent>
+  1965→            </Tooltip>
+  1966→          </TooltipProvider>
+  1967→          <Badge variant="outline" className="text-xs text-emerald-400">
+  1968→            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 animate-pulse" /> Live
+  1969→          </Badge>
+  1970→        </div>
+  1971→      </div>
+  1972→
+  1973→      {/* Tabs */}
+  1974→      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+  1975→        <div className="px-4 pt-2 border-b border-border/40">
+  1976→          <TabsList className="bg-transparent h-auto p-0 gap-0 flex-wrap">
+  1977→            {[
+  1978→              { value: 'overview', label: 'Overview', icon: Activity },
+  1979→              { value: 'catalog', label: 'Catalog', icon: Search },
+  1980→              { value: 'controllers', label: 'Controllers', icon: Server },
+  1981→              { value: 'dispensers', label: 'Dispensers', icon: Fuel },
+  1982→              { value: 'atg', label: 'ATG', icon: Droplets },
+  1983→              { value: 'payment', label: 'Payment', icon: CreditCard },
+  1984→              { value: 'other', label: 'Other', icon: Settings },
+  1985→              { value: 'commands', label: 'Commands', icon: Terminal },
+  1986→              { value: 'events', label: 'Events', icon: FileText },
+  1987→            ].map(tab => (
+  1988→              <TabsTrigger key={tab.value} value={tab.value} className="data-[state=active]:bg-amber-500/10 data-[state=active]:text-amber-400 px-3 py-2 text-xs rounded-b-none">
+  1989→                <tab.icon className="w-3 h-3 mr-1" /> {tab.label}
+  1990→              </TabsTrigger>
+  1991→            ))}
+  1992→          </TabsList>
+  1993→        </div>
+  1994→
+  1995→        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+  1996→          {loading && activeTab === 'overview' ? (
+  1997→            <div className="flex items-center justify-center py-20">
+  1998→              <RefreshCw className="w-8 h-8 animate-spin text-amber-500" />
+  1999→            </div>
+  2000→          ) : (
+
+[showing lines 1-2000 of 2018; use offset=2001 with limit to continue reading]

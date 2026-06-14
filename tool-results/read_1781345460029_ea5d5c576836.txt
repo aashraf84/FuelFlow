@@ -1,0 +1,595 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect } from 'react'
+     4→import {
+     5→  ShoppingCart,
+     6→  Package,
+     7→  Car,
+     8→  Ticket,
+     9→  Droplets,
+    10→  Tag,
+    11→  AlertTriangle,
+    12→  Plus,
+    13→  TrendingDown,
+    14→  CheckCircle2,
+    15→} from 'lucide-react'
+    16→import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+    17→import { Badge } from '@/components/ui/badge'
+    18→import { Button } from '@/components/ui/button'
+    19→import { Skeleton } from '@/components/ui/skeleton'
+    20→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    21→import { ScrollArea } from '@/components/ui/scroll-area'
+    22→import {
+    23→  Table,
+    24→  TableBody,
+    25→  TableCell,
+    26→  TableHead,
+    27→  TableHeader,
+    28→  TableRow,
+    29→} from '@/components/ui/table'
+    30→import { Separator } from '@/components/ui/separator'
+    31→import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+    32→import { Input } from '@/components/ui/input'
+    33→import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+    34→import { Progress } from '@/components/ui/progress'
+    35→
+    36→interface Product {
+    37→  id: string
+    38→  name: string
+    39→  sku: string | null
+    40→  category: string | null
+    41→  price: number
+    42→  costPrice: number | null
+    43→  stockQty: number
+    44→  minStock: number
+    45→  maxStock: number
+    46→  unit: string
+    47→  stockStatus: string
+    48→}
+    49→
+    50→interface CarWashSession {
+    51→  id: string
+    52→  vehiclePlate: string | null
+    53→  washType: string
+    54→  amount: number
+    55→  paymentMethod: string
+    56→  status: string
+    57→  startedAt: string
+    58→}
+    59→
+    60→interface LotterySale {
+    61→  id: string
+    62→  gameType: string
+    63→  ticketCount: number
+    64→  saleAmount: number
+    65→  commission: number
+    66→  createdAt: string
+    67→}
+    68→
+    69→interface LubricantProduct {
+    70→  id: string
+    71→  name: string
+    72→  brand: string | null
+    73→  viscosity: string | null
+    74→  category: string | null
+    75→  price: number
+    76→  costPrice: number | null
+    77→  stockQty: number
+    78→  minStock: number
+    79→  isActive: boolean
+    80→}
+    81→
+    82→interface Promotion {
+    83→  id: string
+    84→  name: string
+    85→  description: string | null
+    86→  discountType: string
+    87→  discountValue: number
+    88→  applicableTo: string
+    89→  validFrom: string
+    90→  validTo: string
+    91→  isActive: boolean
+    92→  _count?: { usage: number }
+    93→}
+    94→
+    95→function LoadingSkeleton() {
+    96→  return (
+    97→    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    98→      {Array.from({ length: 4 }).map((_, i) => (
+    99→        <Card key={i}><CardContent className="p-4"><Skeleton className="h-40 w-full" /></CardContent></Card>
+   100→      ))}
+   101→    </div>
+   102→  )
+   103→}
+   104→
+   105→export default function RetailModule() {
+   106→  const [products, setProducts] = useState<Product[]>([])
+   107→  const [lubricants, setLubricants] = useState<LubricantProduct[]>([])
+   108→  const [carWashSessions, setCarWashSessions] = useState<CarWashSession[]>([])
+   109→  const [lotterySales, setLotterySales] = useState<LotterySale[]>([])
+   110→  const [promotions, setPromotions] = useState<Promotion[]>([])
+   111→  const [carWashRevenue, setCarWashRevenue] = useState(0)
+   112→  const [lotteryTotal, setLotteryTotal] = useState(0)
+   113→  const [lotteryCommission, setLotteryCommission] = useState(0)
+   114→  const [loading, setLoading] = useState(true)
+   115→  const [error, setError] = useState<string | null>(null)
+   116→  const [activeTab, setActiveTab] = useState('products')
+   117→  const [promotionDialogOpen, setPromotionDialogOpen] = useState(false)
+   118→
+   119→  useEffect(() => {
+   120→    async function fetchData() {
+   121→      try {
+   122→        setLoading(true)
+   123→        const [retailRes, carWashRes, lotteryRes, promoRes] = await Promise.all([
+   124→          fetch('/api/retail'),
+   125→          fetch('/api/car-wash'),
+   126→          fetch('/api/lottery'),
+   127→          fetch('/api/promotions'),
+   128→        ])
+   129→        if (retailRes.ok) {
+   130→          const data = await retailRes.json()
+   131→          setProducts(data.products || [])
+   132→        }
+   133→        if (carWashRes.ok) {
+   134→          const data = await carWashRes.json()
+   135→          setCarWashSessions(data.sessions || [])
+   136→          setCarWashRevenue(data.summary?.totalRevenue || 0)
+   137→        }
+   138→        if (lotteryRes.ok) {
+   139→          const data = await lotteryRes.json()
+   140→          setLotterySales(data.sales || [])
+   141→          setLotteryTotal(data.summary?.totalRevenue || 0)
+   142→          setLotteryCommission(data.summary?.totalCommission || 0)
+   143→        }
+   144→        if (promoRes.ok) {
+   145→          const data = await promoRes.json()
+   146→          setPromotions(data.promotions || [])
+   147→        }
+   148→
+   149→        // Fetch lubricants
+   150→        try {
+   151→          const lubRes = await fetch('/api/lubricants')
+   152→          if (lubRes.ok) {
+   153→            const data = await lubRes.json()
+   154→            setLubricants(data.products || [])
+   155→          }
+   156→        } catch {}
+   157→      } catch (err) {
+   158→        setError(err instanceof Error ? err.message : 'Unknown error')
+   159→      } finally {
+   160→        setLoading(false)
+   161→      }
+   162→    }
+   163→    fetchData()
+   164→  }, [])
+   165→
+   166→  if (loading) return <LoadingSkeleton />
+   167→  if (error) {
+   168→    return (
+   169→      <Card>
+   170→        <CardContent className="p-6 text-center">
+   171→          <AlertTriangle className="size-8 text-red-500 mx-auto mb-2" />
+   172→          <p className="text-sm text-muted-foreground">{error}</p>
+   173→          <Button variant="outline" size="sm" className="mt-2" onClick={() => window.location.reload()}>Retry</Button>
+   174→        </CardContent>
+   175→      </Card>
+   176→    )
+   177→  }
+   178→
+   179→  const lowStockProducts = products.filter(p => p.stockStatus === 'low_stock' || p.stockStatus === 'out_of_stock')
+   180→
+   181→  return (
+   182→    <div className="space-y-4">
+   183→      <Tabs value={activeTab} onValueChange={setActiveTab}>
+   184→        <TabsList className="flex-wrap">
+   185→          <TabsTrigger value="products">Products</TabsTrigger>
+   186→          <TabsTrigger value="inventory">Inventory</TabsTrigger>
+   187→          <TabsTrigger value="car-wash">Car Wash</TabsTrigger>
+   188→          <TabsTrigger value="lottery">Lottery</TabsTrigger>
+   189→          <TabsTrigger value="lubricants">Lubricants</TabsTrigger>
+   190→          <TabsTrigger value="promotions">Promotions</TabsTrigger>
+   191→        </TabsList>
+   192→
+   193→        {/* Products */}
+   194→        <TabsContent value="products" className="mt-4">
+   195→          <Card>
+   196→            <CardHeader className="pb-2">
+   197→              <div className="flex items-center justify-between">
+   198→                <div>
+   199→                  <CardTitle className="text-sm font-semibold">Retail Products</CardTitle>
+   200→                  <CardDescription className="text-xs">{products.length} products</CardDescription>
+   201→                </div>
+   202→                {lowStockProducts.length > 0 && (
+   203→                  <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+   204→                    {lowStockProducts.length} low stock
+   205→                  </Badge>
+   206→                )}
+   207→              </div>
+   208→            </CardHeader>
+   209→            <CardContent className="p-0">
+   210→              <ScrollArea className="max-h-96">
+   211→                <Table>
+   212→                  <TableHeader>
+   213→                    <TableRow>
+   214→                      <TableHead className="text-xs">Product</TableHead>
+   215→                      <TableHead className="text-xs">Category</TableHead>
+   216→                      <TableHead className="text-xs text-right">Price</TableHead>
+   217→                      <TableHead className="text-xs text-right">Cost</TableHead>
+   218→                      <TableHead className="text-xs text-right">Stock</TableHead>
+   219→                      <TableHead className="text-xs">Status</TableHead>
+   220→                    </TableRow>
+   221→                  </TableHeader>
+   222→                  <TableBody>
+   223→                    {products.map((p) => (
+   224→                      <TableRow key={p.id}>
+   225→                        <TableCell className="text-xs font-medium">{p.name}</TableCell>
+   226→                        <TableCell>
+   227→                          <Badge variant="outline" className="text-[9px] px-1.5 py-0 capitalize">
+   228→                            {p.category || 'N/A'}
+   229→                          </Badge>
+   230→                        </TableCell>
+   231→                        <TableCell className="text-xs text-right">Rs. {p.price.toLocaleString()}</TableCell>
+   232→                        <TableCell className="text-xs text-right text-muted-foreground">
+   233→                          {p.costPrice ? `Rs. ${p.costPrice.toLocaleString()}` : '-'}
+   234→                        </TableCell>
+   235→                        <TableCell className="text-xs text-right">{p.stockQty} {p.unit}</TableCell>
+   236→                        <TableCell>
+   237→                          <Badge
+   238→                            variant={
+   239→                              p.stockStatus === 'out_of_stock' ? 'destructive' :
+   240→                              p.stockStatus === 'low_stock' ? 'secondary' : 'outline'
+   241→                            }
+   242→                            className="text-[9px] px-1.5 py-0"
+   243→                          >
+   244→                            {p.stockStatus === 'out_of_stock' ? 'Out of Stock' :
+   245→                             p.stockStatus === 'low_stock' ? 'Low Stock' : 'In Stock'}
+   246→                          </Badge>
+   247→                        </TableCell>
+   248→                      </TableRow>
+   249→                    ))}
+   250→                  </TableBody>
+   251→                </Table>
+   252→              </ScrollArea>
+   253→            </CardContent>
+   254→          </Card>
+   255→        </TabsContent>
+   256→
+   257→        {/* Inventory */}
+   258→        <TabsContent value="inventory" className="mt-4">
+   259→          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+   260→            <Card>
+   261→              <CardContent className="p-4">
+   262→                <p className="text-xs text-muted-foreground">Total Products</p>
+   263→                <p className="text-2xl font-bold">{products.length}</p>
+   264→              </CardContent>
+   265→            </Card>
+   266→            <Card>
+   267→              <CardContent className="p-4">
+   268→                <p className="text-xs text-muted-foreground">Low Stock Items</p>
+   269→                <p className="text-2xl font-bold text-amber-500">{lowStockProducts.length}</p>
+   270→              </CardContent>
+   271→            </Card>
+   272→            <Card>
+   273→              <CardContent className="p-4">
+   274→                <p className="text-xs text-muted-foreground">Out of Stock</p>
+   275→                <p className="text-2xl font-bold text-red-500">
+   276→                  {products.filter(p => p.stockStatus === 'out_of_stock').length}
+   277→                </p>
+   278→              </CardContent>
+   279→            </Card>
+   280→          </div>
+   281→          <Card>
+   282→            <CardHeader className="pb-2">
+   283→              <div className="flex items-center gap-2">
+   284→                <TrendingDown className="size-4 text-amber-500" />
+   285→                <CardTitle className="text-sm font-semibold">Stock Levels & Reorder Suggestions</CardTitle>
+   286→              </div>
+   287→            </CardHeader>
+   288→            <CardContent>
+   289→              <ScrollArea className="max-h-72">
+   290→                <div className="space-y-3">
+   291→                  {products.map((p) => (
+   292→                    <div key={p.id} className="space-y-1">
+   293→                      <div className="flex items-center justify-between text-xs">
+   294→                        <span className="font-medium">{p.name}</span>
+   295→                        <span className="text-muted-foreground">
+   296→                          {p.stockQty} / {p.maxStock} {p.unit}
+   297→                        </span>
+   298→                      </div>
+   299→                      <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+   300→                        <div
+   301→                          className={`h-full rounded-full ${
+   302→                            p.stockQty <= p.minStock ? 'bg-red-500' :
+   303→                            p.stockQty <= p.minStock * 2 ? 'bg-amber-500' : 'bg-emerald-500'
+   304→                          }`}
+   305→                          style={{ width: `${Math.min((p.stockQty / p.maxStock) * 100, 100)}%` }}
+   306→                        />
+   307→                      </div>
+   308→                      {p.stockQty <= p.minStock && (
+   309→                        <p className="text-[10px] text-red-500">
+   310→                          Reorder suggested: {p.minStock * 3 - p.stockQty} {p.unit}
+   311→                        </p>
+   312→                      )}
+   313→                    </div>
+   314→                  ))}
+   315→                </div>
+   316→              </ScrollArea>
+   317→            </CardContent>
+   318→          </Card>
+   319→        </TabsContent>
+   320→
+   321→        {/* Car Wash */}
+   322→        <TabsContent value="car-wash" className="mt-4 space-y-4">
+   323→          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+   324→            <Card>
+   325→              <CardContent className="p-4">
+   326→                <div className="flex items-center justify-between">
+   327→                  <div>
+   328→                    <p className="text-xs text-muted-foreground">Total Revenue</p>
+   329→                    <p className="text-xl font-bold">Rs. {Math.round(carWashRevenue).toLocaleString()}</p>
+   330→                  </div>
+   331→                  <Car className="size-8 text-amber-500/30" />
+   332→                </div>
+   333→              </CardContent>
+   334→            </Card>
+   335→            <Card>
+   336→              <CardContent className="p-4">
+   337→                <p className="text-xs text-muted-foreground">Total Sessions</p>
+   338→                <p className="text-xl font-bold">{carWashSessions.length}</p>
+   339→              </CardContent>
+   340→            </Card>
+   341→            <Card>
+   342→              <CardContent className="p-4">
+   343→                <p className="text-xs text-muted-foreground">Avg. Ticket</p>
+   344→                <p className="text-xl font-bold">
+   345→                  Rs. {carWashSessions.length > 0 ? Math.round(carWashRevenue / carWashSessions.length).toLocaleString() : 0}
+   346→                </p>
+   347→              </CardContent>
+   348→            </Card>
+   349→          </div>
+   350→          <Card>
+   351→            <CardHeader className="pb-2">
+   352→              <CardTitle className="text-sm font-semibold">Car Wash Sessions</CardTitle>
+   353→            </CardHeader>
+   354→            <CardContent className="p-0">
+   355→              <ScrollArea className="max-h-72">
+   356→                <Table>
+   357→                  <TableHeader>
+   358→                    <TableRow>
+   359→                      <TableHead className="text-xs">Vehicle</TableHead>
+   360→                      <TableHead className="text-xs">Type</TableHead>
+   361→                      <TableHead className="text-xs text-right">Amount</TableHead>
+   362→                      <TableHead className="text-xs">Payment</TableHead>
+   363→                      <TableHead className="text-xs">Time</TableHead>
+   364→                    </TableRow>
+   365→                  </TableHeader>
+   366→                  <TableBody>
+   367→                    {carWashSessions.length === 0 ? (
+   368→                      <TableRow>
+   369→                        <TableCell colSpan={5} className="text-center text-xs text-muted-foreground py-8">
+   370→                          No car wash sessions
+   371→                        </TableCell>
+   372→                      </TableRow>
+   373→                    ) : (
+   374→                      carWashSessions.map((s) => (
+   375→                        <TableRow key={s.id}>
+   376→                          <TableCell className="text-xs font-mono">{s.vehiclePlate || 'N/A'}</TableCell>
+   377→                          <TableCell className="text-xs capitalize">{s.washType}</TableCell>
+   378→                          <TableCell className="text-xs text-right font-medium">Rs. {s.amount.toLocaleString()}</TableCell>
+   379→                          <TableCell className="text-xs capitalize">{s.paymentMethod}</TableCell>
+   380→                          <TableCell className="text-xs font-mono">{new Date(s.startedAt).toLocaleString()}</TableCell>
+   381→                        </TableRow>
+   382→                      ))
+   383→                    )}
+   384→                  </TableBody>
+   385→                </Table>
+   386→              </ScrollArea>
+   387→            </CardContent>
+   388→          </Card>
+   389→        </TabsContent>
+   390→
+   391→        {/* Lottery */}
+   392→        <TabsContent value="lottery" className="mt-4 space-y-4">
+   393→          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+   394→            <Card>
+   395→              <CardContent className="p-4">
+   396→                <p className="text-xs text-muted-foreground">Total Sales</p>
+   397→                <p className="text-xl font-bold">Rs. {Math.round(lotteryTotal).toLocaleString()}</p>
+   398→              </CardContent>
+   399→            </Card>
+   400→            <Card>
+   401→              <CardContent className="p-4">
+   402→                <p className="text-xs text-muted-foreground">Commission Earned</p>
+   403→                <p className="text-xl font-bold text-emerald-500">Rs. {Math.round(lotteryCommission).toLocaleString()}</p>
+   404→              </CardContent>
+   405→            </Card>
+   406→            <Card>
+   407→              <CardContent className="p-4">
+   408→                <p className="text-xs text-muted-foreground">Tickets Sold</p>
+   409→                <p className="text-xl font-bold">{lotterySales.reduce((sum, s) => sum + s.ticketCount, 0)}</p>
+   410→              </CardContent>
+   411→            </Card>
+   412→          </div>
+   413→          <Card>
+   414→            <CardHeader className="pb-2">
+   415→              <CardTitle className="text-sm font-semibold">Lottery Sales</CardTitle>
+   416→            </CardHeader>
+   417→            <CardContent className="p-0">
+   418→              <ScrollArea className="max-h-72">
+   419→                <Table>
+   420→                  <TableHeader>
+   421→                    <TableRow>
+   422→                      <TableHead className="text-xs">Game Type</TableHead>
+   423→                      <TableHead className="text-xs text-right">Tickets</TableHead>
+   424→                      <TableHead className="text-xs text-right">Sale Amount</TableHead>
+   425→                      <TableHead className="text-xs text-right">Commission</TableHead>
+   426→                      <TableHead className="text-xs">Date</TableHead>
+   427→                    </TableRow>
+   428→                  </TableHeader>
+   429→                  <TableBody>
+   430→                    {lotterySales.length === 0 ? (
+   431→                      <TableRow>
+   432→                        <TableCell colSpan={5} className="text-center text-xs text-muted-foreground py-8">No lottery sales</TableCell>
+   433→                      </TableRow>
+   434→                    ) : (
+   435→                      lotterySales.map((s) => (
+   436→                        <TableRow key={s.id}>
+   437→                          <TableCell className="text-xs capitalize">{s.gameType}</TableCell>
+   438→                          <TableCell className="text-xs text-right">{s.ticketCount}</TableCell>
+   439→                          <TableCell className="text-xs text-right">Rs. {s.saleAmount.toLocaleString()}</TableCell>
+   440→                          <TableCell className="text-xs text-right text-emerald-600">Rs. {s.commission.toLocaleString()}</TableCell>
+   441→                          <TableCell className="text-xs font-mono">{new Date(s.createdAt).toLocaleDateString()}</TableCell>
+   442→                        </TableRow>
+   443→                      ))
+   444→                    )}
+   445→                  </TableBody>
+   446→                </Table>
+   447→              </ScrollArea>
+   448→            </CardContent>
+   449→          </Card>
+   450→        </TabsContent>
+   451→
+   452→        {/* Lubricants */}
+   453→        <TabsContent value="lubricants" className="mt-4">
+   454→          <Card>
+   455→            <CardHeader className="pb-2">
+   456→              <CardTitle className="text-sm font-semibold">Lubricant Products</CardTitle>
+   457→              <CardDescription className="text-xs">{lubricants.length} products</CardDescription>
+   458→            </CardHeader>
+   459→            <CardContent className="p-0">
+   460→              <ScrollArea className="max-h-96">
+   461→                <Table>
+   462→                  <TableHeader>
+   463→                    <TableRow>
+   464→                      <TableHead className="text-xs">Product</TableHead>
+   465→                      <TableHead className="text-xs">Brand</TableHead>
+   466→                      <TableHead className="text-xs">Viscosity</TableHead>
+   467→                      <TableHead className="text-xs text-right">Price</TableHead>
+   468→                      <TableHead className="text-xs text-right">Stock</TableHead>
+   469→                      <TableHead className="text-xs">Status</TableHead>
+   470→                    </TableRow>
+   471→                  </TableHeader>
+   472→                  <TableBody>
+   473→                    {lubricants.length === 0 ? (
+   474→                      <TableRow>
+   475→                        <TableCell colSpan={6} className="text-center text-xs text-muted-foreground py-8">No lubricant products</TableCell>
+   476→                      </TableRow>
+   477→                    ) : (
+   478→                      lubricants.map((l) => (
+   479→                        <TableRow key={l.id}>
+   480→                          <TableCell className="text-xs font-medium">{l.name}</TableCell>
+   481→                          <TableCell className="text-xs">{l.brand || 'N/A'}</TableCell>
+   482→                          <TableCell className="text-xs">{l.viscosity || 'N/A'}</TableCell>
+   483→                          <TableCell className="text-xs text-right">Rs. {l.price.toLocaleString()}</TableCell>
+   484→                          <TableCell className="text-xs text-right">{l.stockQty}</TableCell>
+   485→                          <TableCell>
+   486→                            <Badge
+   487→                              variant={l.stockQty <= l.minStock ? 'destructive' : 'outline'}
+   488→                              className="text-[9px] px-1.5 py-0"
+   489→                            >
+   490→                              {l.stockQty <= l.minStock ? 'Low' : 'OK'}
+   491→                            </Badge>
+   492→                          </TableCell>
+   493→                        </TableRow>
+   494→                      ))
+   495→                    )}
+   496→                  </TableBody>
+   497→                </Table>
+   498→              </ScrollArea>
+   499→            </CardContent>
+   500→          </Card>
+   501→        </TabsContent>
+   502→
+   503→        {/* Promotions */}
+   504→        <TabsContent value="promotions" className="mt-4">
+   505→          <div className="flex items-center justify-between mb-4">
+   506→            <p className="text-xs text-muted-foreground">{promotions.length} active promotions</p>
+   507→            <Dialog open={promotionDialogOpen} onOpenChange={setPromotionDialogOpen}>
+   508→              <DialogTrigger asChild>
+   509→                <Button size="sm" className="gap-1"><Plus className="size-3" /> New Promotion</Button>
+   510→              </DialogTrigger>
+   511→              <DialogContent>
+   512→                <DialogHeader><DialogTitle>Create Promotion</DialogTitle></DialogHeader>
+   513→                <div className="space-y-3">
+   514→                  <div><label className="text-xs font-medium">Name</label><Input placeholder="Promotion name" className="mt-1" /></div>
+   515→                  <div>
+   516→                    <label className="text-xs font-medium">Discount Type</label>
+   517→                    <Select><SelectTrigger className="mt-1"><SelectValue placeholder="Select type" /></SelectTrigger>
+   518→                      <SelectContent>
+   519→                        <SelectItem value="percentage">Percentage</SelectItem>
+   520→                        <SelectItem value="fixed">Fixed Amount</SelectItem>
+   521→                        <SelectItem value="bogo">Buy One Get One</SelectItem>
+   522→                      </SelectContent>
+   523→                    </Select>
+   524→                  </div>
+   525→                  <div><label className="text-xs font-medium">Discount Value</label><Input type="number" placeholder="0" className="mt-1" /></div>
+   526→                  <div>
+   527→                    <label className="text-xs font-medium">Applicable To</label>
+   528→                    <Select><SelectTrigger className="mt-1"><SelectValue placeholder="Select" /></SelectTrigger>
+   529→                      <SelectContent>
+   530→                        <SelectItem value="all">All</SelectItem>
+   531→                        <SelectItem value="fuel">Fuel Only</SelectItem>
+   532→                        <SelectItem value="retail">Retail Only</SelectItem>
+   533→                        <SelectItem value="car_wash">Car Wash</SelectItem>
+   534→                      </SelectContent>
+   535→                    </Select>
+   536→                  </div>
+   537→                  <Button className="w-full" onClick={() => setPromotionDialogOpen(false)}>Create Promotion</Button>
+   538→                </div>
+   539→              </DialogContent>
+   540→            </Dialog>
+   541→          </div>
+   542→          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   543→            {promotions.length === 0 ? (
+   544→              <Card className="col-span-full">
+   545→                <CardContent className="p-6 text-center">
+   546→                  <Tag className="size-8 text-muted-foreground mx-auto mb-2 opacity-50" />
+   547→                  <p className="text-xs text-muted-foreground">No active promotions</p>
+   548→                </CardContent>
+   549→              </Card>
+   550→            ) : (
+   551→              promotions.map((promo) => (
+   552→                <Card key={promo.id}>
+   553→                  <CardHeader className="pb-2 p-4">
+   554→                    <div className="flex items-center justify-between">
+   555→                      <CardTitle className="text-sm font-semibold">{promo.name}</CardTitle>
+   556→                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize">
+   557→                        {promo.discountType}
+   558→                      </Badge>
+   559→                    </div>
+   560→                    {promo.description && (
+   561→                      <CardDescription className="text-[10px]">{promo.description}</CardDescription>
+   562→                    )}
+   563→                  </CardHeader>
+   564→                  <CardContent className="p-4 pt-0 space-y-2 text-xs">
+   565→                    <div className="flex justify-between">
+   566→                      <span className="text-muted-foreground">Discount:</span>
+   567→                      <span className="font-bold text-amber-500">
+   568→                        {promo.discountType === 'percentage' ? `${promo.discountValue}%` : `Rs. ${promo.discountValue}`}
+   569→                      </span>
+   570→                    </div>
+   571→                    <div className="flex justify-between">
+   572→                      <span className="text-muted-foreground">Applies to:</span>
+   573→                      <span className="capitalize">{promo.applicableTo}</span>
+   574→                    </div>
+   575→                    <div className="flex justify-between">
+   576→                      <span className="text-muted-foreground">Valid:</span>
+   577→                      <span>{new Date(promo.validFrom).toLocaleDateString()} - {new Date(promo.validTo).toLocaleDateString()}</span>
+   578→                    </div>
+   579→                    {promo._count && (
+   580→                      <div className="flex justify-between">
+   581→                        <span className="text-muted-foreground">Usage:</span>
+   582→                        <span>{promo._count.usage} times</span>
+   583→                      </div>
+   584→                    )}
+   585→                  </CardContent>
+   586→                </Card>
+   587→              ))
+   588→            )}
+   589→          </div>
+   590→        </TabsContent>
+   591→      </Tabs>
+   592→    </div>
+   593→  )
+   594→}
+   595→

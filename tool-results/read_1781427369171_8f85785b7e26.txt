@@ -1,0 +1,817 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useCallback } from 'react'
+     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→import {
+     6→  Truck,
+     7→  Car,
+     8→  CreditCard,
+     9→  Radio,
+    10→  Receipt,
+    11→  ChevronRight,
+    12→  Plus,
+    13→  Search,
+    14→  ArrowUpRight,
+    15→  ArrowDownRight,
+    16→  AlertTriangle,
+    17→  CheckCircle2,
+    18→  XCircle,
+    19→  Clock,
+    20→  Signal,
+    21→  Wallet,
+    22→  RefreshCw,
+    23→  Loader2,
+    24→} from 'lucide-react'
+    25→import { useAppStore } from '@/stores/app-store'
+    26→
+    27→// ── Types ──────────────────────────────────────────────────
+    28→
+    29→interface FleetAccount {
+    30→  id: string
+    31→  companyName: string
+    32→  contactPerson: string
+    33→  phone: string
+    34→  email: string
+    35→  address: string | null
+    36→  creditLimit: number
+    37→  currentBalance: number
+    38→  dailyLimit: number | null
+    39→  monthlyLimit: number | null
+    40→  fuelTypes: string | null
+    41→  paymentTerms: string | null
+    42→  taxExempt: boolean
+    43→  status: string
+    44→  vehicleCount: number
+    45→  driverCount: number
+    46→  fuelCardCount: number
+    47→  fuelingCount: number
+    48→  vehicles: FleetVehicle[]
+    49→  drivers: FleetDriver[]
+    50→  fuelCards: FleetFuelCard[]
+    51→  createdAt: string
+    52→  updatedAt: string
+    53→}
+    54→
+    55→interface FleetVehicle {
+    56→  id: string
+    57→  plateNumber: string
+    58→  make: string | null
+    59→  model: string | null
+    60→  year: number | null
+    61→  vehicleType: string | null
+    62→  rfidTag: string | null
+    63→  fuelType: string | null
+    64→  dailyLimit: number | null
+    65→  isActive: boolean
+    66→}
+    67→
+    68→interface FleetDriver {
+    69→  id: string
+    70→  name: string
+    71→  phone: string | null
+    72→  licenseNumber: string | null
+    73→  isActive: boolean
+    74→}
+    75→
+    76→interface FleetFuelCard {
+    77→  id: string
+    78→  cardNumber: string
+    79→  cardType: string
+    80→  rfidTag: string | null
+    81→  dailyLimit: number | null
+    82→  monthlyLimit: number | null
+    83→  balance: number
+    84→  isActive: boolean
+    85→  expiryDate: string | null
+    86→}
+    87→
+    88→interface RFIDReader {
+    89→  id: string
+    90→  name: string
+    91→  code: string
+    92→  location: string | null
+    93→  ipAddress: string | null
+    94→  status: string
+    95→  isActive: boolean
+    96→  lastReading: string | null
+    97→  totalReads: number
+    98→}
+    99→
+   100→interface FleetSummary {
+   101→  totalAccounts: number
+   102→  activeAccounts: number
+   103→  totalVehicles: number
+   104→  totalDrivers: number
+   105→  totalFuelCards: number
+   106→  totalCreditLimit: number
+   107→  totalCurrentBalance: number
+   108→  totalOutstanding: number
+   109→}
+   110→
+   111→// ── Helpers ───────────────────────────────────────────────
+   112→
+   113→const pkr = (n: number) => `PKR ${n.toLocaleString()}`
+   114→
+   115→const statusConfig: Record<string, { dot: string; label: string; text: string }> = {
+   116→  active: { dot: 'macos-status-online', label: 'Active', text: 'text-emerald-600 dark:text-emerald-400' },
+   117→  suspended: { dot: 'macos-status-error', label: 'Suspended', text: 'text-red-500' },
+   118→  expired: { dot: 'macos-status-offline', label: 'Expired', text: 'text-muted-foreground' },
+   119→  warning: { dot: 'macos-status-warning', label: 'Warning', text: 'text-teal-500' },
+   120→  online: { dot: 'macos-status-online', label: 'Online', text: 'text-emerald-600 dark:text-emerald-400' },
+   121→  error: { dot: 'macos-status-error', label: 'Error', text: 'text-red-500' },
+   122→  inactive: { dot: 'macos-status-offline', label: 'Inactive', text: 'text-muted-foreground' },
+   123→}
+   124→
+   125→type TabKey = 'accounts' | 'vehicles' | 'cards' | 'rfid' | 'transactions'
+   126→
+   127→const tabs: { key: TabKey; label: string; icon: React.ElementType }[] = [
+   128→  { key: 'accounts', label: 'Fleet Accounts', icon: Truck },
+   129→  { key: 'vehicles', label: 'Vehicles', icon: Car },
+   130→  { key: 'cards', label: 'Fuel Cards', icon: CreditCard },
+   131→  { key: 'rfid', label: 'RFID Readers', icon: Radio },
+   132→  { key: 'transactions', label: 'Transactions', icon: Receipt },
+   133→]
+   134→
+   135→// ── Skeleton ───────────────────────────────────────────────
+   136→
+   137→function SkeletonTable({ rows = 5 }: { rows?: number }) {
+   138→  return (
+   139→    <div className="macos-card overflow-hidden">
+   140→      <div className="px-4 py-3 border-b border-border">
+   141→        <div className="h-4 w-32 rounded bg-muted/40 animate-pulse" />
+   142→      </div>
+   143→      <div className="divide-y divide-border/30">
+   144→        {Array.from({ length: rows }).map((_, i) => (
+   145→          <div key={i} className="flex items-center gap-4 px-4 py-3">
+   146→            <div className="h-3 w-16 rounded bg-muted/30 animate-pulse" />
+   147→            <div className="h-3 w-24 rounded bg-muted/30 animate-pulse" />
+   148→            <div className="h-3 w-20 rounded bg-muted/30 animate-pulse" />
+   149→            <div className="h-3 w-12 rounded bg-muted/30 animate-pulse ml-auto" />
+   150→          </div>
+   151→        ))}
+   152→      </div>
+   153→    </div>
+   154→  )
+   155→}
+   156→
+   157→function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => void }) {
+   158→  return (
+   159→    <div className="macos-card p-5">
+   160→      <div className="flex flex-col items-center gap-3 text-center">
+   161→        <AlertTriangle className="size-8 text-teal-500" />
+   162→        <p className="text-[13px] text-muted-foreground">{message}</p>
+   163→        <button onClick={onRetry} className="macos-btn gap-1.5">
+   164→          <RefreshCw className="size-3.5" /> Retry
+   165→        </button>
+   166→      </div>
+   167→    </div>
+   168→  )
+   169→}
+   170→
+   171→// ── Component ─────────────────────────────────────────────
+   172→
+   173→export default function FleetModule() {
+   174→  const [activeTab, setActiveTab] = useState<TabKey>('accounts')
+   175→  const { selectedStation } = useAppStore()
+   176→
+   177→  // Data state
+   178→  const [fleetAccounts, setFleetAccounts] = useState<FleetAccount[]>([])
+   179→  const [summary, setSummary] = useState<FleetSummary | null>(null)
+   180→  const [rfidReaders, setRfidReaders] = useState<RFIDReader[]>([])
+   181→  const [loading, setLoading] = useState(true)
+   182→  const [error, setError] = useState<string | null>(null)
+   183→
+   184→  const fetchData = useCallback(async () => {
+   185→    setLoading(true)
+   186→    setError(null)
+   187→    try {
+   188→      const [fleetRes, rfidRes] = await Promise.all([
+   189→        fetch('/api/fleet?includeDetails=true'),
+   190→        fetch('/api/rfid-readers'),
+   191→      ])
+   192→
+   193→      if (!fleetRes.ok || !rfidRes.ok) {
+   194→        throw new Error('Failed to fetch fleet data')
+   195→      }
+   196→
+   197→      const fleetData = await fleetRes.json()
+   198→      const rfidData = await rfidRes.json()
+   199→
+   200→      setFleetAccounts(fleetData.fleetAccounts || [])
+   201→      setSummary(fleetData.summary || null)
+   202→      setRfidReaders(rfidData.readers || [])
+   203→    } catch (err) {
+   204→      console.error('FleetModule fetch error:', err)
+   205→      setError('Unable to load fleet data. Please try again.')
+   206→    } finally {
+   207→      setLoading(false)
+   208→    }
+   209→  }, [])
+   210→
+   211→  useEffect(() => {
+   212→    fetchData()
+   213→  }, [fetchData])
+   214→
+   215→  // Derived values
+   216→  const allVehicles = fleetAccounts.flatMap(a => a.vehicles || [])
+   217→  const allFuelCards = fleetAccounts.flatMap(a => a.fuelCards || [])
+   218→  const totalVehicles = summary?.totalVehicles ?? allVehicles.length
+   219→  const totalCards = summary?.totalFuelCards ?? allFuelCards.length
+   220→  const totalOutstanding = summary?.totalCurrentBalance ?? fleetAccounts.reduce((s, a) => s + a.currentBalance, 0)
+   221→
+   222→  if (error) {
+   223→    return <ErrorBanner message={error} onRetry={fetchData} />
+   224→  }
+   225→
+   226→  return (
+   227→    <div className="space-y-5" style={{ fontStyle: 'normal !important' }}>
+   228→      {/* ── Summary Stats ── */}
+   229→      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+   230→        {[
+   231→          { label: 'Fleet Accounts', value: (summary?.totalAccounts ?? fleetAccounts.length).toString(), icon: Truck, accent: false },
+   232→          { label: 'Total Vehicles', value: totalVehicles.toString(), icon: Car, accent: false },
+   233→          { label: 'Active Cards', value: totalCards.toString(), icon: CreditCard, accent: false },
+   234→          { label: 'Outstanding', value: pkr(totalOutstanding), icon: Wallet, accent: true },
+   235→        ].map((stat, i) => (
+   236→          <motion.div
+   237→            key={stat.label}
+   238→            initial={{ opacity: 0, y: 8 }}
+   239→            animate={{ opacity: 1, y: 0 }}
+   240→            transition={{ delay: i * 0.05, duration: 0.3 }}
+   241→            className="macos-card p-4"
+   242→          >
+   243→            <div className="flex items-start justify-between">
+   244→              <div>
+   245→                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{stat.label}</p>
+   246→                <p className={`text-[20px] font-bold mt-1 ${stat.accent ? 'fuel-text-gradient' : 'text-foreground'}`}>
+   247→                  {loading ? <span className="inline-block w-16 h-5 rounded bg-muted/30 animate-pulse" /> : stat.value}
+   248→                </p>
+   249→              </div>
+   250→              <div className={`size-8 rounded-lg flex items-center justify-center ${stat.accent ? 'bg-teal-500/10' : 'bg-black/[0.03] dark:bg-white/[0.05]'}`}>
+   251→                <stat.icon className={`size-4 ${stat.accent ? 'text-teal-500' : 'text-muted-foreground'}`} strokeWidth={1.5} />
+   252→              </div>
+   253→            </div>
+   254→          </motion.div>
+   255→        ))}
+   256→      </div>
+   257→
+   258→      {/* ── Tab Bar ── */}
+   259→      <div className="flex items-center gap-1 overflow-x-auto pb-1 -mb-1">
+   260→        {tabs.map((tab) => {
+   261→          const isActive = activeTab === tab.key
+   262→          const Icon = tab.icon
+   263→          return (
+   264→            <button
+   265→              key={tab.key}
+   266→              onClick={() => setActiveTab(tab.key)}
+   267→              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all duration-150 whitespace-nowrap ${
+   268→                isActive
+   269→                  ? 'bg-teal-500/10 text-teal-600 dark:text-teal-400'
+   270→                  : 'text-muted-foreground hover:bg-black/[0.03] dark:hover:bg-white/[0.05] hover:text-foreground'
+   271→              }`}
+   272→            >
+   273→              <Icon className="size-3.5" strokeWidth={isActive ? 2 : 1.5} />
+   274→              {tab.label}
+   275→            </button>
+   276→          )
+   277→        })}
+   278→        <button
+   279→          onClick={fetchData}
+   280→          className="ml-auto flex items-center gap-1 rounded-lg px-2 py-1.5 text-[12px] text-muted-foreground hover:bg-black/[0.03] dark:hover:bg-white/[0.05] transition-colors"
+   281→          title="Refresh data"
+   282→        >
+   283→          <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
+   284→        </button>
+   285→      </div>
+   286→
+   287→      {/* ── Tab Content ── */}
+   288→      <AnimatePresence mode="wait">
+   289→        <motion.div
+   290→          key={activeTab}
+   291→          initial={{ opacity: 0, y: 6 }}
+   292→          animate={{ opacity: 1, y: 0 }}
+   293→          exit={{ opacity: 0, y: -4 }}
+   294→          transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+   295→        >
+   296→          {loading ? (
+   297→            <SkeletonTable rows={6} />
+   298→          ) : (
+   299→            <>
+   300→              {activeTab === 'accounts' && <FleetAccountsTab accounts={fleetAccounts} onRefresh={fetchData} />}
+   301→              {activeTab === 'vehicles' && <VehiclesTab vehicles={allVehicles} />}
+   302→              {activeTab === 'cards' && <FuelCardsTab cards={allFuelCards} />}
+   303→              {activeTab === 'rfid' && <RFIDReadersTab readers={rfidReaders} />}
+   304→              {activeTab === 'transactions' && <TransactionsTab accounts={fleetAccounts} />}
+   305→            </>
+   306→          )}
+   307→        </motion.div>
+   308→      </AnimatePresence>
+   309→    </div>
+   310→  )
+   311→}
+   312→
+   313→// ── Fleet Accounts Tab ────────────────────────────────────
+   314→
+   315→function FleetAccountsTab({ accounts, onRefresh }: { accounts: FleetAccount[]; onRefresh: () => void }) {
+   316→  if (accounts.length === 0) {
+   317→    return (
+   318→      <div className="macos-card p-8 text-center">
+   319→        <Truck className="size-8 text-muted-foreground mx-auto mb-3" />
+   320→        <p className="text-[13px] font-medium text-foreground">No fleet accounts found</p>
+   321→        <p className="text-[11px] text-muted-foreground mt-1">Create a new fleet account to get started.</p>
+   322→        <button className="macos-btn gap-1 mt-4 mx-auto">
+   323→          <Plus className="size-3.5" /> New Account
+   324→        </button>
+   325→      </div>
+   326→    )
+   327→  }
+   328→
+   329→  return (
+   330→    <div className="macos-card overflow-hidden">
+   331→      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+   332→        <div>
+   333→          <h3 className="text-[13px] font-semibold">Fleet Accounts</h3>
+   334→          <p className="text-[11px] text-muted-foreground mt-0.5">{accounts.length} registered accounts</p>
+   335→        </div>
+   336→        <button className="macos-btn gap-1">
+   337→          <Plus className="size-3.5" /> New Account
+   338→        </button>
+   339→      </div>
+   340→      <div className="overflow-x-auto">
+   341→        <table className="macos-table">
+   342→          <thead>
+   343→            <tr>
+   344→              <th>Account ID</th>
+   345→              <th>Company</th>
+   346→              <th>Contact</th>
+   347→              <th className="text-center">Vehicles</th>
+   348→              <th className="text-center">Cards</th>
+   349→              <th className="text-right">Credit Limit</th>
+   350→              <th className="text-right">Balance</th>
+   351→              <th className="text-right">Utilization</th>
+   352→              <th>Status</th>
+   353→            </tr>
+   354→          </thead>
+   355→          <tbody>
+   356→            {accounts.map((a) => {
+   357→              const util = a.creditLimit > 0 ? Math.round((a.currentBalance / a.creditLimit) * 100) : 0
+   358→              const cfg = statusConfig[a.status] || statusConfig.active
+   359→              return (
+   360→                <tr key={a.id}>
+   361→                  <td className="font-mono text-[12px] text-muted-foreground">{a.id.slice(0, 8)}</td>
+   362→                  <td className="font-semibold">{a.companyName}</td>
+   363→                  <td className="text-muted-foreground">{a.contactPerson}</td>
+   364→                  <td className="text-center">{a.vehicleCount}</td>
+   365→                  <td className="text-center">{a.fuelCardCount}</td>
+   366→                  <td className="text-right font-mono">{pkr(a.creditLimit)}</td>
+   367→                  <td className="text-right font-mono font-semibold text-teal-600 dark:text-teal-400">{pkr(a.currentBalance)}</td>
+   368→                  <td className="text-right">
+   369→                    <div className="flex items-center justify-end gap-2">
+   370→                      <div className="w-16 h-1.5 rounded-full bg-black/[0.05] dark:bg-white/[0.08] overflow-hidden">
+   371→                        <div
+   372→                          className={`h-full rounded-full transition-all ${
+   373→                            util > 90 ? 'bg-red-500' : util > 70 ? 'bg-teal-500' : 'bg-emerald-500'
+   374→                          }`}
+   375→                          style={{ width: `${Math.min(util, 100)}%` }}
+   376→                        />
+   377→                      </div>
+   378→                      <span className="text-[11px] text-muted-foreground w-8 text-right">{util}%</span>
+   379→                    </div>
+   380→                  </td>
+   381→                  <td>
+   382→                    <div className="flex items-center gap-1.5">
+   383→                      <div className={`macos-status-dot ${cfg.dot}`} />
+   384→                      <span className={`text-[11px] font-medium ${cfg.text}`}>{cfg.label}</span>
+   385→                    </div>
+   386→                  </td>
+   387→                </tr>
+   388→              )
+   389→            })}
+   390→          </tbody>
+   391→        </table>
+   392→      </div>
+   393→    </div>
+   394→  )
+   395→}
+   396→
+   397→// ── Vehicles Tab ──────────────────────────────────────────
+   398→
+   399→function VehiclesTab({ vehicles }: { vehicles: FleetVehicle[] }) {
+   400→  const [search, setSearch] = useState('')
+   401→  const filtered = vehicles.filter(v =>
+   402→    !search || v.plateNumber?.toLowerCase().includes(search.toLowerCase()) || v.make?.toLowerCase().includes(search.toLowerCase())
+   403→  )
+   404→
+   405→  if (vehicles.length === 0) {
+   406→    return (
+   407→      <div className="macos-card p-8 text-center">
+   408→        <Car className="size-8 text-muted-foreground mx-auto mb-3" />
+   409→        <p className="text-[13px] font-medium text-foreground">No vehicles found</p>
+   410→        <p className="text-[11px] text-muted-foreground mt-1">Vehicles are associated with fleet accounts.</p>
+   411→      </div>
+   412→    )
+   413→  }
+   414→
+   415→  return (
+   416→    <div className="macos-card overflow-hidden">
+   417→      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+   418→        <div>
+   419→          <h3 className="text-[13px] font-semibold">Registered Vehicles</h3>
+   420→          <p className="text-[11px] text-muted-foreground mt-0.5">{vehicles.length} vehicles across all fleet accounts</p>
+   421→        </div>
+   422→        <div className="flex items-center gap-2">
+   423→          <div className="relative">
+   424→            <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+   425→            <input
+   426→              className="macos-search w-44 !pl-8 !py-1.5 !text-[12px]"
+   427→              placeholder="Search plate..."
+   428→              value={search}
+   429→              onChange={e => setSearch(e.target.value)}
+   430→            />
+   431→          </div>
+   432→        </div>
+   433→      </div>
+   434→      <div className="overflow-x-auto">
+   435→        <table className="macos-table">
+   436→          <thead>
+   437→            <tr>
+   438→              <th>Plate Number</th>
+   439→              <th>Make / Model</th>
+   440→              <th>Type</th>
+   441→              <th>RFID Tag</th>
+   442→              <th>Fuel Type</th>
+   443→              <th className="text-right">Daily Limit</th>
+   444→              <th>Status</th>
+   445→            </tr>
+   446→          </thead>
+   447→          <tbody>
+   448→            {filtered.map((v) => (
+   449→              <tr key={v.id}>
+   450→                <td className="font-mono font-semibold">{v.plateNumber || '—'}</td>
+   451→                <td>
+   452→                  <span className="font-medium">{v.make || '—'}</span>{' '}
+   453→                  <span className="text-muted-foreground">{v.model || ''} {v.year || ''}</span>
+   454→                </td>
+   455→                <td>
+   456→                  <span className="macos-pill bg-black/[0.04] dark:bg-white/[0.06] text-muted-foreground">{v.vehicleType || '—'}</span>
+   457→                </td>
+   458→                <td className="font-mono text-[12px]">
+   459→                  {v.rfidTag ? (
+   460→                    <div className="flex items-center gap-1.5">
+   461→                      <Radio className="size-3 text-teal-500" />
+   462→                      {v.rfidTag}
+   463→                    </div>
+   464→                  ) : '—'}
+   465→                </td>
+   466→                <td>
+   467→                  {v.fuelType ? (
+   468→                    <span className={`macos-pill ${
+   469→                      v.fuelType?.toLowerCase().includes('diesel')
+   470→                        ? 'bg-teal-500/10 text-teal-600 dark:text-teal-400'
+   471→                        : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+   472→                    }`}>
+   473→                      {v.fuelType}
+   474→                    </span>
+   475→                  ) : '—'}
+   476→                </td>
+   477→                <td className="text-right font-mono">{v.dailyLimit ? pkr(v.dailyLimit) : '—'}</td>
+   478→                <td>
+   479→                  <div className="flex items-center gap-1.5">
+   480→                    <div className={`macos-status-dot ${v.isActive ? 'macos-status-online' : 'macos-status-offline'}`} />
+   481→                    <span className={`text-[11px] font-medium ${v.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+   482→                      {v.isActive ? 'Active' : 'Inactive'}
+   483→                    </span>
+   484→                  </div>
+   485→                </td>
+   486→              </tr>
+   487→            ))}
+   488→          </tbody>
+   489→        </table>
+   490→      </div>
+   491→    </div>
+   492→  )
+   493→}
+   494→
+   495→// ── Fuel Cards Tab ────────────────────────────────────────
+   496→
+   497→function FuelCardsTab({ cards }: { cards: FleetFuelCard[] }) {
+   498→  const activeCount = cards.filter(c => c.isActive).length
+   499→  const suspendedCount = cards.filter(c => !c.isActive).length
+   500→  const expiredCount = cards.filter(c => c.expiryDate && new Date(c.expiryDate) < new Date()).length
+   501→
+   502→  if (cards.length === 0) {
+   503→    return (
+   504→      <div className="macos-card p-8 text-center">
+   505→        <CreditCard className="size-8 text-muted-foreground mx-auto mb-3" />
+   506→        <p className="text-[13px] font-medium text-foreground">No fuel cards found</p>
+   507→        <p className="text-[11px] text-muted-foreground mt-1">Fuel cards are associated with fleet accounts.</p>
+   508→        <button className="macos-btn gap-1 mt-4 mx-auto">
+   509→          <Plus className="size-3.5" /> Issue Card
+   510→        </button>
+   511→      </div>
+   512→    )
+   513→  }
+   514→
+   515→  return (
+   516→    <div className="space-y-4">
+   517→      {/* Card Status Summary */}
+   518→      <div className="grid grid-cols-3 gap-3">
+   519→        {[
+   520→          { label: 'Active', count: activeCount, dot: 'macos-status-online', color: 'text-emerald-600 dark:text-emerald-400' },
+   521→          { label: 'Suspended', count: suspendedCount, dot: 'macos-status-error', color: 'text-red-500' },
+   522→          { label: 'Expired', count: expiredCount, dot: 'macos-status-offline', color: 'text-muted-foreground' },
+   523→        ].map(s => (
+   524→          <div key={s.label} className="macos-card p-3 flex items-center gap-2.5">
+   525→            <div className={`macos-status-dot ${s.dot}`} />
+   526→            <div>
+   527→              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{s.label}</p>
+   528→              <p className={`text-[18px] font-bold ${s.color}`}>{s.count}</p>
+   529→            </div>
+   530→          </div>
+   531→        ))}
+   532→      </div>
+   533→
+   534→      {/* Cards Table */}
+   535→      <div className="macos-card overflow-hidden">
+   536→        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+   537→          <h3 className="text-[13px] font-semibold">Fuel Cards</h3>
+   538→          <button className="macos-btn gap-1">
+   539→            <Plus className="size-3.5" /> Issue Card
+   540→          </button>
+   541→        </div>
+   542→        <div className="overflow-x-auto">
+   543→          <table className="macos-table">
+   544→            <thead>
+   545→              <tr>
+   546→                <th>Card Number</th>
+   547→                <th>Type</th>
+   548→                <th>RFID Tag</th>
+   549→                <th className="text-right">Balance</th>
+   550→                <th className="text-right">Daily Limit</th>
+   551→                <th className="text-right">Monthly Limit</th>
+   552→                <th>Expiry</th>
+   553→                <th>Status</th>
+   554→              </tr>
+   555→            </thead>
+   556→            <tbody>
+   557→              {cards.map((fc) => {
+   558→                const isExpired = fc.expiryDate && new Date(fc.expiryDate) < new Date()
+   559→                const cfg = !fc.isActive ? statusConfig.suspended : isExpired ? statusConfig.expired : statusConfig.active
+   560→                return (
+   561→                  <tr key={fc.id}>
+   562→                    <td className="font-mono font-semibold">{fc.cardNumber}</td>
+   563→                    <td>
+   564→                      <span className="macos-pill bg-black/[0.04] dark:bg-white/[0.06] text-muted-foreground">{fc.cardType}</span>
+   565→                    </td>
+   566→                    <td className="font-mono text-[12px]">
+   567→                      {fc.rfidTag ? (
+   568→                        <div className="flex items-center gap-1.5">
+   569→                          <Radio className="size-3 text-teal-500" />
+   570→                          {fc.rfidTag}
+   571→                        </div>
+   572→                      ) : '—'}
+   573→                    </td>
+   574→                    <td className="text-right font-mono font-semibold text-teal-600 dark:text-teal-400">{pkr(fc.balance)}</td>
+   575→                    <td className="text-right font-mono text-muted-foreground">{fc.dailyLimit ? pkr(fc.dailyLimit) : '—'}</td>
+   576→                    <td className="text-right font-mono text-muted-foreground">{fc.monthlyLimit ? pkr(fc.monthlyLimit) : '—'}</td>
+   577→                    <td className="font-mono text-[12px]">{fc.expiryDate ? new Date(fc.expiryDate).toLocaleDateString() : '—'}</td>
+   578→                    <td>
+   579→                      <div className="flex items-center gap-1.5">
+   580→                        <div className={`macos-status-dot ${cfg.dot}`} />
+   581→                        <span className={`text-[11px] font-medium ${cfg.text}`}>{cfg.label}</span>
+   582→                      </div>
+   583→                    </td>
+   584→                  </tr>
+   585→                )
+   586→              })}
+   587→            </tbody>
+   588→          </table>
+   589→        </div>
+   590→      </div>
+   591→    </div>
+   592→  )
+   593→}
+   594→
+   595→// ── RFID Readers Tab ──────────────────────────────────────
+   596→
+   597→function RFIDReadersTab({ readers }: { readers: RFIDReader[] }) {
+   598→  const onlineCount = readers.filter(r => r.status === 'online' || r.isActive).length
+   599→  const totalReads = readers.reduce((s, r) => s + (r.totalReads || 0), 0)
+   600→
+   601→  if (readers.length === 0) {
+   602→    return (
+   603→      <div className="macos-card p-8 text-center">
+   604→        <Radio className="size-8 text-muted-foreground mx-auto mb-3" />
+   605→        <p className="text-[13px] font-medium text-foreground">No RFID readers found</p>
+   606→        <p className="text-[11px] text-muted-foreground mt-1">Register RFID readers to monitor their status.</p>
+   607→      </div>
+   608→    )
+   609→  }
+   610→
+   611→  return (
+   612→    <div className="space-y-4">
+   613→      {/* Status Overview */}
+   614→      <div className="grid grid-cols-3 gap-3">
+   615→        <div className="macos-card p-4">
+   616→          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Readers Online</p>
+   617→          <p className="text-[20px] font-bold text-emerald-600 dark:text-emerald-400 mt-1">{onlineCount}/{readers.length}</p>
+   618→        </div>
+   619→        <div className="macos-card p-4">
+   620→          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Total Reads</p>
+   621→          <p className="text-[20px] font-bold text-foreground mt-1">{totalReads.toLocaleString()}</p>
+   622→        </div>
+   623→        <div className="macos-card p-4">
+   624→          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Status</p>
+   625→          <p className="text-[20px] font-bold text-foreground mt-1">{onlineCount === readers.length ? 'All Online' : 'Partial'}</p>
+   626→        </div>
+   627→      </div>
+   628→
+   629→      {/* Readers Grid */}
+   630→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+   631→        {readers.map((reader, idx) => {
+   632→          const readerStatus = reader.isActive ? 'online' : 'error'
+   633→          const cfg = statusConfig[readerStatus] || statusConfig.online
+   634→          return (
+   635→            <motion.div
+   636→              key={reader.id}
+   637→              initial={{ opacity: 0, scale: 0.97 }}
+   638→              animate={{ opacity: 1, scale: 1 }}
+   639→              transition={{ delay: idx * 0.04 }}
+   640→              className="macos-card p-4"
+   641→            >
+   642→              <div className="flex items-start justify-between mb-3">
+   643→                <div>
+   644→                  <h4 className="text-[13px] font-semibold">{reader.name}</h4>
+   645→                  <p className="text-[11px] text-muted-foreground">{reader.location || reader.code}</p>
+   646→                </div>
+   647→                <div className="flex items-center gap-1.5">
+   648→                  <div className={`macos-status-dot ${cfg.dot}`} />
+   649→                  <span className={`text-[11px] font-medium ${cfg.text}`}>{cfg.label}</span>
+   650→                </div>
+   651→              </div>
+   652→
+   653→              <div className="macos-group">
+   654→                <div className="macos-group-item flex justify-between !py-2 !px-3">
+   655→                  <span className="text-[11px] text-muted-foreground">IP Address</span>
+   656→                  <span className="text-[12px] font-mono">{reader.ipAddress || '—'}</span>
+   657→                </div>
+   658→                <div className="macos-group-item flex justify-between !py-2 !px-3">
+   659→                  <span className="text-[11px] text-muted-foreground">Last Read</span>
+   660→                  <span className="text-[12px]">{reader.lastReading ? new Date(reader.lastReading).toLocaleTimeString() : '—'}</span>
+   661→                </div>
+   662→                <div className="macos-group-item flex justify-between !py-2 !px-3 !border-b-0">
+   663→                  <span className="text-[11px] text-muted-foreground">Total Reads</span>
+   664→                  <span className="text-[12px] font-semibold">{reader.totalReads || 0}</span>
+   665→                </div>
+   666→              </div>
+   667→
+   668→              {!reader.isActive && (
+   669→                <div className="mt-3 flex items-center gap-1.5 rounded-lg bg-red-500/10 px-2.5 py-1.5">
+   670→                  <AlertTriangle className="size-3 text-red-500" />
+   671→                  <span className="text-[11px] font-medium text-red-500">Reader offline — needs attention</span>
+   672→                </div>
+   673→              )}
+   674→            </motion.div>
+   675→          )
+   676→        })}
+   677→      </div>
+   678→    </div>
+   679→  )
+   680→}
+   681→
+   682→// ── Transactions Tab ──────────────────────────────────────
+   683→
+   684→interface TransactionRow {
+   685→  id: string
+   686→  time: string
+   687→  company: string
+   688→  plate: string
+   689→  pump: string
+   690→  product: string
+   691→  litres: number
+   692→  amount: number
+   693→  card: string
+   694→}
+   695→
+   696→function TransactionsTab({ accounts }: { accounts: FleetAccount[] }) {
+   697→  const [transactions, setTransactions] = useState<TransactionRow[]>([])
+   698→  const [loading, setLoading] = useState(true)
+   699→  const { selectedStation } = useAppStore()
+   700→
+   701→  useEffect(() => {
+   702→    async function fetchTransactions() {
+   703→      try {
+   704→        const params = new URLSearchParams()
+   705→        if (selectedStation && selectedStation !== 'all') params.set('stationId', selectedStation)
+   706→        params.set('limit', '20')
+   707→        const res = await fetch(`/api/fuelings?${params.toString()}`)
+   708→        if (res.ok) {
+   709→          const data = await res.json()
+   710→          const txRows: TransactionRow[] = (data.fuelings || []).map((f: Record<string, unknown>) => ({
+   711→            id: f.id?.toString().slice(0, 8) || '',
+   712→            time: f.startedAt ? new Date(f.startedAt as string).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '',
+   713→            company: (f.fleetAccount as Record<string, string>)?.companyName || 'Walk-in',
+   714→            plate: (f.vehiclePlate as string) || '—',
+   715→            pump: (f.dispenser as Record<string, string>)?.name || '—',
+   716→            product: (f.fuelType as string) || '—',
+   717→            litres: (f.volume as number) || 0,
+   718→            amount: (f.totalAmount as number) || 0,
+   719→            card: (f.rfidTag as string) || 'Cash',
+   720→          }))
+   721→          setTransactions(txRows)
+   722→        }
+   723→      } catch (err) {
+   724→        console.error('Transactions fetch error:', err)
+   725→      } finally {
+   726→        setLoading(false)
+   727→      }
+   728→    }
+   729→    fetchTransactions()
+   730→  }, [selectedStation])
+   731→
+   732→  const totalAmount = transactions.reduce((s, t) => s + t.amount, 0)
+   733→  const totalLitres = transactions.reduce((s, t) => s + t.litres, 0)
+   734→
+   735→  if (loading) {
+   736→    return <SkeletonTable rows={6} />
+   737→  }
+   738→
+   739→  if (transactions.length === 0) {
+   740→    return (
+   741→      <div className="macos-card p-8 text-center">
+   742→        <Receipt className="size-8 text-muted-foreground mx-auto mb-3" />
+   743→        <p className="text-[13px] font-medium text-foreground">No fleet transactions found</p>
+   744→        <p className="text-[11px] text-muted-foreground mt-1">Recent fueling transactions will appear here.</p>
+   745→      </div>
+   746→    )
+   747→  }
+   748→
+   749→  return (
+   750→    <div className="space-y-4">
+   751→      {/* Quick Stats */}
+   752→      <div className="grid grid-cols-3 gap-3">
+   753→        <div className="macos-card p-4">
+   754→          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Recent Transactions</p>
+   755→          <p className="text-[20px] font-bold text-foreground mt-1">{transactions.length}</p>
+   756→        </div>
+   757→        <div className="macos-card p-4">
+   758→          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Total Litres</p>
+   759→          <p className="text-[20px] font-bold text-foreground mt-1">{totalLitres.toLocaleString()}L</p>
+   760→        </div>
+   761→        <div className="macos-card p-4">
+   762→          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Total Amount</p>
+   763→          <p className="text-[20px] font-bold fuel-text-gradient mt-1">{pkr(totalAmount)}</p>
+   764→        </div>
+   765→      </div>
+   766→
+   767→      {/* Transactions Table */}
+   768→      <div className="macos-card overflow-hidden">
+   769→        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+   770→          <h3 className="text-[13px] font-semibold">Recent Fleet Transactions</h3>
+   771→          <span className="text-[11px] text-muted-foreground">Latest transactions</span>
+   772→        </div>
+   773→        <div className="overflow-x-auto">
+   774→          <table className="macos-table">
+   775→            <thead>
+   776→              <tr>
+   777→                <th>ID</th>
+   778→                <th>Time</th>
+   779→                <th>Company</th>
+   780→                <th>Plate</th>
+   781→                <th>Pump</th>
+   782→                <th>Product</th>
+   783→                <th className="text-right">Litres</th>
+   784→                <th className="text-right">Amount</th>
+   785→                <th>Card</th>
+   786→              </tr>
+   787→            </thead>
+   788→            <tbody>
+   789→              {transactions.map((tx) => (
+   790→                <tr key={tx.id}>
+   791→                  <td className="font-mono text-[12px] text-muted-foreground">{tx.id}</td>
+   792→                  <td className="font-mono text-[12px]">{tx.time}</td>
+   793→                  <td className="font-medium">{tx.company}</td>
+   794→                  <td className="font-mono text-[12px]">{tx.plate}</td>
+   795→                  <td className="text-muted-foreground">{tx.pump}</td>
+   796→                  <td>
+   797→                    <span className={`macos-pill ${
+   798→                      tx.product?.toLowerCase().includes('diesel')
+   799→                        ? 'bg-teal-500/10 text-teal-600 dark:text-teal-400'
+   800→                        : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+   801→                    }`}>
+   802→                      {tx.product}
+   803→                    </span>
+   804→                  </td>
+   805→                  <td className="text-right font-mono">{tx.litres}L</td>
+   806→                  <td className="text-right font-mono font-semibold text-teal-600 dark:text-teal-400">{pkr(tx.amount)}</td>
+   807→                  <td className="font-mono text-[12px] text-muted-foreground">{tx.card}</td>
+   808→                </tr>
+   809→              ))}
+   810→            </tbody>
+   811→          </table>
+   812→        </div>
+   813→      </div>
+   814→    </div>
+   815→  )
+   816→}
+   817→

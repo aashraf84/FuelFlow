@@ -1,0 +1,502 @@
+   200→   200→
+   201→   201→const DEVICE_TYPE_ICONS: Record<string, { icon: React.ElementType; color: string; label: string }> = {
+   202→   202→  forecourt_controller: { icon: Server, color: '#30d158', label: 'Forecourt Controllers' },
+   203→   203→  payment_terminal: { icon: CreditCard, color: '#ff9f0a', label: 'Payment Terminals' },
+   204→   204→  generator: { icon: Zap, color: '#ffd60a', label: 'Generators' },
+   205→   205→  surveillance_camera: { icon: Eye, color: '#64d2ff', label: 'Surveillance Cameras' },
+   206→   206→  fire_alarm: { icon: AlertTriangle, color: '#ff375f', label: 'Fire Alarm Systems' },
+   207→   207→  utility_meter: { icon: Gauge, color: '#e8930c', label: 'Utility Meters' },
+   208→   208→  weather_station: { icon: Activity, color: '#64d2ff', label: 'Weather Stations' },
+   209→   209→  tanker_tracker: { icon: Radio, color: '#bf5af2', label: 'Tanker Trackers' },
+   210→   210→  car_wash: { icon: Zap, color: '#ffd60a', label: 'Car Wash Systems' },
+   211→   211→  air_compressor: { icon: Cpu, color: '#ff9f0a', label: 'Air Compressors' },
+   212→   212→  vacuum_station: { icon: Cpu, color: '#bf5af2', label: 'Vacuum Stations' },
+   213→   213→  dispenser: { icon: Fuel, color: '#e8930c', label: 'Dispensers' },
+   214→   214→  anpr_camera: { icon: Eye, color: '#64d2ff', label: 'ANPR Cameras' },
+   215→   215→  rfid_reader: { icon: Radio, color: '#bf5af2', label: 'RFID Readers' },
+   216→   216→  price_board: { icon: Monitor, color: '#ff375f', label: 'Price Boards' },
+   217→   217→  atg: { icon: Droplets, color: '#34c759', label: 'ATG Systems' },
+   218→   218→}
+   219→   219→
+   220→   220→function timeAgo(date: Date | string | null): string {
+   221→   221→  if (!date) return 'N/A'
+   222→   222→  const d = typeof date === 'string' ? new Date(date) : date
+   223→   223→  const diff = Date.now() - d.getTime()
+   224→   224→  if (diff < 60000) return 'just now'
+   225→   225→  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`
+   226→   226→  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`
+   227→   227→  return `${Math.floor(diff / 86400000)}d ago`
+   228→   228→}
+   229→   229→
+   230→   230→// ── Skeleton ──────────────────────────────────────
+   231→   231→
+   232→   232→function Skeleton({ className }: { className?: string }) {
+   233→   233→  return <div className={`animate-pulse rounded-md bg-muted ${className ?? ''}`} />
+   234→   234→}
+   235→   235→
+   236→   236→// ── Form Field Helper ──
+   237→   237→function FormField({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
+   238→   238→  return (
+   239→   239→    <div className="space-y-1.5">
+   240→   240→      <Label className="text-[11px] font-medium text-muted-foreground">
+   241→   241→        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+   242→   242→      </Label>
+   243→   243→      {children}
+   244→   244→    </div>
+   245→   245→  )
+   246→   246→}
+   247→   247→
+   248→   248→// ── Add Device Form ──
+   249→   249→function AddDeviceForm({
+   250→   250→  stations,
+   251→   251→  controllers,
+   252→   252→  submitting,
+   253→   253→  onSubmit,
+   254→   254→  onCancel,
+   255→   255→}: {
+   256→   256→  stations: StationOption[]
+   257→   257→  controllers: ForecourtController[]
+   258→   258→  submitting: boolean
+   259→   259→  onSubmit: (data: Record<string, string>) => void
+   260→   260→  onCancel: () => void
+   261→   261→}) {
+   262→   262→  const [category, setCategory] = useState('')
+   263→   263→  const [form, setForm] = useState<Record<string, string>>({})
+   264→   264→
+   265→   265→  const updateField = (key: string, value: string) => {
+   266→   266→    setForm(prev => ({ ...prev, [key]: value }))
+   267→   267→  }
+   268→   268→
+   269→   269→  const handleSubmit = (e: React.FormEvent) => {
+   270→   270→    e.preventDefault()
+   271→   271→    onSubmit({ category, ...form })
+   272→   272→  }
+   273→   273→
+   274→   274→  const selectedCat = DEVICE_CATEGORIES.find(c => c.value === category)
+   275→   275→
+   276→   276→  return (
+   277→   277→    <form onSubmit={handleSubmit} className="space-y-4" style={{ fontStyle: 'normal' }}>
+   278→   278→      {/* Category Selector */}
+   279→   279→      <div className="macos-group">
+   280→   280→        <div className="macos-group-item">
+   281→   281→          <div className="flex items-center justify-between">
+   282→   282→            <span className="text-[11px] text-muted-foreground font-medium">Device Category</span>
+   283→   283→            <span className="text-[10px] text-muted-foreground">{DEVICE_CATEGORIES.length} types available</span>
+   284→   284→          </div>
+   285→   285→        </div>
+   286→   286→        <div className="p-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+   287→   287→          {DEVICE_CATEGORIES.map(cat => {
+   288→   288→            const Icon = cat.icon
+   289→   289→            return (
+   290→   290→              <button
+   291→   291→                key={cat.value}
+   292→   292→                type="button"
+   293→   293→                onClick={() => { setCategory(cat.value); setForm({}) }}
+   294→   294→                className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-[11px] font-medium transition-all ${
+   295→   295→                  category === cat.value
+   296→   296→                    ? 'bg-teal-500/15 text-teal-700 dark:text-teal-400 ring-1 ring-teal-500/30'
+   297→   297→                    : 'text-muted-foreground hover:bg-black/[0.03] dark:hover:bg-white/[0.04]'
+   298→   298→                }`}
+   299→   299→              >
+   300→   300→                <Icon className="size-3.5 shrink-0" />
+   301→   301→                <span className="truncate">{cat.label}</span>
+   302→   302→              </button>
+   303→   303→            )
+   304→   304→          })}
+   305→   305→        </div>
+   306→   306→      </div>
+   307→   307→
+   308→   308→      {category && (
+   309→   309→        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+   310→   310→          {/* Common Fields */}
+   311→   311→          <div className="grid grid-cols-2 gap-3">
+   312→   312→            <FormField label="Station" required>
+   313→   313→              <Select value={form.stationId || ''} onValueChange={v => updateField('stationId', v)}>
+   314→   314→                <SelectTrigger className="h-8 text-[12px]">
+   315→   315→                  <SelectValue placeholder="Select station" />
+   316→   316→                </SelectTrigger>
+   317→   317→                <SelectContent>
+   318→   318→                  {stations.map(s => (
+   319→   319→                    <SelectItem key={s.id} value={s.id} className="text-[12px]">{s.name} ({s.code})</SelectItem>
+   320→   320→                  ))}
+   321→   321→                </SelectContent>
+   322→   322→              </Select>
+   323→   323→            </FormField>
+   324→   324→            <FormField label="Device Code" required>
+   325→   325→              <Input className="h-8 text-[12px]" placeholder="e.g. DSP-007" value={form.code || ''} onChange={e => updateField('code', e.target.value)} />
+   326→   326→            </FormField>
+   327→   327→          </div>
+   328→   328→          <div className="grid grid-cols-2 gap-3">
+   329→   329→            <FormField label="Device Name" required>
+   330→   330→              <Input className="h-8 text-[12px]" placeholder="e.g. Pump #7 Island B" value={form.name || ''} onChange={e => updateField('name', e.target.value)} />
+   331→   331→            </FormField>
+   332→   332→            <FormField label="Manufacturer">
+   333→   333→              <Input className="h-8 text-[12px]" placeholder="e.g. Gilbarco" value={form.manufacturer || ''} onChange={e => updateField('manufacturer', e.target.value)} />
+   334→   334→            </FormField>
+   335→   335→          </div>
+   336→   336→
+   337→   337→          {/* Controller-specific fields */}
+   338→   338→          {category === 'controller' && (
+   339→   339→            <div className="grid grid-cols-2 gap-3">
+   340→   340→              <FormField label="Controller Type" required>
+   341→   341→                <Select value={form.controllerType || ''} onValueChange={v => updateField('controllerType', v)}>
+   342→   342→                  <SelectTrigger className="h-8 text-[12px]">
+   343→   343→                    <SelectValue placeholder="Select type" />
+   344→   344→                  </SelectTrigger>
+   345→   345→                  <SelectContent>
+   346→   346→                    {['IFSF', 'DOMS', 'TATSUNO', 'WAYNE', 'GILBARCO', 'VEEDER-ROOT'].map(t => (
+   347→   347→                      <SelectItem key={t} value={t} className="text-[12px]">{t}</SelectItem>
+   348→   348→                    ))}
+   349→   349→                  </SelectContent>
+   350→   350→                </Select>
+   351→   351→              </FormField>
+   352→   352→              <FormField label="Model">
+   353→   353→                <Input className="h-8 text-[12px]" placeholder="e.g. ENC-7000" value={form.model || ''} onChange={e => updateField('model', e.target.value)} />
+   354→   354→              </FormField>
+   355→   355→              <FormField label="IP Address">
+   356→   356→                <Input className="h-8 text-[12px] font-mono" placeholder="192.168.1.100" value={form.ipAddress || ''} onChange={e => updateField('ipAddress', e.target.value)} />
+   357→   357→              </FormField>
+   358→   358→              <FormField label="Port">
+   359→   359→                <Input className="h-8 text-[12px] font-mono" placeholder="5000" value={form.port || ''} onChange={e => updateField('port', e.target.value)} />
+   360→   360→              </FormField>
+   361→   361→              <FormField label="Communication">
+   362→   362→                <Select value={form.communicationType || ''} onValueChange={v => updateField('communicationType', v)}>
+   363→   363→                  <SelectTrigger className="h-8 text-[12px]">
+   364→   364→                    <SelectValue placeholder="Select comm type" />
+   365→   365→                  </SelectTrigger>
+   366→   366→                  <SelectContent>
+   367→   367→                    {COMM_TYPES.map(t => (
+   368→   368→                      <SelectItem key={t} value={t} className="text-[12px]">{t.toUpperCase()}</SelectItem>
+   369→   369→                    ))}
+   370→   370→                  </SelectContent>
+   371→   371→                </Select>
+   372→   372→              </FormField>
+   373→   373→              <FormField label="Max Dispensers">
+   374→   374→                <Input className="h-8 text-[12px]" type="number" placeholder="32" value={form.maxDispensers || ''} onChange={e => updateField('maxDispensers', e.target.value)} />
+   375→   375→              </FormField>
+   376→   376→              <FormField label="Serial Number">
+   377→   377→                <Input className="h-8 text-[12px] font-mono" placeholder="SN-XXXX" value={form.serialNumber || ''} onChange={e => updateField('serialNumber', e.target.value)} />
+   378→   378→              </FormField>
+   379→   379→              <FormField label="Firmware Version">
+   380→   380→                <Input className="h-8 text-[12px] font-mono" placeholder="v1.2.3" value={form.firmwareVersion || ''} onChange={e => updateField('firmwareVersion', e.target.value)} />
+   381→   381→              </FormField>
+   382→   382→              <FormField label="Polling Interval (ms)">
+   383→   383→                <Input className="h-8 text-[12px]" type="number" placeholder="1000" value={form.pollingInterval || ''} onChange={e => updateField('pollingInterval', e.target.value)} />
+   384→   384→              </FormField>
+   385→   385→              <FormField label="Timeout (ms)">
+   386→   386→                <Input className="h-8 text-[12px]" type="number" placeholder="5000" value={form.timeout || ''} onChange={e => updateField('timeout', e.target.value)} />
+   387→   387→              </FormField>
+   388→   388→            </div>
+   389→   389→          )}
+   390→   390→
+   391→   391→          {/* Dispenser-specific fields */}
+   392→   392→          {category === 'dispenser' && (
+   393→   393→            <>
+   394→   394→              <div className="grid grid-cols-2 gap-3">
+   395→   395→                <FormField label="Forecourt Controller" required>
+   396→   396→                  <Select value={form.forecourtControllerId || ''} onValueChange={v => updateField('forecourtControllerId', v)}>
+   397→   397→                    <SelectTrigger className="h-8 text-[12px]">
+   398→   398→                      <SelectValue placeholder="Select controller" />
+   399→   399→                    </SelectTrigger>
+   400→   400→                    <SelectContent>
+   401→   401→                      {controllers.map(c => (
+   402→   402→                        <SelectItem key={c.id} value={c.id} className="text-[12px]">{c.name} ({c.code})</SelectItem>
+   403→   403→                      ))}
+   404→   404→                    </SelectContent>
+   405→   405→                  </Select>
+   406→   406→                </FormField>
+   407→   407→                <FormField label="Model">
+   408→   408→                  <Input className="h-8 text-[12px]" placeholder="e.g. SK700-II" value={form.model || ''} onChange={e => updateField('model', e.target.value)} />
+   409→   409→                </FormField>
+   410→   410→              </div>
+   411→   411→              <div className="grid grid-cols-2 gap-3">
+   412→   412→                <FormField label="Pump Lane">
+   413→   413→                  <Input className="h-8 text-[12px]" type="number" placeholder="1" value={form.pumpLane || ''} onChange={e => updateField('pumpLane', e.target.value)} />
+   414→   414→                </FormField>
+   415→   415→                <FormField label="Pump Address">
+   416→   416→                  <Input className="h-8 text-[12px]" type="number" placeholder="1" value={form.pumpAddress || ''} onChange={e => updateField('pumpAddress', e.target.value)} />
+   417→   417→                </FormField>
+   418→   418→                <FormField label="Nozzle Count">
+   419→   419→                  <Input className="h-8 text-[12px]" type="number" placeholder="2" value={form.nozzleCount || ''} onChange={e => updateField('nozzleCount', e.target.value)} />
+   420→   420→                </FormField>
+   421→   421→                <FormField label="Flow Rate (L/min)">
+   422→   422→                  <Input className="h-8 text-[12px]" type="number" placeholder="60" value={form.flowRate || ''} onChange={e => updateField('flowRate', e.target.value)} />
+   423→   423→                </FormField>
+   424→   424→                <FormField label="IP Address">
+   425→   425→                  <Input className="h-8 text-[12px] font-mono" placeholder="192.168.1.107" value={form.ipAddress || ''} onChange={e => updateField('ipAddress', e.target.value)} />
+   426→   426→                </FormField>
+   427→   427→                <FormField label="Communication">
+   428→   428→                  <Select value={form.communicationType || ''} onValueChange={v => updateField('communicationType', v)}>
+   429→   429→                    <SelectTrigger className="h-8 text-[12px]">
+   430→   430→                      <SelectValue placeholder="Select comm type" />
+   431→   431→                    </SelectTrigger>
+   432→   432→                    <SelectContent>
+   433→   433→                      {COMM_TYPES.map(t => (
+   434→   434→                        <SelectItem key={t} value={t} className="text-[12px]">{t.toUpperCase()}</SelectItem>
+   435→   435→                      ))}
+   436→   436→                    </SelectContent>
+   437→   437→                  </Select>
+   438→   438→                </FormField>
+   439→   439→                <FormField label="Protocol">
+   440→   440→                  <Input className="h-8 text-[12px]" placeholder="IFSF" value={form.protocol || ''} onChange={e => updateField('protocol', e.target.value)} />
+   441→   441→                </FormField>
+   442→   442→                <FormField label="Serial Number">
+   443→   443→                  <Input className="h-8 text-[12px] font-mono" placeholder="SN-XXXX" value={form.serialNumber || ''} onChange={e => updateField('serialNumber', e.target.value)} />
+   444→   444→                </FormField>
+   445→   445→              </div>
+   446→   446→            </>
+   447→   447→          )}
+   448→   448→
+   449→   449→          {/* Generic fields for other device types */}
+   450→   450→          {category !== 'controller' && category !== 'dispenser' && (
+   451→   451→            <div className="grid grid-cols-2 gap-3">
+   452→   452→              <FormField label="Model">
+   453→   453→                <Input className="h-8 text-[12px]" placeholder="Model number" value={form.model || ''} onChange={e => updateField('model', e.target.value)} />
+   454→   454→              </FormField>
+   455→   455→              <FormField label="Serial Number">
+   456→   456→                <Input className="h-8 text-[12px] font-mono" placeholder="SN-XXXX" value={form.serialNumber || ''} onChange={e => updateField('serialNumber', e.target.value)} />
+   457→   457→              </FormField>
+   458→   458→              <FormField label="IP Address">
+   459→   459→                <Input className="h-8 text-[12px] font-mono" placeholder="192.168.1.x" value={form.ipAddress || ''} onChange={e => updateField('ipAddress', e.target.value)} />
+   460→   460→              </FormField>
+   461→   461→              <FormField label="Communication Type">
+   462→   462→                <Select value={form.communicationType || ''} onValueChange={v => updateField('communicationType', v)}>
+   463→   463→                  <SelectTrigger className="h-8 text-[12px]">
+   464→   464→                    <SelectValue placeholder="Select comm type" />
+   465→   465→                  </SelectTrigger>
+   466→   466→                  <SelectContent>
+   467→   467→                    {COMM_TYPES.map(t => (
+   468→   468→                      <SelectItem key={t} value={t} className="text-[12px]">{t.toUpperCase()}</SelectItem>
+   469→   469→                    ))}
+   470→   470→                  </SelectContent>
+   471→   471→                </Select>
+   472→   472→              </FormField>
+   473→   473→              {category === 'atg' && (
+   474→   474→                <>
+   475→   475→                  <FormField label="ATG Type">
+   476→   476→                    <Select value={form.atgType || ''} onValueChange={v => updateField('atgType', v)}>
+   477→   477→                      <SelectTrigger className="h-8 text-[12px]">
+   478→   478→                        <SelectValue placeholder="Select ATG type" />
+   479→   479→                      </SelectTrigger>
+   480→   480→                      <SelectContent>
+   481→   481→                        {['magnetostrictive', 'capacitive', 'radar', 'ultrasonic', 'float'].map(t => (
+   482→   482→                          <SelectItem key={t} value={t} className="text-[12px]">{t.charAt(0).toUpperCase() + t.slice(1)}</SelectItem>
+   483→   483→                        ))}
+   484→   484→                      </SelectContent>
+   485→   485→                    </Select>
+   486→   486→                  </FormField>
+   487→   487→                  <FormField label="Port">
+   488→   488→                    <Input className="h-8 text-[12px] font-mono" placeholder="5000" value={form.port || ''} onChange={e => updateField('port', e.target.value)} />
+   489→   489→                  </FormField>
+   490→   490→                </>
+   491→   491→              )}
+   492→   492→              {category === 'price_board' && (
+   493→   493→                <>
+   494→   494→                  <FormField label="Display Type">
+   495→   495→                    <Select value={form.displayType || ''} onValueChange={v => updateField('displayType', v)}>
+   496→   496→                      <SelectTrigger className="h-8 text-[12px]">
+   497→   497→                        <SelectValue placeholder="Select type" />
+   498→   498→                      </SelectTrigger>
+   499→   499→                      <SelectContent>
+   500→   500→                        {['LED', 'LCD', 'Flip-Disc', 'E-Ink'].map(t => (
+   501→   501→                          <SelectItem key={t} value={t.toLowerCase()} className="text-[12px]">{t}</SelectItem>
+   502→   502→                        ))}
+   503→   503→                      </SelectContent>
+   504→   504→                    </Select>
+   505→   505→                  </FormField>
+   506→   506→                  <FormField label="Line Count">
+   507→   507→                    <Input className="h-8 text-[12px]" type="number" placeholder="4" value={form.lineCount || ''} onChange={e => updateField('lineCount', e.target.value)} />
+   508→   508→                  </FormField>
+   509→   509→                </>
+   510→   510→              )}
+   511→   511→              {category === 'camera' && (
+   512→   512→                <>
+   513→   513→                  <FormField label="Resolution">
+   514→   514→                    <Select value={form.resolution || ''} onValueChange={v => updateField('resolution', v)}>
+   515→   515→                      <SelectTrigger className="h-8 text-[12px]">
+   516→   516→                        <SelectValue placeholder="Select resolution" />
+   517→   517→                      </SelectTrigger>
+   518→   518→                      <SelectContent>
+   519→   519→                        {['720p', '1080p', '2K', '4K'].map(t => (
+   520→   520→                          <SelectItem key={t} value={t.toLowerCase()} className="text-[12px]">{t}</SelectItem>
+   521→   521→                        ))}
+   522→   522→                      </SelectContent>
+   523→   523→                    </Select>
+   524→   524→                  </FormField>
+   525→   525→                  <FormField label="Port">
+   526→   526→                    <Input className="h-8 text-[12px] font-mono" placeholder="554" value={form.port || ''} onChange={e => updateField('port', e.target.value)} />
+   527→   527→                  </FormField>
+   528→   528→                </>
+   529→   529→              )}
+   530→   530→            </div>
+   531→   531→          )}
+   532→   532→
+   533→   533→          {/* Notes / Config JSON */}
+   534→   534→          <FormField label="Configuration JSON (optional)">
+   535→   535→            <Textarea className="text-[12px] font-mono min-h-[60px]" placeholder='{"key": "value"}' value={form.configJson || ''} onChange={e => updateField('configJson', e.target.value)} />
+   536→   536→          </FormField>
+   537→   537→        </motion.div>
+   538→   538→      )}
+   539→   539→
+   540→   540→      <DialogFooter className="gap-2">
+   541→   541→        <Button type="button" variant="outline" size="sm" className="text-[12px] h-8" onClick={onCancel} disabled={submitting}>
+   542→   542→          Cancel
+   543→   543→        </Button>
+   544→   544→        <Button type="submit" size="sm" className="text-[12px] h-8 bg-teal-600 hover:bg-teal-700 text-white" disabled={submitting || !category || !form.stationId || !form.name || !form.code}>
+   545→   545→          {submitting ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : <Plus className="size-3.5 mr-1.5" />}
+   546→   546→          {submitting ? 'Adding...' : `Add ${selectedCat?.label || 'Device'}`}
+   547→   547→        </Button>
+   548→   548→      </DialogFooter>
+   549→   549→    </form>
+   550→   550→  )
+   551→   551→}
+   552→   552→
+   553→   553→// ── Add Controller Form ──
+   554→   554→function AddControllerForm({
+   555→   555→  stations,
+   556→   556→  submitting,
+   557→   557→  onSubmit,
+   558→   558→  onCancel,
+   559→   559→}: {
+   560→   560→  stations: StationOption[]
+   561→   561→  submitting: boolean
+   562→   562→  onSubmit: (data: Record<string, string>) => void
+   563→   563→  onCancel: () => void
+   564→   564→}) {
+   565→   565→  const [form, setForm] = useState<Record<string, string>>({})
+   566→   566→
+   567→   567→  const updateField = (key: string, value: string) => {
+   568→   568→    setForm(prev => ({ ...prev, [key]: value }))
+   569→   569→  }
+   570→   570→
+   571→   571→  const handleSubmit = (e: React.FormEvent) => {
+   572→   572→    e.preventDefault()
+   573→   573→    onSubmit(form)
+   574→   574→  }
+   575→   575→
+   576→   576→  return (
+   577→   577→    <form onSubmit={handleSubmit} className="space-y-4" style={{ fontStyle: 'normal' }}>
+   578→   578→      {/* Core Identity */}
+   579→   579→      <div>
+   580→   580→        <p className="text-[11px] uppercase tracking-wider font-semibold text-teal-600 dark:text-teal-400 mb-2">Core Identity</p>
+   581→   581→        <div className="grid grid-cols-2 gap-3">
+   582→   582→          <FormField label="Station" required>
+   583→   583→            <Select value={form.stationId || ''} onValueChange={v => updateField('stationId', v)}>
+   584→   584→              <SelectTrigger className="h-8 text-[12px]">
+   585→   585→                <SelectValue placeholder="Select station" />
+   586→   586→              </SelectTrigger>
+   587→   587→              <SelectContent>
+   588→   588→                {stations.map(s => (
+   589→   589→                  <SelectItem key={s.id} value={s.id} className="text-[12px]">{s.name} ({s.code})</SelectItem>
+   590→   590→                ))}
+   591→   591→              </SelectContent>
+   592→   592→            </Select>
+   593→   593→          </FormField>
+   594→   594→          <FormField label="Controller Type" required>
+   595→   595→            <Select value={form.controllerType || ''} onValueChange={v => updateField('controllerType', v)}>
+   596→   596→              <SelectTrigger className="h-8 text-[12px]">
+   597→   597→                <SelectValue placeholder="Select protocol" />
+   598→   598→              </SelectTrigger>
+   599→   599→              <SelectContent>
+   600→   600→                {['IFSF', 'DOMS', 'TATSUNO', 'WAYNE', 'GILBARCO', 'VEEDER-ROOT'].map(t => (
+   601→   601→                  <SelectItem key={t} value={t} className="text-[12px]">{t}</SelectItem>
+   602→   602→                ))}
+   603→   603→              </SelectContent>
+   604→   604→            </Select>
+   605→   605→          </FormField>
+   606→   606→          <FormField label="Controller Name" required>
+   607→   607→            <Input className="h-8 text-[12px]" placeholder="e.g. Main Forecourt Controller" value={form.name || ''} onChange={e => updateField('name', e.target.value)} />
+   608→   608→          </FormField>
+   609→   609→          <FormField label="Code" required>
+   610→   610→            <Input className="h-8 text-[12px] font-mono" placeholder="e.g. FC-001" value={form.code || ''} onChange={e => updateField('code', e.target.value)} />
+   611→   611→          </FormField>
+   612→   612→        </div>
+   613→   613→      </div>
+   614→   614→
+   615→   615→      {/* Hardware Details */}
+   616→   616→      <div>
+   617→   617→        <p className="text-[11px] uppercase tracking-wider font-semibold text-teal-600 dark:text-teal-400 mb-2">Hardware Details</p>
+   618→   618→        <div className="grid grid-cols-2 gap-3">
+   619→   619→          <FormField label="Manufacturer">
+   620→   620→            <Input className="h-8 text-[12px]" placeholder="e.g. Wayne Fueling" value={form.manufacturer || ''} onChange={e => updateField('manufacturer', e.target.value)} />
+   621→   621→          </FormField>
+   622→   622→          <FormField label="Model">
+   623→   623→            <Input className="h-8 text-[12px]" placeholder="e.g. iX Pay" value={form.model || ''} onChange={e => updateField('model', e.target.value)} />
+   624→   624→          </FormField>
+   625→   625→          <FormField label="Serial Number">
+   626→   626→            <Input className="h-8 text-[12px] font-mono" placeholder="SN-XXXX-XXXX" value={form.serialNumber || ''} onChange={e => updateField('serialNumber', e.target.value)} />
+   627→   627→          </FormField>
+   628→   628→          <FormField label="Firmware Version">
+   629→   629→            <Input className="h-8 text-[12px] font-mono" placeholder="v1.0.0" value={form.firmwareVersion || ''} onChange={e => updateField('firmwareVersion', e.target.value)} />
+   630→   630→          </FormField>
+   631→   631→        </div>
+   632→   632→      </div>
+   633→   633→
+   634→   634→      {/* Network Configuration */}
+   635→   635→      <div>
+   636→   636→        <p className="text-[11px] uppercase tracking-wider font-semibold text-teal-600 dark:text-teal-400 mb-2">Network Configuration</p>
+   637→   637→        <div className="grid grid-cols-2 gap-3">
+   638→   638→          <FormField label="Communication Type">
+   639→   639→            <Select value={form.communicationType || ''} onValueChange={v => updateField('communicationType', v)}>
+   640→   640→              <SelectTrigger className="h-8 text-[12px]">
+   641→   641→                <SelectValue placeholder="Select type" />
+   642→   642→              </SelectTrigger>
+   643→   643→              <SelectContent>
+   644→   644→                {COMM_TYPES.map(t => (
+   645→   645→                  <SelectItem key={t} value={t} className="text-[12px]">{t.toUpperCase()}</SelectItem>
+   646→   646→                ))}
+   647→   647→              </SelectContent>
+   648→   648→            </Select>
+   649→   649→          </FormField>
+   650→   650→          <FormField label="Protocol">
+   651→   651→            <Input className="h-8 text-[12px]" placeholder="IFSF" value={form.protocol || ''} onChange={e => updateField('protocol', e.target.value)} />
+   652→   652→          </FormField>
+   653→   653→          <FormField label="IP Address">
+   654→   654→            <Input className="h-8 text-[12px] font-mono" placeholder="192.168.1.100" value={form.ipAddress || ''} onChange={e => updateField('ipAddress', e.target.value)} />
+   655→   655→          </FormField>
+   656→   656→          <FormField label="Port">
+   657→   657→            <Input className="h-8 text-[12px] font-mono" placeholder="5000" value={form.port || ''} onChange={e => updateField('port', e.target.value)} />
+   658→   658→          </FormField>
+   659→   659→          <FormField label="Baud Rate">
+   660→   660→            <Input className="h-8 text-[12px] font-mono" placeholder="9600" value={form.baudRate || ''} onChange={e => updateField('baudRate', e.target.value)} />
+   661→   661→          </FormField>
+   662→   662→          <FormField label="COM Port">
+   663→   663→            <Input className="h-8 text-[12px] font-mono" placeholder="COM1" value={form.comPort || ''} onChange={e => updateField('comPort', e.target.value)} />
+   664→   664→          </FormField>
+   665→   665→        </div>
+   666→   666→      </div>
+   667→   667→
+   668→   668→      {/* Operational Settings */}
+   669→   669→      <div>
+   670→   670→        <p className="text-[11px] uppercase tracking-wider font-semibold text-teal-600 dark:text-teal-400 mb-2">Operational Settings</p>
+   671→   671→        <div className="grid grid-cols-2 gap-3">
+   672→   672→          <FormField label="Max Dispensers">
+   673→   673→            <Input className="h-8 text-[12px]" type="number" placeholder="32" value={form.maxDispensers || ''} onChange={e => updateField('maxDispensers', e.target.value)} />
+   674→   674→          </FormField>
+   675→   675→          <FormField label="Polling Interval (ms)">
+   676→   676→            <Input className="h-8 text-[12px]" type="number" placeholder="1000" value={form.pollingInterval || ''} onChange={e => updateField('pollingInterval', e.target.value)} />
+   677→   677→          </FormField>
+   678→   678→          <FormField label="Timeout (ms)">
+   679→   679→            <Input className="h-8 text-[12px]" type="number" placeholder="5000" value={form.timeout || ''} onChange={e => updateField('timeout', e.target.value)} />
+   680→   680→          </FormField>
+   681→   681→        </div>
+   682→   682→      </div>
+   683→   683→
+   684→   684→      <FormField label="Configuration JSON (optional)">
+   685→   685→        <Textarea className="text-[12px] font-mono min-h-[60px]" placeholder='{"key": "value"}' value={form.configJson || ''} onChange={e => updateField('configJson', e.target.value)} />
+   686→   686→      </FormField>
+   687→   687→
+   688→   688→      <DialogFooter className="gap-2">
+   689→   689→        <Button type="button" variant="outline" size="sm" className="text-[12px] h-8" onClick={onCancel} disabled={submitting}>
+   690→   690→          Cancel
+   691→   691→        </Button>
+   692→   692→        <Button type="submit" size="sm" className="text-[12px] h-8 bg-teal-600 hover:bg-teal-700 text-white" disabled={submitting || !form.stationId || !form.name || !form.code || !form.controllerType}>
+   693→   693→          {submitting ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : <Server className="size-3.5 mr-1.5" />}
+   694→   694→          {submitting ? 'Registering...' : 'Register Controller'}
+   695→   695→        </Button>
+   696→   696→      </DialogFooter>
+   697→   697→    </form>
+   698→   698→  )
+   699→   699→}
+
+[showing lines 200-699 of 1717; use offset=700 with limit to continue reading]

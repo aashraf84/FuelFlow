@@ -1,0 +1,487 @@
+     1→'use client'
+     2→
+     3→import { useState } from 'react'
+     4→import { motion } from 'framer-motion'
+     5→import {
+     6→  Shield, Users, AlertTriangle, HardDrive, Lock, Key, Clock,
+     7→  RefreshCw, Monitor, Ban, CheckCircle2, XCircle, Eye,
+     8→  Globe, Fingerprint, Server, Activity, Search, Filter,
+     9→  ChevronRight, Wifi, Database, Scan, ScanFace, FileWarning,
+    10→} from 'lucide-react'
+    11→import { Badge } from '@/components/ui/badge'
+    12→import { Button } from '@/components/ui/button'
+    13→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    14→
+    15→// ── Static Data ──────────────────────────────────────
+    16→
+    17→const securityOverview = {
+    18→  threatLevel: 'low',
+    19→  activeSessions: 7,
+    20→  failedLogins24h: 3,
+    21→  totalUsers: 18,
+    22→  lockedAccounts: 1,
+    23→  encryptionKeys: 4,
+    24→  lastBackup: '2 hours ago',
+    25→  complianceScore: 94,
+    26→}
+    27→
+    28→const auditLogs = [
+    29→  { id: 1, time: '10:32:18 AM', user: 'James Morrison', action: 'Login', entity: 'Session', details: 'Successful login from Chrome/macOS', ip: '192.168.1.100', level: 'info' },
+    30→  { id: 2, time: '10:28:45 AM', user: 'Sarah Khan', action: 'Update', entity: 'Price', details: 'Updated Petrol 92 price from PKR 272 to PKR 275', ip: '192.168.1.102', level: 'info' },
+    31→  { id: 3, time: '10:15:30 AM', user: 'Unknown', action: 'Login Failed', entity: 'Session', details: 'Invalid credentials for user admin@apexfuel.pk', ip: '203.45.67.89', level: 'warning' },
+    32→  { id: 4, time: '09:58:12 AM', user: 'Ahmed Raza', action: 'Delete', entity: 'Shift', details: 'Closed shift #1847 with cash reconciliation', ip: '192.168.1.105', level: 'info' },
+    33→  { id: 5, time: '09:45:00 AM', user: 'System', action: 'Backup', entity: 'System', details: 'Automated backup completed — 2.4 GB', ip: '-', level: 'info' },
+    34→  { id: 6, time: '09:30:22 AM', user: 'Unknown', action: 'Login Failed', entity: 'Session', details: 'Account locked after 5 failed attempts: operator2@apexfuel.pk', ip: '182.56.78.12', level: 'critical' },
+    35→  { id: 7, time: '09:15:00 AM', user: 'James Morrison', action: 'Create', entity: 'User', details: 'Created user account: farhan@apexfuel.pk (Cashier)', ip: '192.168.1.100', level: 'info' },
+    36→  { id: 8, time: '08:55:18 AM', user: 'System', action: 'Alert', entity: 'Security', details: 'Unusual login pattern detected from IP 182.56.78.12', ip: '-', level: 'warning' },
+    37→  { id: 9, time: '08:30:00 AM', user: 'Farhan Ali', action: 'Login', entity: 'Session', details: 'Successful login from Firefox/Windows', ip: '192.168.1.108', level: 'info' },
+    38→  { id: 10, time: '08:00:00 AM', user: 'System', action: 'Rotation', entity: 'Encryption Key', details: 'AES-256 key rotated automatically', ip: '-', level: 'info' },
+    39→]
+    40→
+    41→const activeSessions = [
+    42→  { id: 'SES-001', user: 'James Morrison', role: 'Station Manager', device: 'Chrome / macOS', ip: '192.168.1.100', loginAt: '10:32 AM', lastActivity: 'Just now', location: 'Islamabad' },
+    43→  { id: 'SES-002', user: 'Sarah Khan', role: 'Admin', device: 'Safari / macOS', ip: '192.168.1.102', loginAt: '09:45 AM', lastActivity: '3 min ago', location: 'Islamabad' },
+    44→  { id: 'SES-003', user: 'Ahmed Raza', role: 'Operator', device: 'Chrome / Windows', ip: '192.168.1.105', loginAt: '09:30 AM', lastActivity: '15 min ago', location: 'Islamabad' },
+    45→  { id: 'SES-004', user: 'Farhan Ali', role: 'Cashier', device: 'Firefox / Windows', ip: '192.168.1.108', loginAt: '08:30 AM', lastActivity: '1 hr ago', location: 'Islamabad' },
+    46→  { id: 'SES-005', user: 'Nadia Siddiqui', role: 'Manager', device: 'Chrome / Android', ip: '192.168.1.115', loginAt: '07:00 AM', lastActivity: '30 min ago', location: 'Lahore' },
+    47→  { id: 'SES-006', user: 'System', role: 'Service Account', device: 'API Client', ip: '127.0.0.1', loginAt: '06:00 AM', lastActivity: '1 min ago', location: 'Server' },
+    48→  { id: 'SES-007', user: 'Tariq Mehmood', role: 'Attendant', device: 'Chrome / Android', ip: '192.168.1.120', loginAt: '06:30 AM', lastActivity: '45 min ago', location: 'Islamabad' },
+    49→]
+    50→
+    51→const rbacMatrix = [
+    52→  { role: 'Super Admin', modules: { Dashboard: 'full', Forecourt: 'full', Tanks: 'full', Sales: 'full', Pricing: 'full', Finance: 'full', Settings: 'full', Security: 'full', Reports: 'full' } },
+    53→  { role: 'Station Manager', modules: { Dashboard: 'full', Forecourt: 'full', Tanks: 'full', Sales: 'full', Pricing: 'edit', Finance: 'view', Settings: 'edit', Security: 'view', Reports: 'full' } },
+    54→  { role: 'Operator', modules: { Dashboard: 'view', Forecourt: 'edit', Tanks: 'view', Sales: 'full', Pricing: 'none', Finance: 'none', Settings: 'none', Security: 'none', Reports: 'view' } },
+    55→  { role: 'Cashier', modules: { Dashboard: 'none', Forecourt: 'view', Tanks: 'none', Sales: 'full', Pricing: 'none', Finance: 'none', Settings: 'none', Security: 'none', Reports: 'none' } },
+    56→  { role: 'Attendant', modules: { Dashboard: 'none', Forecourt: 'view', Tanks: 'none', Sales: 'edit', Pricing: 'none', Finance: 'none', Settings: 'none', Security: 'none', Reports: 'none' } },
+    57→  { role: 'Viewer', modules: { Dashboard: 'view', Forecourt: 'view', Tanks: 'view', Sales: 'view', Pricing: 'view', Finance: 'view', Settings: 'none', Security: 'none', Reports: 'view' } },
+    58→]
+    59→
+    60→const securityAlerts = [
+    61→  { id: 1, time: '09:30 AM', type: 'critical', title: 'Account Lockout', description: 'Account operator2@apexfuel.pk locked after 5 consecutive failed login attempts from IP 182.56.78.12', resolved: false },
+    62→  { id: 2, time: '09:15 AM', type: 'warning', title: 'Suspicious Login Pattern', description: 'Multiple failed login attempts detected from IP 182.56.78.12 targeting different user accounts', resolved: false },
+    63→  { id: 3, time: '08:55 AM', type: 'warning', title: 'Unusual Access Location', description: 'Login attempt from Lahore for user account configured for Islamabad station only', resolved: true },
+    64→  { id: 4, time: '08:30 AM', type: 'info', title: 'Key Rotation Complete', description: 'AES-256 encryption key rotated successfully as per security policy schedule', resolved: true },
+    65→  { id: 5, time: 'Yesterday', type: 'info', title: 'Security Scan Complete', description: 'No vulnerabilities detected in latest automated security scan — all packages up to date', resolved: true },
+    66→  { id: 6, type: 'info', time: 'Yesterday', title: '2FA Enabled', description: 'Two-factor authentication enabled for user account sarah@apexfuel.pk', resolved: true },
+    67→]
+    68→
+    69→const encryptionKeys = [
+    70→  { id: 'KEY-001', algorithm: 'AES-256-GCM', purpose: 'Database Encryption', created: '2025-12-01', rotated: '2026-03-04', status: 'active', size: '256-bit' },
+    71→  { id: 'KEY-002', algorithm: 'RSA-4096', purpose: 'API Request Signing', created: '2025-11-15', rotated: '2026-02-15', status: 'active', size: '4096-bit' },
+    72→  { id: 'KEY-003', algorithm: 'AES-256-CBC', purpose: 'Payment Data Encryption', created: '2025-10-01', rotated: '2026-01-01', status: 'active', size: '256-bit' },
+    73→  { id: 'KEY-004', algorithm: 'HMAC-SHA256', purpose: 'Webhook Signature Verification', created: '2025-09-01', rotated: '2026-03-01', status: 'active', size: '256-bit' },
+    74→  { id: 'KEY-005', algorithm: 'AES-256-GCM', purpose: 'Backup Encryption', created: '2025-06-01', rotated: '2025-12-01', status: 'rotated', size: '256-bit' },
+    75→]
+    76→
+    77→// ── Helpers ──────────────────────────────────────
+    78→
+    79→const THREAT_MAP: Record<string, { label: string; color: string; dot: string }> = {
+    80→  low: { label: 'Low', color: 'text-emerald-600 dark:text-emerald-400', dot: 'macos-status-online' },
+    81→  medium: { label: 'Medium', color: 'text-amber-600 dark:text-amber-400', dot: 'macos-status-warning' },
+    82→  high: { label: 'High', color: 'text-red-600 dark:text-red-400', dot: 'macos-status-error' },
+    83→}
+    84→
+    85→const LEVEL_MAP: Record<string, string> = {
+    86→  info: 'text-muted-foreground',
+    87→  warning: 'text-amber-600 dark:text-amber-400',
+    88→  critical: 'text-red-600 dark:text-red-400',
+    89→}
+    90→
+    91→const ALERT_TYPE_MAP: Record<string, { dot: string; bg: string }> = {
+    92→  critical: { dot: 'macos-status-error', bg: 'bg-red-500/5 border-red-500/10' },
+    93→  warning: { dot: 'macos-status-warning', bg: 'bg-amber-500/5 border-amber-500/10' },
+    94→  info: { dot: 'macos-status-online', bg: 'bg-emerald-500/5 border-emerald-500/10' },
+    95→}
+    96→
+    97→const PERMISSION_COLORS: Record<string, string> = {
+    98→  full: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
+    99→  edit: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+   100→  view: 'bg-sky-500/10 text-sky-600 border-sky-500/20',
+   101→  none: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+   102→}
+   103→
+   104→const ROLE_COLORS: Record<string, string> = {
+   105→  'Super Admin': 'bg-red-500/10 text-red-600 border-red-500/20',
+   106→  'Station Manager': 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+   107→  'Operator': 'bg-sky-500/10 text-sky-600 border-sky-500/20',
+   108→  'Cashier': 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
+   109→  'Attendant': 'bg-slate-500/10 text-slate-500 border-slate-500/20',
+   110→  'Viewer': 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+   111→}
+   112→
+   113→// ── Component ──────────────────────────────────────
+   114→
+   115→export default function SecurityCenterModule() {
+   116→  const [activeTab, setActiveTab] = useState('overview')
+   117→  const [auditFilter, setAuditFilter] = useState('all')
+   118→
+   119→  const filteredLogs = auditFilter === 'all'
+   120→    ? auditLogs
+   121→    : auditLogs.filter(l => l.level === auditFilter)
+   122→
+   123→  const threat = THREAT_MAP[securityOverview.threatLevel]
+   124→
+   125→  return (
+   126→    <div className="space-y-4">
+   127→      <Tabs value={activeTab} onValueChange={setActiveTab}>
+   128→        <div className="overflow-x-auto pb-1">
+   129→          <TabsList className="h-8 w-max gap-0.5 bg-muted/50">
+   130→            <TabsTrigger value="overview" className="text-[11px] px-3 h-6 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">Overview</TabsTrigger>
+   131→            <TabsTrigger value="audit" className="text-[11px] px-3 h-6 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">Audit Log</TabsTrigger>
+   132→            <TabsTrigger value="sessions" className="text-[11px] px-3 h-6 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">Sessions</TabsTrigger>
+   133→            <TabsTrigger value="rbac" className="text-[11px] px-3 h-6 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">RBAC</TabsTrigger>
+   134→            <TabsTrigger value="alerts" className="text-[11px] px-3 h-6 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">Alerts</TabsTrigger>
+   135→            <TabsTrigger value="encryption" className="text-[11px] px-3 h-6 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">Encryption</TabsTrigger>
+   136→          </TabsList>
+   137→        </div>
+   138→
+   139→        {/* ── Overview ── */}
+   140→        <TabsContent value="overview" className="mt-4 space-y-4">
+   141→          {/* Threat Level Banner */}
+   142→          <div className="macos-card p-5">
+   143→            <div className="flex items-center gap-4">
+   144→              <div className="size-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center shrink-0">
+   145→                <Shield className="size-7 text-emerald-500" />
+   146→              </div>
+   147→              <div className="flex-1">
+   148→                <div className="flex items-center gap-2 mb-1">
+   149→                  <h2 className="text-[15px] font-semibold">Security Status</h2>
+   150→                  <div className="flex items-center gap-1.5">
+   151→                    <div className={`macos-status-dot ${threat.dot}`} />
+   152→                    <span className={`text-[11px] font-semibold ${threat.color}`}>Threat Level: {threat.label}</span>
+   153→                  </div>
+   154→                </div>
+   155→                <p className="text-[12px] text-muted-foreground">All security services operating normally. No active threats detected.</p>
+   156→              </div>
+   157→              <div className="text-center">
+   158→                <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{securityOverview.complianceScore}</div>
+   159→                <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Compliance</div>
+   160→              </div>
+   161→            </div>
+   162→          </div>
+   163→
+   164→          {/* Stats Grid */}
+   165→          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   166→            {[
+   167→              { label: 'Active Sessions', value: securityOverview.activeSessions, icon: Monitor, accent: '#34c759' },
+   168→              { label: 'Failed Logins (24h)', value: securityOverview.failedLogins24h, icon: Ban, accent: '#ff3b30' },
+   169→              { label: 'Locked Accounts', value: securityOverview.lockedAccounts, icon: Lock, accent: '#ff9f0a' },
+   170→              { label: 'Encryption Keys', value: securityOverview.encryptionKeys, icon: Key, accent: '#e8930c' },
+   171→            ].map((stat) => (
+   172→              <div key={stat.label} className="macos-card p-4">
+   173→                <div className="flex items-center justify-between">
+   174→                  <div>
+   175→                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">{stat.label}</p>
+   176→                    <p className="text-2xl font-bold mt-0.5" style={{ color: stat.accent }}>{stat.value}</p>
+   177→                  </div>
+   178→                  <div className="size-9 rounded-[10px] flex items-center justify-center" style={{ backgroundColor: `${stat.accent}12` }}>
+   179→                    <stat.icon className="size-4" style={{ color: stat.accent }} />
+   180→                  </div>
+   181→                </div>
+   182→              </div>
+   183→            ))}
+   184→          </div>
+   185→
+   186→          {/* Recent Alerts Preview */}
+   187→          <div>
+   188→            <div className="macos-section-header">Recent Alerts</div>
+   189→            <div className="macos-group mt-1">
+   190→              {securityAlerts.slice(0, 3).map(alert => {
+   191→                const cfg = ALERT_TYPE_MAP[alert.type]
+   192→                return (
+   193→                  <div key={alert.id} className="macos-group-item flex items-center gap-3">
+   194→                    <div className={`macos-status-dot ${cfg.dot}`} />
+   195→                    <div className="flex-1 min-w-0">
+   196→                      <div className="flex items-center gap-2">
+   197→                        <span className="text-[13px] font-medium">{alert.title}</span>
+   198→                        {alert.resolved && (
+   199→                          <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600 border-emerald-500/20">Resolved</Badge>
+   200→                        )}
+   201→                      </div>
+   202→                      <p className="text-[11px] text-muted-foreground truncate">{alert.description}</p>
+   203→                    </div>
+   204→                    <span className="text-[11px] text-muted-foreground whitespace-nowrap">{alert.time}</span>
+   205→                  </div>
+   206→                )
+   207→              })}
+   208→            </div>
+   209→          </div>
+   210→        </TabsContent>
+   211→
+   212→        {/* ── Audit Log ── */}
+   213→        <TabsContent value="audit" className="mt-4 space-y-3">
+   214→          <div className="flex items-center gap-3">
+   215→            <div className="relative flex-1 max-w-xs">
+   216→              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+   217→              <input className="macos-search pl-8 py-1.5 text-[12px]" placeholder="Search audit logs..." />
+   218→            </div>
+   219→            <div className="flex items-center gap-1.5">
+   220→              {['all', 'info', 'warning', 'critical'].map(f => (
+   221→                <button
+   222→                  key={f}
+   223→                  onClick={() => setAuditFilter(f)}
+   224→                  className={`text-[11px] px-2.5 py-1 rounded-md font-medium transition-colors capitalize ${
+   225→                    auditFilter === f
+   226→                      ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+   227→                      : 'text-muted-foreground hover:bg-black/[0.03] dark:hover:bg-white/[0.04]'
+   228→                  }`}
+   229→                >
+   230→                  {f}
+   231→                </button>
+   232→              ))}
+   233→            </div>
+   234→          </div>
+   235→
+   236→          <div className="macos-card overflow-hidden">
+   237→            <div className="max-h-[420px] overflow-y-auto">
+   238→              <table className="macos-table">
+   239→                <thead>
+   240→                  <tr>
+   241→                    <th>Time</th>
+   242→                    <th>User</th>
+   243→                    <th>Action</th>
+   244→                    <th>Entity</th>
+   245→                    <th>Details</th>
+   246→                    <th>IP</th>
+   247→                  </tr>
+   248→                </thead>
+   249→                <tbody>
+   250→                  {filteredLogs.map(log => (
+   251→                    <tr key={log.id}>
+   252→                      <td className="text-[12px] font-mono text-muted-foreground whitespace-nowrap">{log.time}</td>
+   253→                      <td className="text-[13px] font-medium">{log.user}</td>
+   254→                      <td>
+   255→                        <span className={`text-[12px] font-medium ${LEVEL_MAP[log.level]}`}>{log.action}</span>
+   256→                      </td>
+   257→                      <td>
+   258→                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">{log.entity}</Badge>
+   259→                      </td>
+   260→                      <td className="text-[12px] text-muted-foreground max-w-[250px] truncate">{log.details}</td>
+   261→                      <td className="text-[11px] font-mono text-muted-foreground">{log.ip}</td>
+   262→                    </tr>
+   263→                  ))}
+   264→                  {filteredLogs.length === 0 && (
+   265→                    <tr>
+   266→                      <td colSpan={6} className="text-center text-[13px] text-muted-foreground py-8">No logs match your filter</td>
+   267→                    </tr>
+   268→                  )}
+   269→                </tbody>
+   270→              </table>
+   271→            </div>
+   272→          </div>
+   273→          <p className="text-[11px] text-muted-foreground">{filteredLogs.length} log entries</p>
+   274→        </TabsContent>
+   275→
+   276→        {/* ── Active Sessions ── */}
+   277→        <TabsContent value="sessions" className="mt-4 space-y-3">
+   278→          <div className="flex items-center justify-between">
+   279→            <div className="macos-section-header">Active Sessions</div>
+   280→            <button className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+   281→              <Ban className="size-3" /> Revoke All
+   282→            </button>
+   283→          </div>
+   284→          <div className="macos-card overflow-hidden">
+   285→            <div className="max-h-[400px] overflow-y-auto">
+   286→              <table className="macos-table">
+   287→                <thead>
+   288→                  <tr>
+   289→                    <th>User</th>
+   290→                    <th>Role</th>
+   291→                    <th>Device</th>
+   292→                    <th>IP</th>
+   293→                    <th>Login</th>
+   294→                    <th>Last Active</th>
+   295→                    <th>Location</th>
+   296→                    <th></th>
+   297→                  </tr>
+   298→                </thead>
+   299→                <tbody>
+   300→                  {activeSessions.map(s => (
+   301→                    <tr key={s.id}>
+   302→                      <td>
+   303→                        <div className="flex items-center gap-2">
+   304→                          <div className="size-7 rounded-lg bg-amber-500/10 flex items-center justify-center text-[10px] font-bold text-amber-600 dark:text-amber-400">
+   305→                            {s.user.split(' ').map(w => w[0]).join('').slice(0, 2)}
+   306→                          </div>
+   307→                          <span className="text-[13px] font-medium">{s.user}</span>
+   308→                        </div>
+   309→                      </td>
+   310→                      <td>
+   311→                        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-semibold ${ROLE_COLORS[s.role] || ''}`}>
+   312→                          {s.role}
+   313→                        </Badge>
+   314→                      </td>
+   315→                      <td className="text-[12px] text-muted-foreground">{s.device}</td>
+   316→                      <td className="text-[11px] font-mono text-muted-foreground">{s.ip}</td>
+   317→                      <td className="text-[12px] text-muted-foreground">{s.loginAt}</td>
+   318→                      <td className="text-[12px]">{s.lastActivity}</td>
+   319→                      <td className="text-[12px] text-muted-foreground">{s.location}</td>
+   320→                      <td>
+   321→                        {s.role !== 'Service Account' && (
+   322→                          <button className="text-[11px] text-red-500 hover:text-red-600 font-medium transition-colors">
+   323→                            Revoke
+   324→                          </button>
+   325→                        )}
+   326→                      </td>
+   327→                    </tr>
+   328→                  ))}
+   329→                </tbody>
+   330→              </table>
+   331→            </div>
+   332→          </div>
+   333→        </TabsContent>
+   334→
+   335→        {/* ── RBAC Matrix ── */}
+   336→        <TabsContent value="rbac" className="mt-4 space-y-3">
+   337→          <div className="macos-section-header">Role-Based Access Control Matrix</div>
+   338→          <div className="macos-card overflow-hidden">
+   339→            <div className="overflow-x-auto">
+   340→              <table className="macos-table">
+   341→                <thead>
+   342→                  <tr>
+   343→                    <th>Role</th>
+   344→                    {Object.keys(rbacMatrix[0].modules).map(mod => (
+   345→                      <th key={mod} className="text-center">{mod}</th>
+   346→                    ))}
+   347→                  </tr>
+   348→                </thead>
+   349→                <tbody>
+   350→                  {rbacMatrix.map(row => (
+   351→                    <tr key={row.role}>
+   352→                      <td>
+   353→                        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-semibold ${ROLE_COLORS[row.role] || ''}`}>
+   354→                          {row.role}
+   355→                        </Badge>
+   356→                      </td>
+   357→                      {Object.entries(row.modules).map(([mod, perm]) => (
+   358→                        <td key={mod} className="text-center">
+   359→                          <Badge variant="outline" className={`text-[9px] px-1.5 py-0 font-semibold capitalize ${PERMISSION_COLORS[perm]}`}>
+   360→                            {perm}
+   361→                          </Badge>
+   362→                        </td>
+   363→                      ))}
+   364→                    </tr>
+   365→                  ))}
+   366→                </tbody>
+   367→              </table>
+   368→            </div>
+   369→          </div>
+   370→          <div className="flex items-center gap-4 mt-2">
+   371→            {Object.entries(PERMISSION_COLORS).map(([perm, cls]) => (
+   372→              <div key={perm} className="flex items-center gap-1.5">
+   373→                <Badge variant="outline" className={`text-[9px] px-1.5 py-0 font-semibold capitalize ${cls}`}>{perm}</Badge>
+   374→              </div>
+   375→            ))}
+   376→          </div>
+   377→        </TabsContent>
+   378→
+   379→        {/* ── Security Alerts ── */}
+   380→        <TabsContent value="alerts" className="mt-4 space-y-3">
+   381→          <div className="macos-section-header">Security Alerts Feed</div>
+   382→          <div className="space-y-2">
+   383→            {securityAlerts.map((alert, i) => {
+   384→              const cfg = ALERT_TYPE_MAP[alert.type]
+   385→              return (
+   386→                <motion.div
+   387→                  key={alert.id}
+   388→                  initial={{ opacity: 0, y: 6 }}
+   389→                  animate={{ opacity: 1, y: 0 }}
+   390→                  transition={{ delay: i * 0.04 }}
+   391→                  className={`macos-card p-4 border ${cfg.bg}`}
+   392→                >
+   393→                  <div className="flex items-start gap-3">
+   394→                    <div className={`macos-status-dot mt-1.5 ${cfg.dot}`} />
+   395→                    <div className="flex-1 min-w-0">
+   396→                      <div className="flex items-center gap-2 mb-1">
+   397→                        <span className="text-[13px] font-semibold">{alert.title}</span>
+   398→                        <Badge variant="outline" className={`text-[9px] px-1.5 py-0 font-semibold capitalize ${
+   399→                          alert.type === 'critical' ? 'bg-red-500/10 text-red-600 border-red-500/20' :
+   400→                          alert.type === 'warning' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' :
+   401→                          'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+   402→                        }`}>
+   403→                          {alert.type}
+   404→                        </Badge>
+   405→                        {alert.resolved && (
+   406→                          <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
+   407→                            <CheckCircle2 className="size-2.5 mr-0.5" /> Resolved
+   408→                          </Badge>
+   409→                        )}
+   410→                      </div>
+   411→                      <p className="text-[12px] text-muted-foreground">{alert.description}</p>
+   412→                    </div>
+   413→                    <span className="text-[11px] text-muted-foreground whitespace-nowrap">{alert.time}</span>
+   414→                  </div>
+   415→                  {!alert.resolved && (
+   416→                    <div className="flex gap-2 mt-3 ml-5">
+   417→                      <button className="macos-btn text-[11px] px-2.5 py-1">Acknowledge</button>
+   418→                      <button className="macos-btn-secondary text-[11px] px-2.5 py-1">Investigate</button>
+   419→                    </div>
+   420→                  )}
+   421→                </motion.div>
+   422→              )
+   423→            })}
+   424→          </div>
+   425→        </TabsContent>
+   426→
+   427→        {/* ── Encryption Keys ── */}
+   428→        <TabsContent value="encryption" className="mt-4 space-y-3">
+   429→          <div className="macos-card p-5">
+   430→            <div className="flex items-start gap-4">
+   431→              <div className="size-10 rounded-[10px] bg-amber-500/10 flex items-center justify-center shrink-0">
+   432→                <Fingerprint className="size-5 text-amber-500" />
+   433→              </div>
+   434→              <div className="flex-1">
+   435→                <h3 className="text-[13px] font-semibold">Encryption Management</h3>
+   436→                <p className="text-[12px] text-muted-foreground mt-0.5">All encryption keys are managed and rotated according to security policy. Keys are stored in a secure vault with AES-256 encryption at rest.</p>
+   437→              </div>
+   438→              <button className="macos-btn text-[11px] px-2.5 py-1 flex items-center gap-1">
+   439→                <RefreshCw className="size-3" /> Rotate All
+   440→              </button>
+   441→            </div>
+   442→          </div>
+   443→
+   444→          <div className="macos-section-header">Active Encryption Keys</div>
+   445→          <div className="macos-card overflow-hidden">
+   446→            <div className="max-h-[350px] overflow-y-auto">
+   447→              <table className="macos-table">
+   448→                <thead>
+   449→                  <tr>
+   450→                    <th>Key ID</th>
+   451→                    <th>Algorithm</th>
+   452→                    <th>Purpose</th>
+   453→                    <th>Size</th>
+   454→                    <th>Created</th>
+   455→                    <th>Last Rotated</th>
+   456→                    <th>Status</th>
+   457→                  </tr>
+   458→                </thead>
+   459→                <tbody>
+   460→                  {encryptionKeys.map(key => (
+   461→                    <tr key={key.id}>
+   462→                      <td className="font-mono text-[12px] text-amber-600 dark:text-amber-400">{key.id}</td>
+   463→                      <td className="text-[12px] font-mono">{key.algorithm}</td>
+   464→                      <td className="text-[13px]">{key.purpose}</td>
+   465→                      <td className="text-[12px] text-muted-foreground">{key.size}</td>
+   466→                      <td className="text-[12px] text-muted-foreground">{new Date(key.created).toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' })}</td>
+   467→                      <td className="text-[12px] text-muted-foreground">{new Date(key.rotated).toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' })}</td>
+   468→                      <td>
+   469→                        <div className="flex items-center gap-1.5">
+   470→                          <div className={`macos-status-dot ${key.status === 'active' ? 'macos-status-online' : 'macos-status-offline'}`} />
+   471→                          <span className={`text-[11px] font-medium capitalize ${key.status === 'active' ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+   472→                            {key.status}
+   473→                          </span>
+   474→                        </div>
+   475→                      </td>
+   476→                    </tr>
+   477→                  ))}
+   478→                </tbody>
+   479→              </table>
+   480→            </div>
+   481→          </div>
+   482→        </TabsContent>
+   483→      </Tabs>
+   484→    </div>
+   485→  )
+   486→}
+   487→

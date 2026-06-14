@@ -1,0 +1,688 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useCallback } from 'react'
+     4→import { motion } from 'framer-motion'
+     5→import {
+     6→  Wallet,
+     7→  TrendingUp,
+     8→  TrendingDown,
+     9→  ArrowUpRight,
+    10→  ArrowDownRight,
+    11→  FileText,
+    12→  Receipt,
+    13→  CreditCard,
+    14→  Building2,
+    15→  Calculator,
+    16→  PiggyBank,
+    17→  AlertCircle,
+    18→  ChevronRight,
+    19→  RefreshCw,
+    20→  Loader2,
+    21→} from 'lucide-react'
+    22→import { Badge } from '@/components/ui/badge'
+    23→import { ScrollArea } from '@/components/ui/scroll-area'
+    24→import {
+    25→  AreaChart,
+    26→  Area,
+    27→  XAxis,
+    28→  YAxis,
+    29→  Tooltip,
+    30→  ResponsiveContainer,
+    31→  CartesianGrid,
+    32→} from 'recharts'
+    33→
+    34→// ── Types ──────────────────────────────────────────────────
+    35→
+    36→interface FinanceSummary {
+    37→  totalIncome: number
+    38→  totalExpenses: number
+    39→  profit: number
+    40→  totalFuelRevenue: number
+    41→  profitMargin: number
+    42→  payrollCosts: number
+    43→  netProfit: number
+    44→}
+    45→
+    46→interface FinanceData {
+    47→  period: string
+    48→  startDate: string
+    49→  summary: FinanceSummary
+    50→  incomeByCategory: Record<string, number>
+    51→  expenseByCategory: Record<string, number>
+    52→  fuelRevenueByType: Record<string, number>
+    53→  supplierInvoices: {
+    54→    totalPending: number
+    55→    totalPaid: number
+    56→    pendingCount: number
+    57→    paidCount: number
+    58→  }
+    59→  purchaseOrders: {
+    60→    totalOpen: number
+    61→    openCount: number
+    62→  }
+    63→  payroll: {
+    64→    totalCost: number
+    65→    recordCount: number
+    66→    paidCount: number
+    67→    pendingCount: number
+    68→  }
+    69→  transactionCount: number
+    70→  expenseCount: number
+    71→}
+    72→
+    73→interface GLAccount {
+    74→  id: string
+    75→  accountCode: string
+    76→  accountName: string
+    77→  accountType: string
+    78→  balance: number
+    79→  isActive: boolean
+    80→}
+    81→
+    82→interface JournalEntry {
+    83→  id: string
+    84→  entryNumber: string
+    85→  entryDate: string
+    86→  description: string
+    87→  status: string
+    88→  lines: { debit: number; credit: number; accountName: string }[]
+    89→}
+    90→
+    91→interface AccountReceivable {
+    92→  id: string
+    93→  customerName: string
+    94→  amount: number
+    95→  paidAmount: number
+    96→  balance: number
+    97→  dueDate: string
+    98→  status: string
+    99→}
+   100→
+   101→interface AccountPayable {
+   102→  id: string
+   103→  supplierName: string
+   104→  amount: number
+   105→  paidAmount: number
+   106→  balance: number
+   107→  dueDate: string
+   108→  status: string
+   109→}
+   110→
+   111→interface TaxConfig {
+   112→  id: string
+   113→  taxName: string
+   114→  taxRate: number
+   115→  taxType: string
+   116→  isActive: boolean
+   117→  effectiveFrom: string
+   118→}
+   119→
+   120→// ── Helpers ──────────────────────────────────────────────
+   121→
+   122→function formatPKR(amount: number): string {
+   123→  if (Math.abs(amount) >= 1000000) return `PKR ${(amount / 1000000).toFixed(2)}M`
+   124→  if (Math.abs(amount) >= 1000) return `PKR ${(amount / 1000).toFixed(0)}K`
+   125→  return `PKR ${amount.toLocaleString()}`
+   126→}
+   127→
+   128→function formatFull(amount: number): string {
+   129→  return `PKR ${amount.toLocaleString()}`
+   130→}
+   131→
+   132→const fadeUp = {
+   133→  initial: { opacity: 0, y: 8 },
+   134→  animate: { opacity: 1, y: 0 },
+   135→  transition: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
+   136→}
+   137→
+   138→const stagger = {
+   139→  animate: { transition: { staggerChildren: 0.04 } },
+   140→}
+   141→
+   142→// ── Component ────────────────────────────────────────────
+   143→
+   144→export default function FinanceModule() {
+   145→  const [activeTab, setActiveTab] = useState<'overview' | 'gl' | 'ar-ap' | 'tax'>('overview')
+   146→  const [financeData, setFinanceData] = useState<FinanceData | null>(null)
+   147→  const [glAccounts, setGLAccounts] = useState<GLAccount[]>([])
+   148→  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([])
+   149→  const [receivables, setReceivables] = useState<AccountReceivable[]>([])
+   150→  const [payables, setPayables] = useState<AccountPayable[]>([])
+   151→  const [taxConfigs, setTaxConfigs] = useState<TaxConfig[]>([])
+   152→  const [loading, setLoading] = useState(true)
+   153→  const [error, setError] = useState<string | null>(null)
+   154→
+   155→  const fetchData = useCallback(async () => {
+   156→    setLoading(true)
+   157→    setError(null)
+   158→    try {
+   159→      const [financeRes, glRes, jeRes, arRes, apRes, taxRes] = await Promise.all([
+   160→        fetch('/api/finance'),
+   161→        fetch('/api/finance-advanced?type=gl_accounts'),
+   162→        fetch('/api/finance-advanced?type=journal_entries'),
+   163→        fetch('/api/finance-advanced?type=receivables'),
+   164→        fetch('/api/finance-advanced?type=payables'),
+   165→        fetch('/api/finance-advanced?type=tax_configs'),
+   166→      ])
+   167→
+   168→      if (!financeRes.ok) throw new Error('Failed to load finance data')
+   169→
+   170→      const financeJson = await financeRes.json()
+   171→      setFinanceData(financeJson)
+   172→
+   173→      if (glRes.ok) {
+   174→        const glJson = await glRes.json()
+   175→        setGLAccounts(glJson.glAccounts || [])
+   176→      }
+   177→      if (jeRes.ok) {
+   178→        const jeJson = await jeRes.json()
+   179→        setJournalEntries(jeJson.journalEntries || [])
+   180→      }
+   181→      if (arRes.ok) {
+   182→        const arJson = await arRes.json()
+   183→        setReceivables(arJson.receivables || [])
+   184→      }
+   185→      if (apRes.ok) {
+   186→        const apJson = await apRes.json()
+   187→        setPayables(apJson.payables || [])
+   188→      }
+   189→      if (taxRes.ok) {
+   190→        const taxJson = await taxRes.json()
+   191→        setTaxConfigs(taxJson.taxConfigs || [])
+   192→      }
+   193→    } catch (err) {
+   194→      setError(err instanceof Error ? err.message : 'Unknown error')
+   195→    } finally {
+   196→      setLoading(false)
+   197→    }
+   198→  }, [])
+   199→
+   200→  useEffect(() => {
+   201→    fetchData()
+   202→  }, [fetchData])
+   203→
+   204→  const tabs = [
+   205→    { key: 'overview' as const, label: 'Overview' },
+   206→    { key: 'gl' as const, label: 'GL Accounts' },
+   207→    { key: 'ar-ap' as const, label: 'AR / AP' },
+   208→    { key: 'tax' as const, label: 'Tax' },
+   209→  ]
+   210→
+   211→  // Build summary cards from finance data
+   212→  const summaryCards = financeData ? [
+   213→    { label: 'Revenue', value: financeData.summary.totalIncome, icon: TrendingUp, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/10', trend: 'up' as const },
+   214→    { label: 'Expenses', value: financeData.summary.totalExpenses, icon: TrendingDown, color: 'text-red-500 dark:text-red-400', bg: 'bg-red-500/10', trend: 'down' as const },
+   215→    { label: 'Net Profit', value: financeData.summary.netProfit, icon: Wallet, color: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-500/10', trend: 'up' as const },
+   216→    { label: 'Outstanding', value: financeData.supplierInvoices.totalPending, icon: Receipt, color: 'text-rose-500 dark:text-rose-400', bg: 'bg-rose-500/10', trend: 'down' as const },
+   217→  ] : []
+   218→
+   219→  // Build cash flow data from income/expense categories
+   220→  const cashFlowData = (() => {
+   221→    if (!financeData) return []
+   222→    // We'll create a simple single-period view from the data
+   223→    return [{
+   224→      month: new Date().toLocaleDateString('en-US', { month: 'short' }),
+   225→      inflow: financeData.summary.totalIncome,
+   226→      outflow: financeData.summary.totalExpenses,
+   227→    }]
+   228→  })()
+   229→
+   230→  // ── Loading State ──
+   231→  if (loading && !financeData) {
+   232→    return (
+   233→      <div className="space-y-5">
+   234→        <div className="flex items-center gap-1 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] p-1 w-fit">
+   235→          {[...Array(4)].map((_, i) => (
+   236→            <div key={i} className="px-4 py-1.5 w-24 h-7 bg-muted/20 rounded-lg animate-pulse" />
+   237→          ))}
+   238→        </div>
+   239→        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+   240→          {[...Array(4)].map((_, i) => (
+   241→            <div key={i} className="macos-card p-4 h-[110px] animate-pulse bg-muted/10" />
+   242→          ))}
+   243→        </div>
+   244→      </div>
+   245→    )
+   246→  }
+   247→
+   248→  // ── Error State ──
+   249→  if (error && !financeData) {
+   250→    return (
+   251→      <div className="macos-card p-8 flex flex-col items-center justify-center text-center min-h-[300px]">
+   252→        <AlertCircle className="size-10 text-teal-500 mb-4" />
+   253→        <h3 className="text-[15px] font-semibold text-foreground mb-1">Failed to load finance data</h3>
+   254→        <p className="text-[13px] text-muted-foreground mb-4">{error}</p>
+   255→        <button onClick={fetchData} className="macos-btn flex items-center gap-1.5">
+   256→          <RefreshCw className="size-3.5" /> Retry
+   257→        </button>
+   258→      </div>
+   259→    )
+   260→  }
+   261→
+   262→  return (
+   263→    <div className="space-y-5">
+   264→      {/* Tab Bar */}
+   265→      <div className="flex items-center justify-between">
+   266→        <div className="flex items-center gap-1 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] p-1 w-fit">
+   267→          {tabs.map((tab) => (
+   268→            <button
+   269→              key={tab.key}
+   270→              onClick={() => setActiveTab(tab.key)}
+   271→              className={`px-4 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-150 ${
+   272→                activeTab === tab.key
+   273→                  ? 'bg-card text-foreground shadow-sm'
+   274→                  : 'text-muted-foreground hover:text-foreground'
+   275→              }`}
+   276→            >
+   277→              {tab.label}
+   278→            </button>
+   279→          ))}
+   280→        </div>
+   281→        <button
+   282→          onClick={fetchData}
+   283→          disabled={loading}
+   284→          className="macos-btn-secondary flex items-center gap-1.5 text-[12px] px-3 py-1.5"
+   285→        >
+   286→          {loading ? (
+   287→            <Loader2 className="size-3 animate-spin" />
+   288→          ) : (
+   289→            <RefreshCw className="size-3" />
+   290→          )}
+   291→          Refresh
+   292→        </button>
+   293→      </div>
+   294→
+   295→      {/* ── Overview Tab ── */}
+   296→      {activeTab === 'overview' && (
+   297→        <motion.div {...fadeUp} className="space-y-5">
+   298→          {/* Summary Cards */}
+   299→          <motion.div
+   300→            variants={stagger}
+   301→            initial="initial"
+   302→            animate="animate"
+   303→            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+   304→          >
+   305→            {summaryCards.map((card, i) => (
+   306→              <motion.div
+   307→                key={card.label}
+   308→                variants={{ initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 } }}
+   309→                transition={{ delay: i * 0.06, duration: 0.3 }}
+   310→                className="macos-card p-4"
+   311→              >
+   312→                <div className="flex items-start justify-between">
+   313→                  <div>
+   314→                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{card.label}</p>
+   315→                    <p className="text-[20px] font-bold mt-1 tracking-tight">{formatPKR(card.value)}</p>
+   316→                    {financeData && card.label === 'Net Profit' && (
+   317→                      <div className="flex items-center gap-1 mt-1.5">
+   318→                        <span className="text-[11px] text-muted-foreground">Margin: {financeData.summary.profitMargin}%</span>
+   319→                      </div>
+   320→                    )}
+   321→                    {financeData && card.label === 'Expenses' && (
+   322→                      <div className="flex items-center gap-1 mt-1.5">
+   323→                        <span className="text-[11px] text-muted-foreground">Payroll: {formatPKR(financeData.summary.payrollCosts)}</span>
+   324→                      </div>
+   325→                    )}
+   326→                    {financeData && card.label === 'Outstanding' && (
+   327→                      <div className="flex items-center gap-1 mt-1.5">
+   328→                        <span className="text-[11px] text-muted-foreground">{financeData.supplierInvoices.pendingCount} pending invoices</span>
+   329→                      </div>
+   330→                    )}
+   331→                    {financeData && card.label === 'Revenue' && (
+   332→                      <div className="flex items-center gap-1 mt-1.5">
+   333→                        <span className="text-[11px] text-muted-foreground">Fuel: {formatPKR(financeData.summary.totalFuelRevenue)}</span>
+   334→                      </div>
+   335→                    )}
+   336→                  </div>
+   337→                  <div className={`flex size-9 items-center justify-center rounded-xl ${card.bg}`}>
+   338→                    <card.icon className={`size-[18px] ${card.color}`} />
+   339→                  </div>
+   340→                </div>
+   341→              </motion.div>
+   342→            ))}
+   343→          </motion.div>
+   344→
+   345→          {/* Cash Flow Chart */}
+   346→          <div className="macos-card p-5">
+   347→            <div className="flex items-center justify-between mb-4">
+   348→              <div>
+   349→                <h3 className="text-[13px] font-semibold">Cash Flow</h3>
+   350→                <p className="text-[11px] text-muted-foreground mt-0.5">Income vs expenses for {financeData?.period || 'current period'}</p>
+   351→              </div>
+   352→              <div className="flex items-center gap-4">
+   353→                <div className="flex items-center gap-1.5">
+   354→                  <div className="size-2.5 rounded-full bg-emerald-500" />
+   355→                  <span className="text-[11px] text-muted-foreground">Income</span>
+   356→                </div>
+   357→                <div className="flex items-center gap-1.5">
+   358→                  <div className="size-2.5 rounded-full bg-rose-400" />
+   359→                  <span className="text-[11px] text-muted-foreground">Expenses</span>
+   360→                </div>
+   361→              </div>
+   362→            </div>
+   363→            {cashFlowData.length > 0 ? (
+   364→              <div className="h-64">
+   365→                <ResponsiveContainer width="100%" height="100%">
+   366→                  <AreaChart data={cashFlowData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+   367→                    <defs>
+   368→                      <linearGradient id="inflowGrad" x1="0" y1="0" x2="0" y2="1">
+   369→                        <stop offset="0%" stopColor="#34c759" stopOpacity={0.2} />
+   370→                        <stop offset="100%" stopColor="#34c759" stopOpacity={0} />
+   371→                      </linearGradient>
+   372→                      <linearGradient id="outflowGrad" x1="0" y1="0" x2="0" y2="1">
+   373→                        <stop offset="0%" stopColor="#ff6b6b" stopOpacity={0.15} />
+   374→                        <stop offset="100%" stopColor="#ff6b6b" stopOpacity={0} />
+   375→                      </linearGradient>
+   376→                    </defs>
+   377→                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+   378→                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+   379→                    <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${(v / 1000000).toFixed(0)}M`} />
+   380→                    <Tooltip
+   381→                      contentStyle={{ fontSize: 12, borderRadius: 10, border: '0.5px solid var(--border)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+   382→                      formatter={(value: number, name: string) => [formatFull(value), name === 'inflow' ? 'Income' : 'Expenses']}
+   383→                    />
+   384→                    <Area type="monotone" dataKey="inflow" stroke="#34c759" strokeWidth={2} fill="url(#inflowGrad)" />
+   385→                    <Area type="monotone" dataKey="outflow" stroke="#ff6b6b" strokeWidth={2} fill="url(#outflowGrad)" />
+   386→                  </AreaChart>
+   387→                </ResponsiveContainer>
+   388→              </div>
+   389→            ) : (
+   390→              <div className="h-64 flex items-center justify-center text-muted-foreground text-[13px]">
+   391→                No cash flow data available
+   392→              </div>
+   393→            )}
+   394→          </div>
+   395→
+   396→          {/* Income & Expense Breakdown */}
+   397→          {financeData && (Object.keys(financeData.incomeByCategory).length > 0 || Object.keys(financeData.expenseByCategory).length > 0) && (
+   398→            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+   399→              {/* Income Breakdown */}
+   400→              {Object.keys(financeData.incomeByCategory).length > 0 && (
+   401→                <div className="macos-card p-4">
+   402→                  <h3 className="text-[13px] font-semibold mb-3">Income by Category</h3>
+   403→                  <div className="macos-group">
+   404→                    {Object.entries(financeData.incomeByCategory)
+   405→                      .sort(([, a], [, b]) => b - a)
+   406→                      .map(([category, amount]) => (
+   407→                        <div key={category} className="macos-group-item flex items-center justify-between">
+   408→                          <span className="text-[13px] truncate">{category}</span>
+   409→                          <span className="text-[13px] font-medium tabular-nums">{formatPKR(amount)}</span>
+   410→                        </div>
+   411→                      ))}
+   412→                  </div>
+   413→                </div>
+   414→              )}
+   415→              {/* Expense Breakdown */}
+   416→              {Object.keys(financeData.expenseByCategory).length > 0 && (
+   417→                <div className="macos-card p-4">
+   418→                  <h3 className="text-[13px] font-semibold mb-3">Expenses by Category</h3>
+   419→                  <div className="macos-group">
+   420→                    {Object.entries(financeData.expenseByCategory)
+   421→                      .sort(([, a], [, b]) => b - a)
+   422→                      .map(([category, amount]) => (
+   423→                        <div key={category} className="macos-group-item flex items-center justify-between">
+   424→                          <span className="text-[13px] truncate">{category}</span>
+   425→                          <span className="text-[13px] font-medium tabular-nums">{formatPKR(amount)}</span>
+   426→                        </div>
+   427→                      ))}
+   428→                  </div>
+   429→                </div>
+   430→              )}
+   431→            </div>
+   432→          )}
+   433→
+   434→          {/* Recent Journal Entries */}
+   435→          <div className="macos-card overflow-hidden">
+   436→            <div className="flex items-center justify-between p-4 pb-0">
+   437→              <div className="flex items-center gap-2">
+   438→                <FileText className="size-4 text-teal-500" />
+   439→                <h3 className="text-[13px] font-semibold">Recent Journal Entries</h3>
+   440→              </div>
+   441→              <Badge variant="outline" className="text-[11px] px-2 py-0.5">{journalEntries.length} entries</Badge>
+   442→            </div>
+   443→            <ScrollArea className="max-h-[360px]">
+   444→              {journalEntries.length > 0 ? (
+   445→                <table className="macos-table">
+   446→                  <thead>
+   447→                    <tr>
+   448→                      <th>Entry ID</th>
+   449→                      <th>Date</th>
+   450→                      <th>Description</th>
+   451→                      <th>Status</th>
+   452→                      <th className="text-right">Debit</th>
+   453→                      <th className="text-right">Credit</th>
+   454→                    </tr>
+   455→                  </thead>
+   456→                  <tbody>
+   457→                    {journalEntries.map((entry) => {
+   458→                      const totalDebit = entry.lines?.reduce((s, l) => s + l.debit, 0) || 0
+   459→                      const totalCredit = entry.lines?.reduce((s, l) => s + l.credit, 0) || 0
+   460→                      return (
+   461→                        <tr key={entry.id}>
+   462→                          <td className="font-mono text-[12px] text-teal-600 dark:text-teal-400">{entry.entryNumber}</td>
+   463→                          <td className="text-[12px] text-muted-foreground">{new Date(entry.entryDate).toLocaleDateString('en-PK', { day: '2-digit', month: 'short' })}</td>
+   464→                          <td className="text-[13px] max-w-[200px] truncate">{entry.description}</td>
+   465→                          <td>
+   466→                            <span className={`macos-pill ${
+   467→                              entry.status === 'posted'
+   468→                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+   469→                                : 'bg-teal-500/10 text-teal-600 dark:text-teal-400'
+   470→                            }`}>
+   471→                              {entry.status}
+   472→                            </span>
+   473→                          </td>
+   474→                          <td className="text-right font-medium text-[13px]">{totalDebit > 0 ? formatPKR(totalDebit) : '—'}</td>
+   475→                          <td className="text-right font-medium text-[13px] text-emerald-600 dark:text-emerald-400">{totalCredit > 0 ? formatPKR(totalCredit) : '—'}</td>
+   476→                        </tr>
+   477→                      )
+   478→                    })}
+   479→                  </tbody>
+   480→                </table>
+   481→              ) : (
+   482→                <div className="p-6 text-center text-muted-foreground text-[13px]">
+   483→                  No journal entries found
+   484→                </div>
+   485→              )}
+   486→            </ScrollArea>
+   487→          </div>
+   488→        </motion.div>
+   489→      )}
+   490→
+   491→      {/* ── GL Accounts Tab ── */}
+   492→      {activeTab === 'gl' && (
+   493→        <motion.div {...fadeUp} className="space-y-4">
+   494→          <div className="flex items-center gap-2">
+   495→            <Calculator className="size-4 text-teal-500" />
+   496→            <h3 className="text-[13px] font-semibold">General Ledger Accounts</h3>
+   497→          </div>
+   498→          {glAccounts.length > 0 ? (
+   499→            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   500→              {['Asset', 'Liability', 'Equity', 'Revenue', 'Expense'].map((type) => {
+   501→                const accounts = glAccounts.filter((a) => a.accountType === type)
+   502→                if (accounts.length === 0) return null
+   503→                return (
+   504→                  <div key={type} className="macos-group">
+   505→                    <div className="macos-group-item flex items-center justify-between bg-black/[0.02] dark:bg-white/[0.02]">
+   506→                      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{type}</span>
+   507→                      <span className="text-[11px] text-muted-foreground">{accounts.length} accounts</span>
+   508→                    </div>
+   509→                    {accounts.map((account) => (
+   510→                      <div key={account.id} className="macos-group-item flex items-center gap-3">
+   511→                        <div className={`macos-status-dot ${account.isActive ? 'macos-status-online' : 'macos-status-offline'}`} />
+   512→                        <div className="flex-1 min-w-0">
+   513→                          <div className="flex items-center gap-2">
+   514→                            <span className="text-[12px] font-mono text-muted-foreground">{account.accountCode}</span>
+   515→                            <span className="text-[13px] truncate">{account.accountName}</span>
+   516→                          </div>
+   517→                        </div>
+   518→                        <span className="text-[13px] font-medium tabular-nums">{formatPKR(account.balance)}</span>
+   519→                        <ChevronRight className="size-3.5 text-muted-foreground" />
+   520→                      </div>
+   521→                    ))}
+   522→                  </div>
+   523→                )
+   524→              })}
+   525→            </div>
+   526→          ) : (
+   527→            <div className="macos-card p-6 text-center text-muted-foreground text-[13px]">
+   528→              No GL accounts configured. Set up your chart of accounts in Settings.
+   529→            </div>
+   530→          )}
+   531→        </motion.div>
+   532→      )}
+   533→
+   534→      {/* ── AR / AP Tab ── */}
+   535→      {activeTab === 'ar-ap' && (
+   536→        <motion.div {...fadeUp} className="space-y-5">
+   537→          {/* AR/AP Summary Cards */}
+   538→          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   539→            <div className="macos-card p-4">
+   540→              <div className="flex items-center gap-3 mb-4">
+   541→                <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-500/10">
+   542→                  <CreditCard className="size-[18px] text-emerald-500" />
+   543→                </div>
+   544→                <div>
+   545→                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Accounts Receivable</p>
+   546→                  <p className="text-[20px] font-bold tracking-tight">{formatPKR(receivables.reduce((s, r) => s + r.balance, 0))}</p>
+   547→                </div>
+   548→              </div>
+   549→              {receivables.length > 0 ? (
+   550→                <div className="macos-group">
+   551→                  {receivables.slice(0, 10).map((item) => {
+   552→                    const isOverdue = new Date(item.dueDate) < new Date() && item.balance > 0
+   553→                    return (
+   554→                      <div key={item.id} className="macos-group-item flex items-center gap-3">
+   555→                        <div className={`macos-status-dot ${isOverdue ? 'macos-status-warning' : 'macos-status-online'}`} />
+   556→                        <div className="flex-1 min-w-0">
+   557→                          <p className="text-[13px] truncate">{item.customerName}</p>
+   558→                          <p className="text-[11px] text-muted-foreground">
+   559→                            Due: {new Date(item.dueDate).toLocaleDateString('en-PK', { day: '2-digit', month: 'short' })} · {item.status}
+   560→                          </p>
+   561→                        </div>
+   562→                        <span className="text-[13px] font-medium tabular-nums">{formatPKR(item.balance)}</span>
+   563→                      </div>
+   564→                    )
+   565→                  })}
+   566→                </div>
+   567→              ) : (
+   568→                <p className="text-[12px] text-muted-foreground text-center py-4">No receivables</p>
+   569→              )}
+   570→            </div>
+   571→
+   572→            <div className="macos-card p-4">
+   573→              <div className="flex items-center gap-3 mb-4">
+   574→                <div className="flex size-9 items-center justify-center rounded-xl bg-rose-500/10">
+   575→                  <Building2 className="size-[18px] text-rose-500" />
+   576→                </div>
+   577→                <div>
+   578→                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Accounts Payable</p>
+   579→                  <p className="text-[20px] font-bold tracking-tight">{formatPKR(payables.reduce((s, p) => s + p.balance, 0))}</p>
+   580→                </div>
+   581→              </div>
+   582→              {payables.length > 0 ? (
+   583→                <div className="macos-group">
+   584→                  {payables.slice(0, 10).map((item) => {
+   585→                    const isOverdue = new Date(item.dueDate) < new Date() && item.balance > 0
+   586→                    return (
+   587→                      <div key={item.id} className="macos-group-item flex items-center gap-3">
+   588→                        <div className={`macos-status-dot ${isOverdue ? 'macos-status-error' : 'macos-status-online'}`} />
+   589→                        <div className="flex-1 min-w-0">
+   590→                          <p className="text-[13px] truncate">{item.supplierName}</p>
+   591→                          <p className="text-[11px] text-muted-foreground">
+   592→                            Due: {new Date(item.dueDate).toLocaleDateString('en-PK', { day: '2-digit', month: 'short' })} · {item.status}
+   593→                          </p>
+   594→                        </div>
+   595→                        <span className="text-[13px] font-medium tabular-nums">{formatPKR(item.balance)}</span>
+   596→                      </div>
+   597→                    )
+   598→                  })}
+   599→                </div>
+   600→              ) : (
+   601→                <p className="text-[12px] text-muted-foreground text-center py-4">No payables</p>
+   602→              )}
+   603→            </div>
+   604→          </div>
+   605→        </motion.div>
+   606→      )}
+   607→
+   608→      {/* ── Tax Tab ── */}
+   609→      {activeTab === 'tax' && (
+   610→        <motion.div {...fadeUp} className="space-y-5">
+   611→          <div className="flex items-center gap-2">
+   612→            <PiggyBank className="size-4 text-teal-500" />
+   613→            <h3 className="text-[13px] font-semibold">Tax Overview</h3>
+   614→          </div>
+   615→
+   616→          {/* Tax Summary Cards */}
+   617→          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+   618→            <div className="macos-card p-4 text-center">
+   619→              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Active Tax Configs</p>
+   620→              <p className="text-[22px] font-bold mt-1 tracking-tight text-teal-600 dark:text-teal-400">{taxConfigs.filter(t => t.isActive).length}</p>
+   621→            </div>
+   622→            <div className="macos-card p-4 text-center">
+   623→              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Total Tax Configs</p>
+   624→              <p className="text-[22px] font-bold mt-1 tracking-tight">{taxConfigs.length}</p>
+   625→            </div>
+   626→            <div className="macos-card p-4 text-center">
+   627→              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Payroll Cost</p>
+   628→              <p className="text-[22px] font-bold mt-1 tracking-tight text-emerald-600 dark:text-emerald-400">{financeData ? formatPKR(financeData.payroll.totalCost) : '—'}</p>
+   629→            </div>
+   630→          </div>
+   631→
+   632→          {/* Tax Details Table */}
+   633→          <div className="macos-card overflow-hidden">
+   634→            <ScrollArea className="max-h-[400px]">
+   635→              {taxConfigs.length > 0 ? (
+   636→                <table className="macos-table">
+   637→                  <thead>
+   638→                    <tr>
+   639→                      <th>Tax Name</th>
+   640→                      <th>Type</th>
+   641→                      <th>Rate</th>
+   642→                      <th>Effective From</th>
+   643→                      <th>Status</th>
+   644→                    </tr>
+   645→                  </thead>
+   646→                  <tbody>
+   647→                    {taxConfigs.map((tax) => (
+   648→                      <tr key={tax.id}>
+   649→                        <td className="text-[13px] font-medium">{tax.taxName}</td>
+   650→                        <td><span className="macos-pill bg-black/[0.04] dark:bg-white/[0.06] text-[11px]">{tax.taxType}</span></td>
+   651→                        <td className="text-[13px] tabular-nums">{tax.taxRate}%</td>
+   652→                        <td className="text-[12px] text-muted-foreground">{new Date(tax.effectiveFrom).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+   653→                        <td>
+   654→                          <div className="flex items-center gap-1.5">
+   655→                            <div className={`macos-status-dot ${tax.isActive ? 'macos-status-online' : 'macos-status-offline'}`} />
+   656→                            <span className="text-[11px] text-muted-foreground">
+   657→                              {tax.isActive ? 'Active' : 'Inactive'}
+   658→                            </span>
+   659→                          </div>
+   660→                        </td>
+   661→                      </tr>
+   662→                    ))}
+   663→                  </tbody>
+   664→                </table>
+   665→              ) : (
+   666→                <div className="p-6 text-center text-muted-foreground text-[13px]">
+   667→                  No tax configurations found. Set up tax configs in Settings.
+   668→                </div>
+   669→              )}
+   670→            </ScrollArea>
+   671→          </div>
+   672→
+   673→          {financeData && (
+   674→            <div className="flex items-center gap-2 p-3 rounded-xl bg-teal-500/5 border border-teal-500/10">
+   675→              <AlertCircle className="size-4 text-teal-500 shrink-0" />
+   676→              <p className="text-[12px] text-teal-700 dark:text-teal-400">
+   677→                Period: <strong>{financeData.period}</strong> starting {new Date(financeData.startDate).toLocaleDateString()}. 
+   678→                Profit margin: <strong>{financeData.summary.profitMargin}%</strong>.
+   679→                {financeData.supplierInvoices.pendingCount > 0 && ` ${financeData.supplierInvoices.pendingCount} supplier invoices pending payment.`}
+   680→              </p>
+   681→            </div>
+   682→          )}
+   683→        </motion.div>
+   684→      )}
+   685→    </div>
+   686→  )
+   687→}
+   688→

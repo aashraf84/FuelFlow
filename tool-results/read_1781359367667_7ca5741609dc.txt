@@ -1,0 +1,563 @@
+     1→     1→'use client'
+     2→     2→
+     3→     3→import { useState } from 'react'
+     4→     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→     5→import {
+     6→     6→  Truck,
+     7→     7→  Car,
+     8→     8→  CreditCard,
+     9→     9→  Radio,
+    10→    10→  Receipt,
+    11→    11→  ChevronRight,
+    12→    12→  Plus,
+    13→    13→  Search,
+    14→    14→  ArrowUpRight,
+    15→    15→  ArrowDownRight,
+    16→    16→  AlertTriangle,
+    17→    17→  CheckCircle2,
+    18→    18→  XCircle,
+    19→    19→  Clock,
+    20→    20→  Signal,
+    21→    21→  Wallet,
+    22→    22→} from 'lucide-react'
+    23→    23→
+    24→    24→// ── Static Data ──────────────────────────────────────────
+    25→    25→
+    26→    26→const fleetAccounts = [
+    27→    27→  { id: 'FA-001', company: 'Metro Logistics Pvt Ltd', contact: 'Ahmed Khan', vehicles: 34, cards: 42, creditLimit: 5000000, balance: 3240000, status: 'active' as const },
+    28→    28→  { id: 'FA-002', company: 'Swift Carrier Systems', contact: 'Bilal Raza', vehicles: 18, cards: 22, creditLimit: 2500000, balance: 890000, status: 'active' as const },
+    29→    29→  { id: 'FA-003', company: 'Pak Gulf Transport', contact: 'Farhan Sheikh', vehicles: 56, cards: 60, creditLimit: 8000000, balance: 6150000, status: 'active' as const },
+    30→    30→  { id: 'FA-004', company: 'Indus Valley Freight', contact: 'Sajid Mehmood', vehicles: 12, cards: 15, creditLimit: 1500000, balance: 1480000, status: 'warning' as const },
+    31→    31→  { id: 'FA-005', company: 'Crescent Shipping Corp', contact: 'Tariq Anwar', vehicles: 8, cards: 10, creditLimit: 1000000, balance: 120000, status: 'active' as const },
+    32→    32→  { id: 'FA-006', company: 'Karachi Port Haulage', contact: 'Zubair Ahmed', vehicles: 22, cards: 28, creditLimit: 3500000, balance: 2100000, status: 'suspended' as const },
+    33→    33→]
+    34→    34→
+    35→    35→const vehicles = [
+    36→    36→  { id: 'V-001', plate: 'LEA-2345', make: 'Hino', model: 'FG', year: 2022, type: 'Heavy Truck', rfidTag: 'RF-8A3F21', fuelType: 'Diesel', dailyLimit: 15000, active: true },
+    37→    37→  { id: 'V-002', plate: 'LZC-6789', make: 'Isuzu', model: 'NPR', year: 2023, type: 'Medium Truck', rfidTag: 'RF-9B4G32', fuelType: 'Diesel', dailyLimit: 10000, active: true },
+    38→    38→  { id: 'V-003', plate: 'LHR-1122', make: 'Toyota', model: 'Hilux', year: 2021, type: 'Pickup', rfidTag: 'RF-2C5H43', fuelType: 'Petrol', dailyLimit: 5000, active: true },
+    39→    39→  { id: 'V-004', plate: 'KHI-3344', make: 'Mazda', model: 'Titan', year: 2020, type: 'Medium Truck', rfidTag: 'RF-6D8I54', fuelType: 'Diesel', dailyLimit: 12000, active: false },
+    40→    40→  { id: 'V-005', plate: 'ISB-5566', make: 'Daewoo', model: 'Novus', year: 2023, type: 'Heavy Truck', rfidTag: 'RF-1E9J65', fuelType: 'Diesel', dailyLimit: 18000, active: true },
+    41→    41→  { id: 'V-006', plate: 'RWP-7788', make: 'Hyundai', model: 'Porter', year: 2022, type: 'Light Truck', rfidTag: 'RF-3F0K76', fuelType: 'Diesel', dailyLimit: 6000, active: true },
+    42→    42→  { id: 'V-007', plate: 'FSD-9900', make: 'Suzuki', model: 'Carry', year: 2021, type: 'Pickup', rfidTag: 'RF-7G1L87', fuelType: 'Petrol', dailyLimit: 3000, active: true },
+    43→    43→  { id: 'V-008', plate: 'MUL-1234', make: 'Hino', model: '700', year: 2023, type: 'Heavy Truck', rfidTag: 'RF-4H2M98', fuelType: 'Diesel', dailyLimit: 20000, active: true },
+    44→    44→]
+    45→    45→
+    46→    46→const fuelCards = [
+    47→    47→  { id: 'FC-001', number: '•••• •••• •••• 4821', type: 'Fleet', rfid: 'RF-C1A1', balance: 45000, dailyLimit: 15000, monthlyLimit: 300000, expiry: '2026-03-15', status: 'active' as const },
+    48→    48→  { id: 'FC-002', number: '•••• •••• •••• 7293', type: 'Driver', rfid: 'RF-C2B2', balance: 22000, dailyLimit: 8000, monthlyLimit: 150000, expiry: '2025-12-31', status: 'active' as const },
+    49→    49→  { id: 'FC-003', number: '•••• •••• •••• 1056', type: 'Fleet', rfid: 'RF-C3C3', balance: 0, dailyLimit: 10000, monthlyLimit: 200000, expiry: '2025-06-30', status: 'expired' as const },
+    50→    50→  { id: 'FC-004', number: '•••• •••• •••• 8412', type: 'Vehicle', rfid: 'RF-C4D4', balance: 78000, dailyLimit: 20000, monthlyLimit: 500000, expiry: '2026-08-20', status: 'active' as const },
+    51→    51→  { id: 'FC-005', number: '•••• •••• •••• 3678', type: 'Driver', rfid: 'RF-C5E5', balance: 12000, dailyLimit: 5000, monthlyLimit: 100000, expiry: '2025-11-15', status: 'suspended' as const },
+    52→    52→  { id: 'FC-006', number: '•••• •••• •••• 5934', type: 'Fleet', rfid: 'RF-C6F6', balance: 91000, dailyLimit: 25000, monthlyLimit: 600000, expiry: '2026-01-10', status: 'active' as const },
+    53→    53→]
+    54→    54→
+    55→    55→const rfidReaders = [
+    56→    56→  { id: 'R-01', name: 'Pump 1 RFID', location: 'Forecourt A', ip: '192.168.1.101', status: 'online' as const, lastRead: '2 min ago', readsToday: 87 },
+    57→    57→  { id: 'R-02', name: 'Pump 3 RFID', location: 'Forecourt A', ip: '192.168.1.103', status: 'online' as const, lastRead: '5 min ago', readsToday: 63 },
+    58→    58→  { id: 'R-03', name: 'Pump 5 RFID', location: 'Forecourt B', ip: '192.168.1.105', status: 'warning' as const, lastRead: '18 min ago', readsToday: 41 },
+    59→    59→  { id: 'R-04', name: 'Pump 7 RFID', location: 'Forecourt B', ip: '192.168.1.107', status: 'online' as const, lastRead: '1 min ago', readsToday: 92 },
+    60→    60→  { id: 'R-05', name: 'Gate RFID', location: 'Entry Gate', ip: '192.168.1.110', status: 'online' as const, lastRead: '3 min ago', readsToday: 34 },
+    61→    61→  { id: 'R-06', name: 'Pump 9 RFID', location: 'Forecourt C', ip: '192.168.1.109', status: 'error' as const, lastRead: '2 hr ago', readsToday: 12 },
+    62→    62→]
+    63→    63→
+    64→    64→const recentTransactions = [
+    65→    65→  { id: 'TXN-7841', time: '14:32', company: 'Metro Logistics', plate: 'LEA-2345', pump: 'P-03', product: 'Diesel', litres: 120, amount: 39600, card: '•••• 4821' },
+    66→    66→  { id: 'TXN-7840', time: '14:15', company: 'Swift Carrier', plate: 'LZC-6789', pump: 'P-01', product: 'Diesel', litres: 85, amount: 28050, card: '•••• 7293' },
+    67→    67→  { id: 'TXN-7839', time: '13:58', company: 'Pak Gulf Transport', plate: 'ISB-5566', pump: 'P-07', product: 'Diesel', litres: 200, amount: 66000, card: '•••• 8412' },
+    68→    68→  { id: 'TXN-7838', time: '13:42', company: 'Indus Valley Freight', plate: 'RWP-7788', pump: 'P-05', product: 'Diesel', litres: 65, amount: 21450, card: '•••• 5934' },
+    69→    69→  { id: 'TXN-7837', time: '13:21', company: 'Crescent Shipping', plate: 'FSD-9900', pump: 'P-02', product: 'Petrol', litres: 45, amount: 13590, card: '•••• 3678' },
+    70→    70→  { id: 'TXN-7836', time: '12:58', company: 'Metro Logistics', plate: 'MUL-1234', pump: 'P-04', product: 'Diesel', litres: 150, amount: 49500, card: '•••• 4821' },
+    71→    71→]
+    72→    72→
+    73→    73→// ── Helpers ───────────────────────────────────────────────
+    74→    74→
+    75→    75→const pkr = (n: number) => `PKR ${n.toLocaleString()}`
+    76→    76→
+    77→    77→const statusConfig = {
+    78→    78→  active: { dot: 'macos-status-online', label: 'Active', text: 'text-emerald-600 dark:text-emerald-400' },
+    79→    79→  suspended: { dot: 'macos-status-error', label: 'Suspended', text: 'text-red-500' },
+    80→    80→  expired: { dot: 'macos-status-offline', label: 'Expired', text: 'text-muted-foreground' },
+    81→    81→  warning: { dot: 'macos-status-warning', label: 'Warning', text: 'text-amber-500' },
+    82→    82→  online: { dot: 'macos-status-online', label: 'Online', text: 'text-emerald-600 dark:text-emerald-400' },
+    83→    83→  error: { dot: 'macos-status-error', label: 'Error', text: 'text-red-500' },
+    84→    84→}
+    85→    85→
+    86→    86→type TabKey = 'accounts' | 'vehicles' | 'cards' | 'rfid' | 'transactions'
+    87→    87→
+    88→    88→const tabs: { key: TabKey; label: string; icon: React.ElementType }[] = [
+    89→    89→  { key: 'accounts', label: 'Fleet Accounts', icon: Truck },
+    90→    90→  { key: 'vehicles', label: 'Vehicles', icon: Car },
+    91→    91→  { key: 'cards', label: 'Fuel Cards', icon: CreditCard },
+    92→    92→  { key: 'rfid', label: 'RFID Readers', icon: Radio },
+    93→    93→  { key: 'transactions', label: 'Transactions', icon: Receipt },
+    94→    94→]
+    95→    95→
+    96→    96→// ── Component ─────────────────────────────────────────────
+    97→    97→
+    98→    98→export default function FleetModule() {
+    99→    99→  const [activeTab, setActiveTab] = useState<TabKey>('accounts')
+   100→   100→
+   101→   101→  const totalVehicles = fleetAccounts.reduce((s, a) => s + a.vehicles, 0)
+   102→   102→  const totalCards = fleetAccounts.reduce((s, a) => s + a.cards, 0)
+   103→   103→  const totalOutstanding = fleetAccounts.reduce((s, a) => s + a.balance, 0)
+   104→   104→
+   105→   105→  return (
+   106→   106→    <div className="space-y-5">
+   107→   107→      {/* ── Summary Stats ── */}
+   108→   108→      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+   109→   109→        {[
+   110→   110→          { label: 'Fleet Accounts', value: fleetAccounts.length.toString(), icon: Truck, accent: false },
+   111→   111→          { label: 'Total Vehicles', value: totalVehicles.toString(), icon: Car, accent: false },
+   112→   112→          { label: 'Active Cards', value: totalCards.toString(), icon: CreditCard, accent: false },
+   113→   113→          { label: 'Outstanding', value: pkr(totalOutstanding), icon: Wallet, accent: true },
+   114→   114→        ].map((stat, i) => (
+   115→   115→          <motion.div
+   116→   116→            key={stat.label}
+   117→   117→            initial={{ opacity: 0, y: 8 }}
+   118→   118→            animate={{ opacity: 1, y: 0 }}
+   119→   119→            transition={{ delay: i * 0.05, duration: 0.3 }}
+   120→   120→            className="macos-card p-4"
+   121→   121→          >
+   122→   122→            <div className="flex items-start justify-between">
+   123→   123→              <div>
+   124→   124→                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{stat.label}</p>
+   125→   125→                <p className={`text-[20px] font-bold mt-1 ${stat.accent ? 'fuel-text-gradient' : 'text-foreground'}`}>
+   126→   126→                  {stat.value}
+   127→   127→                </p>
+   128→   128→              </div>
+   129→   129→              <div className={`size-8 rounded-lg flex items-center justify-center ${stat.accent ? 'bg-amber-500/10' : 'bg-black/[0.03] dark:bg-white/[0.05]'}`}>
+   130→   130→                <stat.icon className={`size-4 ${stat.accent ? 'text-amber-500' : 'text-muted-foreground'}`} strokeWidth={1.5} />
+   131→   131→              </div>
+   132→   132→            </div>
+   133→   133→          </motion.div>
+   134→   134→        ))}
+   135→   135→      </div>
+   136→   136→
+   137→   137→      {/* ── Tab Bar ── */}
+   138→   138→      <div className="flex items-center gap-1 overflow-x-auto pb-1 -mb-1">
+   139→   139→        {tabs.map((tab) => {
+   140→   140→          const isActive = activeTab === tab.key
+   141→   141→          const Icon = tab.icon
+   142→   142→          return (
+   143→   143→            <button
+   144→   144→              key={tab.key}
+   145→   145→              onClick={() => setActiveTab(tab.key)}
+   146→   146→              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all duration-150 whitespace-nowrap ${
+   147→   147→                isActive
+   148→   148→                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+   149→   149→                  : 'text-muted-foreground hover:bg-black/[0.03] dark:hover:bg-white/[0.05] hover:text-foreground'
+   150→   150→              }`}
+   151→   151→            >
+   152→   152→              <Icon className="size-3.5" strokeWidth={isActive ? 2 : 1.5} />
+   153→   153→              {tab.label}
+   154→   154→            </button>
+   155→   155→          )
+   156→   156→        })}
+   157→   157→      </div>
+   158→   158→
+   159→   159→      {/* ── Tab Content ── */}
+   160→   160→      <AnimatePresence mode="wait">
+   161→   161→        <motion.div
+   162→   162→          key={activeTab}
+   163→   163→          initial={{ opacity: 0, y: 6 }}
+   164→   164→          animate={{ opacity: 1, y: 0 }}
+   165→   165→          exit={{ opacity: 0, y: -4 }}
+   166→   166→          transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+   167→   167→        >
+   168→   168→          {activeTab === 'accounts' && <FleetAccountsTab />}
+   169→   169→          {activeTab === 'vehicles' && <VehiclesTab />}
+   170→   170→          {activeTab === 'cards' && <FuelCardsTab />}
+   171→   171→          {activeTab === 'rfid' && <RFIDReadersTab />}
+   172→   172→          {activeTab === 'transactions' && <TransactionsTab />}
+   173→   173→        </motion.div>
+   174→   174→      </AnimatePresence>
+   175→   175→    </div>
+   176→   176→  )
+   177→   177→}
+   178→   178→
+   179→   179→// ── Fleet Accounts Tab ────────────────────────────────────
+   180→   180→
+   181→   181→function FleetAccountsTab() {
+   182→   182→  return (
+   183→   183→    <div className="macos-card overflow-hidden">
+   184→   184→      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+   185→   185→        <div>
+   186→   186→          <h3 className="text-[13px] font-semibold">Fleet Accounts</h3>
+   187→   187→          <p className="text-[11px] text-muted-foreground mt-0.5">{fleetAccounts.length} registered accounts</p>
+   188→   188→        </div>
+   189→   189→        <button className="macos-btn gap-1">
+   190→   190→          <Plus className="size-3.5" /> New Account
+   191→   191→        </button>
+   192→   192→      </div>
+   193→   193→      <div className="overflow-x-auto">
+   194→   194→        <table className="macos-table">
+   195→   195→          <thead>
+   196→   196→            <tr>
+   197→   197→              <th>Account ID</th>
+   198→   198→              <th>Company</th>
+   199→   199→              <th>Contact</th>
+   200→   200→              <th className="text-center">Vehicles</th>
+   201→   201→              <th className="text-center">Cards</th>
+   202→   202→              <th className="text-right">Credit Limit</th>
+   203→   203→              <th className="text-right">Balance</th>
+   204→   204→              <th className="text-right">Utilization</th>
+   205→   205→              <th>Status</th>
+   206→   206→            </tr>
+   207→   207→          </thead>
+   208→   208→          <tbody>
+   209→   209→            {fleetAccounts.map((a) => {
+   210→   210→              const util = Math.round((a.balance / a.creditLimit) * 100)
+   211→   211→              const cfg = statusConfig[a.status]
+   212→   212→              return (
+   213→   213→                <tr key={a.id}>
+   214→   214→                  <td className="font-mono text-[12px] text-muted-foreground">{a.id}</td>
+   215→   215→                  <td className="font-semibold">{a.company}</td>
+   216→   216→                  <td className="text-muted-foreground">{a.contact}</td>
+   217→   217→                  <td className="text-center">{a.vehicles}</td>
+   218→   218→                  <td className="text-center">{a.cards}</td>
+   219→   219→                  <td className="text-right font-mono">{pkr(a.creditLimit)}</td>
+   220→   220→                  <td className="text-right font-mono font-semibold text-amber-600 dark:text-amber-400">{pkr(a.balance)}</td>
+   221→   221→                  <td className="text-right">
+   222→   222→                    <div className="flex items-center justify-end gap-2">
+   223→   223→                      <div className="w-16 h-1.5 rounded-full bg-black/[0.05] dark:bg-white/[0.08] overflow-hidden">
+   224→   224→                        <div
+   225→   225→                          className={`h-full rounded-full transition-all ${
+   226→   226→                            util > 90 ? 'bg-red-500' : util > 70 ? 'bg-amber-500' : 'bg-emerald-500'
+   227→   227→                          }`}
+   228→   228→                          style={{ width: `${Math.min(util, 100)}%` }}
+   229→   229→                        />
+   230→   230→                      </div>
+   231→   231→                      <span className="text-[11px] text-muted-foreground w-8 text-right">{util}%</span>
+   232→   232→                    </div>
+   233→   233→                  </td>
+   234→   234→                  <td>
+   235→   235→                    <div className="flex items-center gap-1.5">
+   236→   236→                      <div className={`macos-status-dot ${cfg.dot}`} />
+   237→   237→                      <span className={`text-[11px] font-medium ${cfg.text}`}>{cfg.label}</span>
+   238→   238→                    </div>
+   239→   239→                  </td>
+   240→   240→                </tr>
+   241→   241→              )
+   242→   242→            })}
+   243→   243→          </tbody>
+   244→   244→        </table>
+   245→   245→      </div>
+   246→   246→    </div>
+   247→   247→  )
+   248→   248→}
+   249→   249→
+   250→   250→// ── Vehicles Tab ──────────────────────────────────────────
+   251→   251→
+   252→   252→function VehiclesTab() {
+   253→   253→  return (
+   254→   254→    <div className="macos-card overflow-hidden">
+   255→   255→      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+   256→   256→        <div>
+   257→   257→          <h3 className="text-[13px] font-semibold">Registered Vehicles</h3>
+   258→   258→          <p className="text-[11px] text-muted-foreground mt-0.5">{vehicles.length} vehicles across all fleet accounts</p>
+   259→   259→        </div>
+   260→   260→        <div className="flex items-center gap-2">
+   261→   261→          <div className="relative">
+   262→   262→            <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+   263→   263→            <input className="macos-search w-44 !pl-8 !py-1.5 !text-[12px]" placeholder="Search plate..." />
+   264→   264→          </div>
+   265→   265→        </div>
+   266→   266→      </div>
+   267→   267→      <div className="overflow-x-auto">
+   268→   268→        <table className="macos-table">
+   269→   269→          <thead>
+   270→   270→            <tr>
+   271→   271→              <th>Plate Number</th>
+   272→   272→              <th>Make / Model</th>
+   273→   273→              <th>Type</th>
+   274→   274→              <th>RFID Tag</th>
+   275→   275→              <th>Fuel Type</th>
+   276→   276→              <th className="text-right">Daily Limit</th>
+   277→   277→              <th>Status</th>
+   278→   278→            </tr>
+   279→   279→          </thead>
+   280→   280→          <tbody>
+   281→   281→            {vehicles.map((v) => (
+   282→   282→              <tr key={v.id}>
+   283→   283→                <td className="font-mono font-semibold">{v.plate}</td>
+   284→   284→                <td>
+   285→   285→                  <span className="font-medium">{v.make}</span>{' '}
+   286→   286→                  <span className="text-muted-foreground">{v.model} {v.year}</span>
+   287→   287→                </td>
+   288→   288→                <td>
+   289→   289→                  <span className="macos-pill bg-black/[0.04] dark:bg-white/[0.06] text-muted-foreground">{v.type}</span>
+   290→   290→                </td>
+   291→   291→                <td className="font-mono text-[12px]">
+   292→   292→                  <div className="flex items-center gap-1.5">
+   293→   293→                    <Radio className="size-3 text-amber-500" />
+   294→   294→                    {v.rfidTag}
+   295→   295→                  </div>
+   296→   296→                </td>
+   297→   297→                <td>
+   298→   298→                  <span className={`macos-pill ${
+   299→   299→                    v.fuelType === 'Diesel'
+   300→   300→                      ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+   301→   301→                      : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+   302→   302→                  }`}>
+   303→   303→                    {v.fuelType}
+   304→   304→                  </span>
+   305→   305→                </td>
+   306→   306→                <td className="text-right font-mono">{pkr(v.dailyLimit)}</td>
+   307→   307→                <td>
+   308→   308→                  <div className="flex items-center gap-1.5">
+   309→   309→                    <div className={`macos-status-dot ${v.active ? 'macos-status-online' : 'macos-status-offline'}`} />
+   310→   310→                    <span className={`text-[11px] font-medium ${v.active ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+   311→   311→                      {v.active ? 'Active' : 'Inactive'}
+   312→   312→                    </span>
+   313→   313→                  </div>
+   314→   314→                </td>
+   315→   315→              </tr>
+   316→   316→            ))}
+   317→   317→          </tbody>
+   318→   318→        </table>
+   319→   319→      </div>
+   320→   320→    </div>
+   321→   321→  )
+   322→   322→}
+   323→   323→
+   324→   324→// ── Fuel Cards Tab ────────────────────────────────────────
+   325→   325→
+   326→   326→function FuelCardsTab() {
+   327→   327→  const activeCount = fuelCards.filter(c => c.status === 'active').length
+   328→   328→  const suspendedCount = fuelCards.filter(c => c.status === 'suspended').length
+   329→   329→  const expiredCount = fuelCards.filter(c => c.status === 'expired').length
+   330→   330→
+   331→   331→  return (
+   332→   332→    <div className="space-y-4">
+   333→   333→      {/* Card Status Summary */}
+   334→   334→      <div className="grid grid-cols-3 gap-3">
+   335→   335→        {[
+   336→   336→          { label: 'Active', count: activeCount, dot: 'macos-status-online', color: 'text-emerald-600 dark:text-emerald-400' },
+   337→   337→          { label: 'Suspended', count: suspendedCount, dot: 'macos-status-error', color: 'text-red-500' },
+   338→   338→          { label: 'Expired', count: expiredCount, dot: 'macos-status-offline', color: 'text-muted-foreground' },
+   339→   339→        ].map(s => (
+   340→   340→          <div key={s.label} className="macos-card p-3 flex items-center gap-2.5">
+   341→   341→            <div className={`macos-status-dot ${s.dot}`} />
+   342→   342→            <div>
+   343→   343→              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{s.label}</p>
+   344→   344→              <p className={`text-[18px] font-bold ${s.color}`}>{s.count}</p>
+   345→   345→            </div>
+   346→   346→          </div>
+   347→   347→        ))}
+   348→   348→      </div>
+   349→   349→
+   350→   350→      {/* Cards Table */}
+   351→   351→      <div className="macos-card overflow-hidden">
+   352→   352→        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+   353→   353→          <h3 className="text-[13px] font-semibold">Fuel Cards</h3>
+   354→   354→          <button className="macos-btn gap-1">
+   355→   355→            <Plus className="size-3.5" /> Issue Card
+   356→   356→          </button>
+   357→   357→        </div>
+   358→   358→        <div className="overflow-x-auto">
+   359→   359→          <table className="macos-table">
+   360→   360→            <thead>
+   361→   361→              <tr>
+   362→   362→                <th>Card Number</th>
+   363→   363→                <th>Type</th>
+   364→   364→                <th>RFID Tag</th>
+   365→   365→                <th className="text-right">Balance</th>
+   366→   366→                <th className="text-right">Daily Limit</th>
+   367→   367→                <th className="text-right">Monthly Limit</th>
+   368→   368→                <th>Expiry</th>
+   369→   369→                <th>Status</th>
+   370→   370→              </tr>
+   371→   371→            </thead>
+   372→   372→            <tbody>
+   373→   373→              {fuelCards.map((fc) => {
+   374→   374→                const cfg = statusConfig[fc.status]
+   375→   375→                return (
+   376→   376→                  <tr key={fc.id}>
+   377→   377→                    <td className="font-mono font-semibold">{fc.number}</td>
+   378→   378→                    <td>
+   379→   379→                      <span className="macos-pill bg-black/[0.04] dark:bg-white/[0.06] text-muted-foreground">{fc.type}</span>
+   380→   380→                    </td>
+   381→   381→                    <td className="font-mono text-[12px]">
+   382→   382→                      <div className="flex items-center gap-1.5">
+   383→   383→                        <Radio className="size-3 text-amber-500" />
+   384→   384→                        {fc.rfid}
+   385→   385→                      </div>
+   386→   386→                    </td>
+   387→   387→                    <td className="text-right font-mono font-semibold text-amber-600 dark:text-amber-400">{pkr(fc.balance)}</td>
+   388→   388→                    <td className="text-right font-mono text-muted-foreground">{pkr(fc.dailyLimit)}</td>
+   389→   389→                    <td className="text-right font-mono text-muted-foreground">{pkr(fc.monthlyLimit)}</td>
+   390→   390→                    <td className="font-mono text-[12px]">{fc.expiry}</td>
+   391→   391→                    <td>
+   392→   392→                      <div className="flex items-center gap-1.5">
+   393→   393→                        <div className={`macos-status-dot ${cfg.dot}`} />
+   394→   394→                        <span className={`text-[11px] font-medium ${cfg.text}`}>{cfg.label}</span>
+   395→   395→                      </div>
+   396→   396→                    </td>
+   397→   397→                  </tr>
+   398→   398→                )
+   399→   399→              })}
+   400→   400→            </tbody>
+   401→   401→          </table>
+   402→   402→        </div>
+   403→   403→      </div>
+   404→   404→    </div>
+   405→   405→  )
+   406→   406→}
+   407→   407→
+   408→   408→// ── RFID Readers Tab ──────────────────────────────────────
+   409→   409→
+   410→   410→function RFIDReadersTab() {
+   411→   411→  const onlineCount = rfidReaders.filter(r => r.status === 'online').length
+   412→   412→  const totalReads = rfidReaders.reduce((s, r) => s + r.readsToday, 0)
+   413→   413→
+   414→   414→  return (
+   415→   415→    <div className="space-y-4">
+   416→   416→      {/* Status Overview */}
+   417→   417→      <div className="grid grid-cols-3 gap-3">
+   418→   418→        <div className="macos-card p-4">
+   419→   419→          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Readers Online</p>
+   420→   420→          <p className="text-[20px] font-bold text-emerald-600 dark:text-emerald-400 mt-1">{onlineCount}/{rfidReaders.length}</p>
+   421→   421→        </div>
+   422→   422→        <div className="macos-card p-4">
+   423→   423→          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Total Reads Today</p>
+   424→   424→          <p className="text-[20px] font-bold text-foreground mt-1">{totalReads.toLocaleString()}</p>
+   425→   425→        </div>
+   426→   426→        <div className="macos-card p-4">
+   427→   427→          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Avg Response</p>
+   428→   428→          <p className="text-[20px] font-bold text-foreground mt-1">1.2s</p>
+   429→   429→        </div>
+   430→   430→      </div>
+   431→   431→
+   432→   432→      {/* Readers Grid */}
+   433→   433→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+   434→   434→        {rfidReaders.map((reader) => {
+   435→   435→          const cfg = statusConfig[reader.status]
+   436→   436→          return (
+   437→   437→            <motion.div
+   438→   438→              key={reader.id}
+   439→   439→              initial={{ opacity: 0, scale: 0.97 }}
+   440→   440→              animate={{ opacity: 1, scale: 1 }}
+   441→   441→              className="macos-card p-4"
+   442→   442→            >
+   443→   443→              <div className="flex items-start justify-between mb-3">
+   444→   444→                <div>
+   445→   445→                  <h4 className="text-[13px] font-semibold">{reader.name}</h4>
+   446→   446→                  <p className="text-[11px] text-muted-foreground">{reader.location}</p>
+   447→   447→                </div>
+   448→   448→                <div className="flex items-center gap-1.5">
+   449→   449→                  <div className={`macos-status-dot ${cfg.dot}`} />
+   450→   450→                  <span className={`text-[11px] font-medium ${cfg.text}`}>{cfg.label}</span>
+   451→   451→                </div>
+   452→   452→              </div>
+   453→   453→
+   454→   454→              <div className="macos-group">
+   455→   455→                <div className="macos-group-item flex justify-between !py-2 !px-3">
+   456→   456→                  <span className="text-[11px] text-muted-foreground">IP Address</span>
+   457→   457→                  <span className="text-[12px] font-mono">{reader.ip}</span>
+   458→   458→                </div>
+   459→   459→                <div className="macos-group-item flex justify-between !py-2 !px-3">
+   460→   460→                  <span className="text-[11px] text-muted-foreground">Last Read</span>
+   461→   461→                  <span className="text-[12px]">{reader.lastRead}</span>
+   462→   462→                </div>
+   463→   463→                <div className="macos-group-item flex justify-between !py-2 !px-3 !border-b-0">
+   464→   464→                  <span className="text-[11px] text-muted-foreground">Reads Today</span>
+   465→   465→                  <span className="text-[12px] font-semibold">{reader.readsToday}</span>
+   466→   466→                </div>
+   467→   467→              </div>
+   468→   468→
+   469→   469→              {reader.status === 'error' && (
+   470→   470→                <div className="mt-3 flex items-center gap-1.5 rounded-lg bg-red-500/10 px-2.5 py-1.5">
+   471→   471→                  <AlertTriangle className="size-3 text-red-500" />
+   472→   472→                  <span className="text-[11px] font-medium text-red-500">Reader offline — needs attention</span>
+   473→   473→                </div>
+   474→   474→              )}
+   475→   475→              {reader.status === 'warning' && (
+   476→   476→                <div className="mt-3 flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-2.5 py-1.5">
+   477→   477→                  <Clock className="size-3 text-amber-500" />
+   478→   478→                  <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400">Intermittent connection</span>
+   479→   479→                </div>
+   480→   480→              )}
+   481→   481→            </motion.div>
+   482→   482→          )
+   483→   483→        })}
+   484→   484→      </div>
+   485→   485→    </div>
+   486→   486→  )
+   487→   487→}
+   488→   488→
+   489→   489→// ── Transactions Tab ──────────────────────────────────────
+   490→   490→
+   491→   491→function TransactionsTab() {
+   492→   492→  const totalAmount = recentTransactions.reduce((s, t) => s + t.amount, 0)
+   493→   493→  const totalLitres = recentTransactions.reduce((s, t) => s + t.litres, 0)
+   494→   494→
+   495→   495→  return (
+   496→   496→    <div className="space-y-4">
+   497→   497→      {/* Quick Stats */}
+   498→   498→      <div className="grid grid-cols-3 gap-3">
+   499→   499→        <div className="macos-card p-4">
+   500→   500→          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Transactions Today</p>
+   501→   501→          <p className="text-[20px] font-bold text-foreground mt-1">{recentTransactions.length}</p>
+   502→   502→        </div>
+   503→   503→        <div className="macos-card p-4">
+   504→   504→          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Total Litres</p>
+   505→   505→          <p className="text-[20px] font-bold text-foreground mt-1">{totalLitres.toLocaleString()}L</p>
+   506→   506→        </div>
+   507→   507→        <div className="macos-card p-4">
+   508→   508→          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Total Amount</p>
+   509→   509→          <p className="text-[20px] font-bold fuel-text-gradient mt-1">{pkr(totalAmount)}</p>
+   510→   510→        </div>
+   511→   511→      </div>
+   512→   512→
+   513→   513→      {/* Transactions Table */}
+   514→   514→      <div className="macos-card overflow-hidden">
+   515→   515→        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+   516→   516→          <h3 className="text-[13px] font-semibold">Recent Fleet Transactions</h3>
+   517→   517→          <span className="text-[11px] text-muted-foreground">Today&apos;s transactions</span>
+   518→   518→        </div>
+   519→   519→        <div className="overflow-x-auto">
+   520→   520→          <table className="macos-table">
+   521→   521→            <thead>
+   522→   522→              <tr>
+   523→   523→                <th>ID</th>
+   524→   524→                <th>Time</th>
+   525→   525→                <th>Company</th>
+   526→   526→                <th>Plate</th>
+   527→   527→                <th>Pump</th>
+   528→   528→                <th>Product</th>
+   529→   529→                <th className="text-right">Litres</th>
+   530→   530→                <th className="text-right">Amount</th>
+   531→   531→                <th>Card</th>
+   532→   532→              </tr>
+   533→   533→            </thead>
+   534→   534→            <tbody>
+   535→   535→              {recentTransactions.map((tx) => (
+   536→   536→                <tr key={tx.id}>
+   537→   537→                  <td className="font-mono text-[12px] text-muted-foreground">{tx.id}</td>
+   538→   538→                  <td className="font-mono text-[12px]">{tx.time}</td>
+   539→   539→                  <td className="font-medium">{tx.company}</td>
+   540→   540→                  <td className="font-mono text-[12px]">{tx.plate}</td>
+   541→   541→                  <td className="text-muted-foreground">{tx.pump}</td>
+   542→   542→                  <td>
+   543→   543→                    <span className={`macos-pill ${
+   544→   544→                      tx.product === 'Diesel'
+   545→   545→                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+   546→   546→                        : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+   547→   547→                    }`}>
+   548→   548→                      {tx.product}
+   549→   549→                    </span>
+   550→   550→                  </td>
+   551→   551→                  <td className="text-right font-mono">{tx.litres}L</td>
+   552→   552→                  <td className="text-right font-mono font-semibold text-amber-600 dark:text-amber-400">{pkr(tx.amount)}</td>
+   553→   553→                  <td className="font-mono text-[12px] text-muted-foreground">{tx.card}</td>
+   554→   554→                </tr>
+   555→   555→              ))}
+   556→   556→            </tbody>
+   557→   557→          </table>
+   558→   558→        </div>
+   559→   559→      </div>
+   560→   560→    </div>
+   561→   561→  )
+   562→   562→}
+   563→   563→

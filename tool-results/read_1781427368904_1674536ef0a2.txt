@@ -1,0 +1,623 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useCallback } from 'react'
+     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→import {
+     6→  Building2,
+     7→  MapPin,
+     8→  Fuel,
+     9→  Users,
+    10→  Droplets,
+    11→  AlertTriangle,
+    12→  TrendingUp,
+    13→  BarChart3,
+    14→  Globe,
+    15→  ChevronRight,
+    16→  ArrowUpRight,
+    17→  ArrowDownRight,
+    18→  Zap,
+    19→  Radio,
+    20→  Activity,
+    21→  Clock,
+    22→  DollarSign,
+    23→  ShoppingCart,
+    24→  RefreshCw,
+    25→  Loader2,
+    26→} from 'lucide-react'
+    27→import { Badge } from '@/components/ui/badge'
+    28→import { ScrollArea } from '@/components/ui/scroll-area'
+    29→import {
+    30→  BarChart,
+    31→  Bar,
+    32→  XAxis,
+    33→  YAxis,
+    34→  Tooltip,
+    35→  ResponsiveContainer,
+    36→  CartesianGrid,
+    37→} from 'recharts'
+    38→import { useAppStore } from '@/stores/app-store'
+    39→
+    40→// ── Types ──────────────────────────────────────────
+    41→
+    42→interface Station {
+    43→  id: string
+    44→  name: string
+    45→  code: string
+    46→  city: string | null
+    47→  region: string | null
+    48→  stationType: string
+    49→  address: string | null
+    50→  isActive: boolean
+    51→  dispenserCount: number
+    52→  tankCount: number
+    53→  employeeCount: number
+    54→  activeShifts: number
+    55→  fuelLevelPercentage: number
+    56→  createdAt: string
+    57→  // Enriched from dashboard KPIs
+    58→  revenue?: number
+    59→  volume?: number
+    60→  transactions?: number
+    61→  alerts?: Array<{ severity: 'critical' | 'warning' | 'info'; message: string }>
+    62→}
+    63→
+    64→interface DashboardKPIs {
+    65→  revenue: { today: number; week: number; month: number; currency: string }
+    66→  fuelSold: { value: number; unit: string }
+    67→  activePumps: { value: number; total: number }
+    68→  alerts: { value: number; critical: number; warning: number }
+    69→  netProfit: { value: number; currency: string }
+    70→}
+    71→
+    72→const typeConfig: Record<string, { label: string; color: string; bg: string }> = {
+    73→  fuel: { label: 'Fuel', color: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-500/10' },
+    74→  cng: { label: 'CNG', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/10' },
+    75→  ev: { label: 'EV', color: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-500/10' },
+    76→  hybrid: { label: 'Hybrid', color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-500/10' },
+    77→}
+    78→
+    79→const alertSeverityStyle: Record<string, { dot: string; text: string }> = {
+    80→  critical: { dot: 'macos-status-error', text: 'text-red-500' },
+    81→  warning: { dot: 'macos-status-warning', text: 'text-teal-500' },
+    82→  info: { dot: 'macos-status-online', text: 'text-emerald-500' },
+    83→}
+    84→
+    85→// ── Helpers ──────────────────────────────────────
+    86→
+    87→function formatPKR(amount: number): string {
+    88→  if (amount >= 1000000) return `PKR ${(amount / 1000000).toFixed(2)}M`
+    89→  if (amount >= 1000) return `PKR ${(amount / 1000).toFixed(0)}K`
+    90→  return `PKR ${amount.toLocaleString()}`
+    91→}
+    92→
+    93→function formatVol(litres: number): string {
+    94→  if (litres >= 1000) return `${(litres / 1000).toFixed(0)}K L`
+    95→  return `${litres} L`
+    96→}
+    97→
+    98→const fadeUp = {
+    99→  initial: { opacity: 0, y: 8 },
+   100→  animate: { opacity: 1, y: 0 },
+   101→  transition: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
+   102→}
+   103→
+   104→// ── Component ──────────────────────────────────────
+   105→
+   106→export default function MultiSiteModule() {
+   107→  const [stations, setStations] = useState<Station[]>([])
+   108→  const [kpis, setKpis] = useState<DashboardKPIs | null>(null)
+   109→  const [loading, setLoading] = useState(true)
+   110→  const [error, setError] = useState<string | null>(null)
+   111→  const [selectedStation, setSelectedStation] = useState<Station | null>(null)
+   112→  const [activeView, setActiveView] = useState<'grid' | 'compare' | 'detail'>('grid')
+   113→
+   114→  const fetchData = useCallback(async () => {
+   115→    setLoading(true)
+   116→    setError(null)
+   117→    try {
+   118→      const [stationsRes, dashboardRes] = await Promise.all([
+   119→        fetch('/api/stations'),
+   120→        fetch('/api/dashboard'),
+   121→      ])
+   122→
+   123→      if (!stationsRes.ok) throw new Error('Failed to fetch stations')
+   124→
+   125→      const stationsData = await stationsRes.json()
+   126→      const dashboardData = dashboardRes.ok ? await dashboardRes.json() : null
+   127→
+   128→      // Enrich station data with dashboard KPIs where possible
+   129→      const enrichedStations: Station[] = (stationsData.stations || []).map(
+   130→        (s: Station) => ({
+   131→          ...s,
+   132→          revenue: 0,
+   133→          volume: 0,
+   134→          transactions: 0,
+   135→          alerts: [],
+   136→        })
+   137→      )
+   138→
+   139→      // If dashboard has per-station data, we can enrich further
+   140→      // For now, distribute the dashboard totals evenly as a fallback
+   141→      if (dashboardData?.kpis && enrichedStations.length > 0) {
+   142→        const revPerStation = Math.round(dashboardData.kpis.revenue.today / enrichedStations.length)
+   143→        const volPerStation = Math.round(dashboardData.kpis.fuelSold.value / enrichedStations.length)
+   144→        const txPerStation = Math.round(
+   145→          (dashboardData.recentTransactions?.length || 0) / enrichedStations.length
+   146→        )
+   147→        enrichedStations.forEach((s) => {
+   148→          s.revenue = revPerStation
+   149→          s.volume = volPerStation
+   150→          s.transactions = txPerStation
+   151→          // Generate alerts from tank levels
+   152→          if (s.fuelLevelPercentage > 0 && s.fuelLevelPercentage < 25) {
+   153→            s.alerts = [{ severity: 'critical', message: 'Fuel level critically low' }]
+   154→          } else if (s.fuelLevelPercentage >= 25 && s.fuelLevelPercentage < 50) {
+   155→            s.alerts = [{ severity: 'warning', message: 'Fuel level below 50%' }]
+   156→          }
+   157→        })
+   158→      }
+   159→
+   160→      setStations(enrichedStations)
+   161→      setKpis(dashboardData?.kpis || null)
+   162→    } catch (err) {
+   163→      setError(err instanceof Error ? err.message : 'Failed to load station data')
+   164→    } finally {
+   165→      setLoading(false)
+   166→    }
+   167→  }, [])
+   168→
+   169→  useEffect(() => {
+   170→    fetchData()
+   171→  }, [fetchData])
+   172→
+   173→  // Loading state
+   174→  if (loading) {
+   175→    return (
+   176→      <div className="space-y-5">
+   177→        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+   178→          {[1, 2, 3, 4].map((i) => (
+   179→            <div key={i} className="macos-card p-4 animate-pulse">
+   180→              <div className="h-3 bg-muted rounded w-20 mb-2" />
+   181→              <div className="h-6 bg-muted rounded w-28 mb-1" />
+   182→              <div className="h-3 bg-muted rounded w-16" />
+   183→            </div>
+   184→          ))}
+   185→        </div>
+   186→        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   187→          {[1, 2, 3].map((i) => (
+   188→            <div key={i} className="macos-card p-4 animate-pulse">
+   189→              <div className="h-4 bg-muted rounded w-32 mb-3" />
+   190→              <div className="h-3 bg-muted rounded w-48 mb-3" />
+   191→              <div className="grid grid-cols-3 gap-2">
+   192→                <div className="h-10 bg-muted rounded" />
+   193→                <div className="h-10 bg-muted rounded" />
+   194→                <div className="h-10 bg-muted rounded" />
+   195→              </div>
+   196→            </div>
+   197→          ))}
+   198→        </div>
+   199→      </div>
+   200→    )
+   201→  }
+   202→
+   203→  // Error state
+   204→  if (error) {
+   205→    return (
+   206→      <div className="macos-card p-12 flex flex-col items-center justify-center text-muted-foreground">
+   207→        <AlertTriangle className="size-10 mb-3 text-teal-500" />
+   208→        <p className="text-[13px] font-medium">Failed to load station data</p>
+   209→        <p className="text-[11px] mt-1">{error}</p>
+   210→        <button onClick={fetchData} className="macos-btn mt-4 text-[12px] flex items-center gap-1.5">
+   211→          <RefreshCw className="size-3" /> Retry
+   212→        </button>
+   213→      </div>
+   214→    )
+   215→  }
+   216→
+   217→  const totalRevenue = stations.reduce((s, st) => s + (st.revenue || 0), 0)
+   218→  const totalVolume = stations.reduce((s, st) => s + (st.volume || 0), 0)
+   219→  const totalTransactions = stations.reduce((s, st) => s + (st.transactions || 0), 0)
+   220→  const totalAlerts = stations.reduce((s, st) => s + (st.alerts?.length || 0), 0)
+   221→
+   222→  const aggregateCards = [
+   223→    { label: 'Total Revenue', value: formatPKR(totalRevenue), icon: DollarSign, change: kpis ? `${Math.round((kpis.netProfit?.value || 0) / 1000)}K net` : 'No data', trend: 'up' as const, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/10' },
+   224→    { label: 'Total Volume', value: formatVol(totalVolume), icon: Fuel, change: kpis ? `${kpis.fuelSold.unit} total` : 'No data', trend: 'up' as const, color: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-500/10' },
+   225→    { label: 'Transactions', value: totalTransactions.toLocaleString(), icon: ShoppingCart, change: kpis ? `${kpis.activePumps?.value || 0}/${kpis.activePumps?.total || 0} pumps` : 'No data', trend: 'up' as const, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-500/10' },
+   226→    { label: 'Active Alerts', value: totalAlerts.toString(), icon: AlertTriangle, change: kpis ? `${kpis.alerts?.critical || 0} critical` : 'No data', trend: (kpis?.alerts?.critical || 0) > 0 ? 'down' as const : 'up' as const, color: 'text-red-500 dark:text-red-400', bg: 'bg-red-500/10' },
+   227→  ]
+   228→
+   229→  // Group by region
+   230→  const byRegion: Record<string, Station[]> = {}
+   231→  stations.forEach((s) => {
+   232→    const region = s.region || 'Unspecified'
+   233→    if (!byRegion[region]) byRegion[region] = []
+   234→    byRegion[region].push(s)
+   235→  })
+   236→
+   237→  const comparisonData = stations.map((s) => ({
+   238→    name: s.code,
+   239→    revenue: s.revenue || 0,
+   240→    transactions: s.transactions || 0,
+   241→  }))
+   242→
+   243→  return (
+   244→    <div className="space-y-5">
+   245→      {/* Refresh Button */}
+   246→      <div className="flex justify-end">
+   247→        <button onClick={fetchData} className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+   248→          <RefreshCw className="size-3" /> Refresh
+   249→        </button>
+   250→      </div>
+   251→
+   252→      {/* Aggregate Metrics */}
+   253→      <motion.div
+   254→        initial="initial"
+   255→        animate="animate"
+   256→        variants={{ animate: { transition: { staggerChildren: 0.05 } } }}
+   257→        className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+   258→      >
+   259→        {aggregateCards.map((card, i) => (
+   260→          <motion.div
+   261→            key={card.label}
+   262→            variants={{ initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 } }}
+   263→            transition={{ delay: i * 0.06, duration: 0.3 }}
+   264→            className="macos-card p-4"
+   265→          >
+   266→            <div className="flex items-start justify-between">
+   267→              <div>
+   268→                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{card.label}</p>
+   269→                <p className="text-[20px] font-bold mt-1 tracking-tight">{card.value}</p>
+   270→                <div className="flex items-center gap-1 mt-1">
+   271→                  {card.trend === 'up' ? (
+   272→                    <ArrowUpRight className="size-3 text-emerald-500" />
+   273→                  ) : (
+   274→                    <AlertTriangle className="size-3 text-red-500" />
+   275→                  )}
+   276→                  <span className={`text-[12px] font-medium ${card.trend === 'up' ? 'text-emerald-500' : 'text-red-500'}`}>
+   277→                    {card.change}
+   278→                  </span>
+   279→                </div>
+   280→              </div>
+   281→              <div className={`flex size-9 items-center justify-center rounded-xl ${card.bg}`}>
+   282→                <card.icon className={`size-[18px] ${card.color}`} />
+   283→              </div>
+   284→            </div>
+   285→          </motion.div>
+   286→        ))}
+   287→      </motion.div>
+   288→
+   289→      {/* View Switcher */}
+   290→      <div className="flex items-center gap-1 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] p-1 w-fit">
+   291→        {[
+   292→          { key: 'grid' as const, label: 'Stations' },
+   293→          { key: 'compare' as const, label: 'Comparison' },
+   294→          { key: 'detail' as const, label: 'Detail View' },
+   295→        ].map((tab) => (
+   296→          <button
+   297→            key={tab.key}
+   298→            onClick={() => { setActiveView(tab.key); if (tab.key !== 'detail') setSelectedStation(null) }}
+   299→            className={`px-4 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-150 ${
+   300→              activeView === tab.key
+   301→                ? 'bg-card text-foreground shadow-sm'
+   302→                : 'text-muted-foreground hover:text-foreground'
+   303→            }`}
+   304→          >
+   305→            {tab.label}
+   306→          </button>
+   307→        ))}
+   308→      </div>
+   309→
+   310→      {/* ── Stations Grid ── */}
+   311→      <AnimatePresence mode="wait">
+   312→        {activeView === 'grid' && (
+   313→          <motion.div key="grid" {...fadeUp} className="space-y-6">
+   314→            {stations.length === 0 ? (
+   315→              <div className="macos-card p-12 flex flex-col items-center justify-center text-muted-foreground">
+   316→                <Building2 className="size-10 mb-3 opacity-20" />
+   317→                <p className="text-[13px] font-medium">No stations found</p>
+   318→                <p className="text-[11px]">Stations will appear here once they are added to the system</p>
+   319→              </div>
+   320→            ) : (
+   321→              Object.entries(byRegion).map(([region, regionStations]) => (
+   322→                <div key={region}>
+   323→                  <div className="macos-section-header flex items-center gap-2 px-0">
+   324→                    <Globe className="size-3 text-teal-500" />
+   325→                    {region}
+   326→                    <span className="text-[10px] text-muted-foreground">({regionStations.length} stations)</span>
+   327→                  </div>
+   328→                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
+   329→                    {regionStations.map((station) => {
+   330→                      const tc = typeConfig[station.stationType] || typeConfig.fuel
+   331→                      return (
+   332→                        <motion.div
+   333→                          key={station.id}
+   334→                          whileHover={{ y: -2 }}
+   335→                          transition={{ duration: 0.15 }}
+   336→                          className="macos-card p-4 cursor-pointer"
+   337→                          onClick={() => { setSelectedStation(station); setActiveView('detail') }}
+   338→                        >
+   339→                          <div className="flex items-center justify-between mb-3">
+   340→                            <div className="flex items-center gap-2 min-w-0">
+   341→                              <Building2 className="size-4 text-teal-500 shrink-0" />
+   342→                              <h4 className="text-[13px] font-semibold truncate">{station.name}</h4>
+   343→                            </div>
+   344→                            <span className={`macos-pill ${tc.bg} ${tc.color} shrink-0`}>{tc.label}</span>
+   345→                          </div>
+   346→                          <div className="flex items-center gap-1 text-[11px] text-muted-foreground mb-3">
+   347→                            <MapPin className="size-3" />
+   348→                            <span className="truncate">{station.address || station.city || 'No address'}</span>
+   349→                          </div>
+   350→                          <div className="grid grid-cols-3 gap-2 mb-3">
+   351→                            <div className="text-center">
+   352→                              <p className="text-[15px] font-bold">{station.dispenserCount}</p>
+   353→                              <p className="text-[10px] text-muted-foreground">Pumps</p>
+   354→                            </div>
+   355→                            <div className="text-center">
+   356→                              <p className="text-[15px] font-bold">{station.tankCount || '—'}</p>
+   357→                              <p className="text-[10px] text-muted-foreground">Tanks</p>
+   358→                            </div>
+   359→                            <div className="text-center">
+   360→                              <p className="text-[15px] font-bold">{station.employeeCount}</p>
+   361→                              <p className="text-[10px] text-muted-foreground">Staff</p>
+   362→                            </div>
+   363→                          </div>
+   364→                          {/* Fuel Level Bar */}
+   365→                          {station.fuelLevelPercentage > 0 && (
+   366→                            <div className="space-y-1 mb-2">
+   367→                              <div className="flex items-center justify-between text-[11px]">
+   368→                                <span className="text-muted-foreground">Fuel Level</span>
+   369→                                <span className="font-medium">{station.fuelLevelPercentage}%</span>
+   370→                              </div>
+   371→                              <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+   372→                                <div
+   373→                                  className={`h-full rounded-full transition-all ${
+   374→                                    station.fuelLevelPercentage < 25 ? 'bg-red-500' :
+   375→                                    station.fuelLevelPercentage < 50 ? 'bg-teal-500' : 'bg-emerald-500'
+   376→                                  }`}
+   377→                                  style={{ width: `${Math.min(station.fuelLevelPercentage, 100)}%` }}
+   378→                                />
+   379→                              </div>
+   380→                            </div>
+   381→                          )}
+   382→                          {/* Alerts Indicator */}
+   383→                          {station.alerts && station.alerts.length > 0 && (
+   384→                            <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-border/50">
+   385→                              <AlertTriangle className={`size-3 ${station.alerts.some(a => a.severity === 'critical') ? 'text-red-500' : 'text-teal-500'}`} />
+   386→                              <span className="text-[11px] text-muted-foreground">{station.alerts.length} alert{station.alerts.length > 1 ? 's' : ''}</span>
+   387→                            </div>
+   388→                          )}
+   389→                        </motion.div>
+   390→                      )
+   391→                    })}
+   392→                  </div>
+   393→                </div>
+   394→              ))
+   395→            )}
+   396→          </motion.div>
+   397→        )}
+   398→
+   399→        {/* ── Comparison View ── */}
+   400→        {activeView === 'compare' && (
+   401→          <motion.div key="compare" {...fadeUp} className="space-y-5">
+   402→            {stations.length === 0 ? (
+   403→              <div className="macos-card p-12 flex flex-col items-center justify-center text-muted-foreground">
+   404→                <BarChart3 className="size-10 mb-3 opacity-20" />
+   405→                <p className="text-[13px] font-medium">No stations to compare</p>
+   406→                <p className="text-[11px]">Add stations to see comparison data</p>
+   407→              </div>
+   408→            ) : (
+   409→              <>
+   410→                {/* Chart */}
+   411→                <div className="macos-card p-5">
+   412→                  <div className="flex items-center gap-2 mb-4">
+   413→                    <BarChart3 className="size-4 text-teal-500" />
+   414→                    <h3 className="text-[13px] font-semibold">Revenue Comparison</h3>
+   415→                  </div>
+   416→                  <div className="h-64">
+   417→                    <ResponsiveContainer width="100%" height="100%">
+   418→                      <BarChart data={comparisonData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+   419→                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+   420→                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+   421→                        <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${(v / 1000000).toFixed(1)}M`} />
+   422→                        <Tooltip
+   423→                          contentStyle={{ fontSize: 12, borderRadius: 10, border: '0.5px solid var(--border)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+   424→                          formatter={(value: number) => [formatPKR(value), 'Revenue']}
+   425→                        />
+   426→                        <Bar dataKey="revenue" fill="#e8930c" radius={[6, 6, 0, 0]} />
+   427→                      </BarChart>
+   428→                    </ResponsiveContainer>
+   429→                  </div>
+   430→                </div>
+   431→
+   432→                {/* Comparison Table */}
+   433→                <div className="macos-card overflow-hidden">
+   434→                  <ScrollArea className="max-h-[400px]">
+   435→                    <table className="macos-table">
+   436→                      <thead>
+   437→                        <tr>
+   438→                          <th>Station</th>
+   439→                          <th>Type</th>
+   440→                          <th>City</th>
+   441→                          <th className="text-right">Revenue</th>
+   442→                          <th className="text-right">Volume</th>
+   443→                          <th className="text-right">Transactions</th>
+   444→                          <th className="text-right">Pumps</th>
+   445→                          <th>Fuel Level</th>
+   446→                          <th>Alerts</th>
+   447→                        </tr>
+   448→                      </thead>
+   449→                      <tbody>
+   450→                        {stations.map((s) => {
+   451→                          const tc = typeConfig[s.stationType] || typeConfig.fuel
+   452→                          return (
+   453→                            <tr key={s.id} className="cursor-pointer" onClick={() => { setSelectedStation(s); setActiveView('detail') }}>
+   454→                              <td className="text-[13px] font-medium">{s.name}</td>
+   455→                              <td><span className={`macos-pill ${tc.bg} ${tc.color}`}>{tc.label}</span></td>
+   456→                              <td className="text-[13px] text-muted-foreground">{s.city || '—'}</td>
+   457→                              <td className="text-right text-[13px] font-medium tabular-nums">{formatPKR(s.revenue || 0)}</td>
+   458→                              <td className="text-right text-[13px] tabular-nums">{formatVol(s.volume || 0)}</td>
+   459→                              <td className="text-right text-[13px] tabular-nums">{(s.transactions || 0).toLocaleString()}</td>
+   460→                              <td className="text-right text-[13px]">{s.dispenserCount}</td>
+   461→                              <td>
+   462→                                {s.fuelLevelPercentage > 0 ? (
+   463→                                  <span className={`text-[13px] font-medium ${
+   464→                                    s.fuelLevelPercentage < 25 ? 'text-red-500' :
+   465→                                    s.fuelLevelPercentage < 50 ? 'text-teal-500' : 'text-emerald-500'
+   466→                                  }`}>{s.fuelLevelPercentage}%</span>
+   467→                                ) : (
+   468→                                  <span className="text-[13px] text-muted-foreground">N/A</span>
+   469→                                )}
+   470→                              </td>
+   471→                              <td>
+   472→                                {s.alerts && s.alerts.length > 0 ? (
+   473→                                  <div className="flex items-center gap-1">
+   474→                                    <div className={`macos-status-dot ${s.alerts.some(a => a.severity === 'critical') ? 'macos-status-error' : 'macos-status-warning'}`} />
+   475→                                    <span className="text-[11px] text-muted-foreground">{s.alerts.length}</span>
+   476→                                  </div>
+   477→                                ) : (
+   478→                                  <span className="text-[11px] text-muted-foreground">None</span>
+   479→                                )}
+   480→                              </td>
+   481→                            </tr>
+   482→                          )
+   483→                        })}
+   484→                      </tbody>
+   485→                    </table>
+   486→                  </ScrollArea>
+   487→                </div>
+   488→              </>
+   489→            )}
+   490→          </motion.div>
+   491→        )}
+   492→
+   493→        {/* ── Detail View ── */}
+   494→        {activeView === 'detail' && (
+   495→          <motion.div key="detail" {...fadeUp}>
+   496→            {selectedStation ? (
+   497→              <div className="space-y-5">
+   498→                {/* Station Header */}
+   499→                <div className="macos-card p-5">
+   500→                  <div className="flex items-start justify-between">
+   501→                    <div className="flex items-center gap-3">
+   502→                      <div className="flex size-11 items-center justify-center rounded-xl bg-teal-500/10">
+   503→                        <Building2 className="size-5 text-teal-500" />
+   504→                      </div>
+   505→                      <div>
+   506→                        <h3 className="text-[15px] font-semibold">{selectedStation.name}</h3>
+   507→                        <p className="text-[12px] text-muted-foreground">{selectedStation.code} · {selectedStation.address || selectedStation.city || 'No address'}</p>
+   508→                      </div>
+   509→                    </div>
+   510→                    <span className={`macos-pill ${typeConfig[selectedStation.stationType]?.bg || typeConfig.fuel.bg} ${typeConfig[selectedStation.stationType]?.color || typeConfig.fuel.color}`}>
+   511→                      {typeConfig[selectedStation.stationType]?.label || 'Station'}
+   512→                    </span>
+   513→                  </div>
+   514→
+   515→                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
+   516→                    <div>
+   517→                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Revenue</p>
+   518→                      <p className="text-[18px] font-bold mt-0.5">{formatPKR(selectedStation.revenue || 0)}</p>
+   519→                    </div>
+   520→                    <div>
+   521→                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Volume</p>
+   522→                      <p className="text-[18px] font-bold mt-0.5">{formatVol(selectedStation.volume || 0)}</p>
+   523→                    </div>
+   524→                    <div>
+   525→                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Transactions</p>
+   526→                      <p className="text-[18px] font-bold mt-0.5">{(selectedStation.transactions || 0).toLocaleString()}</p>
+   527→                    </div>
+   528→                    <div>
+   529→                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Active Shifts</p>
+   530→                      <p className="text-[18px] font-bold mt-0.5">{selectedStation.activeShifts}</p>
+   531→                    </div>
+   532→                  </div>
+   533→                </div>
+   534→
+   535→                {/* Infrastructure + Alerts */}
+   536→                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   537→                  {/* Infrastructure */}
+   538→                  <div className="macos-card p-4">
+   539→                    <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Infrastructure</h4>
+   540→                    <div className="macos-group">
+   541→                      <div className="macos-group-item flex items-center gap-3">
+   542→                        <Fuel className="size-4 text-teal-500" />
+   543→                        <span className="text-[13px] flex-1">Dispensers / Pumps</span>
+   544→                        <span className="text-[13px] font-semibold">{selectedStation.dispenserCount}</span>
+   545→                      </div>
+   546→                      <div className="macos-group-item flex items-center gap-3">
+   547→                        <Droplets className="size-4 text-emerald-500" />
+   548→                        <span className="text-[13px] flex-1">Storage Tanks</span>
+   549→                        <span className="text-[13px] font-semibold">{selectedStation.tankCount || '—'}</span>
+   550→                      </div>
+   551→                      <div className="macos-group-item flex items-center gap-3">
+   552→                        <Users className="size-4 text-orange-500" />
+   553→                        <span className="text-[13px] flex-1">Total Employees</span>
+   554→                        <span className="text-[13px] font-semibold">{selectedStation.employeeCount}</span>
+   555→                      </div>
+   556→                      {selectedStation.fuelLevelPercentage > 0 && (
+   557→                        <div className="macos-group-item flex items-center gap-3">
+   558→                          <Activity className="size-4 text-teal-500" />
+   559→                          <span className="text-[13px] flex-1">Avg Fuel Level</span>
+   560→                          <span className={`text-[13px] font-semibold ${
+   561→                            selectedStation.fuelLevelPercentage < 25 ? 'text-red-500' :
+   562→                            selectedStation.fuelLevelPercentage < 50 ? 'text-teal-500' : 'text-emerald-500'
+   563→                          }`}>{selectedStation.fuelLevelPercentage}%</span>
+   564→                        </div>
+   565→                      )}
+   566→                    </div>
+   567→                  </div>
+   568→
+   569→                  {/* Alerts */}
+   570→                  <div className="macos-card p-4">
+   571→                    <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Station Alerts</h4>
+   572→                    {!selectedStation.alerts || selectedStation.alerts.length === 0 ? (
+   573→                      <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+   574→                        <Radio className="size-8 mb-2 opacity-30" />
+   575→                        <p className="text-[12px]">No active alerts</p>
+   576→                        <p className="text-[11px]">All systems operating normally</p>
+   577→                      </div>
+   578→                    ) : (
+   579→                      <div className="macos-group">
+   580→                        {selectedStation.alerts.map((alert, idx) => {
+   581→                          const style = alertSeverityStyle[alert.severity]
+   582→                          return (
+   583→                            <div key={idx} className="macos-group-item flex items-start gap-3">
+   584→                              <div className={`macos-status-dot ${style.dot} mt-1.5 shrink-0`} />
+   585→                              <div>
+   586→                                <p className="text-[13px]">{alert.message}</p>
+   587→                                <span className={`text-[11px] font-medium ${style.text} capitalize`}>{alert.severity}</span>
+   588→                              </div>
+   589→                            </div>
+   590→                          )
+   591→                        })}
+   592→                      </div>
+   593→                    )}
+   594→                  </div>
+   595→                </div>
+   596→
+   597→                <button
+   598→                  onClick={() => { setSelectedStation(null); setActiveView('grid') }}
+   599→                  className="macos-btn-secondary text-[12px] gap-1"
+   600→                >
+   601→                  ← Back to Stations
+   602→                </button>
+   603→              </div>
+   604→            ) : (
+   605→              <div className="macos-card p-12 flex flex-col items-center justify-center text-muted-foreground">
+   606→                <Building2 className="size-10 mb-3 opacity-20" />
+   607→                <p className="text-[13px] font-medium">Select a station to view details</p>
+   608→                <p className="text-[11px]">Click any station card from the Stations view</p>
+   609→                <button
+   610→                  onClick={() => setActiveView('grid')}
+   611→                  className="macos-btn mt-4 text-[12px]"
+   612→                >
+   613→                  View All Stations
+   614→                </button>
+   615→              </div>
+   616→            )}
+   617→          </motion.div>
+   618→        )}
+   619→      </AnimatePresence>
+   620→    </div>
+   621→  )
+   622→}
+   623→

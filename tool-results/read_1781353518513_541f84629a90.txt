@@ -1,0 +1,496 @@
+   300→          )}
+   301→        </div>
+   302→      </div>
+   303→
+   304→      {/* Payments (invoice only) */}
+   305→      {isInvoice && inv && inv.payments && inv.payments.length > 0 && (
+   306→        <div className="mb-6">
+   307→          <p className="text-[10px] font-semibold uppercase text-gray-400 mb-2">Payments Received</p>
+   308→          <table className="w-full text-[12px]" style={{ borderCollapse: 'collapse' }}>
+   309→            <thead>
+   310→              <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+   311→                <th className="text-left py-1.5 px-2 font-semibold text-gray-600">Date</th>
+   312→                <th className="text-left py-1.5 px-2 font-semibold text-gray-600">Method</th>
+   313→                <th className="text-left py-1.5 px-2 font-semibold text-gray-600">Reference</th>
+   314→                <th className="text-right py-1.5 px-2 font-semibold text-gray-600">Amount</th>
+   315→              </tr>
+   316→            </thead>
+   317→            <tbody>
+   318→              {inv.payments.map(p => (
+   319→                <tr key={p.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+   320→                  <td className="py-1.5 px-2 text-gray-600">{formatDate(p.paidAt)}</td>
+   321→                  <td className="py-1.5 px-2 text-gray-600 capitalize">{p.method.replace('_', ' ')}</td>
+   322→                  <td className="py-1.5 px-2 text-gray-600">{p.reference || '—'}</td>
+   323→                  <td className="py-1.5 px-2 text-right font-medium text-emerald-600">{formatPKR(p.amount)}</td>
+   324→                </tr>
+   325→              ))}
+   326→            </tbody>
+   327→          </table>
+   328→        </div>
+   329→      )}
+   330→
+   331→      {/* Notes & Terms */}
+   332→      <div className="grid grid-cols-2 gap-6 mb-6">
+   333→        {data.notes && (
+   334→          <div>
+   335→            <p className="text-[10px] font-semibold uppercase text-gray-400 mb-1">Notes</p>
+   336→            <p className="text-[12px] text-gray-600">{data.notes}</p>
+   337→          </div>
+   338→        )}
+   339→        {data.terms && (
+   340→          <div>
+   341→            <p className="text-[10px] font-semibold uppercase text-gray-400 mb-1">Terms & Conditions</p>
+   342→            <p className="text-[12px] text-gray-600">{data.terms}</p>
+   343→          </div>
+   344→        )}
+   345→      </div>
+   346→
+   347→      {/* Quotation signature line */}
+   348→      {!isInvoice && (
+   349→        <div className="mt-8 pt-4 border-t border-gray-200">
+   350→          <div className="flex justify-between">
+   351→            <div>
+   352→              <p className="text-[10px] font-semibold uppercase text-gray-400 mb-1">Authorized By</p>
+   353→              <div className="w-48 border-b border-gray-300 mb-1" />
+   354→              <p className="text-[11px] text-gray-500">ApexFlow Ecosystem</p>
+   355→            </div>
+   356→            <div>
+   357→              <p className="text-[10px] font-semibold uppercase text-gray-400 mb-1">Accepted By</p>
+   358→              <div className="w-48 border-b border-gray-300 mb-1" />
+   359→              <p className="text-[11px] text-gray-500">{companyName}</p>
+   360→            </div>
+   361→          </div>
+   362→        </div>
+   363→      )}
+   364→
+   365→      {/* Footer */}
+   366→      <div className="mt-8 pt-4 border-t border-gray-200 text-center">
+   367→        <p className="text-[11px] text-gray-400">ApexFlow Ecosystem — FuelFlow OS &copy; {new Date().getFullYear()}</p>
+   368→        <p className="text-[10px] text-gray-300">Registered Office: Business Avenue Tower, Clifton, Karachi, Pakistan | NTN: 4021948-6</p>
+   369→      </div>
+   370→    </div>
+   371→  )
+   372→}
+   373→
+   374→// ── Main OwnerModule ────────────────────────────────────
+   375→
+   376→export default function OwnerModule() {
+   377→  const [activeTab, setActiveTab] = useState<OwnerTab>('clients')
+   378→  const [searchQuery, setSearchQuery] = useState('')
+   379→  const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null)
+   380→  const [viewingQuotation, setViewingQuotation] = useState<Quotation | null>(null)
+   381→  const [showPrintView, setShowPrintView] = useState(false)
+   382→  const [copiedKey, setCopiedKey] = useState<string | null>(null)
+   383→  const printRef = useRef<HTMLDivElement>(null)
+   384→
+   385→  // Data state
+   386→  const [clients, setClients] = useState<Client[]>(staticClients)
+   387→  const [plans, setPlans] = useState<Plan[]>(staticPlans)
+   388→  const [subscriptions, setSubscriptions] = useState<Subscription[]>(staticSubscriptions)
+   389→  const [invoices, setInvoices] = useState<Invoice[]>(staticInvoices)
+   390→  const [quotations, setQuotations] = useState<Quotation[]>(staticQuotations)
+   391→  const [licenseKeys, setLicenseKeys] = useState<LicenseKey[]>(staticLicenseKeys)
+   392→  const [devices, setDevices] = useState<ClientDevice[]>(staticDevices)
+   393→  const [loading, setLoading] = useState(false)
+   394→
+   395→  // Fetch data on mount
+   396→  useEffect(() => {
+   397→    let cancelled = false
+   398→    const load = async () => {
+   399→      try {
+   400→        const [clientsRes, plansRes, subsRes, invRes, quotRes, keysRes, devRes] = await Promise.allSettled([
+   401→          fetch('/api/owner/clients'), fetch('/api/owner/plans'), fetch('/api/owner/subscriptions'),
+   402→          fetch('/api/owner/invoices'), fetch('/api/owner/quotations'), fetch('/api/owner/license-keys'),
+   403→          fetch('/api/owner/devices'),
+   404→        ])
+   405→        if (cancelled) return
+   406→        if (clientsRes.status === 'fulfilled' && clientsRes.value.ok) { const d = await clientsRes.value.json(); if (d.length) setClients(d) }
+   407→        if (plansRes.status === 'fulfilled' && plansRes.value.ok) { const d = await plansRes.value.json(); if (d.length) setPlans(d) }
+   408→        if (subsRes.status === 'fulfilled' && subsRes.value.ok) { const d = await subsRes.value.json(); if (d.length) setSubscriptions(d) }
+   409→        if (invRes.status === 'fulfilled' && invRes.value.ok) { const d = await invRes.value.json(); if (d.length) setInvoices(d) }
+   410→        if (quotRes.status === 'fulfilled' && quotRes.value.ok) { const d = await quotRes.value.json(); if (d.length) setQuotations(d) }
+   411→        if (keysRes.status === 'fulfilled' && keysRes.value.ok) { const d = await keysRes.value.json(); if (d.length) setLicenseKeys(d) }
+   412→        if (devRes.status === 'fulfilled' && devRes.value.ok) { const d = await devRes.value.json(); if (d.length) setDevices(d) }
+   413→      } catch { /* use static data */ }
+   414→    }
+   415→    load()
+   416→    return () => { cancelled = true }
+   417→  }, [])
+   418→
+   419→  // Refresh data
+   420→  const refreshData = useCallback(async () => {
+   421→    try {
+   422→      const [clientsRes, plansRes, subsRes, invRes, quotRes, keysRes, devRes] = await Promise.allSettled([
+   423→        fetch('/api/owner/clients'), fetch('/api/owner/plans'), fetch('/api/owner/subscriptions'),
+   424→        fetch('/api/owner/invoices'), fetch('/api/owner/quotations'), fetch('/api/owner/license-keys'),
+   425→        fetch('/api/owner/devices'),
+   426→      ])
+   427→      if (clientsRes.status === 'fulfilled' && clientsRes.value.ok) { const d = await clientsRes.value.json(); if (d.length) setClients(d) }
+   428→      if (plansRes.status === 'fulfilled' && plansRes.value.ok) { const d = await plansRes.value.json(); if (d.length) setPlans(d) }
+   429→      if (subsRes.status === 'fulfilled' && subsRes.value.ok) { const d = await subsRes.value.json(); if (d.length) setSubscriptions(d) }
+   430→      if (invRes.status === 'fulfilled' && invRes.value.ok) { const d = await invRes.value.json(); if (d.length) setInvoices(d) }
+   431→      if (quotRes.status === 'fulfilled' && quotRes.value.ok) { const d = await quotRes.value.json(); if (d.length) setQuotations(d) }
+   432→      if (keysRes.status === 'fulfilled' && keysRes.value.ok) { const d = await keysRes.value.json(); if (d.length) setLicenseKeys(d) }
+   433→      if (devRes.status === 'fulfilled' && devRes.value.ok) { const d = await devRes.value.json(); if (d.length) setDevices(d) }
+   434→    } catch { /* use static data */ }
+   435→  }, [])
+   436→
+   437→  // Seed data
+   438→  const handleSeed = async () => {
+   439→    try { await fetch('/api/owner/seed', { method: 'POST' }); refreshData() } catch { /* ignore */ }
+   440→  }
+   441→
+   442→  // Print
+   443→  const handlePrint = () => {
+   444→    const printContents = document.getElementById('print-area')
+   445→    if (!printContents) return
+   446→    const printWindow = window.open('', '_blank')
+   447→    if (!printWindow) return
+   448→    printWindow.document.write(`
+   449→      <html><head><title>${viewingInvoice ? 'Invoice' : 'Quotation'} — FuelFlow OS</title>
+   450→      <style>
+   451→        * { font-style: normal !important; margin: 0; padding: 0; box-sizing: border-box; }
+   452→        body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+   453→        @page { margin: 0.5in; size: A4; }
+   454→        @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+   455→      </style></head><body>${printContents.innerHTML}</body></html>
+   456→    `)
+   457→    printWindow.document.close()
+   458→    setTimeout(() => { printWindow.print(); printWindow.close() }, 250)
+   459→  }
+   460→
+   461→  // Copy key
+   462→  const copyKey = (key: string) => {
+   463→    navigator.clipboard.writeText(key)
+   464→    setCopiedKey(key)
+   465→    setTimeout(() => setCopiedKey(null), 2000)
+   466→  }
+   467→
+   468→  // Tab config
+   469→  const tabs: { key: OwnerTab; label: string; icon: React.ElementType }[] = [
+   470→    { key: 'clients', label: 'Clients', icon: Users },
+   471→    { key: 'subscriptions', label: 'Subscriptions', icon: CreditCard },
+   472→    { key: 'invoices', label: 'Invoices', icon: FileText },
+   473→    { key: 'quotations', label: 'Quotations', icon: FileSpreadsheet },
+   474→    { key: 'license-keys', label: 'License Keys', icon: Key },
+   475→    { key: 'devices', label: 'Devices', icon: Monitor },
+   476→  ]
+   477→
+   478→  // ── Render ──
+   479→
+   480→  // Print view overlay
+   481→  if (showPrintView && (viewingInvoice || viewingQuotation)) {
+   482→    const doc = viewingInvoice || viewingQuotation!
+   483→    return (
+   484→      <div className="fixed inset-0 z-50 bg-gray-100 overflow-auto">
+   485→        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-gray-200 px-6 py-3 flex items-center justify-between print:hidden">
+   486→          <h2 className="text-[13px] font-semibold">
+   487→            {viewingInvoice ? `Invoice ${viewingInvoice.invoiceNumber}` : `Quotation ${viewingQuotation?.quotationNumber}`}
+   488→          </h2>
+   489→          <div className="flex items-center gap-2">
+   490→            <button onClick={handlePrint} className="macos-btn flex items-center gap-2">
+   491→              <Printer className="size-4" /> Print
+   492→            </button>
+   493→            <button onClick={() => { setShowPrintView(false); setViewingInvoice(null); setViewingQuotation(null) }} className="macos-btn-secondary flex items-center gap-2">
+   494→              <X className="size-4" /> Close
+   495→            </button>
+   496→          </div>
+   497→        </div>
+   498→        <div className="py-8" ref={printRef}>
+   499→          <PrintDocument type={viewingInvoice ? 'invoice' : 'quotation'} data={doc} />
+   500→        </div>
+   501→      </div>
+   502→    )
+   503→  }
+   504→
+   505→  return (
+   506→    <div className="space-y-6">
+   507→      {/* Header */}
+   508→      <div className="flex items-center justify-between">
+   509→        <div>
+   510→          <h2 className="text-[20px] font-bold text-foreground">Owner Console</h2>
+   511→          <p className="text-[13px] text-muted-foreground">Manage clients, subscriptions, billing & licensing</p>
+   512→        </div>
+   513→        <button onClick={handleSeed} className="macos-btn-secondary text-[12px] flex items-center gap-1.5">
+   514→          <RefreshCw className="size-3.5" /> Seed Data
+   515→        </button>
+   516→      </div>
+   517→
+   518→      {/* Tabs */}
+   519→      <div className="flex items-center gap-1 border-b border-border pb-px">
+   520→        {tabs.map(tab => {
+   521→          const isActive = activeTab === tab.key
+   522→          return (
+   523→            <button
+   524→              key={tab.key}
+   525→              onClick={() => setActiveTab(tab.key)}
+   526→              className={`flex items-center gap-1.5 px-3 py-2 text-[12px] font-medium border-b-2 transition-all ${
+   527→                isActive ? 'border-amber-500 text-amber-600 dark:text-amber-400' : 'border-transparent text-muted-foreground hover:text-foreground'
+   528→              }`}
+   529→            >
+   530→              <tab.icon className="size-3.5" />
+   531→              {tab.label}
+   532→            </button>
+   533→          )
+   534→        })}
+   535→      </div>
+   536→
+   537→      {/* Content */}
+   538→      <AnimatePresence mode="wait">
+   539→        <motion.div key={activeTab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.15 }}>
+   540→
+   541→          {/* ── CLIENTS TAB ── */}
+   542→          {activeTab === 'clients' && (
+   543→            <div className="space-y-5">
+   544→              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   545→                <StatCard label="Total Clients" value={String(clients.length)} icon={Users} accent />
+   546→                <StatCard label="Active" value={String(clients.filter(c => c.status === 'active').length)} icon={CheckCircle2} />
+   547→                <StatCard label="Trial" value={String(clients.filter(c => c.status === 'trial').length)} icon={Clock} />
+   548→                <StatCard label="Churned" value={String(clients.filter(c => c.status === 'churned' || c.status === 'suspended').length)} icon={XCircle} />
+   549→              </div>
+   550→
+   551→              <div className="macos-card overflow-hidden">
+   552→                <div className="flex items-center justify-between p-4 border-b border-border">
+   553→                  <div className="relative w-64">
+   554→                    <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+   555→                    <input className="macos-search !pl-8 !h-8" placeholder="Search clients..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+   556→                  </div>
+   557→                </div>
+   558→                <table className="macos-table">
+   559→                  <thead>
+   560→                    <tr>
+   561→                      <th>Company</th><th>Contact</th><th>Email</th><th>Plan</th><th>Status</th><th>Devices</th><th>Onboarded</th>
+   562→                    </tr>
+   563→                  </thead>
+   564→                  <tbody>
+   565→                    {clients.filter(c => !searchQuery || c.companyName.toLowerCase().includes(searchQuery.toLowerCase())).map(client => {
+   566→                      const sub = subscriptions.find(s => s.clientId === client.id && s.status === 'active' || s.status === 'trial')
+   567→                      return (
+   568→                        <tr key={client.id}>
+   569→                          <td className="font-medium">{client.companyName}</td>
+   570→                          <td>{client.contactPerson}</td>
+   571→                          <td className="text-muted-foreground text-[12px]">{client.email}</td>
+   572→                          <td><span className="text-[11px] font-medium">{sub?.plan?.name || '—'}</span></td>
+   573→                          <td><StatusBadge status={client.status} /></td>
+   574→                          <td className="text-center">{client._count?.devices || 0}</td>
+   575→                          <td className="text-muted-foreground text-[12px]">{formatDate(client.onboardedAt)}</td>
+   576→                        </tr>
+   577→                      )
+   578→                    })}
+   579→                  </tbody>
+   580→                </table>
+   581→              </div>
+   582→            </div>
+   583→          )}
+   584→
+   585→          {/* ── SUBSCRIPTIONS TAB ── */}
+   586→          {activeTab === 'subscriptions' && (
+   587→            <div className="space-y-5">
+   588→              {/* Plans */}
+   589→              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+   590→                {plans.map(plan => (
+   591→                  <div key={plan.id} className={`macos-card p-5 relative ${plan.isPopular ? 'ring-2 ring-amber-500/30' : ''}`}>
+   592→                    {plan.isPopular && <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-[9px] font-bold px-2.5 py-0.5 rounded-full">POPULAR</div>}
+   593→                    <div className="flex items-center gap-2 mb-3">
+   594→                      {plan.name === 'Starter' ? <Zap className="size-4 text-gray-400" /> : plan.name === 'Professional' ? <Star className="size-4 text-amber-500" /> : <Crown className="size-4 text-orange-500" />}
+   595→                      <h3 className="text-[15px] font-bold">{plan.name}</h3>
+   596→                    </div>
+   597→                    <div className="mb-3">
+   598→                      <span className="text-[28px] font-bold">{formatPKR(plan.priceMonthly)}</span>
+   599→                      <span className="text-[12px] text-muted-foreground">/mo</span>
+   600→                      <p className="text-[11px] text-muted-foreground mt-0.5">{formatPKR(plan.priceAnnual)}/yr (save {Math.round((1 - plan.priceAnnual / (plan.priceMonthly * 12)) * 100)}%)</p>
+   601→                    </div>
+   602→                    <div className="space-y-1.5 mb-3">
+   603→                      {(() => { try { return JSON.parse(plan.features).map((f: string, i: number) => <div key={i} className="flex items-center gap-1.5 text-[11px]"><CheckCircle2 className="size-3 text-emerald-500 shrink-0" />{f}</div>) } catch { return null } })()}
+   604→                    </div>
+   605→                    <div className="text-[10px] text-muted-foreground border-t border-border pt-2 mt-2">
+   606→                      {plan._count?.subscriptions || 0} active subscriptions · {plan._count?.licenseKeys || 0} keys
+   607→                    </div>
+   608→                  </div>
+   609→                ))}
+   610→              </div>
+   611→
+   612→              {/* Subscriptions Table */}
+   613→              <div className="macos-card overflow-hidden">
+   614→                <div className="p-4 border-b border-border">
+   615→                  <h3 className="text-[13px] font-semibold">Client Subscriptions</h3>
+   616→                </div>
+   617→                <table className="macos-table">
+   618→                  <thead><tr><th>Client</th><th>Plan</th><th>Billing</th><th>Status</th><th>Start</th><th>End</th><th>Auto-Renew</th></tr></thead>
+   619→                  <tbody>
+   620→                    {subscriptions.map(sub => (
+   621→                      <tr key={sub.id}>
+   622→                        <td className="font-medium">{sub.client?.companyName || '—'}</td>
+   623→                        <td><span className="text-[11px] font-medium">{sub.plan?.name || '—'}</span></td>
+   624→                        <td className="capitalize text-[12px]">{sub.billingCycle}</td>
+   625→                        <td><StatusBadge status={sub.status} /></td>
+   626→                        <td className="text-[12px] text-muted-foreground">{formatDate(sub.startDate)}</td>
+   627→                        <td className="text-[12px] text-muted-foreground">{sub.endDate ? formatDate(sub.endDate) : '—'}</td>
+   628→                        <td>{sub.autoRenew ? <CheckCircle2 className="size-4 text-emerald-500" /> : <XCircle className="size-4 text-gray-300" />}</td>
+   629→                      </tr>
+   630→                    ))}
+   631→                  </tbody>
+   632→                </table>
+   633→              </div>
+   634→            </div>
+   635→          )}
+   636→
+   637→          {/* ── INVOICES TAB ── */}
+   638→          {activeTab === 'invoices' && (
+   639→            <div className="space-y-5">
+   640→              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   641→                <StatCard label="Total Revenue" value={formatPKR(invoices.reduce((s, i) => s + i.total, 0))} icon={DollarSign} accent />
+   642→                <StatCard label="Outstanding" value={formatPKR(invoices.filter(i => i.balanceDue > 0).reduce((s, i) => s + i.balanceDue, 0))} icon={AlertCircle} />
+   643→                <StatCard label="Overdue" value={String(invoices.filter(i => i.status === 'overdue').length)} icon={Clock} />
+   644→                <StatCard label="Paid" value={String(invoices.filter(i => i.status === 'paid').length)} icon={CheckCircle2} />
+   645→              </div>
+   646→
+   647→              <div className="macos-card overflow-hidden">
+   648→                <table className="macos-table">
+   649→                  <thead><tr><th>Invoice #</th><th>Client</th><th>Issue Date</th><th>Due Date</th><th>Total</th><th>Balance</th><th>Status</th><th></th></tr></thead>
+   650→                  <tbody>
+   651→                    {invoices.map(inv => (
+   652→                      <tr key={inv.id}>
+   653→                        <td className="font-mono text-[12px] font-semibold">{inv.invoiceNumber}</td>
+   654→                        <td className="font-medium">{inv.client?.companyName || '—'}</td>
+   655→                        <td className="text-[12px] text-muted-foreground">{formatDate(inv.issueDate)}</td>
+   656→                        <td className="text-[12px] text-muted-foreground">{formatDate(inv.dueDate)}</td>
+   657→                        <td className="font-medium">{formatPKR(inv.total)}</td>
+   658→                        <td className={inv.balanceDue > 0 ? 'text-red-500 font-medium' : 'text-emerald-500'}>{formatPKR(inv.balanceDue)}</td>
+   659→                        <td><StatusBadge status={inv.status} /></td>
+   660→                        <td>
+   661→                          <button onClick={() => { setViewingInvoice(inv); setShowPrintView(true) }} className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+   662→                            <Eye className="size-4 text-muted-foreground" />
+   663→                          </button>
+   664→                        </td>
+   665→                      </tr>
+   666→                    ))}
+   667→                  </tbody>
+   668→                </table>
+   669→              </div>
+   670→            </div>
+   671→          )}
+   672→
+   673→          {/* ── QUOTATIONS TAB ── */}
+   674→          {activeTab === 'quotations' && (
+   675→            <div className="space-y-5">
+   676→              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   677→                <StatCard label="Total Quotes" value={String(quotations.length)} icon={FileSpreadsheet} accent />
+   678→                <StatCard label="Sent" value={String(quotations.filter(q => q.status === 'sent').length)} icon={Send} />
+   679→                <StatCard label="Accepted" value={String(quotations.filter(q => q.status === 'accepted').length)} icon={CheckCircle2} />
+   680→                <StatCard label="Total Value" value={formatPKR(quotations.reduce((s, q) => s + q.total, 0))} icon={DollarSign} />
+   681→              </div>
+   682→
+   683→              <div className="macos-card overflow-hidden">
+   684→                <table className="macos-table">
+   685→                  <thead><tr><th>Quote #</th><th>Client</th><th>Issue Date</th><th>Valid Until</th><th>Total</th><th>Status</th><th></th></tr></thead>
+   686→                  <tbody>
+   687→                    {quotations.map(q => (
+   688→                      <tr key={q.id}>
+   689→                        <td className="font-mono text-[12px] font-semibold">{q.quotationNumber}</td>
+   690→                        <td className="font-medium">{q.clientName}</td>
+   691→                        <td className="text-[12px] text-muted-foreground">{formatDate(q.issueDate)}</td>
+   692→                        <td className="text-[12px] text-muted-foreground">{formatDate(q.validUntil)}</td>
+   693→                        <td className="font-medium">{formatPKR(q.total)}</td>
+   694→                        <td><StatusBadge status={q.status} /></td>
+   695→                        <td>
+   696→                          <button onClick={() => { setViewingQuotation(q); setShowPrintView(true) }} className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+   697→                            <Eye className="size-4 text-muted-foreground" />
+   698→                          </button>
+   699→                        </td>
+   700→                      </tr>
+   701→                    ))}
+   702→                  </tbody>
+   703→                </table>
+   704→              </div>
+   705→            </div>
+   706→          )}
+   707→
+   708→          {/* ── LICENSE KEYS TAB ── */}
+   709→          {activeTab === 'license-keys' && (
+   710→            <div className="space-y-5">
+   711→              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   712→                <StatCard label="Total Keys" value={String(licenseKeys.length)} icon={Key} accent />
+   713→                <StatCard label="Available" value={String(licenseKeys.filter(k => k.status === 'available').length)} icon={CheckCircle2} />
+   714→                <StatCard label="Assigned" value={String(licenseKeys.filter(k => k.status === 'assigned').length)} icon={Link2} />
+   715→                <StatCard label="Revoked" value={String(licenseKeys.filter(k => k.status === 'revoked').length)} icon={XCircle} />
+   716→              </div>
+   717→
+   718→              <div className="macos-card overflow-hidden">
+   719→                <table className="macos-table">
+   720→                  <thead><tr><th>License Key</th><th>Client</th><th>Plan</th><th>Stations</th><th>Status</th><th>Assigned</th><th>Expires</th><th></th></tr></thead>
+   721→                  <tbody>
+   722→                    {licenseKeys.map(lk => (
+   723→                      <tr key={lk.id}>
+   724→                        <td>
+   725→                          <div className="flex items-center gap-1.5">
+   726→                            <code className="text-[12px] font-mono font-semibold bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded">{lk.key}</code>
+   727→                            <button onClick={() => copyKey(lk.key)} className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+   728→                              {copiedKey === lk.key ? <CheckCircle2 className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5 text-muted-foreground" />}
+   729→                            </button>
+   730→                          </div>
+   731→                        </td>
+   732→                        <td className="font-medium">{lk.client?.companyName || '—'}</td>
+   733→                        <td className="text-[11px] font-medium">{lk.plan?.name || '—'}</td>
+   734→                        <td className="text-center text-[12px]">{lk.maxStations}</td>
+   735→                        <td><StatusBadge status={lk.status} /></td>
+   736→                        <td className="text-[12px] text-muted-foreground">{lk.assignedAt ? formatDate(lk.assignedAt) : '—'}</td>
+   737→                        <td className="text-[12px] text-muted-foreground">{lk.expiresAt ? formatDate(lk.expiresAt) : '—'}</td>
+   738→                        <td>
+   739→                          {lk.status === 'available' && (
+   740→                            <button className="macos-btn-secondary text-[10px] px-2 py-0.5">Assign</button>
+   741→                          )}
+   742→                        </td>
+   743→                      </tr>
+   744→                    ))}
+   745→                  </tbody>
+   746→                </table>
+   747→              </div>
+   748→            </div>
+   749→          )}
+   750→
+   751→          {/* ── DEVICES TAB ── */}
+   752→          {activeTab === 'devices' && (
+   753→            <div className="space-y-5">
+   754→              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   755→                <StatCard label="Total Devices" value={String(devices.length)} icon={Monitor} accent />
+   756→                <StatCard label="Active" value={String(devices.filter(d => d.status === 'active').length)} icon={CheckCircle2} />
+   757→                <StatCard label="Maintenance" value={String(devices.filter(d => d.status === 'maintenance').length)} icon={AlertCircle} />
+   758→                <StatCard label="Inactive" value={String(devices.filter(d => d.status === 'inactive').length)} icon={XCircle} />
+   759→              </div>
+   760→
+   761→              <div className="macos-card overflow-hidden">
+   762→                <table className="macos-table">
+   763→                  <thead><tr><th>Client</th><th>Device</th><th>Type</th><th>Serial #</th><th>IP Address</th><th>Location</th><th>Status</th><th>Last Seen</th></tr></thead>
+   764→                  <tbody>
+   765→                    {devices.map(dev => {
+   766→                      const IconComp = deviceTypeIcon[dev.deviceType] || Monitor
+   767→                      return (
+   768→                        <tr key={dev.id}>
+   769→                          <td className="font-medium">{dev.client?.companyName || '—'}</td>
+   770→                          <td>
+   771→                            <div className="flex items-center gap-2">
+   772→                              <IconComp className="size-3.5 text-muted-foreground" />
+   773→                              <span>{dev.deviceName}</span>
+   774→                            </div>
+   775→                          </td>
+   776→                          <td className="text-[11px] capitalize">{dev.deviceType.replace('_', ' ')}</td>
+   777→                          <td className="font-mono text-[11px] text-muted-foreground">{dev.serialNumber || '—'}</td>
+   778→                          <td className="font-mono text-[11px] text-muted-foreground">{dev.ipAddress || '—'}</td>
+   779→                          <td className="text-[12px]">{dev.location || '—'}</td>
+   780→                          <td><StatusBadge status={dev.status} /></td>
+   781→                          <td className="text-[12px] text-muted-foreground">{dev.lastSeenAt ? formatDate(dev.lastSeenAt) : '—'}</td>
+   782→                        </tr>
+   783→                      )
+   784→                    })}
+   785→                  </tbody>
+   786→                </table>
+   787→              </div>
+   788→            </div>
+   789→          )}
+   790→        </motion.div>
+   791→      </AnimatePresence>
+   792→    </div>
+   793→  )
+   794→}
+   795→

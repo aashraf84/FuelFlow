@@ -1,0 +1,602 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useCallback } from 'react'
+     4→import {
+     5→  Shield,
+     6→  Users,
+     7→  AlertTriangle,
+     8→  HardDrive,
+     9→  Lock,
+    10→  Key,
+    11→  Clock,
+    12→  RefreshCw,
+    13→  Monitor,
+    14→  Ban,
+    15→  CheckCircle2,
+    16→  XCircle,
+    17→  Eye,
+    18→  ArrowUpDown,
+    19→  Globe,
+    20→} from 'lucide-react'
+    21→import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+    22→import { Badge } from '@/components/ui/badge'
+    23→import { Button } from '@/components/ui/button'
+    24→import { Skeleton } from '@/components/ui/skeleton'
+    25→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    26→import {
+    27→  Table,
+    28→  TableBody,
+    29→  TableCell,
+    30→  TableHead,
+    31→  TableHeader,
+    32→  TableRow,
+    33→} from '@/components/ui/table'
+    34→
+    35→// ── Types ──────────────────────────────────────────────
+    36→
+    37→interface SecurityOverview {
+    38→  activeSessions: number
+    39→  unresolvedAlerts: number
+    40→  lastBackup: {
+    41→    id: string
+    42→    backupType: string
+    43→    status: string
+    44→    completedAt: string | null
+    45→    fileSize: number | null
+    46→  } | null
+    47→  activeEncryptionKeys: number
+    48→}
+    49→
+    50→interface SecuritySession {
+    51→  id: string
+    52→  ipAddress: string | null
+    53→  userAgent: string | null
+    54→  deviceInfo: string | null
+    55→  loginAt: string
+    56→  lastActivityAt: string
+    57→  logoutAt: string | null
+    58→  status: string
+    59→  user: { id: string; name: string; email: string; role: string }
+    60→}
+    61→
+    62→interface RBACPermission {
+    63→  id: string
+    64→  role: string
+    65→  module: string
+    66→  action: string
+    67→  isAllowed: boolean
+    68→}
+    69→
+    70→interface SecurityAlert {
+    71→  id: string
+    72→  alertType: string
+    73→  severity: string
+    74→  title: string
+    75→  description: string | null
+    76→  sourceIp: string | null
+    77→  targetEntity: string | null
+    78→  isResolved: boolean
+    79→  resolvedAt: string | null
+    80→  createdAt: string
+    81→}
+    82→
+    83→interface BackupRecord {
+    84→  id: string
+    85→  backupType: string
+    86→  status: string
+    87→  fileSize: number | null
+    88→  startedAt: string | null
+    89→  completedAt: string | null
+    90→  duration: number | null
+    91→  checksum: string | null
+    92→  isRestorable: boolean
+    93→  createdAt: string
+    94→}
+    95→
+    96→interface EncryptionKey {
+    97→  id: string
+    98→  keyType: string
+    99→  keyReference: string
+   100→  isActive: boolean
+   101→  rotatedAt: string | null
+   102→  expiresAt: string | null
+   103→  createdAt: string
+   104→}
+   105→
+   106→// ── Badge Configs ──────────────────────────────────────
+   107→
+   108→const SESSION_STATUS: Record<string, string> = {
+   109→  active: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/25',
+   110→  expired: 'bg-slate-500/15 text-slate-500 border-slate-500/25',
+   111→  revoked: 'bg-red-500/15 text-red-600 border-red-500/25',
+   112→}
+   113→
+   114→const SEVERITY_BADGE: Record<string, string> = {
+   115→  critical: 'bg-red-500/15 text-red-600 border-red-500/25',
+   116→  error: 'bg-red-500/15 text-red-600 border-red-500/25',
+   117→  warning: 'bg-amber-500/15 text-amber-600 border-amber-500/25',
+   118→  info: 'bg-blue-500/15 text-blue-600 border-blue-500/25',
+   119→}
+   120→
+   121→const BACKUP_STATUS: Record<string, string> = {
+   122→  completed: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/25',
+   123→  in_progress: 'bg-amber-500/15 text-amber-600 border-amber-500/25',
+   124→  pending: 'bg-blue-500/15 text-blue-600 border-blue-500/25',
+   125→  failed: 'bg-red-500/15 text-red-600 border-red-500/25',
+   126→}
+   127→
+   128→const ROLE_COLORS: Record<string, string> = {
+   129→  superadmin: 'bg-red-500/10 text-red-600 border-red-500/25',
+   130→  admin: 'bg-amber-500/10 text-amber-600 border-amber-500/25',
+   131→  manager: 'bg-blue-500/10 text-blue-600 border-blue-500/25',
+   132→  operator: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/25',
+   133→  cashier: 'bg-slate-500/10 text-slate-600 border-slate-500/25',
+   134→  attendant: 'bg-slate-500/10 text-slate-600 border-slate-500/25',
+   135→  viewer: 'bg-slate-500/10 text-slate-500 border-slate-500/25',
+   136→}
+   137→
+   138→function LoadingSkeleton() {
+   139→  return (
+   140→    <div className="space-y-4">
+   141→      {Array.from({ length: 4 }).map((_, i) => (
+   142→        <Card key={i}><CardContent className="p-4"><Skeleton className="h-20 w-full" /></CardContent></Card>
+   143→      ))}
+   144→    </div>
+   145→  )
+   146→}
+   147→
+   148→// ── Main Component ─────────────────────────────────────
+   149→
+   150→export default function SecurityCenterModule() {
+   151→  const [overview, setOverview] = useState<SecurityOverview | null>(null)
+   152→  const [sessions, setSessions] = useState<SecuritySession[]>([])
+   153→  const [rbacPermissions, setRbacPermissions] = useState<RBACPermission[]>([])
+   154→  const [alerts, setAlerts] = useState<SecurityAlert[]>([])
+   155→  const [backups, setBackups] = useState<BackupRecord[]>([])
+   156→  const [encryptionKeys, setEncryptionKeys] = useState<EncryptionKey[]>([])
+   157→  const [loading, setLoading] = useState(true)
+   158→  const [sectionLoading, setSectionLoading] = useState(false)
+   159→
+   160→  const fetchOverview = useCallback(async () => {
+   161→    try {
+   162→      const res = await fetch('/api/security')
+   163→      if (!res.ok) throw new Error('Failed')
+   164→      const data = await res.json()
+   165→      setOverview(data.overview)
+   166→    } catch {
+   167→      setOverview({ activeSessions: 0, unresolvedAlerts: 0, lastBackup: null, activeEncryptionKeys: 0 })
+   168→    } finally {
+   169→      setLoading(false)
+   170→    }
+   171→  }, [])
+   172→
+   173→  const fetchSection = useCallback(async (section: string) => {
+   174→    setSectionLoading(true)
+   175→    try {
+   176→      const res = await fetch(`/api/security?section=${section}`)
+   177→      if (!res.ok) throw new Error('Failed')
+   178→      const data = await res.json()
+   179→      switch (section) {
+   180→        case 'sessions': setSessions(data.sessions || []); break
+   181→        case 'rbac': setRbacPermissions(data.permissions || []); break
+   182→        case 'alerts': setAlerts(data.alerts || []); break
+   183→        case 'backups': setBackups(data.backups || []); break
+   184→        case 'encryption': setEncryptionKeys(data.keys || []); break
+   185→      }
+   186→    } catch {
+   187→      // Silently handle - data stays empty
+   188→    } finally {
+   189→      setSectionLoading(false)
+   190→    }
+   191→  }, [])
+   192→
+   193→  const revokeSession = useCallback(async (sessionId: string) => {
+   194→    try {
+   195→      await fetch('/api/security', {
+   196→        method: 'POST',
+   197→        headers: { 'Content-Type': 'application/json' },
+   198→        body: JSON.stringify({ action: 'revoke_session', sessionId }),
+   199→      })
+   200→      setSessions(prev => prev.filter(s => s.id !== sessionId))
+   201→    } catch {
+   202→      // Handle silently
+   203→    }
+   204→  }, [])
+   205→
+   206→  const resolveAlert = useCallback(async (alertId: string) => {
+   207→    try {
+   208→      await fetch('/api/security', {
+   209→        method: 'POST',
+   210→        headers: { 'Content-Type': 'application/json' },
+   211→        body: JSON.stringify({ action: 'resolve_alert', alertId }),
+   212→      })
+   213→      setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, isResolved: true, resolvedAt: new Date().toISOString() } : a))
+   214→    } catch {
+   215→      // Handle silently
+   216→    }
+   217→  }, [])
+   218→
+   219→  useEffect(() => {
+   220→    fetchOverview()
+   221→  }, [fetchOverview])
+   222→
+   223→  const handleTabChange = (tab: string) => {
+   224→    if (tab !== 'overview') fetchSection(tab)
+   225→  }
+   226→
+   227→  if (loading) return <LoadingSkeleton />
+   228→
+   229→  // Build RBAC matrix
+   230→  const rbacRoles = [...new Set(rbacPermissions.map(p => p.role))]
+   231→  const rbacModules = [...new Set(rbacPermissions.map(p => p.module))]
+   232→  const rbacActions = [...new Set(rbacPermissions.map(p => p.action))]
+   233→
+   234→  const getPermission = (role: string, module: string, action: string) => {
+   235→    const perm = rbacPermissions.find(p => p.role === role && p.module === module && p.action === action)
+   236→    return perm?.isAllowed ?? false
+   237→  }
+   238→
+   239→  return (
+   240→    <div className="space-y-4">
+   241→      <Tabs defaultValue="overview" onValueChange={handleTabChange}>
+   242→        <div className="overflow-x-auto pb-1">
+   243→          <TabsList className="h-9 w-max gap-0.5 bg-muted/50">
+   244→            <TabsTrigger value="overview" className="text-xs px-3 h-7 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">Overview</TabsTrigger>
+   245→            <TabsTrigger value="sessions" className="text-xs px-3 h-7 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">Sessions</TabsTrigger>
+   246→            <TabsTrigger value="rbac" className="text-xs px-3 h-7 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">RBAC</TabsTrigger>
+   247→            <TabsTrigger value="alerts" className="text-xs px-3 h-7 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">Alerts</TabsTrigger>
+   248→            <TabsTrigger value="backups" className="text-xs px-3 h-7 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">Backups</TabsTrigger>
+   249→            <TabsTrigger value="encryption" className="text-xs px-3 h-7 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">Encryption</TabsTrigger>
+   250→          </TabsList>
+   251→        </div>
+   252→
+   253→        {/* ── Overview ── */}
+   254→        <TabsContent value="overview" className="mt-4 space-y-4">
+   255→          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   256→            <Card className="bg-card border rounded-lg">
+   257→              <CardContent className="p-4">
+   258→                <div className="flex items-center justify-between">
+   259→                  <div>
+   260→                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Active Sessions</p>
+   261→                    <p className="text-2xl font-bold mt-0.5">{overview?.activeSessions || 0}</p>
+   262→                  </div>
+   263→                  <div className="size-9 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+   264→                    <Users className="size-4 text-emerald-500" />
+   265→                  </div>
+   266→                </div>
+   267→              </CardContent>
+   268→            </Card>
+   269→            <Card className="bg-card border rounded-lg">
+   270→              <CardContent className="p-4">
+   271→                <div className="flex items-center justify-between">
+   272→                  <div>
+   273→                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Security Alerts</p>
+   274→                    <p className="text-2xl font-bold mt-0.5 text-red-600">{overview?.unresolvedAlerts || 0}</p>
+   275→                  </div>
+   276→                  <div className="size-9 rounded-lg bg-red-500/10 flex items-center justify-center">
+   277→                    <AlertTriangle className="size-4 text-red-500" />
+   278→                  </div>
+   279→                </div>
+   280→              </CardContent>
+   281→            </Card>
+   282→            <Card className="bg-card border rounded-lg">
+   283→              <CardContent className="p-4">
+   284→                <div className="flex items-center justify-between">
+   285→                  <div>
+   286→                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Last Backup</p>
+   287→                    <p className="text-sm font-bold mt-0.5">{overview?.lastBackup ? new Date(overview.lastBackup.completedAt || '').toLocaleDateString() : 'Never'}</p>
+   288→                  </div>
+   289→                  <div className="size-9 rounded-lg bg-amber-500/10 flex items-center justify-center">
+   290→                    <HardDrive className="size-4 text-amber-500" />
+   291→                  </div>
+   292→                </div>
+   293→              </CardContent>
+   294→            </Card>
+   295→            <Card className="bg-card border rounded-lg">
+   296→              <CardContent className="p-4">
+   297→                <div className="flex items-center justify-between">
+   298→                  <div>
+   299→                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Encryption Keys</p>
+   300→                    <p className="text-2xl font-bold mt-0.5 text-amber-600">{overview?.activeEncryptionKeys || 0}</p>
+   301→                  </div>
+   302→                  <div className="size-9 rounded-lg bg-amber-500/10 flex items-center justify-center">
+   303→                    <Lock className="size-4 text-amber-500" />
+   304→                  </div>
+   305→                </div>
+   306→              </CardContent>
+   307→            </Card>
+   308→          </div>
+   309→        </TabsContent>
+   310→
+   311→        {/* ── Sessions ── */}
+   312→        <TabsContent value="sessions" className="mt-4 space-y-4">
+   313→          <div className="flex items-center justify-between">
+   314→            <h3 className="text-sm font-semibold">Active Sessions</h3>
+   315→            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => fetchSection('sessions')}>
+   316→              <RefreshCw className="size-3 mr-1" /> Refresh
+   317→            </Button>
+   318→          </div>
+   319→          <Card className="bg-card border rounded-lg">
+   320→            <CardContent className="p-0">
+   321→              <div className="max-h-96 overflow-y-auto">
+   322→                <Table>
+   323→                  <TableHeader>
+   324→                    <TableRow>
+   325→                      <TableHead className="text-[10px] h-8">User</TableHead>
+   326→                      <TableHead className="text-[10px]">Role</TableHead>
+   327→                      <TableHead className="text-[10px]">IP Address</TableHead>
+   328→                      <TableHead className="text-[10px]">Device</TableHead>
+   329→                      <TableHead className="text-[10px]">Login Time</TableHead>
+   330→                      <TableHead className="text-[10px]">Last Activity</TableHead>
+   331→                      <TableHead className="text-[10px]">Status</TableHead>
+   332→                      <TableHead className="text-[10px]">Action</TableHead>
+   333→                    </TableRow>
+   334→                  </TableHeader>
+   335→                  <TableBody>
+   336→                    {sessions.length === 0 ? (
+   337→                      <TableRow>
+   338→                        <TableCell colSpan={8} className="text-center text-xs text-muted-foreground py-8">No active sessions</TableCell>
+   339→                      </TableRow>
+   340→                    ) : (
+   341→                      sessions.map(session => (
+   342→                        <TableRow key={session.id}>
+   343→                          <TableCell className="text-xs font-medium">{session.user.name}</TableCell>
+   344→                          <TableCell>
+   345→                            <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${ROLE_COLORS[session.user.role] || ''}`}>{session.user.role}</Badge>
+   346→                          </TableCell>
+   347→                          <TableCell className="text-[10px] font-mono">{session.ipAddress || '-'}</TableCell>
+   348→                          <TableCell className="text-[10px] max-w-[120px] truncate">{session.deviceInfo || session.userAgent?.slice(0, 30) || '-'}</TableCell>
+   349→                          <TableCell className="text-[10px] font-mono whitespace-nowrap">{new Date(session.loginAt).toLocaleString()}</TableCell>
+   350→                          <TableCell className="text-[10px] font-mono whitespace-nowrap">{new Date(session.lastActivityAt).toLocaleString()}</TableCell>
+   351→                          <TableCell>
+   352→                            <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${SESSION_STATUS[session.status] || ''}`}>{session.status}</Badge>
+   353→                          </TableCell>
+   354→                          <TableCell>
+   355→                            <Button size="sm" variant="outline" className="h-5 text-[9px] px-1.5 text-red-600 hover:text-red-700 hover:bg-red-500/10" onClick={() => revokeSession(session.id)}>
+   356→                              <Ban className="size-2.5 mr-0.5" /> Revoke
+   357→                            </Button>
+   358→                          </TableCell>
+   359→                        </TableRow>
+   360→                      ))
+   361→                    )}
+   362→                  </TableBody>
+   363→                </Table>
+   364→              </div>
+   365→            </CardContent>
+   366→          </Card>
+   367→        </TabsContent>
+   368→
+   369→        {/* ── RBAC ── */}
+   370→        <TabsContent value="rbac" className="mt-4 space-y-4">
+   371→          <div className="flex items-center justify-between">
+   372→            <h3 className="text-sm font-semibold">Role-Based Access Control</h3>
+   373→            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => fetchSection('rbac')}>
+   374→              <RefreshCw className="size-3 mr-1" /> Refresh
+   375→            </Button>
+   376→          </div>
+   377→          {sectionLoading ? (
+   378→            <LoadingSkeleton />
+   379→          ) : rbacPermissions.length === 0 ? (
+   380→            <Card className="bg-card border rounded-lg">
+   381→              <CardContent className="p-8 text-center">
+   382→                <Shield className="size-8 mx-auto text-muted-foreground/40" />
+   383→                <p className="text-sm text-muted-foreground mt-2">No RBAC permissions configured</p>
+   384→              </CardContent>
+   385→            </Card>
+   386→          ) : (
+   387→            <Card className="bg-card border rounded-lg">
+   388→              <CardContent className="p-0">
+   389→                <div className="max-h-96 overflow-y-auto">
+   390→                  <Table>
+   391→                    <TableHeader>
+   392→                      <TableRow>
+   393→                        <TableHead className="text-[10px] h-8 sticky left-0 bg-card">Role \ Module:Action</TableHead>
+   394→                        {rbacModules.map(mod => (
+   395→                          rbacActions.map(act => (
+   396→                            <TableHead key={`${mod}:${act}`} className="text-[9px] px-1 text-center">
+   397→                              <div>{mod}</div>
+   398→                              <div className="text-muted-foreground font-normal">{act}</div>
+   399→                            </TableHead>
+   400→                          ))
+   401→                        ))}
+   402→                      </TableRow>
+   403→                    </TableHeader>
+   404→                    <TableBody>
+   405→                      {rbacRoles.map(role => (
+   406→                        <TableRow key={role}>
+   407→                          <TableCell className="text-xs font-medium sticky left-0 bg-card">
+   408→                            <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${ROLE_COLORS[role] || ''}`}>{role}</Badge>
+   409→                          </TableCell>
+   410→                          {rbacModules.map(mod => (
+   411→                            rbacActions.map(act => {
+   412→                              const allowed = getPermission(role, mod, act)
+   413→                              return (
+   414→                                <TableCell key={`${role}-${mod}-${act}`} className="text-center px-1">
+   415→                                  {allowed
+   416→                                    ? <CheckCircle2 className="size-3.5 text-emerald-500 mx-auto" />
+   417→                                    : <XCircle className="size-3.5 text-red-300 mx-auto" />
+   418→                                  }
+   419→                                </TableCell>
+   420→                              )
+   421→                            })
+   422→                          ))}
+   423→                        </TableRow>
+   424→                      ))}
+   425→                    </TableBody>
+   426→                  </Table>
+   427→                </div>
+   428→              </CardContent>
+   429→            </Card>
+   430→          )}
+   431→        </TabsContent>
+   432→
+   433→        {/* ── Alerts ── */}
+   434→        <TabsContent value="alerts" className="mt-4 space-y-4">
+   435→          <div className="flex items-center justify-between">
+   436→            <h3 className="text-sm font-semibold">Security Alerts</h3>
+   437→            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => fetchSection('alerts')}>
+   438→              <RefreshCw className="size-3 mr-1" /> Refresh
+   439→            </Button>
+   440→          </div>
+   441→          {alerts.length === 0 ? (
+   442→            <Card className="bg-card border rounded-lg">
+   443→              <CardContent className="p-8 text-center">
+   444→                <CheckCircle2 className="size-8 mx-auto text-emerald-500" />
+   445→                <p className="text-sm text-muted-foreground mt-2">No security alerts</p>
+   446→              </CardContent>
+   447→            </Card>
+   448→          ) : (
+   449→            <div className="space-y-2 max-h-96 overflow-y-auto">
+   450→              {alerts.map(alert => (
+   451→                <Card key={alert.id} className={`bg-card border rounded-lg ${alert.isResolved ? 'opacity-60' : ''}`}>
+   452→                  <CardContent className="p-3">
+   453→                    <div className="flex items-start justify-between gap-2">
+   454→                      <div className="flex items-start gap-2 flex-1">
+   455→                        <div className={`size-7 rounded flex items-center justify-center shrink-0 mt-0.5 ${alert.severity === 'critical' ? 'bg-red-500/10' : alert.severity === 'warning' ? 'bg-amber-500/10' : 'bg-blue-500/10'}`}>
+   456→                          <AlertTriangle className={`size-3.5 ${alert.severity === 'critical' ? 'text-red-500' : alert.severity === 'warning' ? 'text-amber-500' : 'text-blue-500'}`} />
+   457→                        </div>
+   458→                        <div className="min-w-0">
+   459→                          <p className="text-xs font-medium">{alert.title}</p>
+   460→                          {alert.description && <p className="text-[10px] text-muted-foreground mt-0.5">{alert.description}</p>}
+   461→                          <div className="flex items-center gap-2 mt-1.5">
+   462→                            <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${SEVERITY_BADGE[alert.severity] || SEVERITY_BADGE.info}`}>{alert.severity}</Badge>
+   463→                            <span className="text-[9px] text-muted-foreground">{alert.alertType.replace(/_/g, ' ')}</span>
+   464→                            {alert.sourceIp && <span className="text-[9px] font-mono text-muted-foreground">IP: {alert.sourceIp}</span>}
+   465→                            <span className="text-[9px] text-muted-foreground">{new Date(alert.createdAt).toLocaleString()}</span>
+   466→                          </div>
+   467→                        </div>
+   468→                      </div>
+   469→                      {!alert.isResolved && (
+   470→                        <Button size="sm" variant="outline" className="h-6 text-[9px] px-2 shrink-0" onClick={() => resolveAlert(alert.id)}>
+   471→                          <CheckCircle2 className="size-2.5 mr-0.5" /> Resolve
+   472→                        </Button>
+   473→                      )}
+   474→                      {alert.isResolved && (
+   475→                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-emerald-500/15 text-emerald-600 border-emerald-500/25 shrink-0">Resolved</Badge>
+   476→                      )}
+   477→                    </div>
+   478→                  </CardContent>
+   479→                </Card>
+   480→              ))}
+   481→            </div>
+   482→          )}
+   483→        </TabsContent>
+   484→
+   485→        {/* ── Backups ── */}
+   486→        <TabsContent value="backups" className="mt-4 space-y-4">
+   487→          <div className="flex items-center justify-between">
+   488→            <h3 className="text-sm font-semibold">Backup Records</h3>
+   489→            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => fetchSection('backups')}>
+   490→              <RefreshCw className="size-3 mr-1" /> Refresh
+   491→            </Button>
+   492→          </div>
+   493→          <Card className="bg-card border rounded-lg">
+   494→            <CardContent className="p-0">
+   495→              <div className="max-h-96 overflow-y-auto">
+   496→                <Table>
+   497→                  <TableHeader>
+   498→                    <TableRow>
+   499→                      <TableHead className="text-[10px] h-8">Type</TableHead>
+   500→                      <TableHead className="text-[10px]">Status</TableHead>
+   501→                      <TableHead className="text-[10px]">Size (MB)</TableHead>
+   502→                      <TableHead className="text-[10px]">Started</TableHead>
+   503→                      <TableHead className="text-[10px]">Completed</TableHead>
+   504→                      <TableHead className="text-[10px]">Duration</TableHead>
+   505→                      <TableHead className="text-[10px]">Restorable</TableHead>
+   506→                    </TableRow>
+   507→                  </TableHeader>
+   508→                  <TableBody>
+   509→                    {backups.length === 0 ? (
+   510→                      <TableRow>
+   511→                        <TableCell colSpan={7} className="text-center text-xs text-muted-foreground py-8">No backup records found</TableCell>
+   512→                      </TableRow>
+   513→                    ) : (
+   514→                      backups.map(backup => (
+   515→                        <TableRow key={backup.id}>
+   516→                          <TableCell className="text-xs">{backup.backupType}</TableCell>
+   517→                          <TableCell>
+   518→                            <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${BACKUP_STATUS[backup.status] || ''}`}>{backup.status}</Badge>
+   519→                          </TableCell>
+   520→                          <TableCell className="text-[10px]">{backup.fileSize ? backup.fileSize.toFixed(1) : '-'}</TableCell>
+   521→                          <TableCell className="text-[10px] font-mono whitespace-nowrap">{backup.startedAt ? new Date(backup.startedAt).toLocaleString() : '-'}</TableCell>
+   522→                          <TableCell className="text-[10px] font-mono whitespace-nowrap">{backup.completedAt ? new Date(backup.completedAt).toLocaleString() : '-'}</TableCell>
+   523→                          <TableCell className="text-[10px]">{backup.duration ? `${Math.floor(backup.duration / 60)}m ${backup.duration % 60}s` : '-'}</TableCell>
+   524→                          <TableCell>
+   525→                            {backup.isRestorable
+   526→                              ? <CheckCircle2 className="size-3.5 text-emerald-500" />
+   527→                              : <XCircle className="size-3.5 text-red-400" />
+   528→                            }
+   529→                          </TableCell>
+   530→                        </TableRow>
+   531→                      ))
+   532→                    )}
+   533→                  </TableBody>
+   534→                </Table>
+   535→              </div>
+   536→            </CardContent>
+   537→          </Card>
+   538→        </TabsContent>
+   539→
+   540→        {/* ── Encryption ── */}
+   541→        <TabsContent value="encryption" className="mt-4 space-y-4">
+   542→          <div className="flex items-center justify-between">
+   543→            <h3 className="text-sm font-semibold">Encryption Keys</h3>
+   544→            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => fetchSection('encryption')}>
+   545→              <RefreshCw className="size-3 mr-1" /> Refresh
+   546→            </Button>
+   547→          </div>
+   548→          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+   549→            {encryptionKeys.length === 0 ? (
+   550→              <Card className="bg-card border rounded-lg col-span-full">
+   551→                <CardContent className="p-8 text-center">
+   552→                  <Key className="size-8 mx-auto text-muted-foreground/40" />
+   553→                  <p className="text-sm text-muted-foreground mt-2">No encryption keys found</p>
+   554→                </CardContent>
+   555→              </Card>
+   556→            ) : (
+   557→              encryptionKeys.map(key => (
+   558→                <Card key={key.id} className="bg-card border rounded-lg hover:border-amber-500/30 transition-colors">
+   559→                  <CardContent className="p-4">
+   560→                    <div className="flex items-start justify-between mb-2">
+   561→                      <div className="flex items-center gap-2">
+   562→                        <div className="size-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+   563→                          <Lock className="size-3.5 text-amber-500" />
+   564→                        </div>
+   565→                        <div>
+   566→                          <p className="text-sm font-medium">{key.keyType.toUpperCase()}</p>
+   567→                          <p className="text-[10px] text-muted-foreground font-mono">{key.keyReference}</p>
+   568→                        </div>
+   569→                      </div>
+   570→                      <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${key.isActive ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/25' : 'bg-slate-500/15 text-slate-500 border-slate-500/25'}`}>
+   571→                        {key.isActive ? 'Active' : 'Inactive'}
+   572→                      </Badge>
+   573→                    </div>
+   574→                    <div className="space-y-1 text-xs text-muted-foreground mt-2">
+   575→                      {key.rotatedAt && (
+   576→                        <div className="flex justify-between">
+   577→                          <span>Last Rotated</span>
+   578→                          <span className="text-foreground">{new Date(key.rotatedAt).toLocaleDateString()}</span>
+   579→                        </div>
+   580→                      )}
+   581→                      {key.expiresAt && (
+   582→                        <div className="flex justify-between">
+   583→                          <span>Expires</span>
+   584→                          <span className={`text-foreground ${new Date(key.expiresAt) < new Date() ? 'text-red-600' : ''}`}>{new Date(key.expiresAt).toLocaleDateString()}</span>
+   585→                        </div>
+   586→                      )}
+   587→                      <div className="flex justify-between">
+   588→                        <span>Created</span>
+   589→                        <span className="text-foreground">{new Date(key.createdAt).toLocaleDateString()}</span>
+   590→                      </div>
+   591→                    </div>
+   592→                  </CardContent>
+   593→                </Card>
+   594→              ))
+   595→            )}
+   596→          </div>
+   597→        </TabsContent>
+   598→      </Tabs>
+   599→    </div>
+   600→  )
+   601→}
+   602→

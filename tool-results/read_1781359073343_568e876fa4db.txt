@@ -1,0 +1,671 @@
+     1→'use client'
+     2→
+     3→import { useState } from 'react'
+     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→import {
+     6→  Cpu, Wifi, WifiOff, CreditCard, Zap, Gauge, Droplets, Radio,
+     7→  RefreshCw, ChevronRight, Clock, AlertTriangle, CheckCircle2,
+     8→  XCircle, ArrowUpDown, Send, Command, Monitor, Server,
+     9→  Cable, Plug, Wrench, Fuel, Activity, HardDrive, Database,
+    10→  Play, Square, RotateCcw, Eye, Search, Filter,
+    11→} from 'lucide-react'
+    12→import { Badge } from '@/components/ui/badge'
+    13→import { Button } from '@/components/ui/button'
+    14→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    15→import { Input } from '@/components/ui/input'
+    16→import { ScrollArea } from '@/components/ui/scroll-area'
+    17→
+    18→// ── Static Data ──────────────────────────────────────
+    19→
+    20→const deviceTypes = [
+    21→  { type: 'Dispensers', icon: Fuel, count: 8, online: 7, color: '#e8930c' },
+    22→  { type: 'ATG Systems', icon: Droplets, count: 4, online: 4, color: '#34c759' },
+    23→  { type: 'Payment Terminals', icon: CreditCard, count: 6, online: 5, color: '#ff9f0a' },
+    24→  { type: 'Forecourt Controllers', icon: Server, count: 2, online: 2, color: '#30d158' },
+    25→  { type: 'Price Boards', icon: Monitor, count: 3, online: 3, color: '#ff375f' },
+    26→  { type: 'RFID Readers', icon: Radio, count: 4, online: 3, color: '#bf5af2' },
+    27→  { type: 'ANPR Cameras', icon: Eye, count: 2, online: 2, color: '#64d2ff' },
+    28→  { type: 'Car Wash', icon: Zap, count: 1, online: 1, color: '#ffd60a' },
+    29→]
+    30→
+    31→const connectedDevices = [
+    32→  { id: 'DISP-001', name: 'Dispenser 1 (Diesel)', type: 'Dispenser', brand: 'Gilbarco', protocol: 'IFSF', status: 'online', lastSeen: '2 sec ago', ip: '192.168.1.31' },
+    33→  { id: 'DISP-002', name: 'Dispenser 2 (Petrol 92)', type: 'Dispenser', brand: 'Wayne', protocol: 'IFSF', status: 'online', lastSeen: '1 sec ago', ip: '192.168.1.32' },
+    34→  { id: 'DISP-003', name: 'Dispenser 3 (Petrol 95)', type: 'Dispenser', brand: 'Tatsuno', protocol: 'IFSF', status: 'online', lastSeen: '3 sec ago', ip: '192.168.1.33' },
+    35→  { id: 'DISP-004', name: 'Dispenser 4 (Hi-Octane)', type: 'Dispenser', brand: 'Tokheim', protocol: 'IFSF', status: 'warning', lastSeen: '45 sec ago', ip: '192.168.1.34' },
+    36→  { id: 'DISP-005', name: 'Dispenser 5 (Diesel)', type: 'Dispenser', brand: 'Bennett', protocol: 'PARIUS', status: 'online', lastSeen: '1 sec ago', ip: '192.168.1.35' },
+    37→  { id: 'DISP-006', name: 'Dispenser 6 (Petrol 92)', type: 'Dispenser', brand: 'Gilbarco', protocol: 'IFSF', status: 'online', lastSeen: '2 sec ago', ip: '192.168.1.36' },
+    38→  { id: 'DISP-007', name: 'Dispenser 7 (Petrol 95)', type: 'Dispenser', brand: 'Petrotec', protocol: 'DFS', status: 'offline', lastSeen: '15 min ago', ip: '192.168.1.37' },
+    39→  { id: 'DISP-008', name: 'Dispenser 8 (Diesel)', type: 'Dispenser', brand: 'Scheidt & Bachmann', protocol: 'IFSF', status: 'online', lastSeen: '1 sec ago', ip: '192.168.1.38' },
+    40→  { id: 'ATG-001', name: 'ATG Tank 1 (Diesel)', type: 'ATG', brand: 'Veeder-Root', protocol: 'TLS-350', status: 'online', lastSeen: '5 sec ago', ip: '192.168.1.51' },
+    41→  { id: 'ATG-002', name: 'ATG Tank 2 (Petrol 92)', type: 'ATG', brand: 'Veeder-Root', protocol: 'TLS-350', status: 'online', lastSeen: '4 sec ago', ip: '192.168.1.52' },
+    42→  { id: 'ATG-003', name: 'ATG Tank 3 (Petrol 95)', type: 'ATG', brand: 'Veeder-Root', protocol: 'TLS-350', status: 'online', lastSeen: '6 sec ago', ip: '192.168.1.53' },
+    43→  { id: 'ATG-004', name: 'ATG Tank 4 (Hi-Octane)', type: 'ATG', brand: 'Veeder-Root', protocol: 'TLS-350', status: 'online', lastSeen: '3 sec ago', ip: '192.168.1.54' },
+    44→  { id: 'POS-001', name: 'POS Terminal 1', type: 'Payment', brand: 'Ingenico', protocol: 'ISO 8583', status: 'online', lastSeen: '1 sec ago', ip: '192.168.1.61' },
+    45→  { id: 'POS-002', name: 'POS Terminal 2', type: 'Payment', brand: 'Verifone', protocol: 'ISO 8583', status: 'online', lastSeen: '2 sec ago', ip: '192.168.1.62' },
+    46→  { id: 'POS-003', name: 'POS Terminal 3', type: 'Payment', brand: 'Ingenico', protocol: 'ISO 8583', status: 'warning', lastSeen: '2 min ago', ip: '192.168.1.63' },
+    47→  { id: 'POS-004', name: 'Self-Checkout 1', type: 'Payment', brand: 'Gilbarco', protocol: 'IFSF', status: 'online', lastSeen: '1 sec ago', ip: '192.168.1.64' },
+    48→  { id: 'POS-005', name: 'Self-Checkout 2', type: 'Payment', brand: 'Wayne', protocol: 'PARIUS', status: 'offline', lastSeen: '30 min ago', ip: '192.168.1.65' },
+    49→  { id: 'POS-006', name: 'Outdoor Pay Terminal', type: 'Payment', brand: 'Ingenico', protocol: 'ISO 8583', status: 'online', lastSeen: '3 sec ago', ip: '192.168.1.66' },
+    50→  { id: 'FC-001', name: 'Forecourt Controller A', type: 'Controller', brand: 'DOMS', protocol: 'IFSF', status: 'online', lastSeen: '0 sec ago', ip: '192.168.1.10' },
+    51→  { id: 'FC-002', name: 'Forecourt Controller B', type: 'Controller', brand: 'Wayne', protocol: 'PARIUS', status: 'online', lastSeen: '0 sec ago', ip: '192.168.1.11' },
+    52→  { id: 'PB-001', name: 'Price Board (Main Road)', type: 'Price Board', brand: 'Micros', protocol: 'RS485', status: 'online', lastSeen: '30 sec ago', ip: '192.168.1.71' },
+    53→  { id: 'RFID-001', name: 'RFID Reader Lane 1', type: 'RFID', brand: 'Nedap', protocol: 'Wiegand', status: 'online', lastSeen: '5 sec ago', ip: '192.168.1.81' },
+    54→  { id: 'RFID-002', name: 'RFID Reader Lane 2', type: 'RFID', brand: 'Nedap', protocol: 'Wiegand', status: 'online', lastSeen: '8 sec ago', ip: '192.168.1.82' },
+    55→  { id: 'RFID-003', name: 'RFID Reader Lane 3', type: 'RFID', brand: 'Nedap', protocol: 'Wiegand', status: 'warning', lastSeen: '2 min ago', ip: '192.168.1.83' },
+    56→  { id: 'RFID-004', name: 'RFID Reader Lane 4', type: 'RFID', brand: 'Transcore', protocol: 'Wiegand', status: 'offline', lastSeen: '1 hr ago', ip: '192.168.1.84' },
+    57→  { id: 'ANPR-001', name: 'ANPR Camera Entry', type: 'ANPR', brand: 'Axis', protocol: 'HTTP', status: 'online', lastSeen: '1 sec ago', ip: '192.168.1.91' },
+    58→  { id: 'ANPR-002', name: 'ANPR Camera Exit', type: 'ANPR', brand: 'Axis', protocol: 'HTTP', status: 'online', lastSeen: '1 sec ago', ip: '192.168.1.92' },
+    59→]
+    60→
+    61→const commandQueue = [
+    62→  { id: 'CMD-4521', device: 'DISP-001', command: 'Authorize Nozzle', priority: 'high', status: 'executing', retries: 0, maxRetries: 3, queuedAt: '10:32:15 AM', timeout: '30s' },
+    63→  { id: 'CMD-4520', device: 'ATG-002', command: 'Read Tank Level', priority: 'medium', status: 'queued', retries: 0, maxRetries: 2, queuedAt: '10:32:12 AM', timeout: '15s' },
+    64→  { id: 'CMD-4519', device: 'POS-001', command: 'Settle Transaction', priority: 'high', status: 'completed', retries: 0, maxRetries: 3, queuedAt: '10:31:58 AM', timeout: '45s' },
+    65→  { id: 'CMD-4518', device: 'DISP-007', command: 'Reset Pump', priority: 'critical', status: 'retrying', retries: 2, maxRetries: 5, queuedAt: '10:31:40 AM', timeout: '60s' },
+    66→  { id: 'CMD-4517', device: 'PB-001', command: 'Update Price Display', priority: 'low', status: 'queued', retries: 0, maxRetries: 2, queuedAt: '10:31:30 AM', timeout: '20s' },
+    67→  { id: 'CMD-4516', device: 'RFID-004', command: 'Ping Reader', priority: 'medium', status: 'failed', retries: 3, maxRetries: 3, queuedAt: '10:31:15 AM', timeout: '10s' },
+    68→  { id: 'CMD-4515', device: 'FC-001', command: 'Sync Pump Status', priority: 'high', status: 'completed', retries: 0, maxRetries: 2, queuedAt: '10:31:00 AM', timeout: '15s' },
+    69→  { id: 'CMD-4514', device: 'DISP-004', command: 'Lock Nozzle 2', priority: 'medium', status: 'completed', retries: 1, maxRetries: 3, queuedAt: '10:30:45 AM', timeout: '20s' },
+    70→]
+    71→
+    72→const eventLog = [
+    73→  { time: '10:32:18 AM', device: 'DISP-001', event: 'Authorization sent', level: 'info' },
+    74→  { time: '10:32:15 AM', device: 'DISP-003', event: 'Fueling completed — 42.5L Diesel', level: 'success' },
+    75→  { time: '10:32:10 AM', device: 'POS-003', event: 'Connection timeout — retrying', level: 'warning' },
+    76→  { time: '10:31:58 AM', device: 'ATG-001', event: 'Tank level reading: 12,450L', level: 'info' },
+    77→  { time: '10:31:40 AM', device: 'DISP-007', event: 'Communication failure — 3 retries', level: 'error' },
+    78→  { time: '10:31:30 AM', device: 'PB-001', event: 'Price update queued', level: 'info' },
+    79→  { time: '10:31:15 AM', device: 'RFID-004', event: 'Reader offline — all retries exhausted', level: 'error' },
+    80→  { time: '10:31:00 AM', device: 'FC-001', event: 'Controller heartbeat OK', level: 'success' },
+    81→  { time: '10:30:45 AM', device: 'DISP-004', event: 'Slow response — 8.2s latency', level: 'warning' },
+    82→  { time: '10:30:30 AM', device: 'ANPR-001', event: 'License plate detected: LEA-4521', level: 'info' },
+    83→  { time: '10:30:15 AM', device: 'DISP-002', event: 'Fueling started — Petrol 92', level: 'info' },
+    84→  { time: '10:30:00 AM', device: 'ATG-004', event: 'Low stock warning: 2,100L remaining', level: 'warning' },
+    85→]
+    86→
+    87→const hardwareCatalog = [
+    88→  { brand: 'Gilbarco', models: ['Encore 700S', 'Encore 500', 'Skypass', 'CRIND'], protocol: 'IFSF', region: 'Global', supported: true },
+    89→  { brand: 'Wayne', models: ['Helix', 'iX', 'Quantum', 'Ovation'], protocol: 'PARIUS / IFSF', region: 'Global', supported: true },
+    90→  { brand: 'Tatsuno', models: ['TNC-5220', 'TNC-5230', 'MCC-501'], protocol: 'IFSF', region: 'Asia-Pacific', supported: true },
+    91→  { brand: 'Tokheim', models: ['Quantem', 'System 4', 'TQC'], protocol: 'DFS / IFSF', region: 'Europe / MENA', supported: true },
+    92→  { brand: 'Bennett', models: ['Series 3000', 'Series 5000'], protocol: 'PARIUS', region: 'Americas', supported: true },
+    93→  { brand: 'Petrotec', models: ['iLine', 'iCut', 'EuroLine'], protocol: 'DFS', region: 'Europe', supported: true },
+    94→  { brand: 'Scheidt & Bachmann', models: ['S&B POS', 'Multi-Dispenser'], protocol: 'IFSF', region: 'Europe', supported: true },
+    95→]
+    96→
+    97→const commProtocols = [
+    98→  { name: 'IFSF', fullName: 'International Forecourt Standards Forum', type: 'Application', transport: 'TCP/IP', version: 'v3.23', usage: 'Primary dispenser communication', status: 'active', devices: 14 },
+    99→  { name: 'PARIUS', fullName: 'Wayne/Dresser Proprietary Protocol', type: 'Application', transport: 'TCP/IP + RS232', version: 'v2.1', usage: 'Wayne dispenser communication', status: 'active', devices: 3 },
+   100→  { name: 'DFS', fullName: 'Dispenser Forecourt System', type: 'Application', transport: 'TCP/IP', version: 'v1.8', usage: 'Tokheim/Petrotec communication', status: 'active', devices: 2 },
+   101→  { name: 'TLS-350', fullName: 'Veeder-Root ATG Protocol', type: 'Device', transport: 'RS232 / TCP/IP', version: 'v4.0', usage: 'ATG tank gauge communication', status: 'active', devices: 4 },
+   102→  { name: 'ISO 8583', fullName: 'Financial Transaction Card Originated Messages', type: 'Financial', transport: 'TCP/IP (SSL)', version: 'v2003', usage: 'Payment terminal processing', status: 'active', devices: 6 },
+   103→  { name: 'OCPP', fullName: 'Open Charge Point Protocol', type: 'EV Charging', transport: 'WebSocket / MQTT', version: 'v2.0.1', usage: 'EV charger communication', status: 'active', devices: 2 },
+   104→  { name: 'MQTT', fullName: 'Message Queuing Telemetry Transport', type: 'IoT Messaging', transport: 'TCP/IP', version: 'v5.0', usage: 'IoT sensor data & events', status: 'active', devices: 5 },
+   105→  { name: 'Wiegand', fullName: 'Wiegand Interface Protocol', type: 'Access Control', transport: 'RS485', version: 'v1.0', usage: 'RFID reader communication', status: 'active', devices: 4 },
+   106→]
+   107→
+   108→const forecourtControllers = [
+   109→  {
+   110→    id: 'FC-001',
+   111→    name: 'Forecourt Controller A',
+   112→    brand: 'DOMS',
+   113→    model: 'FCC-5000',
+   114→    ip: '192.168.1.10',
+   115→    port: 5000,
+   116→    protocol: 'IFSF',
+   117→    status: 'online',
+   118→    uptime: '14d 7h 32m',
+   119→    connectedPumps: 6,
+   120→    totalPumps: 6,
+   121→    cpuUsage: 23,
+   122→    memUsage: 45,
+   123→    lastHeartbeat: '2 sec ago',
+   124→    firmware: '4.2.1',
+   125→    serialNumber: 'DOMS-FCC5K-00192',
+   126→  },
+   127→  {
+   128→    id: 'FC-002',
+   129→    name: 'Forecourt Controller B',
+   130→    brand: 'Wayne',
+   131→    model: 'iX Controller',
+   132→    ip: '192.168.1.11',
+   133→    port: 5001,
+   134→    protocol: 'PARIUS',
+   135→    status: 'online',
+   136→    uptime: '7d 3h 15m',
+   137→    connectedPumps: 2,
+   138→    totalPumps: 2,
+   139→    cpuUsage: 18,
+   140→    memUsage: 38,
+   141→    lastHeartbeat: '1 sec ago',
+   142→    firmware: '3.1.0',
+   143→    serialNumber: 'WNE-IXC-00451',
+   144→  },
+   145→]
+   146→
+   147→// ── Helpers ──────────────────────────────────────
+   148→
+   149→const STATUS_MAP: Record<string, { dot: string; text: string }> = {
+   150→  online: { dot: 'macos-status-online', text: 'text-emerald-600 dark:text-emerald-400' },
+   151→  warning: { dot: 'macos-status-warning', text: 'text-amber-600 dark:text-amber-400' },
+   152→  offline: { dot: 'macos-status-offline', text: 'text-muted-foreground' },
+   153→  error: { dot: 'macos-status-error', text: 'text-red-600 dark:text-red-400' },
+   154→}
+   155→
+   156→const PRIORITY_MAP: Record<string, string> = {
+   157→  critical: 'bg-red-500/10 text-red-600 border-red-500/20',
+   158→  high: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+   159→  medium: 'bg-sky-500/10 text-sky-600 border-sky-500/20',
+   160→  low: 'bg-slate-500/10 text-slate-500 border-slate-500/20',
+   161→}
+   162→
+   163→const CMD_STATUS_MAP: Record<string, { icon: React.ElementType; color: string }> = {
+   164→  executing: { icon: Play, color: 'text-amber-500' },
+   165→  queued: { icon: Clock, color: 'text-sky-500' },
+   166→  completed: { icon: CheckCircle2, color: 'text-emerald-500' },
+   167→  retrying: { icon: RotateCcw, color: 'text-amber-500' },
+   168→  failed: { icon: XCircle, color: 'text-red-500' },
+   169→}
+   170→
+   171→const EVENT_LEVEL_MAP: Record<string, string> = {
+   172→  info: 'text-muted-foreground',
+   173→  success: 'text-emerald-600 dark:text-emerald-400',
+   174→  warning: 'text-amber-600 dark:text-amber-400',
+   175→  error: 'text-red-600 dark:text-red-400',
+   176→}
+   177→
+   178→// ── Component ──────────────────────────────────────
+   179→
+   180→export default function DeviceIntegrationModule() {
+   181→  const [activeTab, setActiveTab] = useState('overview')
+   182→  const [searchQuery, setSearchQuery] = useState('')
+   183→  const [typeFilter, setTypeFilter] = useState('all')
+   184→
+   185→  const filteredDevices = connectedDevices.filter(d => {
+   186→    const matchesSearch = !searchQuery ||
+   187→      d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+   188→      d.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+   189→      d.brand.toLowerCase().includes(searchQuery.toLowerCase())
+   190→    const matchesType = typeFilter === 'all' || d.type === typeFilter
+   191→    return matchesSearch && matchesType
+   192→  })
+   193→
+   194→  return (
+   195→    <div className="space-y-4">
+   196→      <Tabs value={activeTab} onValueChange={setActiveTab}>
+   197→        <div className="overflow-x-auto pb-1">
+   198→          <TabsList className="h-8 w-max gap-0.5 bg-muted/50">
+   199→            <TabsTrigger value="overview" className="text-[11px] px-3 h-6 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">Overview</TabsTrigger>
+   200→            <TabsTrigger value="devices" className="text-[11px] px-3 h-6 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">Connected Devices</TabsTrigger>
+   201→            <TabsTrigger value="controllers" className="text-[11px] px-3 h-6 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">Controllers</TabsTrigger>
+   202→            <TabsTrigger value="commands" className="text-[11px] px-3 h-6 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">Command Queue</TabsTrigger>
+   203→            <TabsTrigger value="events" className="text-[11px] px-3 h-6 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">Event Log</TabsTrigger>
+   204→            <TabsTrigger value="catalog" className="text-[11px] px-3 h-6 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">Hardware Catalog</TabsTrigger>
+   205→            <TabsTrigger value="protocols" className="text-[11px] px-3 h-6 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-600">Protocols</TabsTrigger>
+   206→          </TabsList>
+   207→        </div>
+   208→
+   209→        {/* ── Overview ── */}
+   210→        <TabsContent value="overview" className="mt-4 space-y-4">
+   211→          {/* Device Type Cards */}
+   212→          <div>
+   213→            <div className="macos-section-header">Device Categories</div>
+   214→            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-1">
+   215→              {deviceTypes.map((dt, i) => (
+   216→                <motion.div
+   217→                  key={dt.type}
+   218→                  initial={{ opacity: 0, y: 8 }}
+   219→                  animate={{ opacity: 1, y: 0 }}
+   220→                  transition={{ delay: i * 0.04 }}
+   221→                  className="macos-card p-4 cursor-pointer"
+   222→                  onClick={() => { setTypeFilter(dt.type === 'Dispensers' ? 'Dispenser' : dt.type === 'ATG Systems' ? 'ATG' : dt.type === 'Payment Terminals' ? 'Payment' : dt.type === 'Forecourt Controllers' ? 'Controller' : dt.type === 'Price Boards' ? 'Price Board' : dt.type === 'RFID Readers' ? 'RFID' : dt.type === 'ANPR Cameras' ? 'ANPR' : 'Other'); setActiveTab('devices') }}
+   223→                >
+   224→                  <div className="flex items-start justify-between">
+   225→                    <div className="size-9 rounded-[10px] flex items-center justify-center" style={{ backgroundColor: `${dt.color}15` }}>
+   226→                      <dt.icon className="size-4" style={{ color: dt.color }} />
+   227→                    </div>
+   228→                    <div className="flex items-center gap-1.5">
+   229→                      <div className={`macos-status-dot ${dt.online === dt.count ? 'macos-status-online' : 'macos-status-warning'}`} />
+   230→                      <span className="text-[11px] text-muted-foreground">{dt.online}/{dt.count}</span>
+   231→                    </div>
+   232→                  </div>
+   233→                  <div className="mt-3">
+   234→                    <p className="text-[13px] font-semibold">{dt.type}</p>
+   235→                    <p className="text-[11px] text-muted-foreground">{dt.count} devices registered</p>
+   236→                  </div>
+   237→                </motion.div>
+   238→              ))}
+   239→            </div>
+   240→          </div>
+   241→
+   242→          {/* Quick Stats */}
+   243→          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   244→            {[
+   245→              { label: 'Total Devices', value: '30', icon: HardDrive, accent: '#e8930c' },
+   246→              { label: 'Online', value: '26', icon: Wifi, accent: '#34c759' },
+   247→              { label: 'Warnings', value: '3', icon: AlertTriangle, accent: '#ff9f0a' },
+   248→              { label: 'Offline', value: '1', icon: WifiOff, accent: '#ff3b30' },
+   249→            ].map((stat) => (
+   250→              <div key={stat.label} className="macos-card p-4">
+   251→                <div className="flex items-center justify-between">
+   252→                  <div>
+   253→                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">{stat.label}</p>
+   254→                    <p className="text-2xl font-bold mt-0.5" style={{ color: stat.accent }}>{stat.value}</p>
+   255→                  </div>
+   256→                  <div className="size-9 rounded-[10px] flex items-center justify-center" style={{ backgroundColor: `${stat.accent}12` }}>
+   257→                    <stat.icon className="size-4" style={{ color: stat.accent }} />
+   258→                  </div>
+   259→                </div>
+   260→              </div>
+   261→            ))}
+   262→          </div>
+   263→
+   264→          {/* Recent Events */}
+   265→          <div>
+   266→            <div className="macos-section-header">Recent Events</div>
+   267→            <div className="macos-group mt-1">
+   268→              {eventLog.slice(0, 5).map((ev, i) => (
+   269→                <div key={i} className="macos-group-item flex items-center gap-3">
+   270→                  <div className={`macos-status-dot ${ev.level === 'error' ? 'macos-status-error' : ev.level === 'warning' ? 'macos-status-warning' : ev.level === 'success' ? 'macos-status-online' : 'macos-status-offline'}`} />
+   271→                  <div className="flex-1 min-w-0">
+   272→                    <div className="flex items-center gap-2">
+   273→                      <span className="text-[13px] font-medium">{ev.device}</span>
+   274→                      <span className={`text-[11px] ${EVENT_LEVEL_MAP[ev.level]}`}>{ev.event}</span>
+   275→                    </div>
+   276→                  </div>
+   277→                  <span className="text-[11px] text-muted-foreground whitespace-nowrap font-mono">{ev.time}</span>
+   278→                  <ChevronRight className="size-3 text-muted-foreground/50" />
+   279→                </div>
+   280→              ))}
+   281→            </div>
+   282→          </div>
+   283→        </TabsContent>
+   284→
+   285→        {/* ── Connected Devices ── */}
+   286→        <TabsContent value="devices" className="mt-4 space-y-3">
+   287→          <div className="flex items-center gap-3">
+   288→            <div className="relative flex-1 max-w-xs">
+   289→              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+   290→              <input
+   291→                className="macos-search pl-8 py-1.5 text-[12px]"
+   292→                placeholder="Search devices..."
+   293→                value={searchQuery}
+   294→                onChange={e => setSearchQuery(e.target.value)}
+   295→              />
+   296→            </div>
+   297→            <div className="flex items-center gap-1.5 flex-wrap">
+   298→              {['all', 'Dispenser', 'ATG', 'Payment', 'Controller', 'RFID', 'ANPR'].map(t => (
+   299→                <button
+   300→                  key={t}
+   301→                  onClick={() => setTypeFilter(t)}
+   302→                  className={`text-[11px] px-2.5 py-1 rounded-md font-medium transition-colors ${
+   303→                    typeFilter === t
+   304→                      ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+   305→                      : 'text-muted-foreground hover:bg-black/[0.03] dark:hover:bg-white/[0.04]'
+   306→                  }`}
+   307→                >
+   308→                  {t === 'all' ? 'All' : t}
+   309→                </button>
+   310→              ))}
+   311→            </div>
+   312→          </div>
+   313→
+   314→          <div className="macos-card overflow-hidden">
+   315→            <div className="max-h-[480px] overflow-y-auto">
+   316→              <table className="macos-table">
+   317→                <thead>
+   318→                  <tr>
+   319→                    <th>Device ID</th>
+   320→                    <th>Name</th>
+   321→                    <th>Type</th>
+   322→                    <th>Brand</th>
+   323→                    <th>Protocol</th>
+   324→                    <th>Status</th>
+   325→                    <th>Last Seen</th>
+   326→                    <th>IP</th>
+   327→                  </tr>
+   328→                </thead>
+   329→                <tbody>
+   330→                  {filteredDevices.map(d => {
+   331→                    const st = STATUS_MAP[d.status] || STATUS_MAP.offline
+   332→                    return (
+   333→                      <tr key={d.id}>
+   334→                        <td className="font-mono text-[12px] text-amber-600 dark:text-amber-400">{d.id}</td>
+   335→                        <td className="font-medium text-[13px]">{d.name}</td>
+   336→                        <td><Badge variant="outline" className="text-[10px] px-1.5 py-0 font-medium">{d.type}</Badge></td>
+   337→                        <td className="text-[13px]">{d.brand}</td>
+   338→                        <td className="text-[12px] font-mono text-muted-foreground">{d.protocol}</td>
+   339→                        <td>
+   340→                          <div className="flex items-center gap-1.5">
+   341→                            <div className={`macos-status-dot ${st.dot}`} />
+   342→                            <span className={`text-[11px] font-medium capitalize ${st.text}`}>{d.status}</span>
+   343→                          </div>
+   344→                        </td>
+   345→                        <td className="text-[12px] text-muted-foreground whitespace-nowrap">{d.lastSeen}</td>
+   346→                        <td className="text-[12px] font-mono text-muted-foreground">{d.ip}</td>
+   347→                      </tr>
+   348→                    )
+   349→                  })}
+   350→                  {filteredDevices.length === 0 && (
+   351→                    <tr>
+   352→                      <td colSpan={8} className="text-center text-[13px] text-muted-foreground py-8">No devices match your filters</td>
+   353→                    </tr>
+   354→                  )}
+   355→                </tbody>
+   356→              </table>
+   357→            </div>
+   358→          </div>
+   359→          <p className="text-[11px] text-muted-foreground">{filteredDevices.length} of {connectedDevices.length} devices shown</p>
+   360→        </TabsContent>
+   361→
+   362→        {/* ── Forecourt Controllers ── */}
+   363→        <TabsContent value="controllers" className="mt-4 space-y-4">
+   364→          <div className="macos-section-header">Forecourt Controllers</div>
+   365→          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+   366→            {forecourtControllers.map(fc => (
+   367→              <motion.div
+   368→                key={fc.id}
+   369→                initial={{ opacity: 0, y: 8 }}
+   370→                animate={{ opacity: 1, y: 0 }}
+   371→                className="macos-card p-5 space-y-4"
+   372→              >
+   373→                <div className="flex items-start justify-between">
+   374→                  <div className="flex items-center gap-3">
+   375→                    <div className="size-10 rounded-[10px] bg-amber-500/10 flex items-center justify-center">
+   376→                      <Server className="size-5 text-amber-500" />
+   377→                    </div>
+   378→                    <div>
+   379→                      <h3 className="text-[13px] font-semibold">{fc.name}</h3>
+   380→                      <p className="text-[11px] text-muted-foreground">{fc.brand} {fc.model}</p>
+   381→                    </div>
+   382→                  </div>
+   383→                  <div className="flex items-center gap-1.5">
+   384→                    <div className="macos-status-dot macos-status-online" />
+   385→                    <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">Online</span>
+   386→                  </div>
+   387→                </div>
+   388→
+   389→                <div className="grid grid-cols-2 gap-3">
+   390→                  <div className="macos-group">
+   391→                    <div className="macos-group-item">
+   392→                      <div className="flex items-center justify-between">
+   393→                        <span className="text-[11px] text-muted-foreground">IP Address</span>
+   394→                        <span className="text-[13px] font-mono">{fc.ip}:{fc.port}</span>
+   395→                      </div>
+   396→                    </div>
+   397→                    <div className="macos-group-item">
+   398→                      <div className="flex items-center justify-between">
+   399→                        <span className="text-[11px] text-muted-foreground">Protocol</span>
+   400→                        <span className="text-[13px]">{fc.protocol}</span>
+   401→                      </div>
+   402→                    </div>
+   403→                    <div className="macos-group-item">
+   404→                      <div className="flex items-center justify-between">
+   405→                        <span className="text-[11px] text-muted-foreground">Firmware</span>
+   406→                        <span className="text-[13px] font-mono">v{fc.firmware}</span>
+   407→                      </div>
+   408→                    </div>
+   409→                    <div className="macos-group-item">
+   410→                      <div className="flex items-center justify-between">
+   411→                        <span className="text-[11px] text-muted-foreground">Serial</span>
+   412→                        <span className="text-[12px] font-mono">{fc.serialNumber}</span>
+   413→                      </div>
+   414→                    </div>
+   415→                  </div>
+   416→
+   417→                  <div className="macos-group">
+   418→                    <div className="macos-group-item">
+   419→                      <div className="flex items-center justify-between">
+   420→                        <span className="text-[11px] text-muted-foreground">Uptime</span>
+   421→                        <span className="text-[13px]">{fc.uptime}</span>
+   422→                      </div>
+   423→                    </div>
+   424→                    <div className="macos-group-item">
+   425→                      <div className="flex items-center justify-between">
+   426→                        <span className="text-[11px] text-muted-foreground">Pumps</span>
+   427→                        <span className="text-[13px]">{fc.connectedPumps}/{fc.totalPumps}</span>
+   428→                      </div>
+   429→                    </div>
+   430→                    <div className="macos-group-item">
+   431→                      <div className="flex items-center justify-between">
+   432→                        <span className="text-[11px] text-muted-foreground">CPU</span>
+   433→                        <div className="flex items-center gap-2">
+   434→                          <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+   435→                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${fc.cpuUsage}%` }} />
+   436→                          </div>
+   437→                          <span className="text-[12px]">{fc.cpuUsage}%</span>
+   438→                        </div>
+   439→                      </div>
+   440→                    </div>
+   441→                    <div className="macos-group-item">
+   442→                      <div className="flex items-center justify-between">
+   443→                        <span className="text-[11px] text-muted-foreground">Memory</span>
+   444→                        <div className="flex items-center gap-2">
+   445→                          <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+   446→                            <div className="h-full bg-amber-500 rounded-full" style={{ width: `${fc.memUsage}%` }} />
+   447→                          </div>
+   448→                          <span className="text-[12px]">{fc.memUsage}%</span>
+   449→                        </div>
+   450→                      </div>
+   451→                    </div>
+   452→                  </div>
+   453→                </div>
+   454→
+   455→                <div className="flex items-center justify-between pt-1">
+   456→                  <span className="text-[11px] text-muted-foreground">Last heartbeat: {fc.lastHeartbeat}</span>
+   457→                  <div className="flex gap-2">
+   458→                    <button className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+   459→                      <RefreshCw className="size-3" /> Restart
+   460→                    </button>
+   461→                    <button className="macos-btn text-[11px] px-2.5 py-1 flex items-center gap-1">
+   462→                      <Activity className="size-3" /> Diagnostics
+   463→                    </button>
+   464→                  </div>
+   465→                </div>
+   466→              </motion.div>
+   467→            ))}
+   468→          </div>
+   469→        </TabsContent>
+   470→
+   471→        {/* ── Command Queue ── */}
+   472→        <TabsContent value="commands" className="mt-4 space-y-3">
+   473→          <div className="flex items-center justify-between">
+   474→            <div className="macos-section-header">Device Command Queue</div>
+   475→            <div className="flex gap-2">
+   476→              <button className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+   477→                <Square className="size-3" /> Clear Completed
+   478→              </button>
+   479→              <button className="macos-btn text-[11px] px-2.5 py-1 flex items-center gap-1">
+   480→                <Command className="size-3" /> New Command
+   481→              </button>
+   482→            </div>
+   483→          </div>
+   484→          <div className="macos-card overflow-hidden">
+   485→            <div className="max-h-[420px] overflow-y-auto">
+   486→              <table className="macos-table">
+   487→                <thead>
+   488→                  <tr>
+   489→                    <th>Command ID</th>
+   490→                    <th>Device</th>
+   491→                    <th>Command</th>
+   492→                    <th>Priority</th>
+   493→                    <th>Status</th>
+   494→                    <th>Retries</th>
+   495→                    <th>Queued At</th>
+   496→                    <th>Timeout</th>
+   497→                  </tr>
+   498→                </thead>
+   499→                <tbody>
+   500→                  {commandQueue.map(cmd => {
+   501→                    const st = CMD_STATUS_MAP[cmd.status]
+   502→                    const StatusIcon = st?.icon || Clock
+   503→                    return (
+   504→                      <tr key={cmd.id}>
+   505→                        <td className="font-mono text-[12px] text-amber-600 dark:text-amber-400">{cmd.id}</td>
+   506→                        <td className="font-mono text-[12px]">{cmd.device}</td>
+   507→                        <td className="text-[13px] font-medium">{cmd.command}</td>
+   508→                        <td>
+   509→                          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-semibold capitalize ${PRIORITY_MAP[cmd.priority]}`}>
+   510→                            {cmd.priority}
+   511→                          </Badge>
+   512→                        </td>
+   513→                        <td>
+   514→                          <div className="flex items-center gap-1.5">
+   515→                            <StatusIcon className={`size-3.5 ${st?.color}`} />
+   516→                            <span className="text-[12px] capitalize">{cmd.status}</span>
+   517→                          </div>
+   518→                        </td>
+   519→                        <td className="text-[12px]">
+   520→                          <span className={cmd.retries > 0 ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-muted-foreground'}>
+   521→                            {cmd.retries}/{cmd.maxRetries}
+   522→                          </span>
+   523→                        </td>
+   524→                        <td className="text-[12px] text-muted-foreground font-mono">{cmd.queuedAt}</td>
+   525→                        <td className="text-[12px] text-muted-foreground">{cmd.timeout}</td>
+   526→                      </tr>
+   527→                    )
+   528→                  })}
+   529→                </tbody>
+   530→              </table>
+   531→            </div>
+   532→          </div>
+   533→        </TabsContent>
+   534→
+   535→        {/* ── Event Log ── */}
+   536→        <TabsContent value="events" className="mt-4 space-y-3">
+   537→          <div className="macos-section-header">Recent Device Events</div>
+   538→          <div className="macos-group">
+   539→            {eventLog.map((ev, i) => (
+   540→              <motion.div
+   541→                key={i}
+   542→                initial={{ opacity: 0, x: -4 }}
+   543→                animate={{ opacity: 1, x: 0 }}
+   544→                transition={{ delay: i * 0.03 }}
+   545→                className="macos-group-item flex items-center gap-3"
+   546→              >
+   547→                <div className={`macos-status-dot ${
+   548→                  ev.level === 'error' ? 'macos-status-error' :
+   549→                  ev.level === 'warning' ? 'macos-status-warning' :
+   550→                  ev.level === 'success' ? 'macos-status-online' : 'macos-status-offline'
+   551→                }`} />
+   552→                <div className="flex-1 min-w-0">
+   553→                  <div className="flex items-center gap-2">
+   554→                    <span className="text-[12px] font-mono font-medium text-amber-600 dark:text-amber-400">{ev.device}</span>
+   555→                    <span className={`text-[13px] ${EVENT_LEVEL_MAP[ev.level]}`}>{ev.event}</span>
+   556→                  </div>
+   557→                </div>
+   558→                <span className="text-[11px] text-muted-foreground font-mono whitespace-nowrap">{ev.time}</span>
+   559→              </motion.div>
+   560→            ))}
+   561→          </div>
+   562→        </TabsContent>
+   563→
+   564→        {/* ── Hardware Catalog ── */}
+   565→        <TabsContent value="catalog" className="mt-4 space-y-3">
+   566→          <div className="macos-section-header">Supported Dispenser Brands</div>
+   567→          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+   568→            {hardwareCatalog.map((brand, i) => (
+   569→              <motion.div
+   570→                key={brand.brand}
+   571→                initial={{ opacity: 0, y: 8 }}
+   572→                animate={{ opacity: 1, y: 0 }}
+   573→                transition={{ delay: i * 0.05 }}
+   574→                className="macos-card p-4"
+   575→              >
+   576→                <div className="flex items-start justify-between mb-3">
+   577→                  <div className="flex items-center gap-2.5">
+   578→                    <div className="size-9 rounded-[10px] bg-amber-500/10 flex items-center justify-center">
+   579→                      <Fuel className="size-4 text-amber-500" />
+   580→                    </div>
+   581→                    <div>
+   582→                      <h3 className="text-[13px] font-semibold">{brand.brand}</h3>
+   583→                      <p className="text-[11px] text-muted-foreground">{brand.region}</p>
+   584→                    </div>
+   585→                  </div>
+   586→                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
+   587→                    Supported
+   588→                  </Badge>
+   589→                </div>
+   590→                <div className="space-y-2">
+   591→                  <div className="flex items-center justify-between text-[12px]">
+   592→                    <span className="text-muted-foreground">Models</span>
+   593→                    <span className="font-medium">{brand.models.join(', ')}</span>
+   594→                  </div>
+   595→                  <div className="flex items-center justify-between text-[12px]">
+   596→                    <span className="text-muted-foreground">Protocol</span>
+   597→                    <span className="font-mono text-amber-600 dark:text-amber-400">{brand.protocol}</span>
+   598→                  </div>
+   599→                </div>
+   600→              </motion.div>
+   601→            ))}
+   602→          </div>
+   603→        </TabsContent>
+   604→
+   605→        {/* ── Communication Protocols ── */}
+   606→        <TabsContent value="protocols" className="mt-4 space-y-3">
+   607→          <div className="macos-section-header">Communication Protocols</div>
+   608→          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+   609→            {commProtocols.map((proto, i) => (
+   610→              <motion.div
+   611→                key={proto.name}
+   612→                initial={{ opacity: 0, y: 8 }}
+   613→                animate={{ opacity: 1, y: 0 }}
+   614→                transition={{ delay: i * 0.04 }}
+   615→                className="macos-card p-4"
+   616→              >
+   617→                <div className="flex items-start justify-between mb-2">
+   618→                  <div className="flex items-center gap-2.5">
+   619→                    <div className="size-9 rounded-[10px] bg-amber-500/10 flex items-center justify-center">
+   620→                      <Cable className="size-4 text-amber-500" />
+   621→                    </div>
+   622→                    <div>
+   623→                      <h3 className="text-[13px] font-semibold">{proto.name}</h3>
+   624→                      <p className="text-[11px] text-muted-foreground">{proto.fullName}</p>
+   625→                    </div>
+   626→                  </div>
+   627→                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
+   628→                    Active
+   629→                  </Badge>
+   630→                </div>
+   631→                <div className="macos-group mt-2">
+   632→                  <div className="macos-group-item">
+   633→                    <div className="flex justify-between text-[12px]">
+   634→                      <span className="text-muted-foreground">Type</span>
+   635→                      <span className="font-medium">{proto.type}</span>
+   636→                    </div>
+   637→                  </div>
+   638→                  <div className="macos-group-item">
+   639→                    <div className="flex justify-between text-[12px]">
+   640→                      <span className="text-muted-foreground">Transport</span>
+   641→                      <span className="font-mono">{proto.transport}</span>
+   642→                    </div>
+   643→                  </div>
+   644→                  <div className="macos-group-item">
+   645→                    <div className="flex justify-between text-[12px]">
+   646→                      <span className="text-muted-foreground">Version</span>
+   647→                      <span className="font-mono">{proto.version}</span>
+   648→                    </div>
+   649→                  </div>
+   650→                  <div className="macos-group-item">
+   651→                    <div className="flex justify-between text-[12px]">
+   652→                      <span className="text-muted-foreground">Connected Devices</span>
+   653→                      <span className="font-semibold text-amber-600 dark:text-amber-400">{proto.devices}</span>
+   654→                    </div>
+   655→                  </div>
+   656→                  <div className="macos-group-item">
+   657→                    <div className="flex justify-between text-[12px]">
+   658→                      <span className="text-muted-foreground">Usage</span>
+   659→                      <span>{proto.usage}</span>
+   660→                    </div>
+   661→                  </div>
+   662→                </div>
+   663→              </motion.div>
+   664→            ))}
+   665→          </div>
+   666→        </TabsContent>
+   667→      </Tabs>
+   668→    </div>
+   669→  )
+   670→}
+   671→

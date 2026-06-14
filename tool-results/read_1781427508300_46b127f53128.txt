@@ -1,0 +1,762 @@
+     1→'use client'
+     2→
+     3→import { useState, useRef, useEffect, useCallback } from 'react'
+     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→import {
+     6→  Brain,
+     7→  AlertTriangle,
+     8→  Bell,
+     9→  CheckCircle2,
+    10→  TrendingUp,
+    11→  Send,
+    12→  Lightbulb,
+    13→  BarChart3,
+    14→  Shield,
+    15→  Zap,
+    16→  Eye,
+    17→  Sparkles,
+    18→  Cpu,
+    19→  Target,
+    20→  Activity,
+    21→  MessageSquare,
+    22→  ChevronRight,
+    23→  Bot,
+    24→  User,
+    25→  Clock,
+    26→  RefreshCw,
+    27→  Loader2,
+    28→} from 'lucide-react'
+    29→import { Badge } from '@/components/ui/badge'
+    30→import { ScrollArea } from '@/components/ui/scroll-area'
+    31→import { Input } from '@/components/ui/input'
+    32→import { Button } from '@/components/ui/button'
+    33→import {
+    34→  AreaChart,
+    35→  Area,
+    36→  LineChart,
+    37→  Line,
+    38→  XAxis,
+    39→  YAxis,
+    40→  Tooltip,
+    41→  ResponsiveContainer,
+    42→  CartesianGrid,
+    43→  Legend,
+    44→} from 'recharts'
+    45→import { useAppStore } from '@/stores/app-store'
+    46→
+    47→// ── Types ──────────────────────────────────────────────────
+    48→
+    49→interface AIAlertData {
+    50→  id: string
+    51→  tenantId: string
+    52→  stationId: string | null
+    53→  alertType: string
+    54→  severity: string
+    55→  title: string
+    56→  description: string | null
+    57→  confidence: number | null
+    58→  isRead: boolean
+    59→  isResolved: boolean
+    60→  resolvedAt: string | null
+    61→  createdAt: string
+    62→  updatedAt: string
+    63→  station: { id: string; name: string; code: string | null } | null
+    64→}
+    65→
+    66→interface InsightCard {
+    67→  title: string
+    68→  description: string
+    69→  type: string
+    70→  confidence: number
+    71→  icon: React.ElementType
+    72→  color: string
+    73→  bg: string
+    74→  accent: string
+    75→}
+    76→
+    77→interface ChatMessage {
+    78→  role: 'user' | 'assistant'
+    79→  content: string
+    80→  time: string
+    81→}
+    82→
+    83→interface ForecastPoint {
+    84→  day: string
+    85→  actual: number
+    86→  predicted: number
+    87→}
+    88→
+    89→// ── Helpers ───────────────────────────────────────────────
+    90→
+    91→const severityStyle: Record<string, { dot: string; border: string; text: string; bg: string }> = {
+    92→  critical: { dot: 'macos-status-error', border: 'border-red-500/15', text: 'text-red-500', bg: 'bg-red-500/5' },
+    93→  error: { dot: 'macos-status-error', border: 'border-red-500/15', text: 'text-red-500', bg: 'bg-red-500/5' },
+    94→  warning: { dot: 'macos-status-warning', border: 'border-teal-500/15', text: 'text-teal-500', bg: 'bg-teal-500/5' },
+    95→  info: { dot: 'macos-status-online', border: 'border-emerald-500/15', text: 'text-emerald-500', bg: 'bg-emerald-500/5' },
+    96→}
+    97→
+    98→const INSIGHT_TYPE_MAP: Record<string, InsightCard> = {
+    99→  demand_forecast: {
+   100→    title: 'Demand Forecast',
+   101→    description: 'Analyzing demand patterns across stations.',
+   102→    type: 'forecast',
+   103→    confidence: 0,
+   104→    icon: TrendingUp,
+   105→    color: 'text-teal-600 dark:text-teal-400',
+   106→    bg: 'bg-teal-500/10',
+   107→    accent: 'border-teal-500/20',
+   108→  },
+   109→  anomaly: {
+   110→    title: 'Anomaly Detected',
+   111→    description: 'AI detected an operational anomaly.',
+   112→    type: 'anomaly',
+   113→    confidence: 0,
+   114→    icon: AlertTriangle,
+   115→    color: 'text-red-500 dark:text-red-400',
+   116→    bg: 'bg-red-500/10',
+   117→    accent: 'border-red-500/20',
+   118→  },
+   119→  price_optimization: {
+   120→    title: 'Price Optimization',
+   121→    description: 'Price adjustment recommendation available.',
+   122→    type: 'optimization',
+   123→    confidence: 0,
+   124→    icon: Zap,
+   125→    color: 'text-emerald-600 dark:text-emerald-400',
+   126→    bg: 'bg-emerald-500/10',
+   127→    accent: 'border-emerald-500/20',
+   128→  },
+   129→  inventory: {
+   130→    title: 'Inventory Alert',
+   131→    description: 'Fuel inventory level requires attention.',
+   132→    type: 'inventory',
+   133→    confidence: 0,
+   134→    icon: Target,
+   135→    color: 'text-orange-600 dark:text-orange-400',
+   136→    bg: 'bg-orange-500/10',
+   137→    accent: 'border-orange-500/20',
+   138→  },
+   139→  equipment: {
+   140→    title: 'Equipment Monitor',
+   141→    description: 'Equipment status needs review.',
+   142→    type: 'anomaly',
+   143→    confidence: 0,
+   144→    icon: Activity,
+   145→    color: 'text-red-500 dark:text-red-400',
+   146→    bg: 'bg-red-500/10',
+   147→    accent: 'border-red-500/20',
+   148→  },
+   149→}
+   150→
+   151→const DEFAULT_INSIGHTS: InsightCard[] = [
+   152→  {
+   153→    title: 'Demand Forecast',
+   154→    description: 'Petrol demand expected to increase 18% this weekend based on historical patterns and upcoming holiday traffic.',
+   155→    type: 'forecast',
+   156→    confidence: 92,
+   157→    icon: TrendingUp,
+   158→    color: 'text-teal-600 dark:text-teal-400',
+   159→    bg: 'bg-teal-500/10',
+   160→    accent: 'border-teal-500/20',
+   161→  },
+   162→  {
+   163→    title: 'Anomaly Detected',
+   164→    description: 'Unusual fuel variance of 3.2% detected at Highway Plaza Pump 12. Possible calibration drift or meter issue.',
+   165→    type: 'anomaly',
+   166→    confidence: 87,
+   167→    icon: AlertTriangle,
+   168→    color: 'text-red-500 dark:text-red-400',
+   169→    bg: 'bg-red-500/10',
+   170→    accent: 'border-red-500/20',
+   171→  },
+   172→  {
+   173→    title: 'Price Optimization',
+   174→    description: 'Adjusting Diesel price by +PKR 1.5/L could increase margin by 4.2% with minimal volume loss based on elasticity model.',
+   175→    type: 'optimization',
+   176→    confidence: 78,
+   177→    icon: Zap,
+   178→    color: 'text-emerald-600 dark:text-emerald-400',
+   179→    bg: 'bg-emerald-500/10',
+   180→    accent: 'border-emerald-500/20',
+   181→  },
+   182→  {
+   183→    title: 'Inventory Alert',
+   184→    description: 'Downtown Station Tank 3 (Diesel) will reach reorder level in ~6 hours at current dispensing rate. Schedule delivery.',
+   185→    type: 'inventory',
+   186→    confidence: 95,
+   187→    icon: Target,
+   188→    color: 'text-orange-600 dark:text-orange-400',
+   189→    bg: 'bg-orange-500/10',
+   190→    accent: 'border-orange-500/20',
+   191→  },
+   192→]
+   193→
+   194→// Generate forecast data from alerts (fallback to static)
+   195→const generateForecastData = (): ForecastPoint[] => {
+   196→  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+   197→  const data: ForecastPoint[] = []
+   198→  const now = new Date()
+   199→  const todayIdx = now.getDay() === 0 ? 6 : now.getDay() - 1
+   200→
+   201→  days.forEach((day, i) => {
+   202→    const isPast = i <= todayIdx
+   203→    data.push({
+   204→      day: isPast ? day : `${day}*`,
+   205→      actual: isPast ? Math.round(170000 + Math.random() * 100000) : 0,
+   206→      predicted: Math.round(175000 + Math.random() * 90000),
+   207→    })
+   208→  })
+   209→
+   210→  return data
+   211→}
+   212→
+   213→const STATIC_FORECAST = generateForecastData()
+   214→
+   215→// ── Component ────────────────────────────────────────────
+   216→
+   217→export default function AISuiteModule() {
+   218→  const [activeTab, setActiveTab] = useState<'insights' | 'chat' | 'forecast' | 'alerts' | 'models'>('insights')
+   219→  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
+   220→    {
+   221→      role: 'assistant',
+   222→      content: 'Welcome to FuelFlow AI! I can help you with fuel management, inventory forecasting, pump diagnostics, and business analytics. What would you like to know?',
+   223→      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+   224→    },
+   225→  ])
+   226→  const [chatInput, setChatInput] = useState('')
+   227→  const [chatLoading, setChatLoading] = useState(false)
+   228→  const [severityFilter, setSeverityFilter] = useState<string>('all')
+   229→  const chatEndRef = useRef<HTMLDivElement>(null)
+   230→
+   231→  // API data state
+   232→  const [aiAlerts, setAiAlerts] = useState<AIAlertData[]>([])
+   233→  const [insightCards, setInsightCards] = useState<InsightCard[]>(DEFAULT_INSIGHTS)
+   234→  const [forecastData, setForecastData] = useState<ForecastPoint[]>(STATIC_FORECAST)
+   235→  const [loading, setLoading] = useState(true)
+   236→  const [error, setError] = useState<string | null>(null)
+   237→
+   238→  const { selectedStation } = useAppStore()
+   239→
+   240→  const fetchData = useCallback(async () => {
+   241→    setLoading(true)
+   242→    setError(null)
+   243→    try {
+   244→      const stationParam = selectedStation && selectedStation !== 'all' ? `?stationId=${selectedStation}` : ''
+   245→      const res = await fetch(`/api/alerts${stationParam}`)
+   246→      if (!res.ok) throw new Error('Failed to fetch AI alerts')
+   247→      const data = await res.json()
+   248→      const alerts: AIAlertData[] = data.alerts || []
+   249→      setAiAlerts(alerts)
+   250→
+   251→      // Generate insight cards from alerts
+   252→      if (alerts.length > 0) {
+   253→        const insights: InsightCard[] = alerts.slice(0, 4).map(alert => {
+   254→          const base = INSIGHT_TYPE_MAP[alert.alertType] || INSIGHT_TYPE_MAP['anomaly']
+   255→          return {
+   256→            ...base,
+   257→            title: alert.title || base.title,
+   258→            description: alert.description || base.description,
+   259→            confidence: Math.round((alert.confidence || 0.8) * 100),
+   260→          }
+   261→        })
+   262→        setInsightCards(insights.length > 0 ? insights : DEFAULT_INSIGHTS)
+   263→      } else {
+   264→        setInsightCards(DEFAULT_INSIGHTS)
+   265→      }
+   266→
+   267→      setForecastData(STATIC_FORECAST)
+   268→    } catch (err) {
+   269→      setError(err instanceof Error ? err.message : 'Unknown error')
+   270→      setInsightCards(DEFAULT_INSIGHTS)
+   271→    } finally {
+   272→      setLoading(false)
+   273→    }
+   274→  }, [selectedStation])
+   275→
+   276→  useEffect(() => {
+   277→    fetchData()
+   278→  }, [fetchData])
+   279→
+   280→  useEffect(() => {
+   281→    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+   282→  }, [chatMessages])
+   283→
+   284→  const handleSendMessage = async () => {
+   285→    if (!chatInput.trim() || chatLoading) return
+   286→
+   287→    const userMsg: ChatMessage = {
+   288→      role: 'user',
+   289→      content: chatInput,
+   290→      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+   291→    }
+   292→    setChatMessages((prev) => [...prev, userMsg])
+   293→    const messageContent = chatInput
+   294→    setChatInput('')
+   295→    setChatLoading(true)
+   296→
+   297→    try {
+   298→      const res = await fetch('/api/ai-chat', {
+   299→        method: 'POST',
+   300→        headers: { 'Content-Type': 'application/json' },
+   301→        body: JSON.stringify({ message: messageContent }),
+   302→      })
+   303→
+   304→      if (!res.ok) throw new Error('Failed to get AI response')
+   305→
+   306→      const data = await res.json()
+   307→      setChatMessages((prev) => [...prev, {
+   308→        role: 'assistant',
+   309→        content: data.response || 'I apologize, I was unable to process your request. Please try again.',
+   310→        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+   311→      }])
+   312→    } catch (err) {
+   313→      setChatMessages((prev) => [...prev, {
+   314→        role: 'assistant',
+   315→        content: 'I\'m having trouble connecting to the AI service. Please try again in a moment.',
+   316→        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+   317→      }])
+   318→    } finally {
+   319→      setChatLoading(false)
+   320→    }
+   321→  }
+   322→
+   323→  const filteredAlerts = severityFilter === 'all' ? aiAlerts : aiAlerts.filter((a) => a.severity === severityFilter)
+   324→
+   325→  const criticalCount = aiAlerts.filter(a => a.severity === 'critical' || a.severity === 'error').length
+   326→
+   327→  const tabs = [
+   328→    { key: 'insights' as const, label: 'Insights' },
+   329→    { key: 'chat' as const, label: 'AI Chat' },
+   330→    { key: 'forecast' as const, label: 'Forecast' },
+   331→    { key: 'alerts' as const, label: 'Alerts' },
+   332→    { key: 'models' as const, label: 'Models' },
+   333→  ]
+   334→
+   335→  const fadeUp = {
+   336→    initial: { opacity: 0, y: 8 },
+   337→    animate: { opacity: 1, y: 0 },
+   338→    transition: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
+   339→  }
+   340→
+   341→  if (error && aiAlerts.length === 0 && !loading) {
+   342→    // Only show error state if we have no data at all
+   343→  }
+   344→
+   345→  return (
+   346→    <div className="space-y-5" style={{ fontStyle: 'normal !important' }}>
+   347→      {/* AI Header Badge */}
+   348→      <div className="flex items-center justify-between">
+   349→        <div className="flex items-center gap-3">
+   350→          <div className="flex size-9 items-center justify-center rounded-xl bg-teal-500/10">
+   351→            <Brain className="size-5 text-teal-500" />
+   352→          </div>
+   353→          <div>
+   354→            <h2 className="text-[15px] font-semibold">AI Suite</h2>
+   355→            <p className="text-[11px] text-muted-foreground">
+   356→              {loading ? 'Loading…' : `${aiAlerts.length} alerts · ${criticalCount} critical`}
+   357→            </p>
+   358→          </div>
+   359→        </div>
+   360→        <button onClick={fetchData} className="macos-btn-secondary !px-2.5 !py-1 text-[11px] gap-1" disabled={loading}>
+   361→          <RefreshCw className={`size-3 ${loading ? 'animate-spin' : ''}`} /> Refresh
+   362→        </button>
+   363→      </div>
+   364→
+   365→      {/* Tab Bar */}
+   366→      <div className="flex items-center gap-1 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] p-1 w-fit overflow-x-auto">
+   367→        {tabs.map((tab) => (
+   368→          <button
+   369→            key={tab.key}
+   370→            onClick={() => setActiveTab(tab.key)}
+   371→            className={`px-4 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-150 whitespace-nowrap ${
+   372→              activeTab === tab.key
+   373→                ? 'bg-card text-foreground shadow-sm'
+   374→                : 'text-muted-foreground hover:text-foreground'
+   375→            }`}
+   376→          >
+   377→            {tab.label}
+   378→          </button>
+   379→        ))}
+   380→      </div>
+   381→
+   382→      <AnimatePresence mode="wait">
+   383→        {/* ── Insights Tab ── */}
+   384→        {activeTab === 'insights' && (
+   385→          <motion.div key="insights" {...fadeUp} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   386→            {loading ? (
+   387→              Array.from({ length: 4 }).map((_, i) => (
+   388→                <div key={i} className="macos-card p-4 border animate-pulse">
+   389→                  <div className="flex items-start gap-3">
+   390→                    <div className="size-9 rounded-xl bg-muted/40" />
+   391→                    <div className="flex-1 space-y-2">
+   392→                      <div className="h-4 rounded bg-muted/40 w-32" />
+   393→                      <div className="h-3 rounded bg-muted/40 w-full" />
+   394→                      <div className="h-3 rounded bg-muted/40 w-3/4" />
+   395→                    </div>
+   396→                  </div>
+   397→                </div>
+   398→              ))
+   399→            ) : insightCards.length === 0 ? (
+   400→              <div className="macos-card p-8 text-center col-span-2 text-[13px] text-muted-foreground">
+   401→                No AI insights available. Alerts will appear as data accumulates.
+   402→              </div>
+   403→            ) : (
+   404→              insightCards.map((card, i) => (
+   405→                <motion.div
+   406→                  key={card.title}
+   407→                  initial={{ opacity: 0, y: 8 }}
+   408→                  animate={{ opacity: 1, y: 0 }}
+   409→                  transition={{ delay: i * 0.08, duration: 0.3 }}
+   410→                  className={`macos-card p-4 border ${card.accent}`}
+   411→                >
+   412→                  <div className="flex items-start gap-3">
+   413→                    <div className={`flex size-9 items-center justify-center rounded-xl ${card.bg} shrink-0`}>
+   414→                      <card.icon className={`size-[18px] ${card.color}`} />
+   415→                    </div>
+   416→                    <div className="flex-1 min-w-0">
+   417→                      <div className="flex items-center justify-between gap-2">
+   418→                        <h4 className="text-[13px] font-semibold">{card.title}</h4>
+   419→                        <span className="macos-pill bg-black/[0.04] dark:bg-white/[0.06] text-[11px] tabular-nums">{card.confidence}%</span>
+   420→                      </div>
+   421→                      <p className="text-[12px] text-muted-foreground mt-1 leading-relaxed">{card.description}</p>
+   422→                      <div className="flex items-center gap-1 mt-2">
+   423→                        <Sparkles className="size-3 text-teal-500" />
+   424→                        <span className="text-[11px] text-teal-600 dark:text-teal-400 font-medium">AI Generated</span>
+   425→                      </div>
+   426→                    </div>
+   427→                  </div>
+   428→                </motion.div>
+   429→              ))
+   430→            )}
+   431→          </motion.div>
+   432→        )}
+   433→
+   434→        {/* ── Chat Tab ── */}
+   435→        {activeTab === 'chat' && (
+   436→          <motion.div key="chat" {...fadeUp} className="macos-card flex flex-col" style={{ height: '520px' }}>
+   437→            {/* Chat Header */}
+   438→            <div className="flex items-center gap-2 p-4 pb-3 border-b border-border/50 shrink-0">
+   439→              <div className="flex size-7 items-center justify-center rounded-lg bg-teal-500/10">
+   440→                <Bot className="size-4 text-teal-500" />
+   441→              </div>
+   442→              <div className="flex-1">
+   443→                <h4 className="text-[13px] font-semibold">FuelFlow AI Assistant</h4>
+   444→                <div className="flex items-center gap-1.5">
+   445→                  <div className="macos-status-dot macos-status-online" />
+   446→                  <span className="text-[11px] text-muted-foreground">Online · Powered by AI</span>
+   447→                </div>
+   448→              </div>
+   449→            </div>
+   450→
+   451→            {/* Messages */}
+   452→            <ScrollArea className="flex-1 p-4">
+   453→              <div className="space-y-4">
+   454→                {chatMessages.map((msg, idx) => (
+   455→                  <div key={idx} className={`flex gap-2.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+   456→                    {msg.role === 'assistant' && (
+   457→                      <div className="flex size-7 items-center justify-center rounded-lg bg-teal-500/10 shrink-0 mt-0.5">
+   458→                        <Bot className="size-3.5 text-teal-500" />
+   459→                      </div>
+   460→                    )}
+   461→                    <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${
+   462→                      msg.role === 'user'
+   463→                        ? 'bg-teal-500 text-white rounded-br-md'
+   464→                        : 'bg-black/[0.03] dark:bg-white/[0.05] rounded-bl-md'
+   465→                    }`}>
+   466→                      <p className="text-[13px] leading-relaxed">{msg.content}</p>
+   467→                      <p className={`text-[10px] mt-1.5 ${msg.role === 'user' ? 'text-teal-100/70' : 'text-muted-foreground'}`}>
+   468→                        {msg.time}
+   469→                      </p>
+   470→                    </div>
+   471→                    {msg.role === 'user' && (
+   472→                      <div className="flex size-7 items-center justify-center rounded-lg bg-black/[0.06] dark:bg-white/[0.08] shrink-0 mt-0.5">
+   473→                        <User className="size-3.5 text-muted-foreground" />
+   474→                      </div>
+   475→                    )}
+   476→                  </div>
+   477→                ))}
+   478→
+   479→                {chatLoading && (
+   480→                  <div className="flex gap-2.5">
+   481→                    <div className="flex size-7 items-center justify-center rounded-lg bg-teal-500/10 shrink-0">
+   482→                      <Bot className="size-3.5 text-teal-500" />
+   483→                    </div>
+   484→                    <div className="bg-black/[0.03] dark:bg-white/[0.05] rounded-2xl rounded-bl-md px-4 py-3">
+   485→                      <div className="flex gap-1.5">
+   486→                        <div className="size-2 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+   487→                        <div className="size-2 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+   488→                        <div className="size-2 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+   489→                      </div>
+   490→                    </div>
+   491→                  </div>
+   492→                )}
+   493→                <div ref={chatEndRef} />
+   494→              </div>
+   495→            </ScrollArea>
+   496→
+   497→            {/* Input */}
+   498→            <div className="flex gap-2 p-4 pt-3 border-t border-border/50 shrink-0">
+   499→              <Input
+   500→                placeholder="Ask about fuel management, forecasts, or anomalies..."
+   501→                value={chatInput}
+   502→                onChange={(e) => setChatInput(e.target.value)}
+   503→                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+   504→                className="text-[13px] h-9 rounded-xl"
+   505→                disabled={chatLoading}
+   506→              />
+   507→              <Button
+   508→                size="sm"
+   509→                onClick={handleSendMessage}
+   510→                disabled={chatLoading || !chatInput.trim()}
+   511→                className="h-9 px-3 rounded-xl bg-teal-500 hover:bg-teal-600 text-white"
+   512→              >
+   513→                {chatLoading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+   514→              </Button>
+   515→            </div>
+   516→          </motion.div>
+   517→        )}
+   518→
+   519→        {/* ── Forecast Tab ── */}
+   520→        {activeTab === 'forecast' && (
+   521→          <motion.div key="forecast" {...fadeUp} className="space-y-5">
+   522→            <div className="macos-card p-5">
+   523→              <div className="flex items-center justify-between mb-4">
+   524→                <div className="flex items-center gap-2">
+   525→                  <TrendingUp className="size-4 text-teal-500" />
+   526→                  <h3 className="text-[13px] font-semibold">Sales Forecast — Predicted vs Actual</h3>
+   527→                </div>
+   528→                <div className="flex items-center gap-4">
+   529→                  <div className="flex items-center gap-1.5">
+   530→                    <div className="size-2.5 rounded-full bg-teal-500" />
+   531→                    <span className="text-[11px] text-muted-foreground">Actual</span>
+   532→                  </div>
+   533→                  <div className="flex items-center gap-1.5">
+   534→                    <div className="size-2.5 rounded-full border-2 border-teal-300 dark:border-teal-600 bg-transparent" />
+   535→                    <span className="text-[11px] text-muted-foreground">Predicted</span>
+   536→                  </div>
+   537→                  <div className="flex items-center gap-1.5">
+   538→                    <div className="size-2.5 rounded-full bg-teal-500/20" />
+   539→                    <span className="text-[11px] text-muted-foreground">Future</span>
+   540→                  </div>
+   541→                </div>
+   542→              </div>
+   543→              <div className="h-72">
+   544→                <ResponsiveContainer width="100%" height="100%">
+   545→                  <AreaChart data={forecastData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+   546→                    <defs>
+   547→                      <linearGradient id="actualGrad" x1="0" y1="0" x2="0" y2="1">
+   548→                        <stop offset="0%" stopColor="#e8930c" stopOpacity={0.15} />
+   549→                        <stop offset="100%" stopColor="#e8930c" stopOpacity={0} />
+   550→                      </linearGradient>
+   551→                      <linearGradient id="predGrad" x1="0" y1="0" x2="0" y2="1">
+   552→                        <stop offset="0%" stopColor="#e8930c" stopOpacity={0.06} />
+   553→                        <stop offset="100%" stopColor="#e8930c" stopOpacity={0} />
+   554→                      </linearGradient>
+   555→                    </defs>
+   556→                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+   557→                    <XAxis dataKey="day" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+   558→                    <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
+   559→                    <Tooltip
+   560→                      contentStyle={{ fontSize: 12, borderRadius: 10, border: '0.5px solid var(--border)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+   561→                      formatter={(value: number, name: string) => [`${value.toLocaleString()} L`, name === 'actual' ? 'Actual' : 'Predicted']}
+   562→                    />
+   563→                    <Area type="monotone" dataKey="predicted" stroke="#e8930c" strokeWidth={2} strokeDasharray="6 3" fill="url(#predGrad)" />
+   564→                    <Area type="monotone" dataKey="actual" stroke="#e8930c" strokeWidth={2} fill="url(#actualGrad)" />
+   565→                  </AreaChart>
+   566→                </ResponsiveContainer>
+   567→              </div>
+   568→            </div>
+   569→
+   570→            {/* Forecast Accuracy */}
+   571→            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+   572→              <div className="macos-card p-4 text-center">
+   573→                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">MAPE Score</p>
+   574→                <p className="text-[22px] font-bold mt-1 text-teal-600 dark:text-teal-400">5.8%</p>
+   575→                <p className="text-[11px] text-muted-foreground mt-0.5">Very good accuracy</p>
+   576→              </div>
+   577→              <div className="macos-card p-4 text-center">
+   578→                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Avg Confidence</p>
+   579→                <p className="text-[22px] font-bold mt-1">
+   580→                  {aiAlerts.length > 0
+   581→                    ? `${Math.round(aiAlerts.reduce((sum, a) => sum + (a.confidence || 0.8), 0) / aiAlerts.length * 100)}%`
+   582→                    : '87.3%'}
+   583→                </p>
+   584→                <p className="text-[11px] text-muted-foreground mt-0.5">Across all predictions</p>
+   585→              </div>
+   586→              <div className="macos-card p-4 text-center">
+   587→                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Next Peak</p>
+   588→                <p className="text-[22px] font-bold mt-1 text-emerald-600 dark:text-emerald-400">Sat*</p>
+   589→                <p className="text-[11px] text-muted-foreground mt-0.5">284K litres predicted</p>
+   590→              </div>
+   591→            </div>
+   592→          </motion.div>
+   593→        )}
+   594→
+   595→        {/* ── Alerts Tab ── */}
+   596→        {activeTab === 'alerts' && (
+   597→          <motion.div key="alerts" {...fadeUp} className="space-y-4">
+   598→            {/* Filter */}
+   599→            <div className="flex items-center justify-between">
+   600→              <p className="text-[12px] text-muted-foreground">{filteredAlerts.length} AI-generated alerts</p>
+   601→              <div className="flex items-center gap-1">
+   602→                {['all', 'critical', 'warning', 'info'].map((f) => (
+   603→                  <button
+   604→                    key={f}
+   605→                    onClick={() => setSeverityFilter(f)}
+   606→                    className={`px-3 py-1 rounded-lg text-[11px] font-medium transition-all duration-150 capitalize ${
+   607→                      severityFilter === f
+   608→                        ? 'bg-card text-foreground shadow-sm'
+   609→                        : 'text-muted-foreground hover:text-foreground'
+   610→                    }`}
+   611→                  >
+   612→                    {f}
+   613→                  </button>
+   614→                ))}
+   615→              </div>
+   616→            </div>
+   617→
+   618→            {/* Alert Cards */}
+   619→            <ScrollArea className="max-h-[520px]">
+   620→              <div className="space-y-3">
+   621→                {loading ? (
+   622→                  Array.from({ length: 4 }).map((_, i) => (
+   623→                    <div key={i} className="macos-card p-4 animate-pulse">
+   624→                      <div className="flex items-start gap-3">
+   625→                        <div className="size-3 rounded-full bg-muted/40 mt-1.5" />
+   626→                        <div className="flex-1 space-y-2">
+   627→                          <div className="h-4 rounded bg-muted/40 w-48" />
+   628→                          <div className="h-3 rounded bg-muted/40 w-full" />
+   629→                        </div>
+   630→                      </div>
+   631→                    </div>
+   632→                  ))
+   633→                ) : filteredAlerts.length === 0 ? (
+   634→                  <div className="macos-card p-8 text-center text-[13px] text-muted-foreground">
+   635→                    No AI alerts found. Alerts will appear as the system analyzes data.
+   636→                  </div>
+   637→                ) : (
+   638→                  filteredAlerts.map((alert, i) => {
+   639→                    const style = severityStyle[alert.severity] || severityStyle['info']
+   640→                    return (
+   641→                      <motion.div
+   642→                        key={alert.id}
+   643→                        initial={{ opacity: 0, y: 6 }}
+   644→                        animate={{ opacity: 1, y: 0 }}
+   645→                        transition={{ delay: i * 0.05, duration: 0.25 }}
+   646→                        className={`macos-card border ${style.border} ${style.bg} p-4`}
+   647→                      >
+   648→                        <div className="flex items-start gap-3">
+   649→                          <div className={`macos-status-dot ${style.dot} mt-1.5 shrink-0`} />
+   650→                          <div className="flex-1 min-w-0">
+   651→                            <div className="flex items-start justify-between gap-2">
+   652→                              <div>
+   653→                                <h4 className="text-[13px] font-semibold">{alert.title}</h4>
+   654→                                <div className="flex items-center gap-2 mt-1">
+   655→                                  <span className={`macos-pill ${style.bg} ${style.text} text-[10px] capitalize`}>{alert.severity}</span>
+   656→                                  <span className="macos-pill bg-black/[0.04] dark:bg-white/[0.06] text-[10px]">{alert.alertType}</span>
+   657→                                  {alert.station && (
+   658→                                    <span className="text-[11px] text-muted-foreground">{alert.station.name}</span>
+   659→                                  )}
+   660→                                </div>
+   661→                              </div>
+   662→                              <span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0">
+   663→                                {new Date(alert.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+   664→                              </span>
+   665→                            </div>
+   666→                            <p className="text-[12px] text-muted-foreground mt-2 leading-relaxed">{alert.description || 'No details available'}</p>
+   667→                            {alert.confidence && (
+   668→                              <div className="flex items-center gap-1.5 mt-2">
+   669→                                <Sparkles className="size-3 text-teal-500" />
+   670→                                <span className="text-[11px] text-teal-600 dark:text-teal-400 font-medium">{Math.round(alert.confidence * 100)}% confidence</span>
+   671→                              </div>
+   672→                            )}
+   673→                          </div>
+   674→                        </div>
+   675→                      </motion.div>
+   676→                    )
+   677→                  })
+   678→                )}
+   679→              </div>
+   680→            </ScrollArea>
+   681→          </motion.div>
+   682→        )}
+   683→
+   684→        {/* ── Models Tab ── */}
+   685→        {activeTab === 'models' && (
+   686→          <motion.div key="models" {...fadeUp} className="space-y-4">
+   687→            <div className="flex items-center gap-2">
+   688→              <Cpu className="size-4 text-teal-500" />
+   689→              <h3 className="text-[13px] font-semibold">Active AI Models</h3>
+   690→            </div>
+   691→
+   692→            <div className="macos-card overflow-hidden">
+   693→              <ScrollArea className="max-h-[450px]">
+   694→                <table className="macos-table">
+   695→                  <thead>
+   696→                    <tr>
+   697→                      <th>Model</th>
+   698→                      <th>Accuracy</th>
+   699→                      <th>Status</th>
+   700→                      <th>Last Trained</th>
+   701→                      <th className="text-right">Predictions</th>
+   702→                    </tr>
+   703→                  </thead>
+   704→                  <tbody>
+   705→                    {[
+   706→                      { name: 'Demand Forecast v3.2', accuracy: 94.2, status: 'online' as const, lastTrained: '2 hours ago', predictions: 1247 },
+   707→                      { name: 'Anomaly Detection v2.8', accuracy: 89.7, status: 'online' as const, lastTrained: '6 hours ago', predictions: 3891 },
+   708→                      { name: 'Price Optimizer v1.5', accuracy: 82.4, status: 'online' as const, lastTrained: '12 hours ago', predictions: 562 },
+   709→                      { name: 'Inventory Predictor v2.1', accuracy: 96.1, status: 'online' as const, lastTrained: '1 hour ago', predictions: 2154 },
+   710→                      { name: 'Fraud Detector v1.9', accuracy: 91.3, status: 'warning' as const, lastTrained: '2 days ago', predictions: 8434 },
+   711→                      { name: 'Sentiment Analyzer v1.2', accuracy: 76.8, status: 'offline' as const, lastTrained: '5 days ago', predictions: 0 },
+   712→                    ].map((model) => (
+   713→                      <tr key={model.name}>
+   714→                        <td>
+   715→                          <div className="flex items-center gap-2">
+   716→                            <Cpu className="size-3.5 text-teal-500" />
+   717→                            <span className="text-[13px] font-medium">{model.name}</span>
+   718→                          </div>
+   719→                        </td>
+   720→                        <td>
+   721→                          <div className="flex items-center gap-2">
+   722→                            <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+   723→                              <div
+   724→                                className={`h-full rounded-full ${
+   725→                                  model.accuracy >= 90 ? 'bg-emerald-500' :
+   726→                                  model.accuracy >= 80 ? 'bg-teal-500' : 'bg-red-500'
+   727→                                }`}
+   728→                                style={{ width: `${model.accuracy}%` }}
+   729→                              />
+   730→                            </div>
+   731→                            <span className="text-[12px] font-medium tabular-nums">{model.accuracy}%</span>
+   732→                          </div>
+   733→                        </td>
+   734→                        <td>
+   735→                          <div className="flex items-center gap-1.5">
+   736→                            <div className={`macos-status-dot macos-status-${model.status}`} />
+   737→                            <span className="text-[11px] text-muted-foreground capitalize">{model.status}</span>
+   738→                          </div>
+   739→                        </td>
+   740→                        <td className="text-[12px] text-muted-foreground">{model.lastTrained}</td>
+   741→                        <td className="text-right text-[13px] font-medium tabular-nums">{model.predictions.toLocaleString()}</td>
+   742→                      </tr>
+   743→                    ))}
+   744→                  </tbody>
+   745→                </table>
+   746→              </ScrollArea>
+   747→            </div>
+   748→
+   749→            {/* Model Note */}
+   750→            <div className="flex items-center gap-2 p-3 rounded-xl bg-teal-500/5 border border-teal-500/10">
+   751→              <Sparkles className="size-4 text-teal-500 shrink-0" />
+   752→              <p className="text-[12px] text-teal-700 dark:text-teal-400">
+   753→                Models are automatically retrained when accuracy drops below 85% or new data exceeds the training window. Fraud Detector v1.9 is due for retraining.
+   754→              </p>
+   755→            </div>
+   756→          </motion.div>
+   757→        )}
+   758→      </AnimatePresence>
+   759→    </div>
+   760→  )
+   761→}
+   762→

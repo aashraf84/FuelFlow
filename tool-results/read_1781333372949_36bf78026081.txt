@@ -1,0 +1,557 @@
+   801→      await db.retailTransaction.create({
+   802→        data: {
+   803→          stationId: mainStation.id,
+   804→          shiftId: openShift.id,
+   805→          totalAmount,
+   806→          paymentMethod: Math.random() > 0.5 ? 'cash' : 'card',
+   807→          items,
+   808→          posTerminal: 'POS-01',
+   809→          discountAmount: Math.random() > 0.7 ? Math.floor(totalAmount * 0.05) : 0,
+   810→          status: 'completed',
+   811→        }
+   812→      })
+   813→    }
+   814→
+   815→    // =====================================================
+   816→    // 21. CAR WASH SESSIONS (4)
+   817→    // =====================================================
+   818→    const washTypes = ['basic', 'premium', 'deluxe']
+   819→    const washPrices: Record<string, number> = { basic: 500, premium: 1200, deluxe: 2500 }
+   820→    for (let i = 0; i < 4; i++) {
+   821→      const washType = washTypes[Math.floor(Math.random() * washTypes.length)]
+   822→      await db.carWashSession.create({
+   823→        data: {
+   824→          stationId: mainStation.id,
+   825→          shiftId: openShift.id,
+   826→          vehiclePlate: `ISB-${Math.floor(Math.random() * 900 + 100)}`,
+   827→          washType,
+   828→          amount: washPrices[washType],
+   829→          paymentMethod: Math.random() > 0.5 ? 'cash' : 'card',
+   830→          status: 'completed',
+   831→          startedAt: new Date(Date.now() - (i + 1) * 3600000),
+   832→          completedAt: new Date(Date.now() - (i + 1) * 3600000 + 1800000),
+   833→        }
+   834→      })
+   835→    }
+   836→
+   837→    // =====================================================
+   838→    // 22. LOTTERY SALES (3)
+   839→    // =====================================================
+   840→    const lotteryGames = ['scratch', 'draw', 'online']
+   841→    for (let i = 0; i < 3; i++) {
+   842→      const ticketCount = 1 + Math.floor(Math.random() * 5)
+   843→      const saleAmount = ticketCount * (100 + Math.floor(Math.random() * 200))
+   844→      await db.lotterySale.create({
+   845→        data: {
+   846→          stationId: mainStation.id,
+   847→          shiftId: openShift.id,
+   848→          gameType: lotteryGames[i],
+   849→          ticketCount,
+   850→          saleAmount,
+   851→          commission: Math.round(saleAmount * 0.05),
+   852→          status: 'completed',
+   853→        }
+   854→      })
+   855→    }
+   856→
+   857→    // =====================================================
+   858→    // 23. SUPPLIER INVOICES (3)
+   859→    // =====================================================
+   860→    await db.supplierInvoice.createMany({
+   861→      data: [
+   862→        { stationId: mainStation.id, supplierId: suppliers[0].id, invoiceNumber: 'INV-PSO-2025-001', invoiceDate: new Date(Date.now() - 5 * 86400000), dueDate: new Date(Date.now() + 25 * 86400000), totalAmount: 2500000, taxAmount: 450000, netAmount: 2950000, status: 'pending', paidAmount: 0, notes: 'Monthly fuel supply - March 2025' },
+   863→        { stationId: mainStation.id, supplierId: suppliers[1].id, invoiceNumber: 'INV-SHELL-2025-001', invoiceDate: new Date(Date.now() - 10 * 86400000), dueDate: new Date(Date.now() + 5 * 86400000), totalAmount: 1800000, taxAmount: 324000, netAmount: 2124000, status: 'approved', paidAmount: 0, notes: 'Diesel & HSD supply - Feb 2025' },
+   864→        { stationId: mainStation.id, supplierId: suppliers[2].id, invoiceNumber: 'INV-CASTROL-2025-001', invoiceDate: new Date(Date.now() - 15 * 86400000), dueDate: new Date(Date.now() - 1 * 86400000), totalAmount: 450000, taxAmount: 81000, netAmount: 531000, status: 'paid', paidAmount: 531000, paidDate: new Date(Date.now() - 3 * 86400000), notes: 'Lubricant stock replenishment' },
+   865→      ]
+   866→    })
+   867→
+   868→    // =====================================================
+   869→    // 24. PURCHASE ORDERS (2)
+   870→    // =====================================================
+   871→    await db.purchaseOrder.createMany({
+   872→      data: [
+   873→        { stationId: mainStation.id, supplierId: suppliers[3].id, poNumber: 'PO-2025-001', orderDate: new Date(Date.now() - 3 * 86400000), expectedDate: new Date(Date.now() + 4 * 86400000), items: JSON.stringify([{ name: 'Mineral Water 500ml', qty: 200, unitPrice: 56 }, { name: 'Energy Drink 250ml', qty: 100, unitPrice: 196 }]), totalAmount: 30800, status: 'submitted', notes: 'Urgent retail stock replenishment' },
+   874→        { stationId: mainStation.id, supplierId: suppliers[4].id, poNumber: 'PO-2025-002', orderDate: new Date(Date.now() - 7 * 86400000), expectedDate: new Date(Date.now() - 2 * 86400000), items: JSON.stringify([{ name: 'Pump Nozzle Calibration', qty: 16, unitPrice: 5000 }, { name: 'ATG Sensor Check', qty: 4, unitPrice: 3500 }]), totalAmount: 94000, status: 'received', approvedBy: users[1].id, notes: 'Quarterly maintenance service' },
+   875→      ]
+   876→    })
+   877→
+   878→    // =====================================================
+   879→    // 25. ATTENDANCE RECORDS (today)
+   880→    // =====================================================
+   881→    for (const emp of employees) {
+   882→      if (emp.role === 'maintenance') continue
+   883→      const checkInHour = emp.role === 'manager' ? 8 : 6 + Math.floor(Math.random() * 2)
+   884→      await db.attendance.create({
+   885→        data: {
+   886→          employeeId: emp.id,
+   887→          stationId: mainStation.id,
+   888→          checkIn: new Date(todayStart.getTime() + checkInHour * 3600000),
+   889→          checkOut: null,
+   890→          status: checkInHour > 7 ? 'late' : 'present',
+   891→          hoursWorked: null,
+   892→        }
+   893→      })
+   894→    }
+   895→
+   896→    // =====================================================
+   897→    // 26. PAYROLL RECORDS (current month - all employees)
+   898→    // =====================================================
+   899→    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+   900→    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+   901→    for (const emp of employees) {
+   902→      const overtimeHours = emp.role === 'attendant' ? Math.floor(Math.random() * 20) : Math.floor(Math.random() * 10)
+   903→      const overtimeRate = emp.salary / 200 // hourly rate approximation
+   904→      const overtimePay = Math.round(overtimeHours * overtimeRate)
+   905→      const commissions = emp.commissionRate ? Math.round(emp.salary * emp.commissionRate * 0.01 * (10 + Math.random() * 20)) : 0
+   906→      const deductions = Math.round(emp.salary * 0.02)
+   907→      const taxDeductions = Math.round(emp.salary * 0.1)
+   908→      const netPay = emp.salary + overtimePay + commissions - deductions - taxDeductions
+   909→      await db.payrollRecord.create({
+   910→        data: {
+   911→          stationId: mainStation.id,
+   912→          employeeId: emp.id,
+   913→          periodStart: currentMonthStart,
+   914→          periodEnd: currentMonthEnd,
+   915→          baseSalary: emp.salary,
+   916→          overtimeHours,
+   917→          overtimePay,
+   918→          commissions,
+   919→          deductions,
+   920→          taxDeductions,
+   921→          netPay,
+   922→          status: emp.role === 'manager' || emp.role === 'supervisor' ? 'approved' : 'pending',
+   923→        }
+   924→      })
+   925→    }
+   926→
+   927→    // Legacy payroll records for February
+   928→    await db.payrollRecord.create({
+   929→      data: {
+   930→        stationId: mainStation.id,
+   931→        employeeId: employees[0].id,
+   932→        periodStart: new Date('2025-02-01'),
+   933→        periodEnd: new Date('2025-02-28'),
+   934→        baseSalary: 85000,
+   935→        overtimeHours: 12,
+   936→        overtimePay: 6000,
+   937→        commissions: 0,
+   938→        deductions: 2000,
+   939→        taxDeductions: 8500,
+   940→        netPay: 80500,
+   941→        status: 'paid',
+   942→        paidDate: new Date('2025-03-01'),
+   943→      }
+   944→    })
+   945→    await db.payrollRecord.create({
+   946→      data: {
+   947→        stationId: mainStation.id,
+   948→        employeeId: employees[1].id,
+   949→        periodStart: new Date('2025-02-01'),
+   950→        periodEnd: new Date('2025-02-28'),
+   951→        baseSalary: 55000,
+   952→        overtimeHours: 8,
+   953→        overtimePay: 4000,
+   954→        commissions: 0,
+   955→        deductions: 1500,
+   956→        taxDeductions: 5500,
+   957→        netPay: 52000,
+   958→        status: 'paid',
+   959→        paidDate: new Date('2025-03-01'),
+   960→      }
+   961→    })
+   962→
+   963→    // =====================================================
+   964→    // 27. LEAVE REQUESTS (1 approved, 1 pending)
+   965→    // =====================================================
+   966→    await db.leaveRequest.create({
+   967→      data: {
+   968→        stationId: mainStation.id,
+   969→        employeeId: employees[2].id,
+   970→        leaveType: 'sick',
+   971→        startDate: new Date(Date.now() - 2 * 86400000),
+   972→        endDate: new Date(Date.now() - 1 * 86400000),
+   973→        reason: 'Medical appointment - flu symptoms',
+   974→        status: 'approved',
+   975→        approvedBy: users[1].id,
+   976→      }
+   977→    })
+   978→    await db.leaveRequest.create({
+   979→      data: {
+   980→        stationId: mainStation.id,
+   981→        employeeId: employees[5].id,
+   982→        leaveType: 'annual',
+   983→        startDate: new Date(Date.now() + 3 * 86400000),
+   984→        endDate: new Date(Date.now() + 5 * 86400000),
+   985→        reason: 'Family wedding in Lahore',
+   986→        status: 'pending',
+   987→      }
+   988→    })
+   989→
+   990→    // =====================================================
+   991→    // 28. AI ALERTS (6)
+   992→    // =====================================================
+   993→    const alertData = [
+   994→      { type: 'fuel_loss', severity: 'critical', title: 'Unusual Fuel Loss Detected - Tank B', desc: 'Variance of 142L detected in Tank B (Diesel) during shift reconciliation. This exceeds the 0.5% threshold.' },
+   995→      { type: 'theft', severity: 'critical', title: 'Potential Fuel Theft Alert - Pump 3', desc: 'Meter readings show discrepancy of 23L on Pump 3 Nozzle 1. Pattern matches known meter manipulation.' },
+   996→      { type: 'variance', severity: 'warning', title: 'Stock Variance - Tank A', desc: 'Tank A (Petrol) showing 0.3% variance over last 3 shifts. Recommend investigation.' },
+   997→      { type: 'maintenance', severity: 'warning', title: 'Pump 7 Calibration Due', desc: 'Pump 7 last calibrated 89 days ago. Recommended calibration interval is 90 days.' },
+   998→      { type: 'demand', severity: 'info', title: 'High Demand Forecast - Weekend', desc: 'AI predicts 35% increase in petrol demand this weekend based on historical patterns and local events.' },
+   999→      { type: 'leakage', severity: 'critical', title: 'Possible Tank Leak - Tank C', desc: 'Continuous level drop of 2.1L/hour detected in Tank C (Premium) with no corresponding sales.' },
+  1000→    ]
+  1001→
+  1002→    for (const a of alertData) {
+  1003→      await db.aIAlert.create({
+  1004→        data: {
+  1005→          tenantId: tenant.id,
+  1006→          stationId: mainStation.id,
+  1007→          alertType: a.type,
+  1008→          severity: a.severity,
+  1009→          title: a.title,
+  1010→          description: a.desc,
+  1011→          confidence: 0.75 + Math.random() * 0.2,
+  1012→          isRead: false,
+  1013→          isResolved: false,
+  1014→        }
+  1015→      })
+  1016→    }
+  1017→
+  1018→    // =====================================================
+  1019→    // 29. NOTIFICATIONS (6)
+  1020→    // =====================================================
+  1021→    const notificationData = [
+  1022→      { title: 'Shift 3 Opened', message: 'Shift #3 has been opened by Farhan Raza at 14:00', type: 'shift', priority: 'normal' },
+  1023→      { title: 'Fuel Delivery Arriving', message: 'Shell Pakistan HSD delivery expected tomorrow at 08:00', type: 'delivery', priority: 'high' },
+  1024→      { title: 'Tank B Low Alert', message: 'Tank B (Diesel) has dropped below 25% capacity', type: 'alert', priority: 'high' },
+  1025→      { title: 'Price Update Scheduled', message: 'Government fuel price revision effective from March 15, 2025', type: 'system', priority: 'normal' },
+  1026→      { title: 'Fleet Payment Due', message: 'Daewoo Express monthly invoice of PKR 1.2M due in 5 days', type: 'warning', priority: 'high' },
+  1027→      { title: 'Daily Report Ready', message: "Yesterday's daily report has been generated and is ready for review", type: 'info', priority: 'low' },
+  1028→    ]
+  1029→
+  1030→    for (const n of notificationData) {
+  1031→      await db.notification.create({
+  1032→        data: {
+  1033→          tenantId: tenant.id,
+  1034→          stationId: mainStation.id,
+  1035→          title: n.title,
+  1036→          message: n.message,
+  1037→          type: n.type,
+  1038→          priority: n.priority,
+  1039→          isRead: false,
+  1040→        }
+  1041→      })
+  1042→    }
+  1043→
+  1044→    // =====================================================
+  1045→    // 30. CUSTOMERS with loyalty data (10)
+  1046→    // =====================================================
+  1047→    const customerNames = [
+  1048→      'Asad Mahmood', 'Bushra Khan', 'Chaudhry Naveed', 'Dr. Saeed Ahmad', 'Erum Fatima',
+  1049→      'Ghulam Mustafa', 'Hina Shahid', 'Irfan-ul-Haq', 'Javeria Siddiqui', 'Khalid Mehmood'
+  1050→    ]
+  1051→
+  1052→    for (let i = 0; i < customerNames.length; i++) {
+  1053→      const tier = i < 2 ? 'platinum' : i < 5 ? 'gold' : i < 8 ? 'silver' : 'basic'
+  1054→      await db.customer.create({
+  1055→        data: {
+  1056→          tenantId: tenant.id,
+  1057→          name: customerNames[i],
+  1058→          phone: `+92-3${Math.floor(Math.random() * 10)}0-${Math.floor(Math.random() * 9000000 + 1000000)}`,
+  1059→          email: `${customerNames[i].toLowerCase().replace(/\s/g, '.')}@email.pk`,
+  1060→          loyaltyPoints: i < 2 ? 5000 + Math.floor(Math.random() * 5000) : 500 + Math.floor(Math.random() * 2000),
+  1061→          membershipTier: tier,
+  1062→          totalSpent: i < 2 ? 500000 + Math.floor(Math.random() * 500000) : 50000 + Math.floor(Math.random() * 200000),
+  1063→          totalVisits: 10 + Math.floor(Math.random() * 100),
+  1064→          lastVisit: new Date(Date.now() - Math.floor(Math.random() * 7) * 86400000),
+  1065→          isActive: true,
+  1066→        }
+  1067→      })
+  1068→    }
+  1069→
+  1070→    // =====================================================
+  1071→    // 31. LOYALTY RULES (2)
+  1072→    // =====================================================
+  1073→    await db.loyaltyRule.createMany({
+  1074→      data: [
+  1075→        { tenantId: tenant.id, name: 'Standard Fuel Points', pointsPerUnit: 1, fuelType: null, minimumPurchase: 500, bonusMultiplier: 1, isActive: true, validFrom: new Date('2025-01-01'), validTo: new Date('2025-12-31') },
+  1076→        { tenantId: tenant.id, name: 'Premium Double Points', pointsPerUnit: 2, fuelType: 'premium', minimumPurchase: 1000, bonusMultiplier: 2, isActive: true, validFrom: new Date('2025-03-01'), validTo: new Date('2025-04-30') },
+  1077→      ]
+  1078→    })
+  1079→
+  1080→    // =====================================================
+  1081→    // 32. PROMOTIONS with usage (2)
+  1082→    // =====================================================
+  1083→    const promo1 = await db.promotion.create({
+  1084→      data: {
+  1085→        tenantId: tenant.id,
+  1086→        name: 'Weekend Fuel Discount',
+  1087→        description: '5% off on all fuel types during weekends',
+  1088→        discountType: 'percentage',
+  1089→        discountValue: 5,
+  1090→        applicableTo: 'fuel',
+  1091→        fuelType: null,
+  1092→        minimumPurchase: 2000,
+  1093→        validFrom: new Date('2025-03-01'),
+  1094→        validTo: new Date('2025-03-31'),
+  1095→        isActive: true,
+  1096→      }
+  1097→    })
+  1098→
+  1099→    const promo2 = await db.promotion.create({
+  1100→      data: {
+  1101→        tenantId: tenant.id,
+  1102→        name: 'Car Wash Bundle',
+  1103→        description: 'Free basic car wash with 40L+ fuel purchase',
+  1104→        discountType: 'fixed',
+  1105→        discountValue: 500,
+  1106→        applicableTo: 'car_wash',
+  1107→        fuelType: null,
+  1108→        minimumPurchase: 10000,
+  1109→        validFrom: new Date('2025-03-01'),
+  1110→        validTo: new Date('2025-04-30'),
+  1111→        isActive: true,
+  1112→      }
+  1113→    })
+  1114→
+  1115→    // Promotion usage
+  1116→    await db.promotionUsage.createMany({
+  1117→      data: [
+  1118→        { stationId: mainStation.id, promotionId: promo1.id, customerName: 'Asad Mahmood', discountAmount: 750 },
+  1119→        { stationId: mainStation.id, promotionId: promo1.id, customerName: 'Bushra Khan', discountAmount: 520 },
+  1120→        { stationId: mainStation.id, promotionId: promo2.id, customerName: 'Chaudhry Naveed', discountAmount: 500 },
+  1121→      ]
+  1122→    })
+  1123→
+  1124→    // =====================================================
+  1125→    // 33. ENVIRONMENTAL ALERTS (3)
+  1126→    // =====================================================
+  1127→    await db.environmentalAlert.createMany({
+  1128→      data: [
+  1129→        { stationId: mainStation.id, alertType: 'vapor', severity: 'warning', tankId: tanks[1].id, description: 'Vapor recovery system showing elevated pressure readings on Tank B', epaCode: 'EPA-VRR-001', isReportable: false, isResolved: false },
+  1130→        { stationId: mainStation.id, alertType: 'water_intrusion', severity: 'warning', tankId: tanks[0].id, description: 'Water level in Tank A exceeding normal thresholds - 48mm detected', epaCode: 'EPA-WI-003', isReportable: false, isResolved: false },
+  1131→        { stationId: mainStation.id, alertType: 'overfill', severity: 'critical', tankId: tanks[2].id, description: 'Overfill alarm triggered during fuel delivery to Tank C', epaCode: 'EPA-OF-002', isReportable: true, isResolved: false, reportedToAgency: true },
+  1132→      ]
+  1133→    })
+  1134→
+  1135→    // =====================================================
+  1136→    // 34. VAPOR RECOVERY READINGS (2)
+  1137→    // =====================================================
+  1138→    await db.vaporRecoveryReading.createMany({
+  1139→      data: [
+  1140→        { stationId: mainStation.id, tankId: tanks[0].id, vaporPressure: 2.5, recoveryRate: 98.5, status: 'normal', readingAt: new Date(Date.now() - 3600000) },
+  1141→        { stationId: mainStation.id, tankId: tanks[1].id, vaporPressure: 4.8, recoveryRate: 92.1, status: 'warning', readingAt: new Date() },
+  1142→      ]
+  1143→    })
+  1144→
+  1145→    // =====================================================
+  1146→    // 35. DAILY REPORTS (last 7 days)
+  1147→    // =====================================================
+  1148→    for (let i = 1; i <= 7; i++) {
+  1149→      const reportDate = new Date(now)
+  1150→      reportDate.setDate(reportDate.getDate() - i)
+  1151→      reportDate.setHours(0, 0, 0, 0)
+  1152→
+  1153→      const fuelRevenue = 400000 + Math.floor(Math.random() * 300000)
+  1154→      const retailRevenue = 20000 + Math.floor(Math.random() * 30000)
+  1155→      const totalVolume = 1500 + Math.floor(Math.random() * 1500)
+  1156→      const expenses = 50000 + Math.floor(Math.random() * 40000)
+  1157→
+  1158→      await db.dailyReport.create({
+  1159→        data: {
+  1160→          stationId: mainStation.id,
+  1161→          reportDate,
+  1162→          totalRevenue: fuelRevenue + retailRevenue,
+  1163→          fuelRevenue,
+  1164→          retailRevenue,
+  1165→          totalVolume,
+  1166→          transactionCount: 50 + Math.floor(Math.random() * 40),
+  1167→          averageTicket: Math.round((fuelRevenue + retailRevenue) / (50 + Math.floor(Math.random() * 40))),
+  1168→          cashVariance: Math.round((Math.random() - 0.5) * 5000),
+  1169→          fuelVariance: Math.round((Math.random() - 0.5) * 200),
+  1170→          expenses,
+  1171→          netProfit: fuelRevenue + retailRevenue - expenses,
+  1172→        }
+  1173→      })
+  1174→    }
+  1175→
+  1176→    // =====================================================
+  1177→    // 36. AUDIT LOGS (20+)
+  1178→    // =====================================================
+  1179→    const auditActions = [
+  1180→      { action: 'LOGIN', entity: 'User', details: 'Superadmin logged in from 192.168.1.10' },
+  1181→      { action: 'CREATE', entity: 'Shift', details: 'Shift #3 opened by Ahmed Khan' },
+  1182→      { action: 'UPDATE', entity: 'FuelPrice', details: 'Petrol price updated from PKR 270.00 to PKR 272.50' },
+  1183→      { action: 'CREATE', entity: 'Fueling', details: 'Fueling transaction #001 created - 35L Petrol' },
+  1184→      { action: 'UPDATE', entity: 'Tank', details: 'Tank A level updated - current: 8,500L' },
+  1185→      { action: 'CREATE', entity: 'FuelDelivery', details: 'Fuel delivery scheduled from PSO - 10,000L Petrol' },
+  1186→      { action: 'APPROVE', entity: 'Reconciliation', details: 'Tank A reconciliation approved by Fatima Noor' },
+  1187→      { action: 'UPDATE', entity: 'Employee', details: 'Employee Bilal Hussain marked as present' },
+  1188→      { action: 'CREATE', entity: 'FleetAccount', details: 'New fleet account created - Pakistan Post Fleet' },
+  1189→      { action: 'UPDATE', entity: 'Dispenser', details: 'Pump 5 status changed to maintenance' },
+  1190→      { action: 'LOGIN', entity: 'User', details: 'Admin Fatima Noor logged in from 192.168.1.11' },
+  1191→      { action: 'CREATE', entity: 'CarWashSession', details: 'Deluxe car wash session started for plate LEA-4521' },
+  1192→      { action: 'UPDATE', entity: 'SupplierInvoice', details: 'Invoice INV-CASTROL-2025-001 marked as paid' },
+  1193→      { action: 'CREATE', entity: 'RetailTransaction', details: 'Retail sale of PKR 1,200 completed at POS-01' },
+  1194→      { action: 'UPDATE', entity: 'PriceBoard', details: 'Main Price Board updated with new fuel prices' },
+  1195→      { action: 'CREATE', entity: 'LeaveRequest', details: 'Tariq Mehmood requested annual leave for 3 days' },
+  1196→      { action: 'UPDATE', entity: 'MeterRecord', details: 'Meter record updated for Pump 1 Nozzle 1' },
+  1197→      { action: 'RESOLVE', entity: 'AIAlert', details: 'Fuel loss alert for Tank B acknowledged by Ahmed Khan' },
+  1198→      { action: 'CREATE', entity: 'PayrollRecord', details: 'Payroll processed for Ahmed Khan - PKR 80,500' },
+  1199→      { action: 'UPDATE', entity: 'Promotion', details: 'Weekend Fuel Discount promotion activated' },
+  1200→      { action: 'CREATE', entity: 'PurchaseOrder', details: 'PO-2025-001 created for Metro Wholesale' },
+  1201→    ]
+  1202→
+  1203→    for (let i = 0; i < auditActions.length; i++) {
+  1204→      const a = auditActions[i]
+  1205→      await db.auditLog.create({
+  1206→        data: {
+  1207→          userId: i < 10 ? users[0].id : users[1].id,
+  1208→          tenantId: tenant.id,
+  1209→          action: a.action,
+  1210→          entity: a.entity,
+  1211→          entityId: `seed-${i + 1}`,
+  1212→          details: a.details,
+  1213→          ipAddress: `192.168.1.${10 + (i % 5)}`,
+  1214→          userAgent: 'Mozilla/5.0 FuelFlow-OS/1.0',
+  1215→        }
+  1216→      })
+  1217→    }
+  1218→
+  1219→    // =====================================================
+  1220→    // 37. EV CHARGERS + CNG DISPENSERS
+  1221→    // =====================================================
+  1222→    await db.eVCharger.createMany({
+  1223→      data: [
+  1224→        { stationId: mainStation.id, name: 'EV Charger 1', code: 'EV-01', connectorType: 'type2', maxPowerKw: 22, status: 'available', isActive: true },
+  1225→        { stationId: mainStation.id, name: 'EV Charger 2', code: 'EV-02', connectorType: 'ccs', maxPowerKw: 50, status: 'charging', currentSession: 'active', isActive: true },
+  1226→        { stationId: mainStation.id, name: 'EV Charger 3', code: 'EV-03', connectorType: 'chademo', maxPowerKw: 50, status: 'available', isActive: true },
+  1227→      ]
+  1228→    })
+  1229→
+  1230→    // Charging sessions
+  1231→    const evChargers = await db.eVCharger.findMany({ where: { stationId: mainStation.id } })
+  1232→    if (evChargers.length >= 2) {
+  1233→      await db.chargingSession.create({
+  1234→        data: {
+  1235→          chargerId: evChargers[1].id,
+  1236→          stationId: mainStation.id,
+  1237→          vehiclePlate: 'ISB-EV-001',
+  1238→          energyKwh: 15.5,
+  1239→          durationMinutes: 45,
+  1240→          pricePerKwh: 35,
+  1241→          totalAmount: 542.5,
+  1242→          paymentMethod: 'card',
+  1243→          status: 'active',
+  1244→          startedAt: new Date(Date.now() - 2700000),
+  1245→        }
+  1246→      })
+  1247→    }
+  1248→
+  1249→    await db.cNGDispenser.createMany({
+  1250→      data: [
+  1251→        { stationId: mainStation.id, name: 'CNG Dispenser 1', code: 'CNG-01', pressure: 220, status: 'idle', isActive: true },
+  1252→        { stationId: mainStation.id, name: 'CNG Dispenser 2', code: 'CNG-02', pressure: 215, status: 'dispensing', isActive: true },
+  1253→      ]
+  1254→    })
+  1255→
+  1256→    // =====================================================
+  1257→    // 38. RFID READERS + ANPR CAMERAS
+  1258→    // =====================================================
+  1259→    await db.rFIDReader.createMany({
+  1260→      data: [
+  1261→        { stationId: mainStation.id, name: 'RFID Lane 1', code: 'RFID-01', readerType: 'vehicle', ipAddress: '192.168.1.200', port: 5000, status: 'online', isActive: true },
+  1262→        { stationId: mainStation.id, name: 'RFID Lane 2', code: 'RFID-02', readerType: 'driver', ipAddress: '192.168.1.201', port: 5001, status: 'online', isActive: true },
+  1263→      ]
+  1264→    })
+  1265→
+  1266→    await db.aNPRCamera.createMany({
+  1267→      data: [
+  1268→        { stationId: mainStation.id, name: 'Entry ANPR', code: 'ANPR-01', location: 'Entry Gate', ipAddress: '192.168.1.210', port: 6000, status: 'online', isActive: true },
+  1269→        { stationId: mainStation.id, name: 'Exit ANPR', code: 'ANPR-02', location: 'Exit Gate', ipAddress: '192.168.1.211', port: 6001, status: 'online', isActive: true },
+  1270→      ]
+  1271→    })
+  1272→
+  1273→    // =====================================================
+  1274→    // 39. FINANCIAL TRANSACTIONS (income + expenses)
+  1275→    // =====================================================
+  1276→    const today = new Date()
+  1277→    for (let i = 0; i < 15; i++) {
+  1278→      const isIncome = Math.random() > 0.3
+  1279→      await db.transaction.create({
+  1280→        data: {
+  1281→          stationId: mainStation.id,
+  1282→          tenantId: tenant.id,
+  1283→          type: isIncome ? 'income' : 'expense',
+  1284→          category: isIncome ? 'fuel_sale' : ['utilities', 'maintenance', 'salary', 'supplies'][Math.floor(Math.random() * 4)],
+  1285→          amount: isIncome ? 50000 + Math.floor(Math.random() * 200000) : 5000 + Math.floor(Math.random() * 30000),
+  1286→          paymentMethod: isIncome ? 'cash' : 'bank_transfer',
+  1287→          status: 'completed',
+  1288→          date: new Date(today.getTime() - Math.floor(Math.random() * 7) * 86400000),
+  1289→          description: isIncome ? 'Daily fuel sales collection' : 'Operational expense payment',
+  1290→          referenceNumber: `TXN-${String(i + 1).padStart(5, '0')}`,
+  1291→        }
+  1292→      })
+  1293→    }
+  1294→
+  1295→    // Additional expenses
+  1296→    const expenseCategories = ['utilities', 'maintenance', 'supplies', 'insurance']
+  1297→    for (let i = 0; i < 5; i++) {
+  1298→      await db.expense.create({
+  1299→        data: {
+  1300→          stationId: mainStation.id,
+  1301→          category: expenseCategories[Math.floor(Math.random() * expenseCategories.length)],
+  1302→          amount: 5000 + Math.floor(Math.random() * 50000),
+  1303→          description: `${expenseCategories[Math.floor(Math.random() * expenseCategories.length)]} expense - March 2025`,
+  1304→          vendor: ['WAPDA', 'SNGPL', 'TechServe', 'State Life', 'Local Supplier'][i],
+  1305→          receiptNumber: `RCT-${String(i + 1).padStart(4, '0')}`,
+  1306→          date: new Date(today.getTime() - Math.floor(Math.random() * 7) * 86400000),
+  1307→          approvedBy: users[1].id,
+  1308→          status: 'approved',
+  1309→        }
+  1310→      })
+  1311→    }
+  1312→
+  1313→    // =====================================================
+  1314→    // 40. MAINTENANCE RECORDS
+  1315→    // =====================================================
+  1316→    await db.maintenanceRecord.createMany({
+  1317→      data: [
+  1318→        { stationId: mainStation.id, equipmentType: 'dispenser', equipmentId: dispensers[4].id, nozzleId: allNozzles.find(n => n.dispenserId === dispensers[4].id)?.id || null, type: 'preventive', description: 'Quarterly pump calibration and inspection', technician: 'Kamran Siddiqui', cost: 15000, status: 'scheduled', scheduledDate: new Date(Date.now() + 2 * 86400000) },
+  1319→        { stationId: mainStation.id, equipmentType: 'tank', equipmentId: tanks[2].id, type: 'corrective', description: 'Overfill alarm sensor replacement for Tank C', technician: 'External - TechServe', cost: 25000, status: 'in_progress', scheduledDate: new Date() },
+  1320→      ]
+  1321→    })
+  1322→
+  1323→    return NextResponse.json({
+  1324→      success: true,
+  1325→      message: 'Database seeded successfully with comprehensive data',
+  1326→      summary: {
+  1327→        tenant: tenant.name,
+  1328→        stations: stations.length,
+  1329→        users: users.length,
+  1330→        employees: employees.length,
+  1331→        dispensers: dispensers.length,
+  1332→        nozzles: allNozzles.length,
+  1333→        tanks: tanks.length,
+  1334→        tankReadings: tanks.length * 24,
+  1335→        suppliers: suppliers.length,
+  1336→        deliveries: deliveries.length,
+  1337→        shifts: 3,
+  1338→        fuelingTransactions: '65+',
+  1339→        fleetAccounts: fleetAccounts.length,
+  1340→        vehicles: fleetAccounts.length * 3,
+  1341→        drivers: fleetAccounts.length * 3,
+  1342→        fuelCards: fleetAccounts.length * 5,
+  1343→        retailProducts: retailItems.length,
+  1344→        lubricantProducts: lubricantItems.length,
+  1345→        aiAlerts: alertData.length,
+  1346→        notifications: notificationData.length,
+  1347→        customers: customerNames.length,
+  1348→        auditLogs: auditActions.length,
+  1349→        dailyReports: 7,
+  1350→      }
+  1351→    })
+  1352→  } catch (error) {
+  1353→    console.error('Seed error:', error)
+  1354→    return NextResponse.json({ success: false, error: String(error) }, { status: 500 })
+  1355→  }
+  1356→}
+  1357→

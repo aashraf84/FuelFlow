@@ -1,0 +1,581 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useCallback } from 'react'
+     4→import { motion } from 'framer-motion'
+     5→import {
+     6→  Key, Webhook, Send, RefreshCw, CheckCircle2, XCircle,
+     7→  Clock, AlertTriangle, Zap, Globe, Activity, Hash,
+     8→  ArrowRightLeft, Copy, Plus, Trash2, Eye, Shield,
+     9→  TrendingUp, BarChart3, Loader2, AlertCircle,
+    10→} from 'lucide-react'
+    11→import { Badge } from '@/components/ui/badge'
+    12→import { Button } from '@/components/ui/button'
+    13→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    14→import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts'
+    15→
+    16→// ── Types ──────────────────────────────────────
+    17→
+    18→interface ApiKeyData {
+    19→  id: string
+    20→  keyPrefix: string
+    21→  name: string
+    22→  permissions: string | null
+    23→  allowedIPs: string | null
+    24→  rateLimit: number
+    25→  isActive: boolean
+    26→  expiresAt: string | null
+    27→  createdAt: string
+    28→  lastUsedAt: string | null
+    29→  usageCount: number
+    30→}
+    31→
+    32→interface WebhookEndpointData {
+    33→  id: string
+    34→  name: string
+    35→  url: string
+    36→  events: string[]
+    37→  isActive: boolean
+    38→  lastTriggeredAt: string | null
+    39→  successCount: number
+    40→  failureCount: number
+    41→  deliveryCount: number
+    42→  createdAt: string
+    43→}
+    44→
+    45→interface WebhookDeliveryData {
+    46→  id: string
+    47→  webhookId: string
+    48→  event: string
+    49→  payload: string | null
+    50→  statusCode: number | null
+    51→  isSuccess: boolean
+    52→  deliveredAt: string
+    53→  duration: number | null
+    54→  retryCount: number
+    55→}
+    56→
+    57→interface OverviewData {
+    58→  keys: { total: number; active: number }
+    59→  endpoints: { total: number; active: number }
+    60→  deliveries: { total: number; successful: number; failed: number }
+    61→}
+    62→
+    63→// ── Skeleton ──────────────────────────────────────
+    64→
+    65→function SkeletonTable({ rows = 5, cols = 6 }: { rows?: number; cols?: number }) {
+    66→  return (
+    67→    <>
+    68→      {Array.from({ length: rows }).map((_, i) => (
+    69→        <tr key={i}>
+    70→          {Array.from({ length: cols }).map((_, j) => (
+    71→            <td key={j} className="p-3">
+    72→              <div className="h-4 bg-muted/40 rounded animate-pulse" style={{ width: `${50 + Math.random() * 50}%` }} />
+    73→            </td>
+    74→          ))}
+    75→        </tr>
+    76→      ))}
+    77→    </>
+    78→  )
+    79→}
+    80→
+    81→function SkeletonCards({ count = 4 }: { count?: number }) {
+    82→  return (
+    83→    <>
+    84→      {Array.from({ length: count }).map((_, i) => (
+    85→        <div key={i} className="macos-card p-4 animate-pulse space-y-3">
+    86→          <div className="flex items-start justify-between">
+    87→            <div className="flex items-center gap-2.5">
+    88→              <div className="size-9 rounded-[10px] bg-muted/40" />
+    89→              <div className="space-y-1.5">
+    90→                <div className="h-3.5 bg-muted/40 rounded w-32" />
+    91→                <div className="h-3 bg-muted/30 rounded w-48" />
+    92→              </div>
+    93→            </div>
+    94→            <div className="size-4 bg-muted/30 rounded-full" />
+    95→          </div>
+    96→          <div className="grid grid-cols-3 gap-2">
+    97→            {Array.from({ length: 3 }).map((_, j) => (
+    98→              <div key={j} className="h-12 bg-muted/20 rounded-lg" />
+    99→            ))}
+   100→          </div>
+   101→        </div>
+   102→      ))}
+   103→    </>
+   104→  )
+   105→}
+   106→
+   107→function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => void }) {
+   108→  return (
+   109→    <div className="macos-card p-4 flex items-center gap-3 border border-red-500/20">
+   110→      <AlertCircle className="size-4 text-red-500 shrink-0" />
+   111→      <p className="text-[12px] text-red-600 dark:text-red-400 flex-1">{message}</p>
+   112→      <button onClick={onRetry} className="macos-btn-secondary text-[11px] px-2 py-0.5 flex items-center gap-1">
+   113→        <RefreshCw className="size-3" /> Retry
+   114→      </button>
+   115→    </div>
+   116→  )
+   117→}
+   118→
+   119→// ── Helpers ──────────────────────────────────────
+   120→
+   121→function getHttpStatusColor(code: number) {
+   122→  if (code >= 200 && code < 300) return 'text-emerald-600 dark:text-emerald-400'
+   123→  if (code >= 400 && code < 500) return 'text-teal-600 dark:text-teal-400'
+   124→  return 'text-red-600 dark:text-red-400'
+   125→}
+   126→
+   127→function timeAgo(dateStr: string | null): string {
+   128→  if (!dateStr) return 'Never'
+   129→  const diff = Date.now() - new Date(dateStr).getTime()
+   130→  const mins = Math.floor(diff / 60000)
+   131→  if (mins < 1) return 'Just now'
+   132→  if (mins < 60) return `${mins} min ago`
+   133→  const hrs = Math.floor(mins / 60)
+   134→  if (hrs < 24) return `${hrs} hr ago`
+   135→  const days = Math.floor(hrs / 24)
+   136→  return `${days} day${days > 1 ? 's' : ''} ago`
+   137→}
+   138→
+   139→// ── Component ──────────────────────────────────────
+   140→
+   141→export default function APIWebhooksModule() {
+   142→  const [activeTab, setActiveTab] = useState('api-keys')
+   143→  const [testingWebhook, setTestingWebhook] = useState<string | null>(null)
+   144→
+   145→  // Data states
+   146→  const [apiKeys, setApiKeys] = useState<ApiKeyData[]>([])
+   147→  const [endpoints, setEndpoints] = useState<WebhookEndpointData[]>([])
+   148→  const [deliveries, setDeliveries] = useState<WebhookDeliveryData[]>([])
+   149→  const [overview, setOverview] = useState<OverviewData | null>(null)
+   150→  const [loading, setLoading] = useState(true)
+   151→  const [error, setError] = useState<string | null>(null)
+   152→
+   153→  const fetchData = useCallback(async () => {
+   154→    setLoading(true)
+   155→    setError(null)
+   156→    try {
+   157→      const [keysRes, endpointsRes, deliveriesRes, overviewRes] = await Promise.all([
+   158→        fetch('/api/webhooks?type=keys'),
+   159→        fetch('/api/webhooks?type=endpoints'),
+   160→        fetch('/api/webhooks?type=deliveries'),
+   161→        fetch('/api/webhooks?type=overview'),
+   162→      ])
+   163→
+   164→      if (!keysRes.ok) throw new Error('Failed to load API data')
+   165→
+   166→      const [keysData, endpointsData, deliveriesData, overviewData] = await Promise.all([
+   167→        keysRes.json(),
+   168→        endpointsRes.json(),
+   169→        deliveriesRes.json(),
+   170→        overviewRes.json(),
+   171→      ])
+   172→
+   173→      setApiKeys((keysData.keys ?? []) as ApiKeyData[])
+   174→      setEndpoints((endpointsData.endpoints ?? []) as WebhookEndpointData[])
+   175→      setDeliveries((deliveriesData.deliveries ?? []) as WebhookDeliveryData[])
+   176→      setOverview((overviewData.overview ?? null) as OverviewData | null)
+   177→    } catch (err) {
+   178→      setError(err instanceof Error ? err.message : 'Unknown error')
+   179→    } finally {
+   180→      setLoading(false)
+   181→    }
+   182→  }, [])
+   183→
+   184→  useEffect(() => { fetchData() }, [fetchData])
+   185→
+   186→  const handleTest = async (id: string) => {
+   187→    setTestingWebhook(id)
+   188→    try {
+   189→      await fetch('/api/webhooks', {
+   190→        method: 'POST',
+   191→        headers: { 'Content-Type': 'application/json' },
+   192→        body: JSON.stringify({ action: 'test_endpoint', endpointId: id }),
+   193→      })
+   194→      // Refresh deliveries after test
+   195→      const res = await fetch('/api/webhooks?type=deliveries')
+   196→      if (res.ok) {
+   197→        const data = await res.json()
+   198→        setDeliveries((data.deliveries ?? []) as WebhookDeliveryData[])
+   199→      }
+   200→    } catch {
+   201→      // silent fail
+   202→    }
+   203→    setTimeout(() => setTestingWebhook(null), 1500)
+   204→  }
+   205→
+   206→  // Compute usage metrics from real data
+   207→  const usageMetricsData = deliveries.length > 0
+   208→    ? (() => {
+   209→        // Group deliveries by day
+   210→        const dayMap = new Map<string, { requests: number; errors: number }>()
+   211→        for (const d of deliveries) {
+   212→          const day = new Date(d.deliveredAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+   213→          const existing = dayMap.get(day) ?? { requests: 0, errors: 0 }
+   214→          existing.requests++
+   215→          if (!d.isSuccess) existing.errors++
+   216→          dayMap.set(day, existing)
+   217→        }
+   218→        return Array.from(dayMap.entries())
+   219→          .slice(-14)
+   220→          .map(([day, data]) => ({ day, ...data }))
+   221→      })()
+   222→    : []
+   223→
+   224→  // Compute endpoint usage from real deliveries
+   225→  const endpointUsageData = (() => {
+   226→    const endpointMap = new Map<string, number>()
+   227→    for (const d of deliveries) {
+   228→      const webhook = endpoints.find(e => e.id === d.webhookId)
+   229→      if (webhook) {
+   230→        const count = endpointMap.get(webhook.name) ?? 0
+   231→        endpointMap.set(webhook.name, count + 1)
+   232→      }
+   233→    }
+   234→    return Array.from(endpointMap.entries())
+   235→      .map(([endpoint, calls]) => ({ endpoint, calls, avgMs: 0 }))
+   236→      .sort((a, b) => b.calls - a.calls)
+   237→      .slice(0, 6)
+   238→  })()
+   239→
+   240→  // Stats from overview
+   241→  const totalRequests = overview?.deliveries?.total ?? 0
+   242→  const errorRate = overview?.deliveries?.total
+   243→    ? ((overview.deliveries.failed / overview.deliveries.total) * 100).toFixed(2)
+   244→    : '0.00'
+   245→  const avgLatency = deliveries.length > 0
+   246→    ? Math.round(deliveries.reduce((sum, d) => sum + (d.duration ?? 0), 0) / deliveries.length)
+   247→    : 0
+   248→
+   249→  if (error) return <ErrorBanner message={error} onRetry={fetchData} />
+   250→
+   251→  return (
+   252→    <div className="space-y-4" style={{ fontStyle: 'normal !important' }}>
+   253→      <Tabs value={activeTab} onValueChange={setActiveTab}>
+   254→        <div className="overflow-x-auto pb-1">
+   255→          <TabsList className="h-8 w-max gap-0.5 bg-muted/50">
+   256→            <TabsTrigger value="api-keys" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">API Keys</TabsTrigger>
+   257→            <TabsTrigger value="webhooks" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Webhooks</TabsTrigger>
+   258→            <TabsTrigger value="deliveries" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Deliveries</TabsTrigger>
+   259→            <TabsTrigger value="metrics" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Usage Metrics</TabsTrigger>
+   260→          </TabsList>
+   261→        </div>
+   262→
+   263→        {/* ── API Keys ── */}
+   264→        <TabsContent value="api-keys" className="mt-4 space-y-3">
+   265→          <div className="flex items-center justify-between">
+   266→            <div className="macos-section-header">API Keys</div>
+   267→            <button className="macos-btn text-[11px] px-2.5 py-1 flex items-center gap-1">
+   268→              <Plus className="size-3" /> Create Key
+   269→            </button>
+   270→          </div>
+   271→          <div className="macos-card overflow-hidden">
+   272→            <div className="max-h-[400px] overflow-y-auto">
+   273→              <table className="macos-table">
+   274→                <thead>
+   275→                  <tr>
+   276→                    <th>Key</th>
+   277→                    <th>Name</th>
+   278→                    <th>Permissions</th>
+   279→                    <th>Rate Limit</th>
+   280→                    <th>Last Used</th>
+   281→                    <th>Expires</th>
+   282→                    <th>Status</th>
+   283→                  </tr>
+   284→                </thead>
+   285→                <tbody>
+   286→                  {loading ? (
+   287→                    <SkeletonTable rows={4} cols={7} />
+   288→                  ) : apiKeys.length === 0 ? (
+   289→                    <tr><td colSpan={7} className="text-center py-8 text-[12px] text-muted-foreground">No API keys found. Create one to get started.</td></tr>
+   290→                  ) : (
+   291→                    apiKeys.map(key => (
+   292→                      <tr key={key.id}>
+   293→                        <td>
+   294→                          <div className="flex items-center gap-1.5">
+   295→                            <Key className="size-3 text-teal-500 shrink-0" />
+   296→                            <code className="text-[11px] font-mono font-medium text-teal-600 dark:text-teal-400">{key.keyPrefix}_****</code>
+   297→                            <button className="text-muted-foreground hover:text-foreground transition-colors" title="Copy">
+   298→                              <Copy className="size-2.5" />
+   299→                            </button>
+   300→                          </div>
+   301→                        </td>
+   302→                        <td className="text-[13px] font-medium">{key.name}</td>
+   303→                        <td>
+   304→                          <div className="flex gap-1">
+   305→                            {(key.permissions ?? '').split(',').filter(Boolean).map(p => (
+   306→                              <Badge key={p} variant="outline" className="text-[9px] px-1.5 py-0 capitalize bg-slate-500/10 text-slate-500 border-slate-500/20">
+   307→                                {p.trim()}
+   308→                              </Badge>
+   309→                            ))}
+   310→                          </div>
+   311→                        </td>
+   312→                        <td className="text-[12px] text-muted-foreground">{key.rateLimit}/hr</td>
+   313→                        <td className="text-[12px] text-muted-foreground whitespace-nowrap">{timeAgo(key.lastUsedAt)}</td>
+   314→                        <td className="text-[12px]">
+   315→                          {key.expiresAt ? (
+   316→                            <span className={new Date(key.expiresAt) < new Date() ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}>
+   317→                              {new Date(key.expiresAt).toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' })}
+   318→                            </span>
+   319→                          ) : (
+   320→                            <span className="text-muted-foreground">Never</span>
+   321→                          )}
+   322→                        </td>
+   323→                        <td>
+   324→                          <div className="flex items-center gap-1.5">
+   325→                            <div className={`macos-status-dot ${key.isActive ? 'macos-status-online' : (key.expiresAt && new Date(key.expiresAt) < new Date() ? 'macos-status-error' : 'macos-status-offline')}`} />
+   326→                            <span className={`text-[11px] font-medium ${key.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+   327→                              {key.isActive ? 'Active' : (key.expiresAt && new Date(key.expiresAt) < new Date() ? 'Expired' : 'Inactive')}
+   328→                            </span>
+   329→                          </div>
+   330→                        </td>
+   331→                      </tr>
+   332→                    ))
+   333→                  )}
+   334→                </tbody>
+   335→              </table>
+   336→            </div>
+   337→          </div>
+   338→        </TabsContent>
+   339→
+   340→        {/* ── Webhook Endpoints ── */}
+   341→        <TabsContent value="webhooks" className="mt-4 space-y-3">
+   342→          <div className="flex items-center justify-between">
+   343→            <div className="macos-section-header">Webhook Endpoints</div>
+   344→            <button className="macos-btn text-[11px] px-2.5 py-1 flex items-center gap-1">
+   345→              <Plus className="size-3" /> Add Endpoint
+   346→            </button>
+   347→          </div>
+   348→          {loading ? (
+   349→            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+   350→              <SkeletonCards count={4} />
+   351→            </div>
+   352→          ) : endpoints.length === 0 ? (
+   353→            <div className="macos-card p-8 text-center">
+   354→              <Webhook className="size-10 text-muted-foreground mx-auto mb-3" />
+   355→              <p className="text-[13px] text-muted-foreground">No webhook endpoints configured</p>
+   356→              <p className="text-[11px] text-muted-foreground mt-1">Add a webhook endpoint to receive real-time event notifications</p>
+   357→            </div>
+   358→          ) : (
+   359→            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+   360→              {endpoints.map((wh, i) => {
+   361→                const totalDeliveries = wh.successCount + wh.failureCount
+   362→                const successRate = totalDeliveries > 0 ? ((wh.successCount / totalDeliveries) * 100).toFixed(1) : '0'
+   363→                return (
+   364→                  <motion.div
+   365→                    key={wh.id}
+   366→                    initial={{ opacity: 0, y: 8 }}
+   367→                    animate={{ opacity: 1, y: 0 }}
+   368→                    transition={{ delay: i * 0.05 }}
+   369→                    className="macos-card p-4"
+   370→                  >
+   371→                    <div className="flex items-start justify-between mb-2">
+   372→                      <div className="flex items-center gap-2.5">
+   373→                        <div className="size-9 rounded-[10px] bg-teal-500/10 flex items-center justify-center">
+   374→                          <Webhook className="size-4 text-teal-500" />
+   375→                        </div>
+   376→                        <div>
+   377→                          <h3 className="text-[13px] font-semibold">{wh.name}</h3>
+   378→                          <p className="text-[10px] text-muted-foreground font-mono truncate max-w-[220px]">{wh.url}</p>
+   379→                        </div>
+   380→                      </div>
+   381→                      <div className="flex items-center gap-1.5">
+   382→                        <div className={`macos-status-dot ${wh.isActive ? 'macos-status-online' : 'macos-status-offline'}`} />
+   383→                        <span className={`text-[10px] font-medium ${wh.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+   384→                          {wh.isActive ? 'Active' : 'Inactive'}
+   385→                        </span>
+   386→                      </div>
+   387→                    </div>
+   388→
+   389→                    <div className="flex flex-wrap gap-1 mt-2">
+   390→                      {(wh.events ?? []).map(ev => (
+   391→                        <Badge key={ev} variant="outline" className="text-[8px] px-1.5 py-0 bg-teal-500/5 text-teal-600 border-teal-500/15 font-mono">
+   392→                          {ev}
+   393→                        </Badge>
+   394→                      ))}
+   395→                    </div>
+   396→
+   397→                    <div className="grid grid-cols-3 gap-2 mt-3">
+   398→                      <div className="text-center p-2 bg-emerald-500/5 rounded-lg">
+   399→                        <p className="text-[12px] font-bold text-emerald-600 dark:text-emerald-400">{wh.successCount.toLocaleString()}</p>
+   400→                        <p className="text-[9px] text-muted-foreground uppercase tracking-wider font-semibold">Success</p>
+   401→                      </div>
+   402→                      <div className="text-center p-2 bg-red-500/5 rounded-lg">
+   403→                        <p className="text-[12px] font-bold text-red-600 dark:text-red-400">{wh.failureCount}</p>
+   404→                        <p className="text-[9px] text-muted-foreground uppercase tracking-wider font-semibold">Failed</p>
+   405→                      </div>
+   406→                      <div className="text-center p-2 bg-teal-500/5 rounded-lg">
+   407→                        <p className="text-[12px] font-bold text-teal-600 dark:text-teal-400">{successRate}%</p>
+   408→                        <p className="text-[9px] text-muted-foreground uppercase tracking-wider font-semibold">Rate</p>
+   409→                      </div>
+   410→                    </div>
+   411→
+   412→                    <div className="flex items-center justify-between mt-3 pt-2 border-t border-border">
+   413→                      <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+   414→                        <span>Last: {timeAgo(wh.lastTriggeredAt)}</span>
+   415→                      </div>
+   416→                      <button
+   417→                        className="macos-btn-secondary text-[10px] px-2 py-0.5 flex items-center gap-1"
+   418→                        disabled={testingWebhook === wh.id}
+   419→                        onClick={() => handleTest(wh.id)}
+   420→                      >
+   421→                        {testingWebhook === wh.id ? (
+   422→                          <RefreshCw className="size-2.5 animate-spin" />
+   423→                        ) : (
+   424→                          <Zap className="size-2.5" />
+   425→                        )}
+   426→                        Test
+   427→                      </button>
+   428→                    </div>
+   429→                  </motion.div>
+   430→                )
+   431→              })}
+   432→            </div>
+   433→          )}
+   434→        </TabsContent>
+   435→
+   436→        {/* ── Deliveries ── */}
+   437→        <TabsContent value="deliveries" className="mt-4 space-y-3">
+   438→          <div className="flex items-center justify-between">
+   439→            <div className="macos-section-header">Recent Webhook Deliveries</div>
+   440→            <button onClick={fetchData} className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+   441→              <RefreshCw className={`size-3 ${loading ? 'animate-spin' : ''}`} /> Refresh
+   442→            </button>
+   443→          </div>
+   444→          <div className="macos-card overflow-hidden">
+   445→            <div className="max-h-[420px] overflow-y-auto">
+   446→              <table className="macos-table">
+   447→                <thead>
+   448→                  <tr>
+   449→                    <th>Time</th>
+   450→                    <th>Event</th>
+   451→                    <th>Status</th>
+   452→                    <th>Code</th>
+   453→                    <th>Duration</th>
+   454→                    <th>Retries</th>
+   455→                    <th>Payload</th>
+   456→                  </tr>
+   457→                </thead>
+   458→                <tbody>
+   459→                  {loading ? (
+   460→                    <SkeletonTable rows={5} cols={7} />
+   461→                  ) : deliveries.length === 0 ? (
+   462→                    <tr><td colSpan={7} className="text-center py-8 text-[12px] text-muted-foreground">No webhook deliveries found</td></tr>
+   463→                  ) : (
+   464→                    deliveries.map(delivery => (
+   465→                      <tr key={delivery.id}>
+   466→                        <td className="text-[11px] font-mono text-muted-foreground whitespace-nowrap">
+   467→                          {new Date(delivery.deliveredAt).toLocaleString('en-PK', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+   468→                        </td>
+   469→                        <td>
+   470→                          <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-mono bg-teal-500/5 text-teal-600 border-teal-500/15">
+   471→                            {delivery.event}
+   472→                          </Badge>
+   473→                        </td>
+   474→                        <td>
+   475→                          {delivery.isSuccess
+   476→                            ? <CheckCircle2 className="size-3.5 text-emerald-500" />
+   477→                            : <XCircle className="size-3.5 text-red-500" />
+   478→                          }
+   479→                        </td>
+   480→                        <td className={`text-[12px] font-mono font-semibold ${delivery.statusCode ? getHttpStatusColor(delivery.statusCode) : 'text-muted-foreground'}`}>
+   481→                          {delivery.statusCode ?? '—'}
+   482→                        </td>
+   483→                        <td className="text-[12px] text-muted-foreground">{delivery.duration ? `${delivery.duration}ms` : '—'}</td>
+   484→                        <td className="text-[12px]">
+   485→                          <span className={delivery.retryCount > 0 ? 'text-teal-600 dark:text-teal-400 font-medium' : 'text-muted-foreground'}>
+   486→                            {delivery.retryCount}
+   487→                          </span>
+   488→                        </td>
+   489→                        <td className="text-[10px] max-w-[160px] truncate font-mono text-muted-foreground">{delivery.payload ?? '—'}</td>
+   490→                      </tr>
+   491→                    ))
+   492→                  )}
+   493→                </tbody>
+   494→              </table>
+   495→            </div>
+   496→          </div>
+   497→        </TabsContent>
+   498→
+   499→        {/* ── Usage Metrics ── */}
+   500→        <TabsContent value="metrics" className="mt-4 space-y-4">
+   501→          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   502→            {[
+   503→              { label: 'Total Deliveries', value: totalRequests > 1000 ? `${(totalRequests / 1000).toFixed(1)}K` : String(totalRequests), icon: Globe, accent: '#e8930c' },
+   504→              { label: 'Avg Response Time', value: `${avgLatency}ms`, icon: Activity, accent: '#34c759' },
+   505→              { label: 'Error Rate', value: `${errorRate}%`, icon: AlertTriangle, accent: '#ff9f0a' },
+   506→              { label: 'Active Keys', value: String(overview?.keys?.active ?? 0), icon: Key, accent: '#e8930c' },
+   507→            ].map((stat) => (
+   508→              <div key={stat.label} className="macos-card p-4">
+   509→                <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">{stat.label}</p>
+   510→                <p className="text-xl font-bold mt-0.5" style={{ color: stat.accent }}>{stat.value}</p>
+   511→              </div>
+   512→            ))}
+   513→          </div>
+   514→
+   515→          <div className="macos-section-header">API Requests (14 Day Trend)</div>
+   516→          <div className="macos-card p-4">
+   517→            <div className="h-[240px]">
+   518→              {usageMetricsData.length > 0 ? (
+   519→                <ResponsiveContainer width="100%" height="100%">
+   520→                  <AreaChart data={usageMetricsData}>
+   521→                    <defs>
+   522→                      <linearGradient id="requestsGrad" x1="0" y1="0" x2="0" y2="1">
+   523→                        <stop offset="5%" stopColor="#e8930c" stopOpacity={0.15} />
+   524→                        <stop offset="95%" stopColor="#e8930c" stopOpacity={0} />
+   525→                      </linearGradient>
+   526→                    </defs>
+   527→                    <XAxis dataKey="day" tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} />
+   528→                    <YAxis tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} width={45} />
+   529→                    <Tooltip
+   530→                      contentStyle={{
+   531→                        backgroundColor: 'var(--card)',
+   532→                        border: '0.5px solid var(--border)',
+   533→                        borderRadius: '8px',
+   534→                        fontSize: '12px',
+   535→                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+   536→                      }}
+   537→                    />
+   538→                    <Area type="monotone" dataKey="requests" stroke="#e8930c" fill="url(#requestsGrad)" strokeWidth={1.5} name="Requests" />
+   539→                  </AreaChart>
+   540→                </ResponsiveContainer>
+   541→              ) : (
+   542→                <div className="flex items-center justify-center h-full text-[12px] text-muted-foreground">
+   543→                  No delivery data available for trend chart
+   544→                </div>
+   545→              )}
+   546→            </div>
+   547→          </div>
+   548→
+   549→          <div className="macos-section-header">Endpoint Usage</div>
+   550→          <div className="macos-card p-4">
+   551→            <div className="h-[200px]">
+   552→              {endpointUsageData.length > 0 ? (
+   553→                <ResponsiveContainer width="100%" height="100%">
+   554→                  <BarChart data={endpointUsageData} layout="vertical">
+   555→                    <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} />
+   556→                    <YAxis dataKey="endpoint" type="category" tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} width={120} />
+   557→                    <Tooltip
+   558→                      contentStyle={{
+   559→                        backgroundColor: 'var(--card)',
+   560→                        border: '0.5px solid var(--border)',
+   561→                        borderRadius: '8px',
+   562→                        fontSize: '12px',
+   563→                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+   564→                      }}
+   565→                    />
+   566→                    <Bar dataKey="calls" fill="#e8930c" radius={[0, 4, 4, 0]} name="Deliveries" barSize={16} />
+   567→                  </BarChart>
+   568→                </ResponsiveContainer>
+   569→              ) : (
+   570→                <div className="flex items-center justify-center h-full text-[12px] text-muted-foreground">
+   571→                  No endpoint usage data available
+   572→                </div>
+   573→              )}
+   574→            </div>
+   575→          </div>
+   576→        </TabsContent>
+   577→      </Tabs>
+   578→    </div>
+   579→  )
+   580→}
+   581→

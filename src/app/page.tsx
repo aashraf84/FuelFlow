@@ -17,19 +17,24 @@ import {
   Brain,
   Zap,
   Settings,
-  ChevronLeft,
-  ChevronRight,
   Search,
   Bell,
   Moon,
   Sun,
-  Menu,
   ChevronDown,
   LogOut,
   User,
   Shield,
+  Cpu,
+  Wifi,
+  Eye,
+  EyeOff,
+  ChevronRight,
+  BarChart3,
+  Radio,
+  Crown,
+  type LucideIcon,
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -69,21 +74,54 @@ import MultiSiteModule from '@/components/fuelflow/MultiSiteModule'
 import AISuiteModule from '@/components/fuelflow/AISuiteModule'
 import EVCNGModule from '@/components/fuelflow/EVCNGModule'
 import SettingsModule from '@/components/fuelflow/SettingsModule'
+import DeviceIntegrationModule from '@/components/fuelflow/DeviceIntegrationModule'
+import SecurityCenterModule from '@/components/fuelflow/SecurityCenterModule'
+import CommsLayerModule from '@/components/fuelflow/CommsLayerModule'
+import ReportBuilderModule from '@/components/fuelflow/ReportBuilderModule'
+import APIWebhooksModule from '@/components/fuelflow/APIWebhooksModule'
+import LoginPage from '@/components/fuelflow/LoginPage'
+import OwnerModule from '@/components/fuelflow/OwnerModule'
 
-const navItems: { key: ModuleKey; label: string; icon: React.ElementType }[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { key: 'forecourt', label: 'Forecourt', icon: Fuel },
-  { key: 'tanks', label: 'Tanks & Wet Stock', icon: Droplets },
-  { key: 'sales', label: 'Fuel Sales', icon: Receipt },
-  { key: 'fleet', label: 'Fleet & RFID', icon: Truck },
-  { key: 'pricing', label: 'Price Management', icon: DollarSign },
-  { key: 'retail', label: 'Retail Store', icon: ShoppingCart },
-  { key: 'employees', label: 'Employees', icon: Users },
-  { key: 'finance', label: 'Finance', icon: Wallet },
-  { key: 'multisite', label: 'Multi-Site', icon: Building2 },
-  { key: 'ai-suite', label: 'AI Suite', icon: Brain },
-  { key: 'ev-cng', label: 'EV & CNG', icon: Zap },
-  { key: 'settings', label: 'Settings', icon: Settings },
+// ── Navigation Configuration ──────────────────────────────
+
+interface NavItem {
+  key: ModuleKey
+  label: string
+  icon: LucideIcon
+  section?: string
+  sectionColor?: string
+}
+
+// Section color palette — each section gets a unique solid bg + white text when active
+const sectionColors: Record<string, { bg: string; text: string; darkBg: string; darkText: string; dot: string; headerText: string; darkHeaderText: string }> = {
+  Overview:     { bg: 'bg-teal-600',       text: 'text-white',         darkBg: 'dark:bg-teal-500',         darkText: 'dark:text-white',         dot: 'bg-teal-500',      headerText: 'text-teal-600',      darkHeaderText: 'dark:text-teal-400' },
+  Operations:   { bg: 'bg-emerald-600',    text: 'text-white',         darkBg: 'dark:bg-emerald-500',      darkText: 'dark:text-white',         dot: 'bg-emerald-500',   headerText: 'text-emerald-600',   darkHeaderText: 'dark:text-emerald-400' },
+  Business:     { bg: 'bg-cyan-600',       text: 'text-white',         darkBg: 'dark:bg-cyan-500',         darkText: 'dark:text-white',         dot: 'bg-cyan-500',      headerText: 'text-cyan-600',      darkHeaderText: 'dark:text-cyan-400' },
+  Management:   { bg: 'bg-rose-600',       text: 'text-white',         darkBg: 'dark:bg-rose-500',         darkText: 'dark:text-white',         dot: 'bg-rose-500',      headerText: 'text-rose-600',      darkHeaderText: 'dark:text-rose-400' },
+  Intelligence: { bg: 'bg-violet-600',     text: 'text-white',         darkBg: 'dark:bg-violet-500',       darkText: 'dark:text-white',         dot: 'bg-violet-500',    headerText: 'text-violet-600',    darkHeaderText: 'dark:text-violet-400' },
+  System:       { bg: 'bg-slate-600',      text: 'text-white',         darkBg: 'dark:bg-slate-500',        darkText: 'dark:text-white',         dot: 'bg-slate-500',     headerText: 'text-slate-600',     darkHeaderText: 'dark:text-slate-400' },
+}
+
+const navItems: NavItem[] = [
+  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'Overview' },
+  { key: 'forecourt', label: 'Forecourt', icon: Fuel, section: 'Operations' },
+  { key: 'tanks', label: 'Tanks & Wet Stock', icon: Droplets, section: 'Operations' },
+  { key: 'sales', label: 'Fuel Sales', icon: Receipt, section: 'Operations' },
+  { key: 'fleet', label: 'Fleet & RFID', icon: Truck, section: 'Operations' },
+  { key: 'pricing', label: 'Price Management', icon: DollarSign, section: 'Business' },
+  { key: 'retail', label: 'Retail Store', icon: ShoppingCart, section: 'Business' },
+  { key: 'employees', label: 'Employees', icon: Users, section: 'Business' },
+  { key: 'finance', label: 'Finance', icon: Wallet, section: 'Business' },
+  { key: 'multisite', label: 'Multi-Site', icon: Building2, section: 'Management' },
+  { key: 'ai-suite', label: 'AI Suite', icon: Brain, section: 'Intelligence' },
+  { key: 'ev-cng', label: 'EV & CNG', icon: Zap, section: 'Intelligence' },
+  { key: 'devices', label: 'Device Integration', icon: Cpu, section: 'System' },
+  { key: 'security', label: 'Security Center', icon: Shield, section: 'System' },
+  { key: 'comms', label: 'Comms Layer', icon: Wifi, section: 'System' },
+  { key: 'reports', label: 'Report Builder', icon: BarChart3, section: 'System' },
+  { key: 'api-webhooks', label: 'API & Webhooks', icon: Radio, section: 'System' },
+  { key: 'settings', label: 'Settings', icon: Settings, section: 'System' },
+  { key: 'owner', label: 'Owner Console', icon: Crown, section: 'System' },
 ]
 
 const moduleComponents: Record<ModuleKey, React.ComponentType> = {
@@ -99,7 +137,13 @@ const moduleComponents: Record<ModuleKey, React.ComponentType> = {
   multisite: MultiSiteModule,
   'ai-suite': AISuiteModule,
   'ev-cng': EVCNGModule,
+  devices: DeviceIntegrationModule,
+  security: SecurityCenterModule,
+  comms: CommsLayerModule,
+  reports: ReportBuilderModule,
+  'api-webhooks': APIWebhooksModule,
   settings: SettingsModule,
+  owner: OwnerModule,
 }
 
 const staticStations = [
@@ -109,6 +153,8 @@ const staticStations = [
   { value: 'airport', label: 'Airport Terminal' },
   { value: 'suburban', label: 'Suburban Branch' },
 ]
+
+// ── Sub-Components ────────────────────────────────────────
 
 function LiveClock() {
   const [time, setTime] = useState<string>('')
@@ -126,140 +172,137 @@ function LiveClock() {
   }, [])
 
   return (
-    <div className="hidden sm:flex flex-col items-end text-xs">
-      <span className="font-mono font-medium">{time}</span>
+    <div className="hidden sm:flex items-center gap-2 text-[12px]">
+      <span className="font-medium text-foreground/70 font-mono">{time}</span>
       <span className="text-muted-foreground">{date}</span>
     </div>
   )
 }
 
+// macOS Sidebar Navigation Content
 function SidebarNavContent({
-  collapsed,
   activeModule,
   setActiveModule,
   selectedStation,
   setSelectedStation,
+  isViewOnly,
   onNavClick,
 }: {
-  collapsed: boolean
   activeModule: ModuleKey
   setActiveModule: (m: ModuleKey) => void
   selectedStation: string
   setSelectedStation: (s: string) => void
+  isViewOnly: boolean
   onNavClick?: () => void
 }) {
+  // Group nav items by section
+  const sections = navItems.reduce<Record<string, NavItem[]>>((acc, item) => {
+    const section = item.section || 'Other'
+    if (!acc[section]) acc[section] = []
+    acc[section].push(item)
+    return acc
+  }, {})
+
   return (
-    <div className="flex h-full flex-col">
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-4 py-5 border-b border-slate-700/50">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-amber-500/20">
-          <Fuel className="size-5 text-white" />
+    <div className="flex h-full flex-col py-2">
+      {/* Logo Area */}
+      <div className="flex items-center gap-2.5 px-4 pb-3 pt-1">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-[10px] fuel-gradient shadow-sm">
+          <Fuel className="size-4 text-white" />
         </div>
-        {!collapsed && (
-          <motion.div
-            initial={{ opacity: 0, width: 0 }}
-            animate={{ opacity: 1, width: 'auto' }}
-            exit={{ opacity: 0, width: 0 }}
-            className="overflow-hidden"
-          >
-            <h1 className="text-base font-bold text-white tracking-tight">FuelFlow OS</h1>
-            <p className="text-[10px] text-slate-400 leading-tight">ApexFlow Ecosystem</p>
-          </motion.div>
-        )}
+        <div className="min-w-0">
+          <h1 className="text-[13px] font-bold text-foreground tracking-tight leading-tight">FuelFlow OS</h1>
+          <p className="text-[10px] text-muted-foreground leading-tight">ApexFlow Ecosystem</p>
+        </div>
       </div>
 
-      {/* Station Selector */}
-      {!collapsed && (
-        <div className="px-3 py-3">
-          <Select value={selectedStation} onValueChange={setSelectedStation}>
-            <SelectTrigger className="h-8 w-full border-slate-600 bg-slate-800/50 text-xs text-slate-200 hover:bg-slate-700/50 focus:ring-amber-500/30">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {staticStations.map((s) => (
-                <SelectItem key={s.value} value={s.value}>
-                  {s.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      {/* View Only Badge */}
+      {isViewOnly && (
+        <div className="px-3 pb-1">
+          <div className="flex items-center gap-1.5 rounded-md bg-teal-500/10 border border-teal-500/15 px-2 py-1">
+            <EyeOff className="size-3 text-teal-500" />
+            <span className="text-[10px] font-semibold text-teal-600 dark:text-teal-400">View Only</span>
+          </div>
         </div>
       )}
-      {collapsed && <div className="py-2" />}
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-2 py-1 space-y-0.5">
-        {navItems.map((item) => {
-          const isActive = activeModule === item.key
-          const Icon = item.icon
+      {/* Station Selector */}
+      <div className="px-3 pb-2 pt-1">
+        <Select value={selectedStation} onValueChange={setSelectedStation}>
+          <SelectTrigger className="h-7 w-full text-[12px] bg-black/[0.03] dark:bg-white/[0.04] border-0 rounded-md focus:ring-1 focus:ring-teal-500/30">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {staticStations.map((s) => (
+              <SelectItem key={s.value} value={s.value} className="text-[12px]">
+                {s.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Navigation Sections */}
+      <nav className="flex-1 overflow-y-auto px-2 pb-2">
+        {Object.entries(sections).map(([section, items]) => {
+          const colors = sectionColors[section] || sectionColors.System
           return (
-            <button
-              key={item.key}
-              onClick={() => {
-                setActiveModule(item.key)
-                onNavClick?.()
-              }}
-              className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 ${
-                isActive
-                  ? 'bg-amber-500/15 text-amber-400 sidebar-nav-active'
-                  : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'
-              }`}
-              title={collapsed ? item.label : undefined}
-            >
-              <Icon
-                className={`size-4 shrink-0 transition-colors ${
-                  isActive ? 'text-amber-400' : 'text-slate-500 group-hover:text-slate-300'
-                }`}
-              />
-              {!collapsed && (
-                <motion.span
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="truncate"
-                >
-                  {item.label}
-                </motion.span>
-              )}
-              {!collapsed && item.key === 'ai-suite' && (
-                <Badge className="ml-auto text-[9px] px-1.5 py-0 bg-amber-500/20 text-amber-400 border-amber-500/30 hover:bg-amber-500/30">
-                  AI
-                </Badge>
-              )}
-            </button>
+            <div key={section} className="mb-1">
+              <div className={`macos-section-header px-1 ${colors.headerText} ${colors.darkHeaderText}`}>
+                <span className={`macos-section-dot ${colors.dot}`} />
+                {section}
+              </div>
+              {items.map((item) => {
+                const isActive = activeModule === item.key
+                const Icon = item.icon
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => {
+                      setActiveModule(item.key)
+                      onNavClick?.()
+                    }}
+                    className={`macos-sidebar-item w-full ${isActive ? 'active' : ''} ${isActive ? `${colors.bg} ${colors.text} ${colors.darkBg} ${colors.darkText}` : ''}`}
+                  >
+                    <Icon className="size-[15px] shrink-0" strokeWidth={isActive ? 2 : 1.5} />
+                    <span className="truncate">{item.label}</span>
+                    {item.key === 'ai-suite' && !isActive && (
+                      <span className="ml-auto text-[9px] font-bold rounded-md bg-violet-500/15 text-violet-600 dark:text-violet-400 px-1.5 py-0.5">
+                        AI
+                      </span>
+                    )}
+                    {item.key === 'ai-suite' && isActive && (
+                      <span className="ml-auto text-[9px] font-bold rounded-md bg-white/20 text-white px-1.5 py-0.5">
+                        AI
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
           )
         })}
       </nav>
 
-      {/* User Profile */}
-      <div className="border-t border-slate-700/50 px-3 py-3">
-        {!collapsed ? (
-          <div className="flex items-center gap-3">
-            <Avatar className="size-8 border-2 border-amber-500/30">
-              <AvatarFallback className="bg-amber-500/20 text-amber-400 text-xs font-semibold">
-                JM
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-200 truncate">James Morrison</p>
-              <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-amber-500/30 text-amber-400 bg-amber-500/10">
-                <Shield className="size-2.5 mr-0.5" />
-                Station Manager
-              </Badge>
-            </div>
+      {/* User Profile at Bottom */}
+      <div className="border-t border-border px-3 py-2.5">
+        <div className="flex items-center gap-2.5">
+          <Avatar className="size-7 border border-teal-500/20">
+            <AvatarFallback className="bg-teal-500/10 text-teal-600 dark:text-teal-400 text-[10px] font-bold rounded-md">
+              JM
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <p className="text-[12px] font-semibold text-foreground truncate">James Morrison</p>
+            <p className="text-[10px] text-muted-foreground">Station Manager</p>
           </div>
-        ) : (
-          <div className="flex justify-center">
-            <Avatar className="size-8 border-2 border-amber-500/30">
-              <AvatarFallback className="bg-amber-500/20 text-amber-400 text-xs font-semibold">
-                JM
-              </AvatarFallback>
-            </Avatar>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   )
 }
+
+// ── Main App Component ────────────────────────────────────
 
 export default function Home() {
   const {
@@ -271,6 +314,10 @@ export default function Home() {
     setSidebarOpen,
     selectedStation,
     setSelectedStation,
+    isAuthenticated,
+    authUser,
+    accessLevel,
+    logout,
   } = useAppStore()
 
   const { theme, setTheme } = useTheme()
@@ -283,214 +330,227 @@ export default function Home() {
 
   const currentNav = navItems.find((n) => n.key === activeModule)
   const ActiveModuleComponent = moduleComponents[activeModule]
-
   const stationLabel = staticStations.find((s) => s.value === selectedStation)?.label ?? 'All Stations'
+  const isViewOnly = accessLevel === 'view-only'
 
-  const toggleSidebar = useCallback(() => {
-    if (isMobile) {
-      setSidebarOpen(!sidebarOpen)
-    } else {
-      setSidebarCollapsed(!sidebarCollapsed)
+  const userName = authUser?.name || 'James Morrison'
+  const userInitials = userName
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
+  const userRole = authUser?.isDemo ? 'Demo Viewer' : authUser?.role || 'Station Manager'
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await fetch('/api/auth/session', { method: 'DELETE' })
+    } catch {
+      // ignore
     }
-  }, [isMobile, sidebarOpen, sidebarCollapsed, setSidebarOpen, setSidebarCollapsed])
+    logout()
+  }, [logout])
 
-  const sidebarWidth = sidebarCollapsed ? 68 : 280
-
+  // Loading screen during hydration
   if (!mounted) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex items-center gap-3">
-          <div className="flex size-9 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-600">
+          <div className="flex size-9 items-center justify-center rounded-xl fuel-gradient">
             <Fuel className="size-5 text-white" />
           </div>
-          <span className="text-lg font-bold">FuelFlow OS</span>
+          <span className="text-[15px] font-semibold text-foreground">FuelFlow OS</span>
         </div>
       </div>
     )
   }
 
+  // Not authenticated — show login
+  if (!isAuthenticated) {
+    return <LoginPage />
+  }
+
+  // ── Authenticated App Shell ──
+
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      {/* Desktop Sidebar */}
+    <div className="flex h-screen overflow-hidden macos-window-bg">
+      {/* ── Desktop Sidebar ── */}
       {!isMobile && (
         <motion.aside
           initial={false}
-          animate={{ width: sidebarWidth }}
-          transition={{ duration: 0.2, ease: 'easeInOut' }}
-          className="relative flex shrink-0 flex-col bg-slate-900 dark:bg-slate-950 text-white overflow-hidden"
+          animate={{ width: sidebarCollapsed ? 0 : 260 }}
+          transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+          className="macos-sidebar relative flex shrink-0 flex-col overflow-hidden"
+          style={{ width: sidebarCollapsed ? 0 : 260 }}
         >
           <SidebarNavContent
-            collapsed={sidebarCollapsed}
             activeModule={activeModule}
             setActiveModule={setActiveModule}
             selectedStation={selectedStation}
             setSelectedStation={setSelectedStation}
+            isViewOnly={isViewOnly}
           />
-
-          {/* Collapse Toggle */}
-          <button
-            onClick={toggleSidebar}
-            className="absolute right-0 top-7 z-10 flex size-5 items-center justify-center rounded-l-md border border-r-0 border-slate-700 bg-slate-800 text-slate-400 hover:text-amber-400 hover:bg-slate-700 transition-colors"
-            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {sidebarCollapsed ? (
-              <ChevronRight className="size-3" />
-            ) : (
-              <ChevronLeft className="size-3" />
-            )}
-          </button>
         </motion.aside>
       )}
 
-      {/* Mobile Sidebar Sheet */}
+      {/* ── Mobile Sidebar Sheet ── */}
       {isMobile && (
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-          <SheetContent side="left" className="w-[280px] p-0 bg-slate-900 dark:bg-slate-950 border-slate-700">
+          <SheetContent side="left" className="w-[280px] p-0 macos-sidebar border-0">
             <SheetHeader className="sr-only">
               <SheetTitle>Navigation Menu</SheetTitle>
             </SheetHeader>
             <SidebarNavContent
-              collapsed={false}
               activeModule={activeModule}
               setActiveModule={setActiveModule}
               selectedStation={selectedStation}
               setSelectedStation={setSelectedStation}
+              isViewOnly={isViewOnly}
               onNavClick={() => setSidebarOpen(false)}
             />
           </SheetContent>
         </Sheet>
       )}
 
-      {/* Main Area */}
+      {/* ── Main Content Area ── */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Top Header Bar */}
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-background px-4">
-          {/* Mobile menu button */}
-          {isMobile && (
-            <Button variant="ghost" size="icon" className="shrink-0" onClick={() => setSidebarOpen(true)}>
-              <Menu className="size-5" />
-            </Button>
-          )}
-
-          {/* Station Name */}
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="hidden sm:flex size-7 items-center justify-center rounded-md bg-amber-500/10">
-              <Fuel className="size-3.5 text-amber-500" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-sm font-semibold truncate">{stationLabel}</h2>
-              <p className="hidden sm:block text-[10px] text-muted-foreground leading-tight">{currentNav?.label || 'Dashboard'}</p>
-            </div>
-          </div>
-
-          <Separator orientation="vertical" className="hidden sm:block h-6" />
-
-          {/* Search Bar */}
-          <div className="hidden md:flex items-center flex-1 max-w-md">
-            <div className="relative w-full">
-              <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search transactions, pumps, customers..."
-                className="h-8 w-full rounded-md border bg-muted/50 pl-8 pr-3 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/50 transition-colors"
-                readOnly
-              />
-            </div>
-          </div>
-
-          <div className="flex-1 md:hidden" />
-
-          {/* Live Clock */}
-          <LiveClock />
-
-          {/* WebSocket Status */}
-          <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground" title="Forecourt Controller Connection">
-            <div className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="hidden lg:inline">Live</span>
-          </div>
-
-          {/* Notification Bell */}
-          <Button variant="ghost" size="icon" className="relative shrink-0">
-            <Bell className="size-4" />
-            <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
-              3
-            </span>
-          </Button>
-
-          {/* AI Alerts */}
-          <Button variant="ghost" size="icon" className="relative shrink-0" title="AI Alerts - 1 critical">
-            <Brain className="size-4" />
-            <span className="absolute right-1.5 top-1.5 flex size-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-              <span className="relative inline-flex size-2 rounded-full bg-red-500" />
-            </span>
-          </Button>
-
-          {/* Theme Toggle */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="shrink-0"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        {/* ── macOS Titlebar ── */}
+        <header className="macos-titlebar flex h-[52px] shrink-0 items-center px-4 gap-3 z-20">
+          {/* Sidebar Toggle */}
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="flex items-center justify-center size-7 rounded-md hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
+            title={sidebarCollapsed ? 'Show Sidebar' : 'Hide Sidebar'}
           >
-            {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
-          </Button>
+            <ChevronRight className={`size-3.5 text-muted-foreground transition-transform ${sidebarCollapsed ? '' : 'rotate-180'}`} />
+          </button>
 
-          {/* User Avatar Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="shrink-0 gap-2 px-2 h-8">
-                <Avatar className="size-7">
-                  <AvatarFallback className="bg-amber-500/20 text-amber-600 text-xs font-semibold">
-                    JM
-                  </AvatarFallback>
-                </Avatar>
-                <ChevronDown className="size-3 text-muted-foreground" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <div className="px-2 py-1.5">
-                <p className="text-sm font-medium">James Morrison</p>
-                <p className="text-xs text-muted-foreground">j.morrison@apexfuel.com</p>
-              </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <User className="mr-2 size-4" />
-                Profile
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Settings className="mr-2 size-4" />
-                Preferences
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-red-600 focus:text-red-600">
-                <LogOut className="mr-2 size-4" />
-                Sign Out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Center: Module Title */}
+          <div className="flex-1 flex items-center justify-center">
+            <div className="flex items-center gap-2">
+              {currentNav && (() => {
+                const secColors = sectionColors[currentNav.section || 'System'] || sectionColors.System
+                return (
+                  <>
+                    <currentNav.icon className={`size-3.5 ${secColors.headerText} ${secColors.darkHeaderText}`} strokeWidth={1.5} />
+                    <span className={`text-[13px] font-semibold ${secColors.headerText} ${secColors.darkHeaderText}`}>{currentNav?.label || 'Dashboard'}</span>
+                  </>
+                )
+              })()}
+            </div>
+          </div>
+
+          {/* Right Side Actions */}
+          <div className="flex items-center gap-1.5">
+            {/* View Only Badge */}
+            {isViewOnly && (
+              <Badge variant="outline" className="hidden sm:flex items-center gap-1 text-[10px] px-2 py-0 border-teal-500/20 text-teal-600 dark:text-teal-400 bg-teal-500/5 rounded-md font-medium">
+                <EyeOff className="size-3" />
+                View Only
+              </Badge>
+            )}
+
+            <LiveClock />
+
+            {/* WebSocket Status */}
+            <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/[0.02] dark:bg-white/[0.03]" title="Forecourt Controller Connection">
+              <div className="macos-status-dot macos-status-online" />
+              <span className="text-[11px] font-medium text-muted-foreground">Live</span>
+            </div>
+
+            {/* Notification Bell */}
+            <button className="relative flex items-center justify-center size-7 rounded-md hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors">
+              <Bell className="size-4 text-muted-foreground" />
+              <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
+                3
+              </span>
+            </button>
+
+            {/* AI Alerts */}
+            <button className="relative flex items-center justify-center size-7 rounded-md hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors" title="AI Alerts - 1 critical">
+              <Brain className="size-4 text-muted-foreground" />
+              <span className="absolute -top-0.5 -right-0.5 flex size-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex size-2 rounded-full bg-red-500" />
+              </span>
+            </button>
+
+            {/* Theme Toggle */}
+            <button
+              className="flex items-center justify-center size-7 rounded-md hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            >
+              {theme === 'dark' ? <Sun className="size-4 text-muted-foreground" /> : <Moon className="size-4 text-muted-foreground" />}
+            </button>
+
+            {/* User Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1.5 rounded-md px-1.5 py-1 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors">
+                  <Avatar className="size-6 border border-teal-500/15">
+                    <AvatarFallback className="bg-teal-500/10 text-teal-600 dark:text-teal-400 text-[9px] font-bold rounded-[5px]">
+                      {userInitials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <ChevronDown className="size-3 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52 rounded-xl shadow-lg border-border/50">
+                <div className="px-3 py-2">
+                  <p className="text-[13px] font-semibold">{userName}</p>
+                  <p className="text-[11px] text-muted-foreground">{authUser?.email || 'j.morrison@apexfuel.com'}</p>
+                  {isViewOnly && (
+                    <Badge variant="outline" className="mt-1 text-[9px] px-1.5 py-0 border-teal-500/20 text-teal-500 bg-teal-500/5 rounded-md">
+                      <Eye className="size-2.5 mr-0.5" />
+                      View Only
+                    </Badge>
+                  )}
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-[13px] rounded-md">
+                  <User className="mr-2 size-4" />
+                  Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-[13px] rounded-md">
+                  <Settings className="mr-2 size-4" />
+                  Preferences
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-[13px] rounded-md text-red-500 focus:text-red-500" onClick={handleLogout}>
+                  <LogOut className="mr-2 size-4" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </header>
 
-        {/* Module Content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
-          {/* Module Header */}
-          <div className="mb-6">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-              <LayoutDashboard className="size-3" />
-              <span>FuelFlow OS</span>
-              <span>/</span>
-              <span className="text-foreground font-medium">{currentNav?.label}</span>
-            </div>
-          </div>
+        {/* ── Content Area ── */}
+        <main className="flex-1 overflow-y-auto macos-content">
+          {/* View Only Notice */}
+          {isViewOnly && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mx-6 mt-4 flex items-center gap-2.5 rounded-xl border border-teal-500/15 bg-teal-500/5 px-4 py-2.5"
+            >
+              <Eye className="size-4 text-teal-500 shrink-0" />
+              <p className="text-[12px] text-teal-700 dark:text-teal-400">
+                You are in <strong>View Only</strong> mode. All modifications are disabled.
+                <span className="text-muted-foreground ml-1">Sign in with a full account to make changes.</span>
+              </p>
+            </motion.div>
+          )}
 
-          {/* Active Module */}
+          {/* Active Module with Animation */}
           <AnimatePresence mode="wait">
             <motion.div
               key={activeModule}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.15, ease: 'easeOut' }}
+              initial={{ opacity: 0, y: 6, scale: 0.995 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.995 }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+              className="p-6"
             >
               <ActiveModuleComponent />
             </motion.div>

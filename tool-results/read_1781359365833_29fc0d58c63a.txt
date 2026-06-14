@@ -1,0 +1,914 @@
+     1→'use client'
+     2→
+     3→import { useState } from 'react'
+     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→import {
+     6→  Settings, Cpu, Users, Bell, Link2, FileText, AlertTriangle,
+     7→  Building2, MapPin, Clock, Wifi, CheckCircle2, Shield, Save,
+     8→  Fuel, Gauge, Droplets, Radio, Monitor, CreditCard, Database,
+     9→  Key, HardDrive, RefreshCw, Copy, Eye, Trash2, Plus,
+    10→  ChevronRight, Globe, Package, Server, Activity, Cable,
+    11→  Camera, Volume2, Mail, MessageSquare, Smartphone,
+    12→  Calendar, Download, RotateCcw, Info, Zap, Layers,
+    13→} from 'lucide-react'
+    14→import { Badge } from '@/components/ui/badge'
+    15→import { Button } from '@/components/ui/button'
+    16→import { Switch } from '@/components/ui/switch'
+    17→import { ScrollArea } from '@/components/ui/scroll-area'
+    18→
+    19→// ── Types ──────────────────────────────────────
+    20→
+    21→type SettingsCategory = 'general' | 'hardware' | 'brands' | 'notifications' | 'billing' | 'users' | 'backup' | 'about'
+    22→
+    23→interface CategoryItem {
+    24→  key: SettingsCategory
+    25→  label: string
+    26→  icon: React.ElementType
+    27→  subtitle: string
+    28→}
+    29→
+    30→// ── Navigation Data ──────────────────────────────────────
+    31→
+    32→const categories: CategoryItem[] = [
+    33→  { key: 'general', label: 'General', icon: Settings, subtitle: 'Station name, timezone, language' },
+    34→  { key: 'hardware', label: 'Hardware Integration', icon: Cpu, subtitle: 'Controllers, dispensers, ATG' },
+    35→  { key: 'brands', label: 'Dispenser Brands', icon: Fuel, subtitle: 'Supported brand configuration' },
+    36→  { key: 'notifications', label: 'Notifications', icon: Bell, subtitle: 'Alert rules and channels' },
+    37→  { key: 'billing', label: 'Billing', icon: CreditCard, subtitle: 'Subscription and serial key' },
+    38→  { key: 'users', label: 'Users & Roles', icon: Users, subtitle: 'User management, permissions' },
+    39→  { key: 'backup', label: 'Backup', icon: Database, subtitle: 'Backup schedule and restore' },
+    40→  { key: 'about', label: 'About', icon: Info, subtitle: 'Version and system info' },
+    41→]
+    42→
+    43→// ── Static Data ──────────────────────────────────────
+    44→
+    45→const stationConfig = {
+    46→  name: 'Apex Fuel — Downtown Islamabad',
+    47→  code: 'APEX-ISB-001',
+    48→  address: '42 Blue Area, Jinnah Avenue, Islamabad',
+    49→  city: 'Islamabad',
+    50→  phone: '+92-51-5550123',
+    51→  email: 'ops@apexfuel.pk',
+    52→  operatingHours: '24/7',
+    53→  timezone: 'Asia/Karachi (UTC+5)',
+    54→  language: 'English (US)',
+    55→  currency: 'PKR — Pakistani Rupee',
+    56→  taxRate: '17.0%',
+    57→  stationType: 'Full-Service Fuel Station',
+    58→}
+    59→
+    60→const forecourtControllers = [
+    61→  { name: 'Forecourt Controller A', brand: 'DOMS FCC-5000', ip: '192.168.1.10', port: 5000, protocol: 'IFSF', pumps: 6, status: 'online' },
+    62→  { name: 'Forecourt Controller B', brand: 'Wayne iX Controller', ip: '192.168.1.11', port: 5001, protocol: 'PARIUS', pumps: 2, status: 'online' },
+    63→]
+    64→
+    65→const dispenserProfiles = [
+    66→  { id: 'DISP-001', name: 'Pump 1 (Diesel)', brand: 'Gilbarco', model: 'Encore 700S', controller: 'FC-A', nozzles: 2, protocol: 'IFSF', status: 'online' },
+    67→  { id: 'DISP-002', name: 'Pump 2 (Petrol 92)', brand: 'Wayne', model: 'Helix', controller: 'FC-A', nozzles: 2, protocol: 'IFSF', status: 'online' },
+    68→  { id: 'DISP-003', name: 'Pump 3 (Petrol 95)', brand: 'Tatsuno', model: 'TNC-5220', controller: 'FC-A', nozzles: 2, protocol: 'IFSF', status: 'online' },
+    69→  { id: 'DISP-004', name: 'Pump 4 (Hi-Octane)', brand: 'Tokheim', model: 'Quantem', controller: 'FC-A', nozzles: 1, protocol: 'IFSF', status: 'warning' },
+    70→  { id: 'DISP-005', name: 'Pump 5 (Diesel)', brand: 'Bennett', model: 'Series 3000', controller: 'FC-B', nozzles: 2, protocol: 'PARIUS', status: 'online' },
+    71→  { id: 'DISP-006', name: 'Pump 6 (Petrol 92)', brand: 'Gilbarco', model: 'Encore 500', controller: 'FC-B', nozzles: 2, protocol: 'IFSF', status: 'online' },
+    72→  { id: 'DISP-007', name: 'Pump 7 (Petrol 95)', brand: 'Petrotec', model: 'iLine', controller: 'FC-B', nozzles: 2, protocol: 'DFS', status: 'offline' },
+    73→  { id: 'DISP-008', name: 'Pump 8 (Diesel)', brand: 'Scheidt & Bachmann', model: 'Multi-Dispenser', controller: 'FC-A', nozzles: 2, protocol: 'IFSF', status: 'online' },
+    74→]
+    75→
+    76→const atgProfiles = [
+    77→  { id: 'ATG-001', name: 'Tank 1 — Diesel', brand: 'Veeder-Root', model: 'TLS-350 Plus', ip: '192.168.1.51', capacity: '20,000L', protocol: 'TLS-350', status: 'online' },
+    78→  { id: 'ATG-002', name: 'Tank 2 — Petrol 92', brand: 'Veeder-Root', model: 'TLS-350 Plus', ip: '192.168.1.52', capacity: '15,000L', protocol: 'TLS-350', status: 'online' },
+    79→  { id: 'ATG-003', name: 'Tank 3 — Petrol 95', brand: 'Veeder-Root', model: 'TLS-350 Plus', ip: '192.168.1.53', capacity: '15,000L', protocol: 'TLS-350', status: 'online' },
+    80→  { id: 'ATG-004', name: 'Tank 4 — Hi-Octane', brand: 'Veeder-Root', model: 'TLS-350', ip: '192.168.1.54', capacity: '10,000L', protocol: 'TLS-350', status: 'online' },
+    81→]
+    82→
+    83→const commProtocols = [
+    84→  { name: 'IFSF', transport: 'TCP/IP', port: 5000, status: 'active', devices: 14 },
+    85→  { name: 'PARIUS', transport: 'TCP/IP + RS232', port: 5001, status: 'active', devices: 3 },
+    86→  { name: 'DFS', transport: 'TCP/IP', port: 5002, status: 'active', devices: 2 },
+    87→  { name: 'TLS-350', transport: 'RS232 / TCP', port: 10001, status: 'active', devices: 4 },
+    88→  { name: 'ISO 8583', transport: 'TCP/IP (SSL)', port: 443, status: 'active', devices: 6 },
+    89→  { name: 'MQTT', transport: 'TCP/IP', port: 1883, status: 'active', devices: 5 },
+    90→  { name: 'OCPP', transport: 'WebSocket', port: 8080, status: 'active', devices: 2 },
+    91→  { name: 'Wiegand', transport: 'RS485', port: '-', status: 'active', devices: 4 },
+    92→]
+    93→
+    94→const dispenserBrands = [
+    95→  { brand: 'Gilbarco', models: ['Encore 700S', 'Encore 500', 'Skypass', 'CRIND'], protocol: 'IFSF', region: 'Global', enabled: true, configuredPumps: 2 },
+    96→  { brand: 'Wayne', models: ['Helix', 'iX', 'Quantum', 'Ovation'], protocol: 'PARIUS / IFSF', region: 'Global', enabled: true, configuredPumps: 1 },
+    97→  { brand: 'Tatsuno', models: ['TNC-5220', 'TNC-5230', 'MCC-501'], protocol: 'IFSF', region: 'Asia-Pacific', enabled: true, configuredPumps: 1 },
+    98→  { brand: 'Tokheim', models: ['Quantem', 'System 4', 'TQC'], protocol: 'DFS / IFSF', region: 'Europe / MENA', enabled: true, configuredPumps: 1 },
+    99→  { brand: 'Bennett', models: ['Series 3000', 'Series 5000'], protocol: 'PARIUS', region: 'Americas', enabled: true, configuredPumps: 1 },
+   100→  { brand: 'Petrotec', models: ['iLine', 'iCut', 'EuroLine'], protocol: 'DFS', region: 'Europe', enabled: true, configuredPumps: 1 },
+   101→  { brand: 'Scheidt & Bachmann', models: ['S&B POS', 'Multi-Dispenser'], protocol: 'IFSF', region: 'Europe', enabled: true, configuredPumps: 1 },
+   102→]
+   103→
+   104→const alertRules = [
+   105→  { name: 'Fuel Loss Detection', channel: 'Email + SMS', enabled: true, description: 'Alert when fuel variance exceeds 0.5%' },
+   106→  { name: 'Low Stock Warning', channel: 'Email + Dashboard', enabled: true, description: 'Alert when tank level drops below 15%' },
+   107→  { name: 'Critical Stock Level', channel: 'Email + SMS + Push', enabled: true, description: 'Alert when tank level drops below 5%' },
+   108→  { name: 'Shift Open/Close', channel: 'Dashboard', enabled: true, description: 'Notify when shifts are opened or closed' },
+   109→  { name: 'Delivery Received', channel: 'Email + Dashboard', enabled: true, description: 'Alert when a fuel delivery is registered' },
+   110→  { name: 'Price Change Alert', channel: 'Email + SMS', enabled: true, description: 'Alert when fuel prices are modified' },
+   111→  { name: 'Device Offline', channel: 'Email + SMS + Push', enabled: true, description: 'Alert when a critical device goes offline' },
+   112→  { name: 'Security Breach', channel: 'Email + SMS + Push', enabled: true, description: 'Alert on suspicious login or unauthorized access' },
+   113→  { name: 'AI Anomaly Detection', channel: 'Email + Dashboard', enabled: true, description: 'Alert when AI detects unusual patterns' },
+   114→  { name: 'Maintenance Reminder', channel: 'Dashboard', enabled: false, description: 'Remind about scheduled maintenance tasks' },
+   115→  { name: 'Payment Terminal Error', channel: 'Email + SMS', enabled: true, description: 'Alert on POS terminal communication errors' },
+   116→]
+   117→
+   118→const billingInfo = {
+   119→  plan: 'Enterprise',
+   120→  serialKey: 'AFPK-ENT-2023-XXXX-XXXX-7F2A',
+   121→  status: 'Active',
+   122→  monthlyCost: 'PKR 227,000',
+   123→  billingCycle: 'Monthly',
+   124→  nextBillingDate: 'April 1, 2026',
+   125→  stations: '4 / 25',
+   126→  users: '18 / 50',
+   127→  devices: '30 / 200',
+   128→  lastPayment: 'March 3, 2026',
+   129→  paymentMethod: 'Bank Transfer — HBL Account ****7821',
+   130→}
+   131→
+   132→const users = [
+   133→  { name: 'James Morrison', email: 'j.morrison@apexfuel.pk', role: 'Station Manager', status: 'active', lastLogin: '10:32 AM Today' },
+   134→  { name: 'Sarah Khan', email: 's.khan@apexfuel.pk', role: 'Admin', status: 'active', lastLogin: '09:45 AM Today' },
+   135→  { name: 'Ahmed Raza', email: 'a.raza@apexfuel.pk', role: 'Operator', status: 'active', lastLogin: '09:30 AM Today' },
+   136→  { name: 'Farhan Ali', email: 'f.ali@apexfuel.pk', role: 'Cashier', status: 'active', lastLogin: '08:30 AM Today' },
+   137→  { name: 'Nadia Siddiqui', email: 'n.siddiqui@apexfuel.pk', role: 'Manager', status: 'active', lastLogin: '07:00 AM Today' },
+   138→  { name: 'Tariq Mehmood', email: 't.mehmood@apexfuel.pk', role: 'Attendant', status: 'active', lastLogin: '06:30 AM Today' },
+   139→  { name: 'Zainab Hussain', email: 'z.hussain@apexfuel.pk', role: 'Cashier', status: 'inactive', lastLogin: '3 days ago' },
+   140→  { name: 'Usman Sheikh', email: 'operator2@apexfuel.pk', role: 'Operator', status: 'locked', lastLogin: '5 days ago' },
+   141→]
+   142→
+   143→const backupSettings = {
+   144→  autoBackup: true,
+   145→  frequency: 'Every 6 hours',
+   146→  retention: '30 days',
+   147→  lastBackup: '2 hours ago',
+   148→  nextBackup: 'In 4 hours',
+   149→  backupSize: '2.4 GB',
+   150→  backupLocation: 'Local + Cloud (S3)',
+   151→  encryption: 'AES-256',
+   152→}
+   153→
+   154→const backups = [
+   155→  { id: 1, date: 'Mar 4, 2026 — 08:00 AM', type: 'Automatic', size: '2.4 GB', location: 'Local + S3', status: 'completed' },
+   156→  { id: 2, date: 'Mar 4, 2026 — 02:00 AM', type: 'Automatic', size: '2.4 GB', location: 'Local + S3', status: 'completed' },
+   157→  { id: 3, date: 'Mar 3, 2026 — 08:00 PM', type: 'Automatic', size: '2.3 GB', location: 'Local + S3', status: 'completed' },
+   158→  { id: 4, date: 'Mar 3, 2026 — 02:00 PM', type: 'Automatic', size: '2.3 GB', location: 'Local + S3', status: 'completed' },
+   159→  { id: 5, date: 'Mar 1, 2026 — 10:00 AM', type: 'Manual', size: '2.3 GB', location: 'Local', status: 'completed' },
+   160→]
+   161→
+   162→const ROLE_COLORS: Record<string, string> = {
+   163→  Admin: 'bg-red-500/10 text-red-600 border-red-500/20',
+   164→  'Station Manager': 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+   165→  Manager: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+   166→  Operator: 'bg-sky-500/10 text-sky-600 border-sky-500/20',
+   167→  Cashier: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
+   168→  Attendant: 'bg-slate-500/10 text-slate-500 border-slate-500/20',
+   169→}
+   170→
+   171→const USER_STATUS: Record<string, { dot: string; text: string }> = {
+   172→  active: { dot: 'macos-status-online', text: 'text-emerald-600 dark:text-emerald-400' },
+   173→  inactive: { dot: 'macos-status-offline', text: 'text-muted-foreground' },
+   174→  locked: { dot: 'macos-status-error', text: 'text-red-600 dark:text-red-400' },
+   175→}
+   176→
+   177→// ── Component ──────────────────────────────────────
+   178→
+   179→export default function SettingsModule() {
+   180→  const [activeCategory, setActiveCategory] = useState<SettingsCategory>('general')
+   181→
+   182→  return (
+   183→    <div className="flex gap-6 min-h-[calc(100vh-140px)]">
+   184→      {/* ── Left: Category Sidebar ── */}
+   185→      <nav className="w-[220px] shrink-0">
+   186→        <div className="macos-card p-2 sticky top-0">
+   187→          {categories.map(cat => {
+   188→            const isActive = activeCategory === cat.key
+   189→            const Icon = cat.icon
+   190→            return (
+   191→              <button
+   192→                key={cat.key}
+   193→                onClick={() => setActiveCategory(cat.key)}
+   194→                className={`macos-sidebar-item w-full ${isActive ? 'active' : ''}`}
+   195→              >
+   196→                <Icon className="size-[15px] shrink-0" strokeWidth={isActive ? 2 : 1.5} />
+   197→                <div className="flex-1 text-left min-w-0">
+   198→                  <span className="text-[13px] block truncate">{cat.label}</span>
+   199→                </div>
+   200→                {isActive && <ChevronRight className="size-3 text-amber-500 shrink-0" />}
+   201→              </button>
+   202→            )
+   203→          })}
+   204→        </div>
+   205→      </nav>
+   206→
+   207→      {/* ── Right: Detail Panel ── */}
+   208→      <div className="flex-1 min-w-0">
+   209→        <AnimatePresence mode="wait">
+   210→          <motion.div
+   211→            key={activeCategory}
+   212→            initial={{ opacity: 0, x: 8 }}
+   213→            animate={{ opacity: 1, x: 0 }}
+   214→            exit={{ opacity: 0, x: -8 }}
+   215→            transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+   216→          >
+   217→            {activeCategory === 'general' && <GeneralSettings />}
+   218→            {activeCategory === 'hardware' && <HardwareSettings />}
+   219→            {activeCategory === 'brands' && <BrandsSettings />}
+   220→            {activeCategory === 'notifications' && <NotificationsSettings />}
+   221→            {activeCategory === 'billing' && <BillingSettings />}
+   222→            {activeCategory === 'users' && <UsersSettings />}
+   223→            {activeCategory === 'backup' && <BackupSettings />}
+   224→            {activeCategory === 'about' && <AboutSettings />}
+   225→          </motion.div>
+   226→        </AnimatePresence>
+   227→      </div>
+   228→    </div>
+   229→  )
+   230→}
+   231→
+   232→// ── General Settings ──
+   233→function GeneralSettings() {
+   234→  return (
+   235→    <div className="space-y-4">
+   236→      <h2 className="text-[20px] font-semibold tracking-tight">General</h2>
+   237→      <p className="text-[13px] text-muted-foreground -mt-2">Configure station details, timezone, and regional settings</p>
+   238→
+   239→      <div className="macos-section-header">Station Information</div>
+   240→      <div className="macos-group">
+   241→        {[
+   242→          { label: 'Station Name', value: stationConfig.name },
+   243→          { label: 'Station Code', value: stationConfig.code, mono: true },
+   244→          { label: 'Address', value: stationConfig.address },
+   245→          { label: 'City', value: stationConfig.city },
+   246→          { label: 'Phone', value: stationConfig.phone },
+   247→          { label: 'Email', value: stationConfig.email },
+   248→          { label: 'Operating Hours', value: stationConfig.operatingHours },
+   249→          { label: 'Station Type', value: stationConfig.stationType },
+   250→        ].map(item => (
+   251→          <div key={item.label} className="macos-group-item">
+   252→            <div className="flex items-center justify-between">
+   253→              <span className="text-[13px] text-muted-foreground">{item.label}</span>
+   254→              <span className={`text-[13px] font-medium ${item.mono ? 'font-mono' : ''}`}>{item.value}</span>
+   255→            </div>
+   256→          </div>
+   257→        ))}
+   258→      </div>
+   259→
+   260→      <div className="macos-section-header">Regional Settings</div>
+   261→      <div className="macos-group">
+   262→        {[
+   263→          { label: 'Timezone', value: stationConfig.timezone, icon: Clock },
+   264→          { label: 'Language', value: stationConfig.language, icon: Globe },
+   265→          { label: 'Currency', value: stationConfig.currency, icon: CreditCard },
+   266→          { label: 'Tax Rate', value: stationConfig.taxRate, icon: Building2 },
+   267→        ].map(item => (
+   268→          <div key={item.label} className="macos-group-item">
+   269→            <div className="flex items-center justify-between">
+   270→              <div className="flex items-center gap-2">
+   271→                <item.icon className="size-3.5 text-muted-foreground" />
+   272→                <span className="text-[13px] text-muted-foreground">{item.label}</span>
+   273→              </div>
+   274→              <span className="text-[13px] font-medium">{item.value}</span>
+   275→            </div>
+   276→          </div>
+   277→        ))}
+   278→      </div>
+   279→
+   280→      <div className="flex justify-end pt-2">
+   281→        <button className="macos-btn text-[12px] px-4 py-1.5 flex items-center gap-1.5">
+   282→          <Save className="size-3.5" /> Save Changes
+   283→        </button>
+   284→      </div>
+   285→    </div>
+   286→  )
+   287→}
+   288→
+   289→// ── Hardware Integration Settings ──
+   290→function HardwareSettings() {
+   291→  return (
+   292→    <div className="space-y-4">
+   293→      <h2 className="text-[20px] font-semibold tracking-tight">Hardware Integration</h2>
+   294→      <p className="text-[13px] text-muted-foreground -mt-2">Configure forecourt controllers, dispensers, ATG systems, and communication protocols</p>
+   295→
+   296→      <div className="macos-section-header">Forecourt Controllers</div>
+   297→      {forecourtControllers.map(fc => (
+   298→        <div key={fc.name} className="macos-card p-4">
+   299→          <div className="flex items-start justify-between mb-3">
+   300→            <div className="flex items-center gap-3">
+   301→              <div className="size-9 rounded-[10px] bg-amber-500/10 flex items-center justify-center">
+   302→                <Server className="size-4 text-amber-500" />
+   303→              </div>
+   304→              <div>
+   305→                <h3 className="text-[13px] font-semibold">{fc.name}</h3>
+   306→                <p className="text-[11px] text-muted-foreground">{fc.brand}</p>
+   307→              </div>
+   308→            </div>
+   309→            <div className="flex items-center gap-1.5">
+   310→              <div className="macos-status-dot macos-status-online" />
+   311→              <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">Online</span>
+   312→            </div>
+   313→          </div>
+   314→          <div className="macos-group">
+   315→            <div className="macos-group-item">
+   316→              <div className="flex justify-between text-[12px]">
+   317→                <span className="text-muted-foreground">IP Address</span>
+   318→                <span className="font-mono">{fc.ip}:{fc.port}</span>
+   319→              </div>
+   320→            </div>
+   321→            <div className="macos-group-item">
+   322→              <div className="flex justify-between text-[12px]">
+   323→                <span className="text-muted-foreground">Protocol</span>
+   324→                <span className="font-mono text-amber-600 dark:text-amber-400">{fc.protocol}</span>
+   325→              </div>
+   326→            </div>
+   327→            <div className="macos-group-item">
+   328→              <div className="flex justify-between text-[12px]">
+   329→                <span className="text-muted-foreground">Connected Pumps</span>
+   330→                <span className="font-medium">{fc.pumps}</span>
+   331→              </div>
+   332→            </div>
+   333→          </div>
+   334→        </div>
+   335→      ))}
+   336→
+   337→      <div className="macos-section-header">Dispenser Profiles</div>
+   338→      <div className="macos-card overflow-hidden">
+   339→        <div className="max-h-[320px] overflow-y-auto">
+   340→          <table className="macos-table">
+   341→            <thead>
+   342→              <tr>
+   343→                <th>ID</th>
+   344→                <th>Name</th>
+   345→                <th>Brand</th>
+   346→                <th>Model</th>
+   347→                <th>Protocol</th>
+   348→                <th>Nozzles</th>
+   349→                <th>Status</th>
+   350→              </tr>
+   351→            </thead>
+   352→            <tbody>
+   353→              {dispenserProfiles.map(d => {
+   354→                const st = d.status === 'online' ? 'macos-status-online' : d.status === 'warning' ? 'macos-status-warning' : 'macos-status-offline'
+   355→                const tc = d.status === 'online' ? 'text-emerald-600 dark:text-emerald-400' : d.status === 'warning' ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'
+   356→                return (
+   357→                  <tr key={d.id}>
+   358→                    <td className="font-mono text-[12px] text-amber-600 dark:text-amber-400">{d.id}</td>
+   359→                    <td className="text-[13px] font-medium">{d.name}</td>
+   360→                    <td className="text-[12px]">{d.brand}</td>
+   361→                    <td className="text-[12px] text-muted-foreground">{d.model}</td>
+   362→                    <td className="text-[11px] font-mono">{d.protocol}</td>
+   363→                    <td className="text-[12px] text-center">{d.nozzles}</td>
+   364→                    <td>
+   365→                      <div className="flex items-center gap-1.5">
+   366→                        <div className={`macos-status-dot ${st}`} />
+   367→                        <span className={`text-[11px] font-medium capitalize ${tc}`}>{d.status}</span>
+   368→                      </div>
+   369→                    </td>
+   370→                  </tr>
+   371→                )
+   372→              })}
+   373→            </tbody>
+   374→          </table>
+   375→        </div>
+   376→      </div>
+   377→
+   378→      <div className="macos-section-header">ATG Profiles</div>
+   379→      <div className="macos-card overflow-hidden">
+   380→        <div className="max-h-[240px] overflow-y-auto">
+   381→          <table className="macos-table">
+   382→            <thead>
+   383→              <tr>
+   384→                <th>ID</th>
+   385→                <th>Tank</th>
+   386→                <th>Brand</th>
+   387→                <th>Model</th>
+   388→                <th>IP</th>
+   389→                <th>Capacity</th>
+   390→                <th>Status</th>
+   391→              </tr>
+   392→            </thead>
+   393→            <tbody>
+   394→              {atgProfiles.map(a => (
+   395→                <tr key={a.id}>
+   396→                  <td className="font-mono text-[12px] text-amber-600 dark:text-amber-400">{a.id}</td>
+   397→                  <td className="text-[13px] font-medium">{a.name}</td>
+   398→                  <td className="text-[12px]">{a.brand}</td>
+   399→                  <td className="text-[12px] text-muted-foreground">{a.model}</td>
+   400→                  <td className="text-[11px] font-mono">{a.ip}</td>
+   401→                  <td className="text-[12px]">{a.capacity}</td>
+   402→                  <td>
+   403→                    <div className="flex items-center gap-1.5">
+   404→                      <div className="macos-status-dot macos-status-online" />
+   405→                      <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">Online</span>
+   406→                    </div>
+   407→                  </td>
+   408→                </tr>
+   409→              ))}
+   410→            </tbody>
+   411→          </table>
+   412→        </div>
+   413→      </div>
+   414→
+   415→      <div className="macos-section-header">Communication Protocols</div>
+   416→      <div className="macos-group">
+   417→        {commProtocols.map(proto => (
+   418→          <div key={proto.name} className="macos-group-item">
+   419→            <div className="flex items-center justify-between">
+   420→              <div className="flex items-center gap-2.5">
+   421→                <Cable className="size-3.5 text-amber-500" />
+   422→                <span className="text-[13px] font-medium font-mono">{proto.name}</span>
+   423→                <span className="text-[11px] text-muted-foreground">{proto.transport}</span>
+   424→              </div>
+   425→              <div className="flex items-center gap-3">
+   426→                <span className="text-[12px] text-muted-foreground">Port: {proto.port}</span>
+   427→                <span className="text-[12px] text-amber-600 dark:text-amber-400 font-medium">{proto.devices} devices</span>
+   428→                <div className="flex items-center gap-1.5">
+   429→                  <div className="macos-status-dot macos-status-online" />
+   430→                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400">Active</span>
+   431→                </div>
+   432→              </div>
+   433→            </div>
+   434→          </div>
+   435→        ))}
+   436→      </div>
+   437→    </div>
+   438→  )
+   439→}
+   440→
+   441→// ── Dispenser Brands Settings ──
+   442→function BrandsSettings() {
+   443→  const [enabledBrands, setEnabledBrands] = useState<Record<string, boolean>>(
+   444→    Object.fromEntries(dispenserBrands.map(b => [b.brand, b.enabled]))
+   445→  )
+   446→
+   447→  return (
+   448→    <div className="space-y-4">
+   449→      <h2 className="text-[20px] font-semibold tracking-tight">Dispenser Brands</h2>
+   450→      <p className="text-[13px] text-muted-foreground -mt-2">Configure supported dispenser manufacturers and their protocol mappings</p>
+   451→
+   452→      <div className="space-y-2">
+   453→        {dispenserBrands.map((brand, i) => (
+   454→          <div key={brand.brand} className="macos-card p-4">
+   455→            <div className="flex items-center justify-between">
+   456→              <div className="flex items-center gap-3">
+   457→                <div className="size-10 rounded-[10px] bg-amber-500/10 flex items-center justify-center">
+   458→                  <Fuel className="size-5 text-amber-500" />
+   459→                </div>
+   460→                <div>
+   461→                  <h3 className="text-[13px] font-semibold">{brand.brand}</h3>
+   462→                  <p className="text-[11px] text-muted-foreground">{brand.region} • Protocol: <span className="font-mono text-amber-600 dark:text-amber-400">{brand.protocol}</span></p>
+   463→                </div>
+   464→              </div>
+   465→              <div className="flex items-center gap-4">
+   466→                <span className="text-[11px] text-muted-foreground">{brand.configuredPumps} pump{brand.configuredPumps > 1 ? 's' : ''}</span>
+   467→                <Switch
+   468→                  checked={enabledBrands[brand.brand]}
+   469→                  onCheckedChange={(checked) => setEnabledBrands(prev => ({ ...prev, [brand.brand]: checked }))}
+   470→                />
+   471→              </div>
+   472→            </div>
+   473→            {enabledBrands[brand.brand] && (
+   474→              <motion.div
+   475→                initial={{ opacity: 0, height: 0 }}
+   476→                animate={{ opacity: 1, height: 'auto' }}
+   477→                exit={{ opacity: 0, height: 0 }}
+   478→                className="mt-3 pt-3 border-t border-border"
+   479→              >
+   480→                <div className="macos-section-header">Supported Models</div>
+   481→                <div className="flex flex-wrap gap-1.5 mt-1">
+   482→                  {brand.models.map(model => (
+   483→                    <Badge key={model} variant="outline" className="text-[10px] px-2 py-0.5 bg-amber-500/5 text-amber-600 border-amber-500/15 font-medium">
+   484→                      {model}
+   485→                    </Badge>
+   486→                  ))}
+   487→                </div>
+   488→              </motion.div>
+   489→            )}
+   490→          </div>
+   491→        ))}
+   492→      </div>
+   493→    </div>
+   494→  )
+   495→}
+   496→
+   497→// ── Notifications Settings ──
+   498→function NotificationsSettings() {
+   499→  const [rules, setRules] = useState(alertRules)
+   500→
+   501→  return (
+   502→    <div className="space-y-4">
+   503→      <h2 className="text-[20px] font-semibold tracking-tight">Notifications</h2>
+   504→      <p className="text-[13px] text-muted-foreground -mt-2">Configure alert rules and notification delivery channels</p>
+   505→
+   506→      <div className="macos-section-header">Alert Rules</div>
+   507→      <div className="space-y-1">
+   508→        {rules.map((rule, i) => (
+   509→          <div key={rule.name} className="macos-card p-3">
+   510→            <div className="flex items-center justify-between">
+   511→              <div className="flex items-center gap-3 flex-1 min-w-0">
+   512→                <div className={`size-8 rounded-lg flex items-center justify-center shrink-0 ${
+   513→                  rule.enabled ? 'bg-amber-500/10' : 'bg-slate-500/10'
+   514→                }`}>
+   515→                  {rule.channel.includes('SMS') ? (
+   516→                    <Smartphone className={`size-4 ${rule.enabled ? 'text-amber-500' : 'text-slate-400'}`} />
+   517→                  ) : rule.channel.includes('Email') ? (
+   518→                    <Mail className={`size-4 ${rule.enabled ? 'text-amber-500' : 'text-slate-400'}`} />
+   519→                  ) : (
+   520→                    <Bell className={`size-4 ${rule.enabled ? 'text-amber-500' : 'text-slate-400'}`} />
+   521→                  )}
+   522→                </div>
+   523→                <div className="flex-1 min-w-0">
+   524→                  <h3 className="text-[13px] font-medium">{rule.name}</h3>
+   525→                  <p className="text-[11px] text-muted-foreground truncate">{rule.description}</p>
+   526→                </div>
+   527→              </div>
+   528→              <div className="flex items-center gap-3 shrink-0">
+   529→                <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-slate-500/10 text-slate-500 border-slate-500/20">
+   530→                  {rule.channel}
+   531→                </Badge>
+   532→                <Switch
+   533→                  checked={rule.enabled}
+   534→                  onCheckedChange={(checked) => {
+   535→                    setRules(prev => prev.map((r, idx) => idx === i ? { ...r, enabled: checked } : r))
+   536→                  }}
+   537→                />
+   538→              </div>
+   539→            </div>
+   540→          </div>
+   541→        ))}
+   542→      </div>
+   543→
+   544→      <div className="macos-section-header">Notification Channels</div>
+   545→      <div className="macos-group">
+   546→        {[
+   547→          { name: 'Email', icon: Mail, detail: 'ops@apexfuel.pk', enabled: true },
+   548→          { name: 'SMS', icon: Smartphone, detail: '+92-301-5550123', enabled: true },
+   549→          { name: 'Push Notifications', icon: Bell, detail: 'Mobile app push', enabled: true },
+   550→          { name: 'Dashboard', icon: Monitor, detail: 'In-app notifications', enabled: true },
+   551→          { name: 'Webhook', icon: Link2, detail: 'https://hooks.slack.com/***', enabled: false },
+   552→        ].map(ch => (
+   553→          <div key={ch.name} className="macos-group-item">
+   554→            <div className="flex items-center justify-between">
+   555→              <div className="flex items-center gap-2.5">
+   556→                <ch.icon className="size-4 text-muted-foreground" />
+   557→                <div>
+   558→                  <span className="text-[13px] font-medium">{ch.name}</span>
+   559→                  <p className="text-[11px] text-muted-foreground">{ch.detail}</p>
+   560→                </div>
+   561→              </div>
+   562→              <Switch defaultChecked={ch.enabled} />
+   563→            </div>
+   564→          </div>
+   565→        ))}
+   566→      </div>
+   567→    </div>
+   568→  )
+   569→}
+   570→
+   571→// ── Billing Settings ──
+   572→function BillingSettings() {
+   573→  return (
+   574→    <div className="space-y-4">
+   575→      <h2 className="text-[20px] font-semibold tracking-tight">Billing</h2>
+   576→      <p className="text-[13px] text-muted-foreground -mt-2">Manage your subscription, serial key, and billing information</p>
+   577→
+   578→      <div className="macos-card p-5">
+   579→        <div className="flex items-start gap-4">
+   580→          <div className="size-12 rounded-2xl bg-amber-500/10 flex items-center justify-center shrink-0">
+   581→            <Package className="size-6 text-amber-500" />
+   582→          </div>
+   583→          <div className="flex-1">
+   584→            <div className="flex items-center gap-3 mb-1">
+   585→              <h3 className="text-[15px] font-semibold">{billingInfo.plan} Plan</h3>
+   586→              <Badge variant="outline" className="text-[10px] px-2 py-0 bg-emerald-500/10 text-emerald-600 border-emerald-500/20 font-semibold">
+   587→                <CheckCircle2 className="size-2.5 mr-0.5" /> {billingInfo.status}
+   588→              </Badge>
+   589→            </div>
+   590→            <p className="text-[13px] font-medium" style={{ color: '#e8930c' }}>{billingInfo.monthlyCost}/month</p>
+   591→          </div>
+   592→        </div>
+   593→      </div>
+   594→
+   595→      <div className="macos-section-header">License Key</div>
+   596→      <div className="macos-card p-4">
+   597→        <div className="flex items-center justify-between">
+   598→          <div className="flex items-center gap-3">
+   599→            <Key className="size-4 text-amber-500" />
+   600→            <div>
+   601→              <code className="text-[13px] font-mono bg-muted/50 px-2 py-0.5 rounded">{billingInfo.serialKey}</code>
+   602→              <p className="text-[11px] text-muted-foreground mt-0.5">Billing cycle: {billingInfo.billingCycle} • Next: {billingInfo.nextBillingDate}</p>
+   603→            </div>
+   604→          </div>
+   605→          <button className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+   606→            <Copy className="size-3" /> Copy
+   607→          </button>
+   608→        </div>
+   609→      </div>
+   610→
+   611→      <div className="macos-section-header">Usage & Limits</div>
+   612→      <div className="macos-group">
+   613→        {[
+   614→          { label: 'Stations', value: billingInfo.stations, icon: Building2 },
+   615→          { label: 'Users', value: billingInfo.users, icon: Users },
+   616→          { label: 'Devices', value: billingInfo.devices, icon: HardDrive },
+   617→        ].map(item => {
+   618→          const [used, max] = item.value.split(' / ').map(Number)
+   619→          const pct = Math.round((used / max) * 100)
+   620→          return (
+   621→            <div key={item.label} className="macos-group-item">
+   622→              <div className="flex items-center justify-between">
+   623→                <div className="flex items-center gap-2.5">
+   624→                  <item.icon className="size-4 text-muted-foreground" />
+   625→                  <span className="text-[13px]">{item.label}</span>
+   626→                </div>
+   627→                <div className="flex items-center gap-3">
+   628→                  <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
+   629→                    <div
+   630→                      className="h-full rounded-full"
+   631→                      style={{
+   632→                        width: `${pct}%`,
+   633→                        backgroundColor: pct > 80 ? '#ff3b30' : pct > 60 ? '#ff9f0a' : '#34c759'
+   634→                      }}
+   635→                    />
+   636→                  </div>
+   637→                  <span className="text-[12px] font-medium w-14 text-right">{item.value}</span>
+   638→                </div>
+   639→              </div>
+   640→            </div>
+   641→          )
+   642→        })}
+   643→      </div>
+   644→
+   645→      <div className="macos-section-header">Payment Information</div>
+   646→      <div className="macos-group">
+   647→        <div className="macos-group-item">
+   648→          <div className="flex justify-between text-[13px]">
+   649→            <span className="text-muted-foreground">Payment Method</span>
+   650→            <span className="font-medium">{billingInfo.paymentMethod}</span>
+   651→          </div>
+   652→        </div>
+   653→        <div className="macos-group-item">
+   654→          <div className="flex justify-between text-[13px]">
+   655→            <span className="text-muted-foreground">Last Payment</span>
+   656→            <span>{billingInfo.lastPayment}</span>
+   657→          </div>
+   658→        </div>
+   659→        <div className="macos-group-item">
+   660→          <div className="flex justify-between text-[13px]">
+   661→            <span className="text-muted-foreground">Next Billing Date</span>
+   662→            <span className="font-medium">{billingInfo.nextBillingDate}</span>
+   663→          </div>
+   664→        </div>
+   665→      </div>
+   666→    </div>
+   667→  )
+   668→}
+   669→
+   670→// ── Users & Roles Settings ──
+   671→function UsersSettings() {
+   672→  return (
+   673→    <div className="space-y-4">
+   674→      <div className="flex items-center justify-between">
+   675→        <div>
+   676→          <h2 className="text-[20px] font-semibold tracking-tight">Users & Roles</h2>
+   677→          <p className="text-[13px] text-muted-foreground -mt-2">Manage user accounts, roles, and permissions</p>
+   678→        </div>
+   679→        <button className="macos-btn text-[12px] px-3 py-1.5 flex items-center gap-1.5">
+   680→          <Plus className="size-3.5" /> Add User
+   681→        </button>
+   682→      </div>
+   683→
+   684→      <div className="macos-section-header">User Accounts</div>
+   685→      <div className="space-y-1">
+   686→        {users.map(user => {
+   687→          const st = USER_STATUS[user.status] || USER_STATUS.inactive
+   688→          return (
+   689→            <div key={user.email} className="macos-card p-3">
+   690→              <div className="flex items-center justify-between">
+   691→                <div className="flex items-center gap-3">
+   692→                  <div className="size-9 rounded-[10px] bg-amber-500/10 flex items-center justify-center text-[11px] font-bold text-amber-600 dark:text-amber-400">
+   693→                    {user.name.split(' ').map(w => w[0]).join('').slice(0, 2)}
+   694→                  </div>
+   695→                  <div>
+   696→                    <h3 className="text-[13px] font-medium">{user.name}</h3>
+   697→                    <p className="text-[11px] text-muted-foreground">{user.email}</p>
+   698→                  </div>
+   699→                </div>
+   700→                <div className="flex items-center gap-3">
+   701→                  <Badge variant="outline" className={`text-[9px] px-1.5 py-0 font-semibold ${ROLE_COLORS[user.role] || ''}`}>
+   702→                    {user.role}
+   703→                  </Badge>
+   704→                  <div className="flex items-center gap-1.5">
+   705→                    <div className={`macos-status-dot ${st.dot}`} />
+   706→                    <span className={`text-[10px] font-medium capitalize ${st.text}`}>{user.status}</span>
+   707→                  </div>
+   708→                  <span className="text-[11px] text-muted-foreground hidden sm:inline">{user.lastLogin}</span>
+   709→                </div>
+   710→              </div>
+   711→            </div>
+   712→          )
+   713→        })}
+   714→      </div>
+   715→
+   716→      <div className="macos-section-header">Role Permissions</div>
+   717→      <div className="macos-group">
+   718→        {[
+   719→          { role: 'Admin', desc: 'Full system access including user management and billing', count: 1 },
+   720→          { role: 'Station Manager', desc: 'Operations, pricing, finance, reports, and settings', count: 1 },
+   721→          { role: 'Manager', desc: 'Multi-station oversight with read-only finance access', count: 1 },
+   722→          { role: 'Operator', desc: 'Forecourt, sales, and basic tank monitoring', count: 1 },
+   723→          { role: 'Cashier', desc: 'Sales processing and shift management', count: 2 },
+   724→          { role: 'Attendant', desc: 'View-only forecourt and basic sales entry', count: 1 },
+   725→        ].map(r => (
+   726→          <div key={r.role} className="macos-group-item">
+   727→            <div className="flex items-center justify-between">
+   728→              <div>
+   729→                <span className="text-[13px] font-medium">{r.role}</span>
+   730→                <p className="text-[11px] text-muted-foreground">{r.desc}</p>
+   731→              </div>
+   732→              <span className="text-[11px] text-muted-foreground">{r.count} user{r.count > 1 ? 's' : ''}</span>
+   733→            </div>
+   734→          </div>
+   735→        ))}
+   736→      </div>
+   737→    </div>
+   738→  )
+   739→}
+   740→
+   741→// ── Backup Settings ──
+   742→function BackupSettings() {
+   743→  return (
+   744→    <div className="space-y-4">
+   745→      <h2 className="text-[20px] font-semibold tracking-tight">Backup</h2>
+   746→      <p className="text-[13px] text-muted-foreground -mt-2">Configure automated backups and restore from previous snapshots</p>
+   747→
+   748→      <div className="macos-card p-5">
+   749→        <div className="flex items-start justify-between">
+   750→          <div className="flex items-center gap-3">
+   751→            <div className="size-10 rounded-[10px] bg-emerald-500/10 flex items-center justify-center">
+   752→              <Database className="size-5 text-emerald-500" />
+   753→            </div>
+   754→            <div>
+   755→              <h3 className="text-[13px] font-semibold">Automatic Backup</h3>
+   756→              <p className="text-[11px] text-muted-foreground mt-0.5">Last backup: {backupSettings.lastBackup} • Next: {backupSettings.nextBackup}</p>
+   757→            </div>
+   758→          </div>
+   759→          <Switch defaultChecked={backupSettings.autoBackup} />
+   760→        </div>
+   761→      </div>
+   762→
+   763→      <div className="macos-section-header">Backup Configuration</div>
+   764→      <div className="macos-group">
+   765→        {[
+   766→          { label: 'Frequency', value: backupSettings.frequency, icon: Clock },
+   767→          { label: 'Retention Period', value: backupSettings.retention, icon: Calendar },
+   768→          { label: 'Backup Size', value: backupSettings.backupSize, icon: HardDrive },
+   769→          { label: 'Storage Location', value: backupSettings.backupLocation, icon: Cloud },
+   770→          { label: 'Encryption', value: backupSettings.encryption, icon: Shield },
+   771→        ].map(item => (
+   772→          <div key={item.label} className="macos-group-item">
+   773→            <div className="flex items-center justify-between">
+   774→              <div className="flex items-center gap-2">
+   775→                <item.icon className="size-3.5 text-muted-foreground" />
+   776→                <span className="text-[13px] text-muted-foreground">{item.label}</span>
+   777→              </div>
+   778→              <span className="text-[13px] font-medium">{item.value}</span>
+   779→            </div>
+   780→          </div>
+   781→        ))}
+   782→      </div>
+   783→
+   784→      <div className="flex gap-2 pt-1">
+   785→        <button className="macos-btn text-[12px] px-3 py-1.5 flex items-center gap-1.5">
+   786→          <Download className="size-3.5" /> Backup Now
+   787→        </button>
+   788→        <button className="macos-btn-secondary text-[12px] px-3 py-1.5 flex items-center gap-1.5">
+   789→          <RotateCcw className="size-3.5" /> Restore from Backup
+   790→        </button>
+   791→      </div>
+   792→
+   793→      <div className="macos-section-header">Backup History</div>
+   794→      <div className="macos-card overflow-hidden">
+   795→        <div className="max-h-[260px] overflow-y-auto">
+   796→          <table className="macos-table">
+   797→            <thead>
+   798→              <tr>
+   799→                <th>Date</th>
+   800→                <th>Type</th>
+   801→                <th>Size</th>
+   802→                <th>Location</th>
+   803→                <th>Status</th>
+   804→                <th></th>
+   805→              </tr>
+   806→            </thead>
+   807→            <tbody>
+   808→              {backups.map(bk => (
+   809→                <tr key={bk.id}>
+   810→                  <td className="text-[12px] whitespace-nowrap">{bk.date}</td>
+   811→                  <td>
+   812→                    <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${bk.type === 'Manual' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 'bg-slate-500/10 text-slate-500 border-slate-500/20'}`}>
+   813→                      {bk.type}
+   814→                    </Badge>
+   815→                  </td>
+   816→                  <td className="text-[12px] text-muted-foreground">{bk.size}</td>
+   817→                  <td className="text-[12px] text-muted-foreground">{bk.location}</td>
+   818→                  <td>
+   819→                    <div className="flex items-center gap-1.5">
+   820→                      <div className="macos-status-dot macos-status-online" />
+   821→                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400">Complete</span>
+   822→                    </div>
+   823→                  </td>
+   824→                  <td>
+   825→                    <button className="size-6 rounded-md flex items-center justify-center hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors" title="Restore">
+   826→                      <RotateCcw className="size-3 text-muted-foreground" />
+   827→                    </button>
+   828→                  </td>
+   829→                </tr>
+   830→              ))}
+   831→            </tbody>
+   832→          </table>
+   833→        </div>
+   834→      </div>
+   835→    </div>
+   836→  )
+   837→}
+   838→
+   839→// ── About Settings ──
+   840→function AboutSettings() {
+   841→  return (
+   842→    <div className="space-y-4">
+   843→      <h2 className="text-[20px] font-semibold tracking-tight">About FuelFlow OS</h2>
+   844→      <p className="text-[13px] text-muted-foreground -mt-2">System information and version details</p>
+   845→
+   846→      <div className="macos-card p-6 text-center">
+   847→        <div className="size-16 rounded-2xl fuel-gradient flex items-center justify-center mx-auto mb-4 shadow-lg">
+   848→          <Fuel className="size-8 text-white" />
+   849→        </div>
+   850→        <h3 className="text-[18px] font-bold">FuelFlow OS</h3>
+   851→        <p className="text-[13px] text-muted-foreground mt-1">ApexFlow Ecosystem</p>
+   852→        <p className="text-[15px] font-semibold mt-2" style={{ color: '#e8930c' }}>Version 3.2.1</p>
+   853→        <p className="text-[11px] text-muted-foreground mt-1">Build 2026.03.04.1847 • macOS Golden Gate</p>
+   854→      </div>
+   855→
+   856→      <div className="macos-section-header">System Information</div>
+   857→      <div className="macos-group">
+   858→        {[
+   859→          { label: 'Platform', value: 'FuelFlow OS for macOS Golden Gate' },
+   860→          { label: 'Version', value: '3.2.1 (Build 1847)' },
+   861→          { label: 'Architecture', value: 'Next.js 16 / TypeScript 5 / Tailwind CSS 4' },
+   862→          { label: 'Database', value: 'SQLite / Prisma ORM' },
+   863→          { label: 'Station ID', value: 'APEX-ISB-001', mono: true },
+   864→          { label: 'Tenant ID', value: 'AFPK-ENT-00421', mono: true },
+   865→          { label: 'License', value: 'Enterprise — Active' },
+   866→          { label: 'Registered', value: 'June 15, 2023' },
+   867→        ].map(item => (
+   868→          <div key={item.label} className="macos-group-item">
+   869→            <div className="flex items-center justify-between">
+   870→              <span className="text-[13px] text-muted-foreground">{item.label}</span>
+   871→              <span className={`text-[13px] font-medium ${item.mono ? 'font-mono' : ''}`}>{item.value}</span>
+   872→            </div>
+   873→          </div>
+   874→        ))}
+   875→      </div>
+   876→
+   877→      <div className="macos-section-header">Runtime Status</div>
+   878→      <div className="macos-group">
+   879→        {[
+   880→          { label: 'Uptime', value: '14d 7h 32m', icon: Activity },
+   881→          { label: 'Node Version', value: 'Bun 1.2.x', icon: Zap },
+   882→          { label: 'Connected Devices', value: '30', icon: Cpu },
+   883→          { label: 'Active Sessions', value: '7', icon: Users },
+   884→          { label: 'Database Size', value: '248 MB', icon: Database },
+   885→          { label: 'Cache Status', value: 'Healthy', icon: Layers },
+   886→        ].map(item => (
+   887→          <div key={item.label} className="macos-group-item">
+   888→            <div className="flex items-center justify-between">
+   889→              <div className="flex items-center gap-2">
+   890→                <item.icon className="size-3.5 text-muted-foreground" />
+   891→                <span className="text-[13px] text-muted-foreground">{item.label}</span>
+   892→              </div>
+   893→              <span className="text-[13px] font-medium">{item.value}</span>
+   894→            </div>
+   895→          </div>
+   896→        ))}
+   897→      </div>
+   898→
+   899→      <div className="macos-section-header">Acknowledgments</div>
+   900→      <div className="macos-card p-4">
+   901→        <p className="text-[12px] text-muted-foreground leading-relaxed">
+   902→          FuelFlow OS is built on the ApexFlow Ecosystem platform, designed for modern fuel retail operations in Pakistan.
+   903→          Powered by Next.js, TypeScript, Tailwind CSS, and Prisma. Communication protocols support IFSF, PARIUS, DFS, and TLS-350 standards.
+   904→          All transaction data is encrypted with AES-256. Compliance with OGRA and PRA regulatory requirements.
+   905→        </p>
+   906→      </div>
+   907→
+   908→      <div className="text-center pt-4">
+   909→        <p className="text-[11px] text-muted-foreground">© 2023–2026 ApexFlow Technologies (Pvt.) Ltd. All rights reserved.</p>
+   910→      </div>
+   911→    </div>
+   912→  )
+   913→}
+   914→

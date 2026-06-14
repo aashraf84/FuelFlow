@@ -1,0 +1,1601 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useRef, useCallback } from 'react'
+     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→import {
+     6→  Users, CreditCard, FileText, FileSpreadsheet, Key, Monitor, Fuel,
+     7→  Plus, Search, ChevronRight, X, Printer, Download, Copy,
+     8→  CheckCircle2, AlertCircle, Loader2, Building2, Mail, Phone,
+     9→  MapPin, Globe, Calendar, DollarSign, Eye, Edit, Trash2,
+    10→  MoreHorizontal, ArrowRight, Shield, Zap, Crown, Star, Cpu, Droplets,
+    11→  Hash, Link2, Clock, Send, CheckCircle, XCircle, RefreshCw,
+    12→  Database, Server, HardDrive, Activity, ChevronDown, ExternalLink,
+    13→} from 'lucide-react'
+    14→import {
+    15→  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+    16→} from '@/components/ui/dialog'
+    17→import {
+    18→  Sheet, SheetContent, SheetHeader, SheetTitle,
+    19→} from '@/components/ui/sheet'
+    20→import {
+    21→  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+    22→} from '@/components/ui/select'
+    23→import { Input } from '@/components/ui/input'
+    24→import { Label } from '@/components/ui/label'
+    25→import { Textarea } from '@/components/ui/textarea'
+    26→import { Button } from '@/components/ui/button'
+    27→import { Separator } from '@/components/ui/separator'
+    28→import { Badge } from '@/components/ui/badge'
+    29→
+    30→// ── Types ──────────────────────────────────────────────
+    31→
+    32→type OwnerTab = 'clients' | 'subscriptions' | 'invoices' | 'quotations' | 'license-keys' | 'devices' | 'tenants'
+    33→
+    34→interface Client {
+    35→  id: string; companyName: string; slug: string; contactPerson: string; email: string
+    36→  phone: string; address?: string; city?: string; state?: string; country: string
+    37→  postalCode?: string; website?: string; taxId?: string; registrationNumber?: string
+    38→  logo?: string; industry?: string; notes?: string; status: string
+    39→  onboardedAt: string; createdAt: string
+    40→  databaseUrl?: string; databaseName?: string; databaseStatus?: string
+    41→  _count?: { subscriptions: number; invoices: number; devices: number; licenseKeys: number }
+    42→  tenantDatabase?: TenantDatabaseInfo
+    43→}
+    44→
+    45→interface TenantDatabaseInfo {
+    46→  id: string; databaseName: string; status: string; totalSize?: string
+    47→  tableCount: number; activatedAt?: string; lastMigratedAt?: string; schemaVersion?: string
+    48→}
+    49→
+    50→interface Plan {
+    51→  id: string; name: string; slug: string; description?: string; priceMonthly: number
+    52→  priceAnnual: number; currency: string; maxStations: number; maxDispensers: number
+    53→  maxUsers: number; maxDevices: number; features: string; isPopular: boolean
+    54→  _count?: { subscriptions: number; licenseKeys: number }
+    55→}
+    56→
+    57→interface Subscription {
+    58→  id: string; clientId: string; planId: string; status: string; billingCycle: string
+    59→  startDate: string; endDate?: string; autoRenew: boolean; notes?: string
+    60→  client?: Client; plan?: Plan
+    61→}
+    62→
+    63→interface InvoiceItem { id: string; description: string; quantity: number; unitPrice: number; amount: number }
+    64→interface InvoicePayment { id: string; amount: number; method: string; reference?: string; paidAt: string }
+    65→
+    66→interface Invoice {
+    67→  id: string; invoiceNumber: string; clientId: string; status: string
+    68→  issueDate: string; dueDate: string; paidDate?: string; subtotal: number
+    69→  taxRate: number; taxAmount: number; discountRate: number; discountAmount: number
+    70→  total: number; paidAmount: number; balanceDue: number; currency: string
+    71→  notes?: string; terms?: string; items: InvoiceItem[]; payments: InvoicePayment[]
+    72→  client?: Client; subscriptionId?: string
+    73→}
+    74→
+    75→interface QuotationItem { id: string; description: string; quantity: number; unitPrice: number; amount: number }
+    76→
+    77→interface Quotation {
+    78→  id: string; quotationNumber: string; clientId?: string; clientName: string
+    79→  clientEmail?: string; clientPhone?: string; clientAddress?: string
+    80→  status: string; issueDate: string; validUntil: string
+    81→  subtotal: number; taxRate: number; taxAmount: number; discountRate: number
+    82→  discountAmount: number; total: number; currency: string
+    83→  notes?: string; terms?: string; internalNotes?: string
+    84→  items: QuotationItem[]; client?: Client
+    85→}
+    86→
+    87→interface LicenseKey {
+    88→  id: string; key: string; clientId?: string; planId?: string; status: string
+    89→  maxStations: number; maxDispensers: number; maxUsers: number
+    90→  assignedAt?: string; revokedAt?: string; expiresAt?: string; notes?: string
+    91→  client?: Client; plan?: Plan
+    92→}
+    93→
+    94→interface ClientDevice {
+    95→  id: string; clientId: string; deviceName: string; deviceType: string
+    96→  serialNumber?: string; macAddress?: string; ipAddress?: string
+    97→  location?: string; status: string; activatedAt: string; lastSeenAt?: string; notes?: string
+    98→  client?: Client
+    99→}
+   100→
+   101→// ── Helpers ────────────────────────────────────────────
+   102→
+   103→const formatPKR = (n: number) => `PKR ${n.toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+   104→const formatDate = (d: string) => new Date(d).toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' })
+   105→
+   106→const statusColor: Record<string, string> = {
+   107→  active: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+   108→  inactive: 'bg-gray-500/10 text-gray-500 border-gray-500/20',
+   109→  suspended: 'bg-red-500/10 text-red-500 border-red-500/20',
+   110→  trial: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+   111→  churned: 'bg-gray-500/10 text-gray-400 border-gray-500/20',
+   112→  past_due: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+   113→  cancelled: 'bg-red-500/10 text-red-500 border-red-500/20',
+   114→  expired: 'bg-gray-500/10 text-gray-400 border-gray-500/20',
+   115→  draft: 'bg-gray-500/10 text-gray-500 border-gray-500/20',
+   116→  sent: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+   117→  paid: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+   118→  partial: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
+   119→  overdue: 'bg-red-500/10 text-red-500 border-red-500/20',
+   120→  accepted: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+   121→  rejected: 'bg-red-500/10 text-red-500 border-red-500/20',
+   122→  converted: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+   123→  available: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+   124→  assigned: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+   125→  revoked: 'bg-red-500/10 text-red-500 border-red-500/20',
+   126→  maintenance: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+   127→  pending: 'bg-gray-500/10 text-gray-500 border-gray-500/20',
+   128→  provisioning: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+   129→  provisioning_schema: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+   130→  error: 'bg-red-500/10 text-red-500 border-red-500/20',
+   131→  deleted: 'bg-gray-500/10 text-gray-400 border-gray-500/20',
+   132→}
+   133→
+   134→const deviceTypeIcon: Record<string, React.ElementType> = {
+   135→  pos: Monitor, dispenser_controller: Cpu, atg: Droplets,
+   136→  payment_terminal: CreditCard, scanner: Search, other: MoreHorizontal,
+   137→}
+   138→
+   139→// ── Sub-Components ─────────────────────────────────────
+   140→
+   141→function StatusBadge({ status }: { status: string }) {
+   142→  return (
+   143→    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase ${statusColor[status] || 'bg-gray-500/10 text-gray-500 border-gray-500/20'}`}>
+   144→      {status.replace('_', ' ')}
+   145→    </span>
+   146→  )
+   147→}
+   148→
+   149→function StatCard({ label, value, icon: Icon, accent }: { label: string; value: string; icon: React.ElementType; accent?: boolean }) {
+   150→  return (
+   151→    <div className="macos-card p-4">
+   152→      <div className="flex items-center justify-between mb-1">
+   153→        <span className="text-[11px] font-semibold uppercase text-muted-foreground">{label}</span>
+   154→        <Icon className={`size-4 ${accent ? 'text-amber-500' : 'text-muted-foreground'}`} />
+   155→      </div>
+   156→      <p className={`text-[22px] font-bold leading-tight ${accent ? 'fuel-text-gradient' : ''}`}>{value}</p>
+   157→    </div>
+   158→  )
+   159→}
+   160→
+   161→// ── Professional Invoice/Quotation Print Layout ─────────
+   162→
+   163→function PrintDocument({ type, data }: { type: 'invoice' | 'quotation'; data: Invoice | Quotation }) {
+   164→  const isInvoice = type === 'invoice'
+   165→  const inv = isInvoice ? data as Invoice : null
+   166→  const quote = !isInvoice ? data as Quotation : null
+   167→  const items = data.items
+   168→  const companyName = data.client?.companyName || (quote?.clientName) || ''
+   169→  const clientEmail = data.client?.email || quote?.clientEmail || ''
+   170→  const clientPhone = data.client?.phone || quote?.clientPhone || ''
+   171→  const clientAddress = data.client?.address || quote?.clientAddress || ''
+   172→
+   173→  return (
+   174→    <div id="print-area" className="bg-white text-black p-10 max-w-[800px] mx-auto" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif' }}>
+   175→      {/* Header */}
+   176→      <div className="flex justify-between items-start mb-8">
+   177→        <div>
+   178→          <div className="flex items-center gap-3 mb-2">
+   179→            <div className="size-10 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #e8930c, #ea580c)' }}>
+   180→              <Fuel className="size-5 text-white" />
+   181→            </div>
+   182→            <div>
+   183→              <h1 className="text-xl font-bold text-gray-900">ApexFlow Ecosystem</h1>
+   184→              <p className="text-xs text-gray-500">Enterprise Fuel Station Solutions</p>
+   185→            </div>
+   186→          </div>
+   187→          <div className="text-[11px] text-gray-500 mt-2 leading-relaxed">
+   188→            <p>Office 1207, Business Avenue Tower</p>
+   189→            <p>Block 9, Clifton, Karachi 75600, Pakistan</p>
+   190→            <p>Tax ID: NTN-4021948-6 | STR: 3210-948-1234</p>
+   191→            <p>info@apexflow.io | +92-21-3589-1234</p>
+   192→          </div>
+   193→        </div>
+   194→        <div className="text-right">
+   195→          <h2 className="text-2xl font-bold mb-1" style={{ color: '#e8930c' }}>
+   196→            {isInvoice ? 'INVOICE' : 'QUOTATION'}
+   197→          </h2>
+   198→          <div className="text-[12px] text-gray-600 space-y-0.5">
+   199→            <p><span className="font-semibold">{isInvoice ? 'Invoice' : 'Quotation'} #:</span> {isInvoice ? inv?.invoiceNumber : quote?.quotationNumber}</p>
+   200→            <p><span className="font-semibold">Date:</span> {formatDate(data.issueDate)}</p>
+   201→            {isInvoice ? (
+   202→              <p><span className="font-semibold">Due Date:</span> {formatDate(inv!.dueDate)}</p>
+   203→            ) : (
+   204→              <p><span className="font-semibold">Valid Until:</span> {formatDate(quote!.validUntil)}</p>
+   205→            )}
+   206→            <div className="mt-1">
+   207→              <StatusBadge status={data.status} />
+   208→            </div>
+   209→          </div>
+   210→        </div>
+   211→      </div>
+   212→
+   213→      {/* Bill To */}
+   214→      <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+   215→        <p className="text-[10px] font-semibold uppercase text-gray-400 mb-1.5">{isInvoice ? 'Bill To' : 'Quote To'}</p>
+   216→        <p className="text-[14px] font-bold text-gray-900">{companyName}</p>
+   217→        {clientAddress && <p className="text-[12px] text-gray-600">{clientAddress}</p>}
+   218→        <div className="text-[12px] text-gray-500 space-x-4 mt-1">
+   219→          {clientEmail && <span>{clientEmail}</span>}
+   220→          {clientPhone && <span>{clientPhone}</span>}
+   221→        </div>
+   222→      </div>
+   223→
+   224→      {/* Items Table */}
+   225→      <table className="w-full mb-6 text-[12px]" style={{ borderCollapse: 'collapse' }}>
+   226→        <thead>
+   227→          <tr style={{ borderBottom: '2px solid #e8930c' }}>
+   228→            <th className="text-left py-2.5 px-3 font-semibold text-gray-700">#</th>
+   229→            <th className="text-left py-2.5 px-3 font-semibold text-gray-700">Description</th>
+   230→            <th className="text-center py-2.5 px-3 font-semibold text-gray-700">Qty</th>
+   231→            <th className="text-right py-2.5 px-3 font-semibold text-gray-700">Unit Price</th>
+   232→            <th className="text-right py-2.5 px-3 font-semibold text-gray-700">Amount</th>
+   233→          </tr>
+   234→        </thead>
+   235→        <tbody>
+   236→          {items.map((item, i) => (
+   237→            <tr key={item.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
+   238→              <td className="py-2.5 px-3 text-gray-500">{i + 1}</td>
+   239→              <td className="py-2.5 px-3 text-gray-900">{item.description}</td>
+   240→              <td className="py-2.5 px-3 text-center text-gray-700">{item.quantity}</td>
+   241→              <td className="py-2.5 px-3 text-right text-gray-700">{formatPKR(item.unitPrice)}</td>
+   242→              <td className="py-2.5 px-3 text-right font-medium text-gray-900">{formatPKR(item.amount)}</td>
+   243→            </tr>
+   244→          ))}
+   245→        </tbody>
+   246→      </table>
+   247→
+   248→      {/* Totals */}
+   249→      <div className="flex justify-end mb-6">
+   250→        <div className="w-[300px]">
+   251→          <div className="flex justify-between py-1.5 text-[12px]">
+   252→            <span className="text-gray-500">Subtotal</span>
+   253→            <span className="font-medium text-gray-900">{formatPKR(data.subtotal)}</span>
+   254→          </div>
+   255→          {data.discountAmount > 0 && (
+   256→            <div className="flex justify-between py-1.5 text-[12px]">
+   257→              <span className="text-gray-500">Discount ({data.discountRate}%)</span>
+   258→              <span className="text-red-500">-{formatPKR(data.discountAmount)}</span>
+   259→            </div>
+   260→          )}
+   261→          {data.taxAmount > 0 && (
+   262→            <div className="flex justify-between py-1.5 text-[12px]">
+   263→              <span className="text-gray-500">Tax ({data.taxRate}%)</span>
+   264→              <span className="text-gray-700">{formatPKR(data.taxAmount)}</span>
+   265→            </div>
+   266→          )}
+   267→          <div className="flex justify-between py-2 text-[14px] font-bold mt-1" style={{ borderTop: '2px solid #e8930c' }}>
+   268→            <span>Total</span>
+   269→            <span style={{ color: '#e8930c' }}>{formatPKR(data.total)}</span>
+   270→          </div>
+   271→          {isInvoice && inv && inv.balanceDue > 0 && (
+   272→            <div className="flex justify-between py-1.5 text-[12px] bg-red-50 -mx-3 px-3 rounded">
+   273→              <span className="text-red-600 font-semibold">Balance Due</span>
+   274→              <span className="text-red-600 font-bold">{formatPKR(inv.balanceDue)}</span>
+   275→            </div>
+   276→          )}
+   277→        </div>
+   278→      </div>
+   279→
+   280→      {/* Bank Details (invoice only) */}
+   281→      {isInvoice && inv && inv.balanceDue > 0 && (
+   282→        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+   283→          <p className="text-[10px] font-semibold uppercase text-amber-600 mb-2">Bank Payment Details</p>
+   284→          <div className="grid grid-cols-2 gap-x-8 text-[11px]">
+   285→            <div><span className="text-gray-500">Bank:</span> <span className="font-medium text-gray-800">HBL — Habib Bank Limited</span></div>
+   286→            <div><span className="text-gray-500">Account Name:</span> <span className="font-medium text-gray-800">ApexFlow Technologies (Pvt) Ltd</span></div>
+   287→            <div><span className="text-gray-500">Account #:</span> <span className="font-medium text-gray-800">0022-7901-001234-01</span></div>
+   288→            <div><span className="text-gray-500">IBAN:</span> <span className="font-medium text-gray-800">PK36HABB0022790100123401</span></div>
+   289→            <div><span className="text-gray-500">Branch:</span> <span className="font-medium text-gray-800">Clifton, Karachi</span></div>
+   290→            <div><span className="text-gray-500">Swift Code:</span> <span className="font-medium text-gray-800">HABBPKKA</span></div>
+   291→          </div>
+   292→        </div>
+   293→      )}
+   294→
+   295→      {/* Payments (invoice only) */}
+   296→      {isInvoice && inv && inv.payments && inv.payments.length > 0 && (
+   297→        <div className="mb-6">
+   298→          <p className="text-[10px] font-semibold uppercase text-gray-400 mb-2">Payments Received</p>
+   299→          <table className="w-full text-[12px]" style={{ borderCollapse: 'collapse' }}>
+   300→            <thead>
+   301→              <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+   302→                <th className="text-left py-1.5 px-2 font-semibold text-gray-600">Date</th>
+   303→                <th className="text-left py-1.5 px-2 font-semibold text-gray-600">Method</th>
+   304→                <th className="text-left py-1.5 px-2 font-semibold text-gray-600">Reference</th>
+   305→                <th className="text-right py-1.5 px-2 font-semibold text-gray-600">Amount</th>
+   306→              </tr>
+   307→            </thead>
+   308→            <tbody>
+   309→              {inv.payments.map(p => (
+   310→                <tr key={p.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+   311→                  <td className="py-1.5 px-2 text-gray-600">{formatDate(p.paidAt)}</td>
+   312→                  <td className="py-1.5 px-2 text-gray-600 capitalize">{p.method.replace('_', ' ')}</td>
+   313→                  <td className="py-1.5 px-2 text-gray-600">{p.reference || '--'}</td>
+   314→                  <td className="py-1.5 px-2 text-right font-medium text-emerald-600">{formatPKR(p.amount)}</td>
+   315→                </tr>
+   316→              ))}
+   317→            </tbody>
+   318→          </table>
+   319→        </div>
+   320→      )}
+   321→
+   322→      {/* Notes & Terms */}
+   323→      <div className="grid grid-cols-2 gap-6 mb-6">
+   324→        {data.notes && (
+   325→          <div>
+   326→            <p className="text-[10px] font-semibold uppercase text-gray-400 mb-1">Notes</p>
+   327→            <p className="text-[12px] text-gray-600">{data.notes}</p>
+   328→          </div>
+   329→        )}
+   330→        {data.terms && (
+   331→          <div>
+   332→            <p className="text-[10px] font-semibold uppercase text-gray-400 mb-1">Terms & Conditions</p>
+   333→            <p className="text-[12px] text-gray-600">{data.terms}</p>
+   334→          </div>
+   335→        )}
+   336→      </div>
+   337→
+   338→      {/* Quotation signature line */}
+   339→      {!isInvoice && (
+   340→        <div className="mt-8 pt-4 border-t border-gray-200">
+   341→          <div className="flex justify-between">
+   342→            <div>
+   343→              <p className="text-[10px] font-semibold uppercase text-gray-400 mb-1">Authorized By</p>
+   344→              <div className="w-48 border-b border-gray-300 mb-1" />
+   345→              <p className="text-[11px] text-gray-500">ApexFlow Ecosystem</p>
+   346→            </div>
+   347→            <div>
+   348→              <p className="text-[10px] font-semibold uppercase text-gray-400 mb-1">Accepted By</p>
+   349→              <div className="w-48 border-b border-gray-300 mb-1" />
+   350→              <p className="text-[11px] text-gray-500">{companyName}</p>
+   351→            </div>
+   352→          </div>
+   353→        </div>
+   354→      )}
+   355→
+   356→      {/* Footer */}
+   357→      <div className="mt-8 pt-4 border-t border-gray-200 text-center">
+   358→        <p className="text-[11px] text-gray-400">ApexFlow Ecosystem -- FuelFlow OS &copy; {new Date().getFullYear()}</p>
+   359→        <p className="text-[10px] text-gray-300">Registered Office: Business Avenue Tower, Clifton, Karachi, Pakistan | NTN: 4021948-6 | SECP: 0012345</p>
+   360→      </div>
+   361→    </div>
+   362→  )
+   363→}
+   364→
+   365→// ── Tenant Databases Management Tab ──────────────────────
+   366→
+   367→function TenantDatabasesTab({ clients, onRefresh }: { clients: Client[]; onRefresh: () => void }) {
+   368→  const [provisioning, setProvisioning] = useState<string | null>(null)
+   369→  const [dropping, setDropping] = useState<string | null>(null)
+   370→  const [migrating, setMigrating] = useState<string | null>(null)
+   371→  const [error, setError] = useState<string | null>(null)
+   372→  const [success, setSuccess] = useState<string | null>(null)
+   373→
+   374→  const handleProvision = async (clientId: string, companyName: string) => {
+   375→    setProvisioning(clientId)
+   376→    setError(null)
+   377→    setSuccess(null)
+   378→    try {
+   379→      const res = await fetch('/api/owner/tenants', {
+   380→        method: 'POST',
+   381→        headers: { 'Content-Type': 'application/json' },
+   382→        body: JSON.stringify({ clientId }),
+   383→      })
+   384→      const data = await res.json()
+   385→      if (!res.ok) {
+   386→        setError(data.error || 'Provisioning failed')
+   387→      } else {
+   388→        setSuccess(`Database for ${companyName} provisioned successfully (${data.tablesCreated || 0} tables created)`)
+   389→        onRefresh()
+   390→      }
+   391→    } catch {
+   392→      setError('Network error during provisioning')
+   393→    } finally {
+   394→      setProvisioning(null)
+   395→    }
+   396→  }
+   397→
+   398→  const handleDrop = async (clientId: string, companyName: string) => {
+   399→    if (!confirm(`Are you sure you want to DROP the database for ${companyName}? This action is irreversible and will delete ALL data.`)) return
+   400→    setDropping(clientId)
+   401→    setError(null)
+   402→    setSuccess(null)
+   403→    try {
+   404→      const res = await fetch(`/api/owner/tenants?clientId=${clientId}`, { method: 'DELETE' })
+   405→      const data = await res.json()
+   406→      if (!res.ok) {
+   407→        setError(data.error || 'Failed to drop database')
+   408→      } else {
+   409→        setSuccess(`Database for ${companyName} dropped successfully`)
+   410→        onRefresh()
+   411→      }
+   412→    } catch {
+   413→      setError('Network error during drop')
+   414→    } finally {
+   415→      setDropping(null)
+   416→    }
+   417→  }
+   418→
+   419→  const handleMigrate = async (clientId: string, companyName: string) => {
+   420→    setMigrating(clientId)
+   421→    setError(null)
+   422→    setSuccess(null)
+   423→    try {
+   424→      const res = await fetch('/api/owner/tenants', {
+   425→        method: 'POST',
+   426→        headers: { 'Content-Type': 'application/json' },
+   427→        body: JSON.stringify({ clientId, force: true }),
+   428→      })
+   429→      const data = await res.json()
+   430→      if (!res.ok) {
+   431→        setError(data.error || 'Migration failed')
+   432→      } else {
+   433→        setSuccess(`Schema migration for ${companyName} completed`)
+   434→        onRefresh()
+   435→      }
+   436→    } catch {
+   437→      setError('Network error during migration')
+   438→    } finally {
+   439→      setMigrating(null)
+   440→    }
+   441→  }
+   442→
+   443→  const activeClients = clients.filter(c => c.status === 'active' || c.status === 'trial')
+   444→  const withDb = clients.filter(c => c.databaseStatus === 'active')
+   445→  const pendingDb = clients.filter(c => c.databaseStatus === 'pending' || c.databaseStatus === 'error')
+   446→  const provisioningDb = clients.filter(c => c.databaseStatus === 'provisioning' || c.databaseStatus === 'provisioning_schema')
+   447→
+   448→  return (
+   449→    <div className="space-y-5">
+   450→      {/* Stats */}
+   451→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   452→        <StatCard label="Active Clients" value={String(activeClients.length)} icon={Users} accent />
+   453→        <StatCard label="With Database" value={String(withDb.length)} icon={Database} />
+   454→        <StatCard label="Pending Setup" value={String(pendingDb.length)} icon={Clock} />
+   455→        <StatCard label="Provisioning" value={String(provisioningDb.length)} icon={Loader2} />
+   456→      </div>
+   457→
+   458→      {/* Messages */}
+   459→      <AnimatePresence>
+   460→        {error && (
+   461→          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+   462→            className="flex items-center gap-2.5 rounded-xl border border-red-500/15 bg-red-500/5 px-4 py-2.5">
+   463→            <AlertCircle className="size-4 text-red-500 shrink-0" />
+   464→            <p className="text-[12px] text-red-600 dark:text-red-400">{error}</p>
+   465→            <button onClick={() => setError(null)} className="ml-auto"><X className="size-3.5 text-red-400" /></button>
+   466→          </motion.div>
+   467→        )}
+   468→        {success && (
+   469→          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+   470→            className="flex items-center gap-2.5 rounded-xl border border-emerald-500/15 bg-emerald-500/5 px-4 py-2.5">
+   471→            <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />
+   472→            <p className="text-[12px] text-emerald-600 dark:text-emerald-400">{success}</p>
+   473→            <button onClick={() => setSuccess(null)} className="ml-auto"><X className="size-3.5 text-emerald-400" /></button>
+   474→          </motion.div>
+   475→        )}
+   476→      </AnimatePresence>
+   477→
+   478→      {/* Architecture Info */}
+   479→      <div className="macos-card p-5">
+   480→        <div className="flex items-center gap-3 mb-4">
+   481→          <div className="size-9 rounded-xl flex items-center justify-center bg-amber-500/10">
+   482→            <Server className="size-4.5 text-amber-500" />
+   483→          </div>
+   484→          <div>
+   485→            <h3 className="text-[14px] font-bold">Multi-Tenant Database Architecture</h3>
+   486→            <p className="text-[11px] text-muted-foreground">Neon PostgreSQL -- Each client operates in a fully isolated database</p>
+   487→          </div>
+   488→        </div>
+   489→        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+   490→          <div className="rounded-lg border border-border bg-black/[0.02] dark:bg-white/[0.02] p-3">
+   491→            <div className="flex items-center gap-2 mb-1.5">
+   492→              <Database className="size-3.5 text-amber-500" />
+   493→              <span className="text-[11px] font-semibold">Platform DB</span>
+   494→            </div>
+   495→            <p className="text-[10px] text-muted-foreground">Owner data, clients, billing, licensing -- shared platform database</p>
+   496→            <code className="text-[9px] text-muted-foreground/70 mt-1 block truncate">neondb (Neon PostgreSQL)</code>
+   497→          </div>
+   498→          <div className="rounded-lg border border-border bg-black/[0.02] dark:bg-white/[0.02] p-3">
+   499→            <div className="flex items-center gap-2 mb-1.5">
+   500→              <HardDrive className="size-3.5 text-emerald-500" />
+   501→              <span className="text-[11px] font-semibold">Tenant DBs</span>
+   502→            </div>
+   503→            <p className="text-[10px] text-muted-foreground">Per-client isolated databases with full ERP schema for data separation</p>
+   504→            <code className="text-[9px] text-muted-foreground/70 mt-1 block truncate">ff_&lt;slug&gt;_&lt;id&gt; (Neon PostgreSQL)</code>
+   505→          </div>
+   506→          <div className="rounded-lg border border-border bg-black/[0.02] dark:bg-white/[0.02] p-3">
+   507→            <div className="flex items-center gap-2 mb-1.5">
+   508→              <Activity className="size-3.5 text-blue-500" />
+   509→              <span className="text-[11px] font-semibold">Connection Pool</span>
+   510→            </div>
+   511→            <p className="text-[10px] text-muted-foreground">Neon pooler for efficient connection management with auto-scaling</p>
+   512→            <code className="text-[9px] text-muted-foreground/70 mt-1 block truncate">ep-*-pooler.neon.tech</code>
+   513→          </div>
+   514→        </div>
+   515→      </div>
+   516→
+   517→      {/* Client Database List */}
+   518→      <div className="macos-card overflow-hidden">
+   519→        <div className="flex items-center justify-between p-4 border-b border-border">
+   520→          <h3 className="text-[13px] font-semibold">Client Databases</h3>
+   521→          <button onClick={onRefresh} className="macos-btn-secondary text-[11px] flex items-center gap-1.5">
+   522→            <RefreshCw className="size-3" /> Refresh
+   523→          </button>
+   524→        </div>
+   525→        <div className="divide-y divide-border">
+   526→          {clients.map(client => {
+   527→            const dbStatus = client.databaseStatus || 'pending'
+   528→            const isProvisioning = provisioning === client.id
+   529→            const isDropping = dropping === client.id
+   530→            const isMigrating = migrating === client.id
+   531→            const td = client.tenantDatabase
+   532→
+   533→            return (
+   534→              <div key={client.id} className="flex items-center gap-4 p-4 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors">
+   535→                {/* Client Info */}
+   536→                <div className="flex items-center gap-3 min-w-[200px]">
+   537→                  <div className="size-9 rounded-lg flex items-center justify-center bg-amber-500/10 shrink-0">
+   538→                    <Building2 className="size-4 text-amber-500" />
+   539→                  </div>
+   540→                  <div className="min-w-0">
+   541→                    <p className="text-[13px] font-semibold truncate">{client.companyName}</p>
+   542→                    <p className="text-[11px] text-muted-foreground">{client.city || '--'}, {client.country}</p>
+   543→                  </div>
+   544→                </div>
+   545→
+   546→                {/* Database Name */}
+   547→                <div className="min-w-[180px]">
+   548→                  {client.databaseName ? (
+   549→                    <code className="text-[11px] font-mono bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded">{client.databaseName}</code>
+   550→                  ) : (
+   551→                    <span className="text-[11px] text-muted-foreground">Not provisioned</span>
+   552→                  )}
+   553→                </div>
+   554→
+   555→                {/* Database Status */}
+   556→                <div className="min-w-[130px]">
+   557→                  <StatusBadge status={dbStatus} />
+   558→                </div>
+   559→
+   560→                {/* Tenant DB Details */}
+   561→                {td && td.status === 'active' && (
+   562→                  <div className="flex-1 flex items-center gap-4 text-[11px] text-muted-foreground">
+   563→                    {td.totalSize && (
+   564→                      <div className="flex items-center gap-1"><HardDrive className="size-3" /><span>{td.totalSize}</span></div>
+   565→                    )}
+   566→                    {td.tableCount > 0 && (
+   567→                      <div className="flex items-center gap-1"><Hash className="size-3" /><span>{td.tableCount} tables</span></div>
+   568→                    )}
+   569→                    {td.schemaVersion && (
+   570→                      <div className="flex items-center gap-1"><Shield className="size-3" /><span>v{td.schemaVersion}</span></div>
+   571→                    )}
+   572→                  </div>
+   573→                )}
+   574→
+   575→                {dbStatus === 'error' && (
+   576→                  <div className="flex-1"><p className="text-[11px] text-red-500">Provisioning error</p></div>
+   577→                )}
+   578→
+   579→                {(!td || td.status !== 'active') && dbStatus !== 'error' && <div className="flex-1" />}
+   580→
+   581→                {/* Actions */}
+   582→                <div className="flex items-center gap-2">
+   583→                  {dbStatus === 'pending' || dbStatus === 'error' ? (
+   584→                    <button onClick={() => handleProvision(client.id, client.companyName)} disabled={isProvisioning}
+   585→                      className="macos-btn text-[11px] flex items-center gap-1.5 disabled:opacity-50">
+   586→                      {isProvisioning ? <Loader2 className="size-3 animate-spin" /> : <Plus className="size-3" />}
+   587→                      {isProvisioning ? 'Provisioning...' : 'Provision DB'}
+   588→                    </button>
+   589→                  ) : dbStatus === 'active' ? (
+   590→                    <>
+   591→                      <button onClick={() => handleMigrate(client.id, client.companyName)} disabled={isMigrating}
+   592→                        className="macos-btn-secondary text-[11px] flex items-center gap-1.5 disabled:opacity-50">
+   593→                        {isMigrating ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}
+   594→                        Migrate
+   595→                      </button>
+   596→                      <button onClick={() => handleDrop(client.id, client.companyName)} disabled={isDropping}
+   597→                        className="macos-btn-secondary text-[11px] flex items-center gap-1.5 text-red-500 hover:text-red-600 hover:bg-red-500/5 disabled:opacity-50">
+   598→                        {isDropping ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
+   599→                        Drop
+   600→                      </button>
+   601→                    </>
+   602→                  ) : (
+   603→                    <span className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+   604→                      <Loader2 className="size-3 animate-spin" /> In progress...
+   605→                    </span>
+   606→                  )}
+   607→                </div>
+   608→              </div>
+   609→            )
+   610→          })}
+   611→        </div>
+   612→      </div>
+   613→    </div>
+   614→  )
+   615→}
+   616→
+   617→// ── Main OwnerModule ────────────────────────────────────
+   618→
+   619→export default function OwnerModule() {
+   620→  const [activeTab, setActiveTab] = useState<OwnerTab>('clients')
+   621→  const [searchQuery, setSearchQuery] = useState('')
+   622→  const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null)
+   623→  const [viewingQuotation, setViewingQuotation] = useState<Quotation | null>(null)
+   624→  const [showPrintView, setShowPrintView] = useState(false)
+   625→  const [copiedKey, setCopiedKey] = useState<string | null>(null)
+   626→  const printRef = useRef<HTMLDivElement>(null)
+   627→
+   628→  // Dialog states
+   629→  const [showCreateClient, setShowCreateClient] = useState(false)
+   630→  const [showCreateInvoice, setShowCreateInvoice] = useState(false)
+   631→  const [showCreateQuotation, setShowCreateQuotation] = useState(false)
+   632→  const [showGenerateKey, setShowGenerateKey] = useState(false)
+   633→  const [showRegisterDevice, setShowRegisterDevice] = useState(false)
+   634→  const [showClientDetail, setShowClientDetail] = useState(false)
+   635→  const [selectedClient, setSelectedClient] = useState<Client | null>(null)
+   636→  const [saving, setSaving] = useState(false)
+   637→
+   638→  // Data state
+   639→  const [clients, setClients] = useState<Client[]>([])
+   640→  const [plans, setPlans] = useState<Plan[]>([])
+   641→  const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
+   642→  const [invoices, setInvoices] = useState<Invoice[]>([])
+   643→  const [quotations, setQuotations] = useState<Quotation[]>([])
+   644→  const [licenseKeys, setLicenseKeys] = useState<LicenseKey[]>([])
+   645→  const [devices, setDevices] = useState<ClientDevice[]>([])
+   646→  const [loading, setLoading] = useState(true)
+   647→
+   648→  // Form states
+   649→  const [newClient, setNewClient] = useState({ companyName: '', contactPerson: '', email: '', phone: '', address: '', city: '', state: '', country: 'Pakistan', postalCode: '', website: '', taxId: '', industry: '', notes: '' })
+   650→  const [newInvoice, setNewInvoice] = useState({ clientId: '', subscriptionId: '', issueDate: '', dueDate: '', taxRate: 16, discountRate: 0, notes: '', terms: 'Payment due within 15 days of issue date.', items: [{ description: '', quantity: 1, unitPrice: 0, amount: 0 }] })
+   651→  const [newQuotation, setNewQuotation] = useState({ clientId: '', clientName: '', clientEmail: '', clientPhone: '', clientAddress: '', issueDate: '', validUntil: '', taxRate: 16, discountRate: 0, notes: '', terms: 'Valid for 30 days from issue date.', items: [{ description: '', quantity: 1, unitPrice: 0, amount: 0 }] })
+   652→  const [newKey, setNewKey] = useState({ planId: '', maxStations: 1, maxDispensers: 4, maxUsers: 5, notes: '' })
+   653→  const [newDevice, setNewDevice] = useState({ clientId: '', deviceName: '', deviceType: 'pos', serialNumber: '', macAddress: '', ipAddress: '', location: '', notes: '' })
+   654→
+   655→  // Fetch data on mount
+   656→  useEffect(() => {
+   657→    let cancelled = false
+   658→    const load = async () => {
+   659→      setLoading(true)
+   660→      try {
+   661→        const [clientsRes, plansRes, subsRes, invRes, quotRes, keysRes, devRes] = await Promise.allSettled([
+   662→          fetch('/api/owner/clients'), fetch('/api/owner/plans'), fetch('/api/owner/subscriptions'),
+   663→          fetch('/api/owner/invoices'), fetch('/api/owner/quotations'), fetch('/api/owner/license-keys'),
+   664→          fetch('/api/owner/devices'),
+   665→        ])
+   666→        if (cancelled) return
+   667→        if (clientsRes.status === 'fulfilled' && clientsRes.value.ok) { const d = await clientsRes.value.json(); if (d.clients?.length) setClients(d.clients) }
+   668→        if (plansRes.status === 'fulfilled' && plansRes.value.ok) { const d = await plansRes.value.json(); if (d.length) setPlans(d) }
+   669→        if (subsRes.status === 'fulfilled' && subsRes.value.ok) { const d = await subsRes.value.json(); if (d.length) setSubscriptions(d) }
+   670→        if (invRes.status === 'fulfilled' && invRes.value.ok) { const d = await invRes.value.json(); if (d.invoices?.length) setInvoices(d.invoices) }
+   671→        if (quotRes.status === 'fulfilled' && quotRes.value.ok) { const d = await quotRes.value.json(); if (d.quotations?.length) setQuotations(d.quotations) }
+   672→        if (keysRes.status === 'fulfilled' && keysRes.value.ok) { const d = await keysRes.value.json(); if (d.length) setLicenseKeys(d) }
+   673→        if (devRes.status === 'fulfilled' && devRes.value.ok) { const d = await devRes.value.json(); if (d.length) setDevices(d) }
+   674→      } catch { /* ignore */ }
+   675→      setLoading(false)
+   676→    }
+   677→    load()
+   678→    return () => { cancelled = true }
+   679→  }, [])
+   680→
+   681→  // Refresh data
+   682→  const refreshData = useCallback(async () => {
+   683→    try {
+   684→      const [clientsRes, plansRes, subsRes, invRes, quotRes, keysRes, devRes] = await Promise.allSettled([
+   685→        fetch('/api/owner/clients'), fetch('/api/owner/plans'), fetch('/api/owner/subscriptions'),
+   686→        fetch('/api/owner/invoices'), fetch('/api/owner/quotations'), fetch('/api/owner/license-keys'),
+   687→        fetch('/api/owner/devices'),
+   688→      ])
+   689→      if (clientsRes.status === 'fulfilled' && clientsRes.value.ok) { const d = await clientsRes.value.json(); if (d.clients?.length) setClients(d.clients) }
+   690→      if (plansRes.status === 'fulfilled' && plansRes.value.ok) { const d = await plansRes.value.json(); if (d.length) setPlans(d) }
+   691→      if (subsRes.status === 'fulfilled' && subsRes.value.ok) { const d = await subsRes.value.json(); if (d.length) setSubscriptions(d) }
+   692→      if (invRes.status === 'fulfilled' && invRes.value.ok) { const d = await invRes.value.json(); if (d.invoices?.length) setInvoices(d.invoices) }
+   693→      if (quotRes.status === 'fulfilled' && quotRes.value.ok) { const d = await quotRes.value.json(); if (d.quotations?.length) setQuotations(d.quotations) }
+   694→      if (keysRes.status === 'fulfilled' && keysRes.value.ok) { const d = await keysRes.value.json(); if (d.length) setLicenseKeys(d) }
+   695→      if (devRes.status === 'fulfilled' && devRes.value.ok) { const d = await devRes.value.json(); if (d.length) setDevices(d) }
+   696→    } catch { /* ignore */ }
+   697→  }, [])
+   698→
+   699→  // Seed data
+   700→  const handleSeed = async () => {
+   701→    try { await fetch('/api/owner/seed', { method: 'POST' }); refreshData() } catch { /* ignore */ }
+   702→  }
+   703→
+   704→  // Print
+   705→  const handlePrint = () => {
+   706→    const printContents = document.getElementById('print-area')
+   707→    if (!printContents) return
+   708→    const printWindow = window.open('', '_blank')
+   709→    if (!printWindow) return
+   710→    printWindow.document.write(`
+   711→      <html><head><title>${viewingInvoice ? 'Invoice' : 'Quotation'} -- FuelFlow OS</title>
+   712→      <style>
+   713→        * { font-style: normal !important; margin: 0; padding: 0; box-sizing: border-box; }
+   714→        body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+   715→        @page { margin: 0.5in; size: A4; }
+   716→        @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+   717→      </style></head><body>${printContents.innerHTML}</body></html>
+   718→    `)
+   719→    printWindow.document.close()
+   720→    setTimeout(() => { printWindow.print(); printWindow.close() }, 250)
+   721→  }
+   722→
+   723→  // Copy key
+   724→  const copyKey = (key: string) => {
+   725→    navigator.clipboard.writeText(key)
+   726→    setCopiedKey(key)
+   727→    setTimeout(() => setCopiedKey(null), 2000)
+   728→  }
+   729→
+   730→  // Create client
+   731→  const handleCreateClient = async () => {
+   732→    if (!newClient.companyName || !newClient.contactPerson || !newClient.email || !newClient.phone) return
+   733→    setSaving(true)
+   734→    try {
+   735→      const res = await fetch('/api/owner/clients', {
+   736→        method: 'POST',
+   737→        headers: { 'Content-Type': 'application/json' },
+   738→        body: JSON.stringify(newClient),
+   739→      })
+   740→      if (res.ok) {
+   741→        setShowCreateClient(false)
+   742→        setNewClient({ companyName: '', contactPerson: '', email: '', phone: '', address: '', city: '', state: '', country: 'Pakistan', postalCode: '', website: '', taxId: '', industry: '', notes: '' })
+   743→        refreshData()
+   744→      }
+   745→    } catch { /* ignore */ }
+   746→    setSaving(false)
+   747→  }
+   748→
+   749→  // Create invoice
+   750→  const handleCreateInvoice = async () => {
+   751→    if (!newInvoice.clientId || !newInvoice.issueDate || !newInvoice.dueDate) return
+   752→    setSaving(true)
+   753→    try {
+   754→      const subtotal = newInvoice.items.reduce((s, i) => s + i.amount, 0)
+   755→      const taxAmount = subtotal * (newInvoice.taxRate / 100)
+   756→      const discountAmount = subtotal * (newInvoice.discountRate / 100)
+   757→      const total = subtotal + taxAmount - discountAmount
+   758→      const res = await fetch('/api/owner/invoices', {
+   759→        method: 'POST',
+   760→        headers: { 'Content-Type': 'application/json' },
+   761→        body: JSON.stringify({ ...newInvoice, subtotal, taxAmount, total }),
+   762→      })
+   763→      if (res.ok) {
+   764→        setShowCreateInvoice(false)
+   765→        setNewInvoice({ clientId: '', subscriptionId: '', issueDate: '', dueDate: '', taxRate: 16, discountRate: 0, notes: '', terms: 'Payment due within 15 days of issue date.', items: [{ description: '', quantity: 1, unitPrice: 0, amount: 0 }] })
+   766→        refreshData()
+   767→      }
+   768→    } catch { /* ignore */ }
+   769→    setSaving(false)
+   770→  }
+   771→
+   772→  // Create quotation
+   773→  const handleCreateQuotation = async () => {
+   774→    if (!newQuotation.clientName || !newQuotation.issueDate || !newQuotation.validUntil) return
+   775→    setSaving(true)
+   776→    try {
+   777→      const subtotal = newQuotation.items.reduce((s, i) => s + i.amount, 0)
+   778→      const taxAmount = subtotal * (newQuotation.taxRate / 100)
+   779→      const discountAmount = subtotal * (newQuotation.discountRate / 100)
+   780→      const total = subtotal + taxAmount - discountAmount
+   781→      const res = await fetch('/api/owner/quotations', {
+   782→        method: 'POST',
+   783→        headers: { 'Content-Type': 'application/json' },
+   784→        body: JSON.stringify({ ...newQuotation, subtotal, taxAmount, total }),
+   785→      })
+   786→      if (res.ok) {
+   787→        setShowCreateQuotation(false)
+   788→        setNewQuotation({ clientId: '', clientName: '', clientEmail: '', clientPhone: '', clientAddress: '', issueDate: '', validUntil: '', taxRate: 16, discountRate: 0, notes: '', terms: 'Valid for 30 days from issue date.', items: [{ description: '', quantity: 1, unitPrice: 0, amount: 0 }] })
+   789→        refreshData()
+   790→      }
+   791→    } catch { /* ignore */ }
+   792→    setSaving(false)
+   793→  }
+   794→
+   795→  // Generate license key
+   796→  const handleGenerateKey = async () => {
+   797→    if (!newKey.planId) return
+   798→    setSaving(true)
+   799→    try {
+   800→      const res = await fetch('/api/owner/license-keys', {
+   801→        method: 'POST',
+   802→        headers: { 'Content-Type': 'application/json' },
+   803→        body: JSON.stringify(newKey),
+   804→      })
+   805→      if (res.ok) {
+   806→        setShowGenerateKey(false)
+   807→        setNewKey({ planId: '', maxStations: 1, maxDispensers: 4, maxUsers: 5, notes: '' })
+   808→        refreshData()
+   809→      }
+   810→    } catch { /* ignore */ }
+   811→    setSaving(false)
+   812→  }
+   813→
+   814→  // Register device
+   815→  const handleRegisterDevice = async () => {
+   816→    if (!newDevice.clientId || !newDevice.deviceName) return
+   817→    setSaving(true)
+   818→    try {
+   819→      const res = await fetch('/api/owner/devices', {
+   820→        method: 'POST',
+   821→        headers: { 'Content-Type': 'application/json' },
+   822→        body: JSON.stringify(newDevice),
+   823→      })
+   824→      if (res.ok) {
+   825→        setShowRegisterDevice(false)
+   826→        setNewDevice({ clientId: '', deviceName: '', deviceType: 'pos', serialNumber: '', macAddress: '', ipAddress: '', location: '', notes: '' })
+   827→        refreshData()
+   828→      }
+   829→    } catch { /* ignore */ }
+   830→    setSaving(false)
+   831→  }
+   832→
+   833→  // Open client detail
+   834→  const openClientDetail = (client: Client) => {
+   835→    setSelectedClient(client)
+   836→    setShowClientDetail(true)
+   837→  }
+   838→
+   839→  // Tab config
+   840→  const tabs: { key: OwnerTab; label: string; icon: React.ElementType }[] = [
+   841→    { key: 'clients', label: 'Clients', icon: Users },
+   842→    { key: 'subscriptions', label: 'Subscriptions', icon: CreditCard },
+   843→    { key: 'invoices', label: 'Invoices', icon: FileText },
+   844→    { key: 'quotations', label: 'Quotations', icon: FileSpreadsheet },
+   845→    { key: 'license-keys', label: 'License Keys', icon: Key },
+   846→    { key: 'devices', label: 'Devices', icon: Monitor },
+   847→    { key: 'tenants', label: 'Databases', icon: Database },
+   848→  ]
+   849→
+   850→  // ── Render ──
+   851→
+   852→  // Print view overlay
+   853→  if (showPrintView && (viewingInvoice || viewingQuotation)) {
+   854→    const doc = viewingInvoice || viewingQuotation!
+   855→    return (
+   856→      <div className="fixed inset-0 z-50 bg-gray-100 overflow-auto">
+   857→        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-gray-200 px-6 py-3 flex items-center justify-between print:hidden">
+   858→          <h2 className="text-[13px] font-semibold">
+   859→            {viewingInvoice ? `Invoice ${viewingInvoice.invoiceNumber}` : `Quotation ${viewingQuotation?.quotationNumber}`}
+   860→          </h2>
+   861→          <div className="flex items-center gap-2">
+   862→            <button onClick={handlePrint} className="macos-btn flex items-center gap-2">
+   863→              <Printer className="size-4" /> Print
+   864→            </button>
+   865→            <button onClick={() => { setShowPrintView(false); setViewingInvoice(null); setViewingQuotation(null) }} className="macos-btn-secondary flex items-center gap-2">
+   866→              <X className="size-4" /> Close
+   867→            </button>
+   868→          </div>
+   869→        </div>
+   870→        <div className="py-8" ref={printRef}>
+   871→          <PrintDocument type={viewingInvoice ? 'invoice' : 'quotation'} data={doc} />
+   872→        </div>
+   873→      </div>
+   874→    )
+   875→  }
+   876→
+   877→  return (
+   878→    <div className="space-y-6">
+   879→      {/* Header */}
+   880→      <div className="flex items-center justify-between">
+   881→        <div>
+   882→          <h2 className="text-[20px] font-bold text-foreground">Owner Console</h2>
+   883→          <p className="text-[13px] text-muted-foreground">Manage clients, subscriptions, billing & licensing</p>
+   884→        </div>
+   885→        <div className="flex items-center gap-2">
+   886→          <button onClick={refreshData} className="macos-btn-secondary text-[12px] flex items-center gap-1.5">
+   887→            <RefreshCw className="size-3.5" /> Refresh
+   888→          </button>
+   889→          <button onClick={handleSeed} className="macos-btn-secondary text-[12px] flex items-center gap-1.5">
+   890→            <Database className="size-3.5" /> Seed Data
+   891→          </button>
+   892→        </div>
+   893→      </div>
+   894→
+   895→      {/* Tabs */}
+   896→      <div className="flex items-center gap-1 border-b border-border pb-px overflow-x-auto">
+   897→        {tabs.map(tab => {
+   898→          const isActive = activeTab === tab.key
+   899→          return (
+   900→            <button
+   901→              key={tab.key}
+   902→              onClick={() => setActiveTab(tab.key)}
+   903→              className={`flex items-center gap-1.5 px-3 py-2 text-[12px] font-medium border-b-2 transition-all whitespace-nowrap ${
+   904→                isActive ? 'border-amber-500 text-amber-600 dark:text-amber-400' : 'border-transparent text-muted-foreground hover:text-foreground'
+   905→              }`}
+   906→            >
+   907→              <tab.icon className="size-3.5" />
+   908→              {tab.label}
+   909→            </button>
+   910→          )
+   911→        })}
+   912→      </div>
+   913→
+   914→      {/* Loading */}
+   915→      {loading && (
+   916→        <div className="flex items-center justify-center py-20">
+   917→          <Loader2 className="size-6 text-amber-500 animate-spin" />
+   918→          <span className="ml-3 text-[13px] text-muted-foreground">Loading data from Neon PostgreSQL...</span>
+   919→        </div>
+   920→      )}
+   921→
+   922→      {/* Content */}
+   923→      {!loading && (
+   924→        <AnimatePresence mode="wait">
+   925→          <motion.div key={activeTab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.15 }}>
+   926→
+   927→            {/* ── CLIENTS TAB ── */}
+   928→            {activeTab === 'clients' && (
+   929→              <div className="space-y-5">
+   930→                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   931→                  <StatCard label="Total Clients" value={String(clients.length)} icon={Users} accent />
+   932→                  <StatCard label="Active" value={String(clients.filter(c => c.status === 'active').length)} icon={CheckCircle2} />
+   933→                  <StatCard label="Trial" value={String(clients.filter(c => c.status === 'trial').length)} icon={Clock} />
+   934→                  <StatCard label="Suspended" value={String(clients.filter(c => c.status === 'churned' || c.status === 'suspended').length)} icon={XCircle} />
+   935→                </div>
+   936→
+   937→                <div className="macos-card overflow-hidden">
+   938→                  <div className="flex items-center justify-between p-4 border-b border-border">
+   939→                    <div className="relative w-64">
+   940→                      <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+   941→                      <input className="macos-search !pl-8 !h-8" placeholder="Search clients..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+   942→                    </div>
+   943→                    <button onClick={() => setShowCreateClient(true)} className="macos-btn text-[12px] flex items-center gap-1.5">
+   944→                      <Plus className="size-3.5" /> New Client
+   945→                    </button>
+   946→                  </div>
+   947→                  {clients.length === 0 ? (
+   948→                    <div className="py-16 text-center">
+   949→                      <Users className="size-8 text-muted-foreground/30 mx-auto mb-3" />
+   950→                      <p className="text-[13px] text-muted-foreground">No clients yet. Add your first client or seed sample data.</p>
+   951→                    </div>
+   952→                  ) : (
+   953→                    <table className="macos-table">
+   954→                      <thead><tr><th>Company</th><th>Contact</th><th>City</th><th>Plan</th><th>Status</th><th>DB</th><th>Devices</th></tr></thead>
+   955→                      <tbody>
+   956→                        {clients.filter(c => !searchQuery || c.companyName.toLowerCase().includes(searchQuery.toLowerCase()) || c.email.toLowerCase().includes(searchQuery.toLowerCase())).map(client => {
+   957→                          const sub = subscriptions.find(s => s.clientId === client.id && (s.status === 'active' || s.status === 'trial'))
+   958→                          return (
+   959→                            <tr key={client.id} className="cursor-pointer" onClick={() => openClientDetail(client)}>
+   960→                              <td className="font-medium">{client.companyName}</td>
+   961→                              <td>{client.contactPerson}</td>
+   962→                              <td className="text-muted-foreground text-[12px]">{client.city || '--'}</td>
+   963→                              <td><span className="text-[11px] font-medium">{sub?.plan?.name || '--'}</span></td>
+   964→                              <td><StatusBadge status={client.status} /></td>
+   965→                              <td>
+   966→                                <div className="flex items-center gap-1.5">
+   967→                                  <div className={`macos-status-dot ${client.databaseStatus === 'active' ? 'macos-status-online' : client.databaseStatus === 'error' ? 'macos-status-error' : 'macos-status-offline'}`} />
+   968→                                  <span className="text-[11px] text-muted-foreground">{client.databaseStatus || 'pending'}</span>
+   969→                                </div>
+   970→                              </td>
+   971→                              <td className="text-center">{client._count?.devices || 0}</td>
+   972→                            </tr>
+   973→                          )
+   974→                        })}
+   975→                      </tbody>
+   976→                    </table>
+   977→                  )}
+   978→                </div>
+   979→              </div>
+   980→            )}
+   981→
+   982→            {/* ── SUBSCRIPTIONS TAB ── */}
+   983→            {activeTab === 'subscriptions' && (
+   984→              <div className="space-y-5">
+   985→                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+   986→                  {plans.map(plan => (
+   987→                    <div key={plan.id} className={`macos-card p-5 relative ${plan.isPopular ? 'ring-2 ring-amber-500/30' : ''}`}>
+   988→                      {plan.isPopular && <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-[9px] font-bold px-2.5 py-0.5 rounded-full">POPULAR</div>}
+   989→                      <div className="flex items-center gap-2 mb-3">
+   990→                        {plan.name === 'Starter' ? <Zap className="size-4 text-gray-400" /> : plan.name === 'Professional' ? <Star className="size-4 text-amber-500" /> : <Crown className="size-4 text-orange-500" />}
+   991→                        <h3 className="text-[15px] font-bold">{plan.name}</h3>
+   992→                      </div>
+   993→                      <div className="mb-3">
+   994→                        <span className="text-[28px] font-bold">{formatPKR(plan.priceMonthly)}</span>
+   995→                        <span className="text-[12px] text-muted-foreground">/mo</span>
+   996→                        <p className="text-[11px] text-muted-foreground mt-0.5">{formatPKR(plan.priceAnnual)}/yr (save {Math.round((1 - plan.priceAnnual / (plan.priceMonthly * 12)) * 100)}%)</p>
+   997→                      </div>
+   998→                      <div className="space-y-1.5 mb-3">
+   999→                        {(() => { try { return JSON.parse(plan.features).map((f: string, i: number) => <div key={i} className="flex items-center gap-1.5 text-[11px]"><CheckCircle2 className="size-3 text-emerald-500 shrink-0" />{f}</div>) } catch { return null } })()}
+  1000→                      </div>
+  1001→                      <div className="text-[10px] text-muted-foreground border-t border-border pt-2 mt-2">
+  1002→                        {plan._count?.subscriptions || 0} active subscriptions
+  1003→                      </div>
+  1004→                    </div>
+  1005→                  ))}
+  1006→                </div>
+  1007→
+  1008→                <div className="macos-card overflow-hidden">
+  1009→                  <div className="p-4 border-b border-border"><h3 className="text-[13px] font-semibold">Client Subscriptions</h3></div>
+  1010→                  <table className="macos-table">
+  1011→                    <thead><tr><th>Client</th><th>Plan</th><th>Billing</th><th>Status</th><th>Start</th><th>End</th><th>Auto-Renew</th></tr></thead>
+  1012→                    <tbody>
+  1013→                      {subscriptions.map(sub => (
+  1014→                        <tr key={sub.id}>
+  1015→                          <td className="font-medium">{sub.client?.companyName || '--'}</td>
+  1016→                          <td><span className="text-[11px] font-medium">{sub.plan?.name || '--'}</span></td>
+  1017→                          <td className="capitalize text-[12px]">{sub.billingCycle}</td>
+  1018→                          <td><StatusBadge status={sub.status} /></td>
+  1019→                          <td className="text-[12px] text-muted-foreground">{formatDate(sub.startDate)}</td>
+  1020→                          <td className="text-[12px] text-muted-foreground">{sub.endDate ? formatDate(sub.endDate) : '--'}</td>
+  1021→                          <td>{sub.autoRenew ? <CheckCircle2 className="size-4 text-emerald-500" /> : <XCircle className="size-4 text-gray-300" />}</td>
+  1022→                        </tr>
+  1023→                      ))}
+  1024→                    </tbody>
+  1025→                  </table>
+  1026→                </div>
+  1027→              </div>
+  1028→            )}
+  1029→
+  1030→            {/* ── INVOICES TAB ── */}
+  1031→            {activeTab === 'invoices' && (
+  1032→              <div className="space-y-5">
+  1033→                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+  1034→                  <StatCard label="Total Revenue" value={formatPKR(invoices.reduce((s, i) => s + i.total, 0))} icon={DollarSign} accent />
+  1035→                  <StatCard label="Outstanding" value={formatPKR(invoices.filter(i => i.balanceDue > 0).reduce((s, i) => s + i.balanceDue, 0))} icon={AlertCircle} />
+  1036→                  <StatCard label="Overdue" value={String(invoices.filter(i => i.status === 'overdue').length)} icon={Clock} />
+  1037→                  <StatCard label="Paid" value={String(invoices.filter(i => i.status === 'paid').length)} icon={CheckCircle2} />
+  1038→                </div>
+  1039→
+  1040→                <div className="macos-card overflow-hidden">
+  1041→                  <div className="flex items-center justify-between p-4 border-b border-border">
+  1042→                    <h3 className="text-[13px] font-semibold">Invoices</h3>
+  1043→                    <button onClick={() => setShowCreateInvoice(true)} className="macos-btn text-[12px] flex items-center gap-1.5">
+  1044→                      <Plus className="size-3.5" /> New Invoice
+  1045→                    </button>
+  1046→                  </div>
+  1047→                  <table className="macos-table">
+  1048→                    <thead><tr><th>Invoice #</th><th>Client</th><th>Issue Date</th><th>Due Date</th><th>Total</th><th>Balance</th><th>Status</th><th></th></tr></thead>
+  1049→                    <tbody>
+  1050→                      {invoices.map(inv => (
+  1051→                        <tr key={inv.id}>
+  1052→                          <td className="font-mono text-[12px] font-semibold">{inv.invoiceNumber}</td>
+  1053→                          <td className="font-medium">{inv.client?.companyName || '--'}</td>
+  1054→                          <td className="text-[12px] text-muted-foreground">{formatDate(inv.issueDate)}</td>
+  1055→                          <td className="text-[12px] text-muted-foreground">{formatDate(inv.dueDate)}</td>
+  1056→                          <td className="font-medium">{formatPKR(inv.total)}</td>
+  1057→                          <td className={inv.balanceDue > 0 ? 'text-red-500 font-medium' : 'text-emerald-500'}>{formatPKR(inv.balanceDue)}</td>
+  1058→                          <td><StatusBadge status={inv.status} /></td>
+  1059→                          <td>
+  1060→                            <button onClick={() => { setViewingInvoice(inv); setShowPrintView(true) }} className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+  1061→                              <Eye className="size-4 text-muted-foreground" />
+  1062→                            </button>
+  1063→                          </td>
+  1064→                        </tr>
+  1065→                      ))}
+  1066→                    </tbody>
+  1067→                  </table>
+  1068→                </div>
+  1069→              </div>
+  1070→            )}
+  1071→
+  1072→            {/* ── QUOTATIONS TAB ── */}
+  1073→            {activeTab === 'quotations' && (
+  1074→              <div className="space-y-5">
+  1075→                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+  1076→                  <StatCard label="Total Quotes" value={String(quotations.length)} icon={FileSpreadsheet} accent />
+  1077→                  <StatCard label="Sent" value={String(quotations.filter(q => q.status === 'sent').length)} icon={Send} />
+  1078→                  <StatCard label="Accepted" value={String(quotations.filter(q => q.status === 'accepted').length)} icon={CheckCircle2} />
+  1079→                  <StatCard label="Total Value" value={formatPKR(quotations.reduce((s, q) => s + q.total, 0))} icon={DollarSign} />
+  1080→                </div>
+  1081→
+  1082→                <div className="macos-card overflow-hidden">
+  1083→                  <div className="flex items-center justify-between p-4 border-b border-border">
+  1084→                    <h3 className="text-[13px] font-semibold">Quotations</h3>
+  1085→                    <button onClick={() => setShowCreateQuotation(true)} className="macos-btn text-[12px] flex items-center gap-1.5">
+  1086→                      <Plus className="size-3.5" /> New Quotation
+  1087→                    </button>
+  1088→                  </div>
+  1089→                  <table className="macos-table">
+  1090→                    <thead><tr><th>Quote #</th><th>Client</th><th>Issue Date</th><th>Valid Until</th><th>Total</th><th>Status</th><th></th></tr></thead>
+  1091→                    <tbody>
+  1092→                      {quotations.map(q => (
+  1093→                        <tr key={q.id}>
+  1094→                          <td className="font-mono text-[12px] font-semibold">{q.quotationNumber}</td>
+  1095→                          <td className="font-medium">{q.clientName}</td>
+  1096→                          <td className="text-[12px] text-muted-foreground">{formatDate(q.issueDate)}</td>
+  1097→                          <td className="text-[12px] text-muted-foreground">{formatDate(q.validUntil)}</td>
+  1098→                          <td className="font-medium">{formatPKR(q.total)}</td>
+  1099→                          <td><StatusBadge status={q.status} /></td>
+  1100→                          <td>
+  1101→                            <button onClick={() => { setViewingQuotation(q); setShowPrintView(true) }} className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+  1102→                              <Eye className="size-4 text-muted-foreground" />
+  1103→                            </button>
+  1104→                          </td>
+  1105→                        </tr>
+  1106→                      ))}
+  1107→                    </tbody>
+  1108→                  </table>
+  1109→                </div>
+  1110→              </div>
+  1111→            )}
+  1112→
+  1113→            {/* ── LICENSE KEYS TAB ── */}
+  1114→            {activeTab === 'license-keys' && (
+  1115→              <div className="space-y-5">
+  1116→                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+  1117→                  <StatCard label="Total Keys" value={String(licenseKeys.length)} icon={Key} accent />
+  1118→                  <StatCard label="Available" value={String(licenseKeys.filter(k => k.status === 'available').length)} icon={CheckCircle2} />
+  1119→                  <StatCard label="Assigned" value={String(licenseKeys.filter(k => k.status === 'assigned').length)} icon={Link2} />
+  1120→                  <StatCard label="Revoked" value={String(licenseKeys.filter(k => k.status === 'revoked').length)} icon={XCircle} />
+  1121→                </div>
+  1122→
+  1123→                <div className="macos-card overflow-hidden">
+  1124→                  <div className="flex items-center justify-between p-4 border-b border-border">
+  1125→                    <h3 className="text-[13px] font-semibold">License Keys</h3>
+  1126→                    <button onClick={() => setShowGenerateKey(true)} className="macos-btn text-[12px] flex items-center gap-1.5">
+  1127→                      <Plus className="size-3.5" /> Generate Key
+  1128→                    </button>
+  1129→                  </div>
+  1130→                  <table className="macos-table">
+  1131→                    <thead><tr><th>License Key</th><th>Client</th><th>Plan</th><th>Stations</th><th>Status</th><th>Assigned</th><th>Expires</th></tr></thead>
+  1132→                    <tbody>
+  1133→                      {licenseKeys.map(lk => (
+  1134→                        <tr key={lk.id}>
+  1135→                          <td>
+  1136→                            <div className="flex items-center gap-1.5">
+  1137→                              <code className="text-[12px] font-mono font-semibold bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded">{lk.key}</code>
+  1138→                              <button onClick={() => copyKey(lk.key)} className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+  1139→                                {copiedKey === lk.key ? <CheckCircle2 className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5 text-muted-foreground" />}
+  1140→                              </button>
+  1141→                            </div>
+  1142→                          </td>
+  1143→                          <td className="font-medium">{lk.client?.companyName || '--'}</td>
+  1144→                          <td className="text-[11px] font-medium">{lk.plan?.name || '--'}</td>
+  1145→                          <td className="text-center text-[12px]">{lk.maxStations}</td>
+  1146→                          <td><StatusBadge status={lk.status} /></td>
+  1147→                          <td className="text-[12px] text-muted-foreground">{lk.assignedAt ? formatDate(lk.assignedAt) : '--'}</td>
+  1148→                          <td className="text-[12px] text-muted-foreground">{lk.expiresAt ? formatDate(lk.expiresAt) : '--'}</td>
+  1149→                        </tr>
+  1150→                      ))}
+  1151→                    </tbody>
+  1152→                  </table>
+  1153→                </div>
+  1154→              </div>
+  1155→            )}
+  1156→
+  1157→            {/* ── DEVICES TAB ── */}
+  1158→            {activeTab === 'devices' && (
+  1159→              <div className="space-y-5">
+  1160→                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+  1161→                  <StatCard label="Total Devices" value={String(devices.length)} icon={Monitor} accent />
+  1162→                  <StatCard label="Active" value={String(devices.filter(d => d.status === 'active').length)} icon={CheckCircle2} />
+  1163→                  <StatCard label="Maintenance" value={String(devices.filter(d => d.status === 'maintenance').length)} icon={AlertCircle} />
+  1164→                  <StatCard label="Inactive" value={String(devices.filter(d => d.status === 'inactive').length)} icon={XCircle} />
+  1165→                </div>
+  1166→
+  1167→                <div className="macos-card overflow-hidden">
+  1168→                  <div className="flex items-center justify-between p-4 border-b border-border">
+  1169→                    <h3 className="text-[13px] font-semibold">Client Devices</h3>
+  1170→                    <button onClick={() => setShowRegisterDevice(true)} className="macos-btn text-[12px] flex items-center gap-1.5">
+  1171→                      <Plus className="size-3.5" /> Register Device
+  1172→                    </button>
+  1173→                  </div>
+  1174→                  <table className="macos-table">
+  1175→                    <thead><tr><th>Client</th><th>Device</th><th>Type</th><th>Serial #</th><th>IP Address</th><th>Location</th><th>Status</th><th>Last Seen</th></tr></thead>
+  1176→                    <tbody>
+  1177→                      {devices.map(dev => {
+  1178→                        const IconComp = deviceTypeIcon[dev.deviceType] || Monitor
+  1179→                        return (
+  1180→                          <tr key={dev.id}>
+  1181→                            <td className="font-medium">{dev.client?.companyName || '--'}</td>
+  1182→                            <td>
+  1183→                              <div className="flex items-center gap-2">
+  1184→                                <IconComp className="size-3.5 text-muted-foreground" />
+  1185→                                <span>{dev.deviceName}</span>
+  1186→                              </div>
+  1187→                            </td>
+  1188→                            <td className="text-[11px] capitalize">{dev.deviceType.replace('_', ' ')}</td>
+  1189→                            <td className="font-mono text-[11px] text-muted-foreground">{dev.serialNumber || '--'}</td>
+  1190→                            <td className="font-mono text-[11px] text-muted-foreground">{dev.ipAddress || '--'}</td>
+  1191→                            <td className="text-[12px]">{dev.location || '--'}</td>
+  1192→                            <td><StatusBadge status={dev.status} /></td>
+  1193→                            <td className="text-[12px] text-muted-foreground">{dev.lastSeenAt ? formatDate(dev.lastSeenAt) : '--'}</td>
+  1194→                          </tr>
+  1195→                        )
+  1196→                      })}
+  1197→                    </tbody>
+  1198→                  </table>
+  1199→                </div>
+  1200→              </div>
+  1201→            )}
+  1202→
+  1203→            {/* ── TENANT DATABASES TAB ── */}
+  1204→            {activeTab === 'tenants' && (
+  1205→              <TenantDatabasesTab clients={clients} onRefresh={refreshData} />
+  1206→            )}
+  1207→          </motion.div>
+  1208→        </AnimatePresence>
+  1209→      )}
+  1210→
+  1211→      {/* ── DIALOGS ── */}
+  1212→
+  1213→      {/* Create Client Dialog */}
+  1214→      <Dialog open={showCreateClient} onOpenChange={setShowCreateClient}>
+  1215→        <DialogContent className="sm:max-w-[525px] rounded-xl">
+  1216→          <DialogHeader>
+  1217→            <DialogTitle className="flex items-center gap-2"><Users className="size-4 text-amber-500" /> New Client</DialogTitle>
+  1218→          </DialogHeader>
+  1219→          <div className="grid gap-3 py-3 max-h-[60vh] overflow-y-auto">
+  1220→            <div className="grid grid-cols-2 gap-3">
+  1221→              <div><Label className="text-[11px]">Company Name *</Label><Input value={newClient.companyName} onChange={e => setNewClient(p => ({ ...p, companyName: e.target.value }))} placeholder="e.g. Al-Falah Petroleum" /></div>
+  1222→              <div><Label className="text-[11px]">Contact Person *</Label><Input value={newClient.contactPerson} onChange={e => setNewClient(p => ({ ...p, contactPerson: e.target.value }))} placeholder="e.g. Ahmed Khan" /></div>
+  1223→            </div>
+  1224→            <div className="grid grid-cols-2 gap-3">
+  1225→              <div><Label className="text-[11px]">Email *</Label><Input type="email" value={newClient.email} onChange={e => setNewClient(p => ({ ...p, email: e.target.value }))} placeholder="ahmed@company.pk" /></div>
+  1226→              <div><Label className="text-[11px]">Phone *</Label><Input value={newClient.phone} onChange={e => setNewClient(p => ({ ...p, phone: e.target.value }))} placeholder="+92-300-1234567" /></div>
+  1227→            </div>
+  1228→            <div><Label className="text-[11px]">Address</Label><Input value={newClient.address} onChange={e => setNewClient(p => ({ ...p, address: e.target.value }))} placeholder="Street address" /></div>
+  1229→            <div className="grid grid-cols-3 gap-3">
+  1230→              <div><Label className="text-[11px]">City</Label><Input value={newClient.city} onChange={e => setNewClient(p => ({ ...p, city: e.target.value }))} placeholder="Karachi" /></div>
+  1231→              <div><Label className="text-[11px]">State</Label><Input value={newClient.state} onChange={e => setNewClient(p => ({ ...p, state: e.target.value }))} placeholder="Sindh" /></div>
+  1232→              <div><Label className="text-[11px]">Country</Label><Input value={newClient.country} onChange={e => setNewClient(p => ({ ...p, country: e.target.value }))} /></div>
+  1233→            </div>
+  1234→            <div className="grid grid-cols-2 gap-3">
+  1235→              <div><Label className="text-[11px]">Industry</Label><Input value={newClient.industry} onChange={e => setNewClient(p => ({ ...p, industry: e.target.value }))} placeholder="Fuel Retail" /></div>
+  1236→              <div><Label className="text-[11px]">Website</Label><Input value={newClient.website} onChange={e => setNewClient(p => ({ ...p, website: e.target.value }))} placeholder="https://..." /></div>
+  1237→            </div>
+  1238→            <div className="grid grid-cols-2 gap-3">
+  1239→              <div><Label className="text-[11px]">Tax ID (NTN)</Label><Input value={newClient.taxId} onChange={e => setNewClient(p => ({ ...p, taxId: e.target.value }))} placeholder="NTN-1234567-8" /></div>
+  1240→              <div><Label className="text-[11px]">Postal Code</Label><Input value={newClient.postalCode} onChange={e => setNewClient(p => ({ ...p, postalCode: e.target.value }))} /></div>
+  1241→            </div>
+  1242→            <div><Label className="text-[11px]">Notes</Label><Textarea value={newClient.notes} onChange={e => setNewClient(p => ({ ...p, notes: e.target.value }))} placeholder="Additional notes..." rows={2} /></div>
+  1243→          </div>
+  1244→          <DialogFooter>
+  1245→            <Button variant="outline" onClick={() => setShowCreateClient(false)}>Cancel</Button>
+  1246→            <Button onClick={handleCreateClient} disabled={saving || !newClient.companyName || !newClient.email} className="bg-amber-500 hover:bg-amber-600 text-white">
+  1247→              {saving ? <Loader2 className="size-4 animate-spin mr-1" /> : <Plus className="size-4 mr-1" />} Create Client
+  1248→            </Button>
+  1249→          </DialogFooter>
+  1250→        </DialogContent>
+  1251→      </Dialog>
+  1252→
+  1253→      {/* Create Invoice Dialog */}
+  1254→      <Dialog open={showCreateInvoice} onOpenChange={setShowCreateInvoice}>
+  1255→        <DialogContent className="sm:max-w-[600px] rounded-xl">
+  1256→          <DialogHeader>
+  1257→            <DialogTitle className="flex items-center gap-2"><FileText className="size-4 text-amber-500" /> New Invoice</DialogTitle>
+  1258→          </DialogHeader>
+  1259→          <div className="grid gap-3 py-3 max-h-[60vh] overflow-y-auto">
+  1260→            <div className="grid grid-cols-2 gap-3">
+  1261→              <div>
+  1262→                <Label className="text-[11px]">Client *</Label>
+  1263→                <Select value={newInvoice.clientId} onValueChange={v => setNewInvoice(p => ({ ...p, clientId: v }))}>
+  1264→                  <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
+  1265→                  <SelectContent>{clients.map(c => <SelectItem key={c.id} value={c.id}>{c.companyName}</SelectItem>)}</SelectContent>
+  1266→                </Select>
+  1267→              </div>
+  1268→              <div>
+  1269→                <Label className="text-[11px]">Subscription</Label>
+  1270→                <Select value={newInvoice.subscriptionId} onValueChange={v => setNewInvoice(p => ({ ...p, subscriptionId: v }))}>
+  1271→                  <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+  1272→                  <SelectContent>
+  1273→                    {subscriptions.filter(s => s.clientId === newInvoice.clientId).map(s => <SelectItem key={s.id} value={s.id}>{s.plan?.name} ({s.billingCycle})</SelectItem>)}
+  1274→                  </SelectContent>
+  1275→                </Select>
+  1276→              </div>
+  1277→            </div>
+  1278→            <div className="grid grid-cols-2 gap-3">
+  1279→              <div><Label className="text-[11px]">Issue Date *</Label><Input type="date" value={newInvoice.issueDate} onChange={e => setNewInvoice(p => ({ ...p, issueDate: e.target.value }))} /></div>
+  1280→              <div><Label className="text-[11px]">Due Date *</Label><Input type="date" value={newInvoice.dueDate} onChange={e => setNewInvoice(p => ({ ...p, dueDate: e.target.value }))} /></div>
+  1281→            </div>
+  1282→
+  1283→            <Separator />
+  1284→
+  1285→            <div>
+  1286→              <div className="flex items-center justify-between mb-2">
+  1287→                <Label className="text-[11px] font-semibold">Line Items</Label>
+  1288→                <button onClick={() => setNewInvoice(p => ({ ...p, items: [...p.items, { description: '', quantity: 1, unitPrice: 0, amount: 0 }] }))}
+  1289→                  className="text-[11px] text-amber-500 hover:text-amber-600 flex items-center gap-1"><Plus className="size-3" /> Add Item</button>
+  1290→              </div>
+  1291→              {newInvoice.items.map((item, idx) => (
+  1292→                <div key={idx} className="grid grid-cols-12 gap-2 mb-2 items-end">
+  1293→                  <div className="col-span-5"><Input placeholder="Description" value={item.description} onChange={e => {
+  1294→                    const items = [...newInvoice.items]; items[idx] = { ...items[idx], description: e.target.value }; setNewInvoice(p => ({ ...p, items }))
+  1295→                  }} /></div>
+  1296→                  <div className="col-span-2"><Input type="number" placeholder="Qty" value={item.quantity || ''} onChange={e => {
+  1297→                    const q = parseFloat(e.target.value) || 0; const items = [...newInvoice.items]; items[idx] = { ...items[idx], quantity: q, amount: q * items[idx].unitPrice }; setNewInvoice(p => ({ ...p, items }))
+  1298→                  }} /></div>
+  1299→                  <div className="col-span-3"><Input type="number" placeholder="Unit Price" value={item.unitPrice || ''} onChange={e => {
+  1300→                    const up = parseFloat(e.target.value) || 0; const items = [...newInvoice.items]; items[idx] = { ...items[idx], unitPrice: up, amount: items[idx].quantity * up }; setNewInvoice(p => ({ ...p, items }))
+  1301→                  }} /></div>
+  1302→                  <div className="col-span-1 text-[12px] font-medium text-right">{formatPKR(item.amount)}</div>
+  1303→                  <div className="col-span-1">
+  1304→                    {newInvoice.items.length > 1 && (
+  1305→                      <button onClick={() => setNewInvoice(p => ({ ...p, items: p.items.filter((_, i) => i !== idx) }))} className="p-1 text-red-400 hover:text-red-500"><X className="size-3.5" /></button>
+  1306→                    )}
+  1307→                  </div>
+  1308→                </div>
+  1309→              ))}
+  1310→              <div className="text-right text-[13px] font-bold mt-2">
+  1311→                Total: {formatPKR(newInvoice.items.reduce((s, i) => s + i.amount, 0) * (1 + newInvoice.taxRate / 100) * (1 - newInvoice.discountRate / 100))}
+  1312→              </div>
+  1313→            </div>
+  1314→
+  1315→            <div className="grid grid-cols-2 gap-3">
+  1316→              <div><Label className="text-[11px]">Tax Rate (%)</Label><Input type="number" value={newInvoice.taxRate} onChange={e => setNewInvoice(p => ({ ...p, taxRate: parseFloat(e.target.value) || 0 }))} /></div>
+  1317→              <div><Label className="text-[11px]">Discount (%)</Label><Input type="number" value={newInvoice.discountRate} onChange={e => setNewInvoice(p => ({ ...p, discountRate: parseFloat(e.target.value) || 0 }))} /></div>
+  1318→            </div>
+  1319→            <div><Label className="text-[11px]">Terms</Label><Textarea value={newInvoice.terms} onChange={e => setNewInvoice(p => ({ ...p, terms: e.target.value }))} rows={2} /></div>
+  1320→          </div>
+  1321→          <DialogFooter>
+  1322→            <Button variant="outline" onClick={() => setShowCreateInvoice(false)}>Cancel</Button>
+  1323→            <Button onClick={handleCreateInvoice} disabled={saving || !newInvoice.clientId || !newInvoice.issueDate} className="bg-amber-500 hover:bg-amber-600 text-white">
+  1324→              {saving ? <Loader2 className="size-4 animate-spin mr-1" /> : <Plus className="size-4 mr-1" />} Create Invoice
+  1325→            </Button>
+  1326→          </DialogFooter>
+  1327→        </DialogContent>
+  1328→      </Dialog>
+  1329→
+  1330→      {/* Create Quotation Dialog */}
+  1331→      <Dialog open={showCreateQuotation} onOpenChange={setShowCreateQuotation}>
+  1332→        <DialogContent className="sm:max-w-[600px] rounded-xl">
+  1333→          <DialogHeader>
+  1334→            <DialogTitle className="flex items-center gap-2"><FileSpreadsheet className="size-4 text-amber-500" /> New Quotation</DialogTitle>
+  1335→          </DialogHeader>
+  1336→          <div className="grid gap-3 py-3 max-h-[60vh] overflow-y-auto">
+  1337→            <div className="grid grid-cols-2 gap-3">
+  1338→              <div>
+  1339→                <Label className="text-[11px]">Client (existing)</Label>
+  1340→                <Select value={newQuotation.clientId} onValueChange={v => {
+  1341→                  const c = clients.find(cl => cl.id === v)
+  1342→                  setNewQuotation(p => ({ ...p, clientId: v, clientName: c?.companyName || '', clientEmail: c?.email || '', clientPhone: c?.phone || '', clientAddress: c?.address || '' }))
+  1343→                }}>
+  1344→                  <SelectTrigger><SelectValue placeholder="Select or fill manually" /></SelectTrigger>
+  1345→                  <SelectContent>{clients.map(c => <SelectItem key={c.id} value={c.id}>{c.companyName}</SelectItem>)}</SelectContent>
+  1346→                </Select>
+  1347→              </div>
+  1348→              <div><Label className="text-[11px]">Client Name *</Label><Input value={newQuotation.clientName} onChange={e => setNewQuotation(p => ({ ...p, clientName: e.target.value }))} placeholder="Company name" /></div>
+  1349→            </div>
+  1350→            <div className="grid grid-cols-2 gap-3">
+  1351→              <div><Label className="text-[11px]">Email</Label><Input value={newQuotation.clientEmail} onChange={e => setNewQuotation(p => ({ ...p, clientEmail: e.target.value }))} /></div>
+  1352→              <div><Label className="text-[11px]">Phone</Label><Input value={newQuotation.clientPhone} onChange={e => setNewQuotation(p => ({ ...p, clientPhone: e.target.value }))} /></div>
+  1353→            </div>
+  1354→            <div><Label className="text-[11px]">Address</Label><Input value={newQuotation.clientAddress} onChange={e => setNewQuotation(p => ({ ...p, clientAddress: e.target.value }))} /></div>
+  1355→            <div className="grid grid-cols-2 gap-3">
+  1356→              <div><Label className="text-[11px]">Issue Date *</Label><Input type="date" value={newQuotation.issueDate} onChange={e => setNewQuotation(p => ({ ...p, issueDate: e.target.value }))} /></div>
+  1357→              <div><Label className="text-[11px]">Valid Until *</Label><Input type="date" value={newQuotation.validUntil} onChange={e => setNewQuotation(p => ({ ...p, validUntil: e.target.value }))} /></div>
+  1358→            </div>
+  1359→
+  1360→            <Separator />
+  1361→
+  1362→            <div>
+  1363→              <div className="flex items-center justify-between mb-2">
+  1364→                <Label className="text-[11px] font-semibold">Line Items</Label>
+  1365→                <button onClick={() => setNewQuotation(p => ({ ...p, items: [...p.items, { description: '', quantity: 1, unitPrice: 0, amount: 0 }] }))}
+  1366→                  className="text-[11px] text-amber-500 hover:text-amber-600 flex items-center gap-1"><Plus className="size-3" /> Add Item</button>
+  1367→              </div>
+  1368→              {newQuotation.items.map((item, idx) => (
+  1369→                <div key={idx} className="grid grid-cols-12 gap-2 mb-2 items-end">
+  1370→                  <div className="col-span-5"><Input placeholder="Description" value={item.description} onChange={e => {
+  1371→                    const items = [...newQuotation.items]; items[idx] = { ...items[idx], description: e.target.value }; setNewQuotation(p => ({ ...p, items }))
+  1372→                  }} /></div>
+  1373→                  <div className="col-span-2"><Input type="number" placeholder="Qty" value={item.quantity || ''} onChange={e => {
+  1374→                    const q = parseFloat(e.target.value) || 0; const items = [...newQuotation.items]; items[idx] = { ...items[idx], quantity: q, amount: q * items[idx].unitPrice }; setNewQuotation(p => ({ ...p, items }))
+  1375→                  }} /></div>
+  1376→                  <div className="col-span-3"><Input type="number" placeholder="Unit Price" value={item.unitPrice || ''} onChange={e => {
+  1377→                    const up = parseFloat(e.target.value) || 0; const items = [...newQuotation.items]; items[idx] = { ...items[idx], unitPrice: up, amount: items[idx].quantity * up }; setNewQuotation(p => ({ ...p, items }))
+  1378→                  }} /></div>
+  1379→                  <div className="col-span-1 text-[12px] font-medium text-right">{formatPKR(item.amount)}</div>
+  1380→                  <div className="col-span-1">
+  1381→                    {newQuotation.items.length > 1 && (
+  1382→                      <button onClick={() => setNewQuotation(p => ({ ...p, items: p.items.filter((_, i) => i !== idx) }))} className="p-1 text-red-400 hover:text-red-500"><X className="size-3.5" /></button>
+  1383→                    )}
+  1384→                  </div>
+  1385→                </div>
+  1386→              ))}
+  1387→              <div className="text-right text-[13px] font-bold mt-2">
+  1388→                Total: {formatPKR(newQuotation.items.reduce((s, i) => s + i.amount, 0) * (1 + newQuotation.taxRate / 100) * (1 - newQuotation.discountRate / 100))}
+  1389→              </div>
+  1390→            </div>
+  1391→
+  1392→            <div className="grid grid-cols-2 gap-3">
+  1393→              <div><Label className="text-[11px]">Tax Rate (%)</Label><Input type="number" value={newQuotation.taxRate} onChange={e => setNewQuotation(p => ({ ...p, taxRate: parseFloat(e.target.value) || 0 }))} /></div>
+  1394→              <div><Label className="text-[11px]">Discount (%)</Label><Input type="number" value={newQuotation.discountRate} onChange={e => setNewQuotation(p => ({ ...p, discountRate: parseFloat(e.target.value) || 0 }))} /></div>
+  1395→            </div>
+  1396→            <div><Label className="text-[11px]">Terms</Label><Textarea value={newQuotation.terms} onChange={e => setNewQuotation(p => ({ ...p, terms: e.target.value }))} rows={2} /></div>
+  1397→          </div>
+  1398→          <DialogFooter>
+  1399→            <Button variant="outline" onClick={() => setShowCreateQuotation(false)}>Cancel</Button>
+  1400→            <Button onClick={handleCreateQuotation} disabled={saving || !newQuotation.clientName || !newQuotation.issueDate} className="bg-amber-500 hover:bg-amber-600 text-white">
+  1401→              {saving ? <Loader2 className="size-4 animate-spin mr-1" /> : <Plus className="size-4 mr-1" />} Create Quotation
+  1402→            </Button>
+  1403→          </DialogFooter>
+  1404→        </DialogContent>
+  1405→      </Dialog>
+  1406→
+  1407→      {/* Generate License Key Dialog */}
+  1408→      <Dialog open={showGenerateKey} onOpenChange={setShowGenerateKey}>
+  1409→        <DialogContent className="sm:max-w-[425px] rounded-xl">
+  1410→          <DialogHeader>
+  1411→            <DialogTitle className="flex items-center gap-2"><Key className="size-4 text-amber-500" /> Generate License Key</DialogTitle>
+  1412→          </DialogHeader>
+  1413→          <div className="grid gap-3 py-3">
+  1414→            <div>
+  1415→              <Label className="text-[11px]">Plan *</Label>
+  1416→              <Select value={newKey.planId} onValueChange={v => {
+  1417→                const plan = plans.find(p => p.id === v)
+  1418→                setNewKey(p => ({ ...p, planId: v, maxStations: plan?.maxStations || 1, maxDispensers: plan?.maxDispensers || 4, maxUsers: plan?.maxUsers || 5 }))
+  1419→              }}>
+  1420→                <SelectTrigger><SelectValue placeholder="Select plan" /></SelectTrigger>
+  1421→                <SelectContent>{plans.map(p => <SelectItem key={p.id} value={p.id}>{p.name} -- {formatPKR(p.priceMonthly)}/mo</SelectItem>)}</SelectContent>
+  1422→              </Select>
+  1423→            </div>
+  1424→            <div className="grid grid-cols-3 gap-3">
+  1425→              <div><Label className="text-[11px]">Max Stations</Label><Input type="number" value={newKey.maxStations} onChange={e => setNewKey(p => ({ ...p, maxStations: parseInt(e.target.value) || 1 }))} /></div>
+  1426→              <div><Label className="text-[11px]">Max Dispensers</Label><Input type="number" value={newKey.maxDispensers} onChange={e => setNewKey(p => ({ ...p, maxDispensers: parseInt(e.target.value) || 4 }))} /></div>
+  1427→              <div><Label className="text-[11px]">Max Users</Label><Input type="number" value={newKey.maxUsers} onChange={e => setNewKey(p => ({ ...p, maxUsers: parseInt(e.target.value) || 5 }))} /></div>
+  1428→            </div>
+  1429→            <div><Label className="text-[11px]">Notes</Label><Textarea value={newKey.notes} onChange={e => setNewKey(p => ({ ...p, notes: e.target.value }))} rows={2} /></div>
+  1430→          </div>
+  1431→          <DialogFooter>
+  1432→            <Button variant="outline" onClick={() => setShowGenerateKey(false)}>Cancel</Button>
+  1433→            <Button onClick={handleGenerateKey} disabled={saving || !newKey.planId} className="bg-amber-500 hover:bg-amber-600 text-white">
+  1434→              {saving ? <Loader2 className="size-4 animate-spin mr-1" /> : <Plus className="size-4 mr-1" />} Generate
+  1435→            </Button>
+  1436→          </DialogFooter>
+  1437→        </DialogContent>
+  1438→      </Dialog>
+  1439→
+  1440→      {/* Register Device Dialog */}
+  1441→      <Dialog open={showRegisterDevice} onOpenChange={setShowRegisterDevice}>
+  1442→        <DialogContent className="sm:max-w-[500px] rounded-xl">
+  1443→          <DialogHeader>
+  1444→            <DialogTitle className="flex items-center gap-2"><Monitor className="size-4 text-amber-500" /> Register Device</DialogTitle>
+  1445→          </DialogHeader>
+  1446→          <div className="grid gap-3 py-3">
+  1447→            <div>
+  1448→              <Label className="text-[11px]">Client *</Label>
+  1449→              <Select value={newDevice.clientId} onValueChange={v => setNewDevice(p => ({ ...p, clientId: v }))}>
+  1450→                <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
+  1451→                <SelectContent>{clients.map(c => <SelectItem key={c.id} value={c.id}>{c.companyName}</SelectItem>)}</SelectContent>
+  1452→              </Select>
+  1453→            </div>
+  1454→            <div className="grid grid-cols-2 gap-3">
+  1455→              <div><Label className="text-[11px]">Device Name *</Label><Input value={newDevice.deviceName} onChange={e => setNewDevice(p => ({ ...p, deviceName: e.target.value }))} placeholder="e.g. POS Terminal - Counter 1" /></div>
+  1456→              <div>
+  1457→                <Label className="text-[11px]">Device Type</Label>
+  1458→                <Select value={newDevice.deviceType} onValueChange={v => setNewDevice(p => ({ ...p, deviceType: v }))}>
+  1459→                  <SelectTrigger><SelectValue /></SelectTrigger>
+  1460→                  <SelectContent>
+  1461→                    <SelectItem value="pos">POS Terminal</SelectItem>
+  1462→                    <SelectItem value="dispenser_controller">Dispenser Controller</SelectItem>
+  1463→                    <SelectItem value="atg">ATG Probe</SelectItem>
+  1464→                    <SelectItem value="payment_terminal">Payment Terminal</SelectItem>
+  1465→                    <SelectItem value="scanner">Scanner</SelectItem>
+  1466→                    <SelectItem value="other">Other</SelectItem>
+  1467→                  </SelectContent>
+  1468→                </Select>
+  1469→              </div>
+  1470→            </div>
+  1471→            <div className="grid grid-cols-2 gap-3">
+  1472→              <div><Label className="text-[11px]">Serial Number</Label><Input value={newDevice.serialNumber} onChange={e => setNewDevice(p => ({ ...p, serialNumber: e.target.value }))} /></div>
+  1473→              <div><Label className="text-[11px]">MAC Address</Label><Input value={newDevice.macAddress} onChange={e => setNewDevice(p => ({ ...p, macAddress: e.target.value }))} placeholder="AA:BB:CC:DD:EE:FF" /></div>
+  1474→            </div>
+  1475→            <div className="grid grid-cols-2 gap-3">
+  1476→              <div><Label className="text-[11px]">IP Address</Label><Input value={newDevice.ipAddress} onChange={e => setNewDevice(p => ({ ...p, ipAddress: e.target.value }))} placeholder="192.168.1.100" /></div>
+  1477→              <div><Label className="text-[11px]">Location</Label><Input value={newDevice.location} onChange={e => setNewDevice(p => ({ ...p, location: e.target.value }))} placeholder="Station name" /></div>
+  1478→            </div>
+  1479→            <div><Label className="text-[11px]">Notes</Label><Textarea value={newDevice.notes} onChange={e => setNewDevice(p => ({ ...p, notes: e.target.value }))} rows={2} /></div>
+  1480→          </div>
+  1481→          <DialogFooter>
+  1482→            <Button variant="outline" onClick={() => setShowRegisterDevice(false)}>Cancel</Button>
+  1483→            <Button onClick={handleRegisterDevice} disabled={saving || !newDevice.clientId || !newDevice.deviceName} className="bg-amber-500 hover:bg-amber-600 text-white">
+  1484→              {saving ? <Loader2 className="size-4 animate-spin mr-1" /> : <Plus className="size-4 mr-1" />} Register
+  1485→            </Button>
+  1486→          </DialogFooter>
+  1487→        </DialogContent>
+  1488→      </Dialog>
+  1489→
+  1490→      {/* Client Detail Sheet */}
+  1491→      <Sheet open={showClientDetail} onOpenChange={setShowClientDetail}>
+  1492→        <SheetContent className="sm:max-w-[480px] p-0 overflow-y-auto">
+  1493→          <SheetHeader className="p-5 border-b border-border">
+  1494→            <SheetTitle className="flex items-center gap-3">
+  1495→              <div className="size-10 rounded-xl flex items-center justify-center bg-amber-500/10">
+  1496→                <Building2 className="size-5 text-amber-500" />
+  1497→              </div>
+  1498→              <div>
+  1499→                <p className="text-[15px] font-bold">{selectedClient?.companyName}</p>
+  1500→                <p className="text-[11px] text-muted-foreground">{selectedClient?.industry || 'Fuel Retail'}</p>
+  1501→              </div>
+  1502→            </SheetTitle>
+  1503→          </SheetHeader>
+  1504→
+  1505→          {selectedClient && (
+  1506→            <div className="p-5 space-y-5">
+  1507→              {/* Status */}
+  1508→              <div className="flex items-center gap-2">
+  1509→                <StatusBadge status={selectedClient.status} />
+  1510→                <StatusBadge status={selectedClient.databaseStatus || 'pending'} />
+  1511→              </div>
+  1512→
+  1513→              {/* Contact Info */}
+  1514→              <div className="macos-group">
+  1515→                <div className="macos-section-header px-1 mb-1">Contact Information</div>
+  1516→                <div className="macos-group-item flex items-center gap-2"><Mail className="size-3.5 text-muted-foreground" /><span className="text-[12px]">{selectedClient.email}</span></div>
+  1517→                <div className="macos-group-item flex items-center gap-2"><Phone className="size-3.5 text-muted-foreground" /><span className="text-[12px]">{selectedClient.phone}</span></div>
+  1518→                <div className="macos-group-item flex items-center gap-2"><Users className="size-3.5 text-muted-foreground" /><span className="text-[12px]">{selectedClient.contactPerson}</span></div>
+  1519→                {selectedClient.address && <div className="macos-group-item flex items-center gap-2"><MapPin className="size-3.5 text-muted-foreground" /><span className="text-[12px]">{selectedClient.address}, {selectedClient.city}, {selectedClient.country}</span></div>}
+  1520→                {selectedClient.website && <div className="macos-group-item flex items-center gap-2"><Globe className="size-3.5 text-muted-foreground" /><span className="text-[12px]">{selectedClient.website}</span></div>}
+  1521→                {selectedClient.taxId && <div className="macos-group-item flex items-center gap-2"><Hash className="size-3.5 text-muted-foreground" /><span className="text-[12px]">NTN: {selectedClient.taxId}</span></div>}
+  1522→              </div>
+  1523→
+  1524→              {/* Subscription */}
+  1525→              <div>
+  1526→                <div className="macos-section-header px-1 mb-1">Subscription</div>
+  1527→                {(() => {
+  1528→                  const sub = subscriptions.find(s => s.clientId === selectedClient.id && (s.status === 'active' || s.status === 'trial'))
+  1529→                  return sub ? (
+  1530→                    <div className="macos-card p-3">
+  1531→                      <div className="flex items-center justify-between">
+  1532→                        <span className="text-[13px] font-semibold">{sub.plan?.name || 'Unknown'}</span>
+  1533→                        <StatusBadge status={sub.status} />
+  1534→                      </div>
+  1535→                      <p className="text-[11px] text-muted-foreground mt-1">{sub.billingCycle} billing -- {sub.autoRenew ? 'Auto-renew' : 'Manual'}</p>
+  1536→                    </div>
+  1537→                  ) : (
+  1538→                    <p className="text-[11px] text-muted-foreground px-1">No active subscription</p>
+  1539→                  )
+  1540→                })()}
+  1541→              </div>
+  1542→
+  1543→              {/* Database */}
+  1544→              <div>
+  1545→                <div className="macos-section-header px-1 mb-1">Database</div>
+  1546→                {selectedClient.databaseName ? (
+  1547→                  <div className="macos-card p-3">
+  1548→                    <div className="flex items-center justify-between">
+  1549→                      <code className="text-[11px] font-mono bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded">{selectedClient.databaseName}</code>
+  1550→                      <StatusBadge status={selectedClient.databaseStatus || 'active'} />
+  1551→                    </div>
+  1552→                    {selectedClient.tenantDatabase && (
+  1553→                      <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
+  1554→                        {selectedClient.tenantDatabase.totalSize && <span>{selectedClient.tenantDatabase.totalSize}</span>}
+  1555→                        <span>{selectedClient.tenantDatabase.tableCount} tables</span>
+  1556→                        {selectedClient.tenantDatabase.schemaVersion && <span>v{selectedClient.tenantDatabase.schemaVersion}</span>}
+  1557→                      </div>
+  1558→                    )}
+  1559→                  </div>
+  1560→                ) : (
+  1561→                  <p className="text-[11px] text-muted-foreground px-1">No database provisioned</p>
+  1562→                )}
+  1563→              </div>
+  1564→
+  1565→              {/* Stats */}
+  1566→              <div>
+  1567→                <div className="macos-section-header px-1 mb-1">Activity</div>
+  1568→                <div className="grid grid-cols-3 gap-2">
+  1569→                  <div className="macos-card p-3 text-center">
+  1570→                    <p className="text-[18px] font-bold">{selectedClient._count?.invoices || 0}</p>
+  1571→                    <p className="text-[10px] text-muted-foreground">Invoices</p>
+  1572→                  </div>
+  1573→                  <div className="macos-card p-3 text-center">
+  1574→                    <p className="text-[18px] font-bold">{selectedClient._count?.devices || 0}</p>
+  1575→                    <p className="text-[10px] text-muted-foreground">Devices</p>
+  1576→                  </div>
+  1577→                  <div className="macos-card p-3 text-center">
+  1578→                    <p className="text-[18px] font-bold">{selectedClient._count?.licenseKeys || 0}</p>
+  1579→                    <p className="text-[10px] text-muted-foreground">Keys</p>
+  1580→                  </div>
+  1581→                </div>
+  1582→              </div>
+  1583→
+  1584→              {/* Notes */}
+  1585→              {selectedClient.notes && (
+  1586→                <div>
+  1587→                  <div className="macos-section-header px-1 mb-1">Notes</div>
+  1588→                  <p className="text-[12px] text-muted-foreground px-1">{selectedClient.notes}</p>
+  1589→                </div>
+  1590→              )}
+  1591→
+  1592→              {/* Onboarded */}
+  1593→              <p className="text-[11px] text-muted-foreground px-1">Client since {formatDate(selectedClient.onboardedAt)}</p>
+  1594→            </div>
+  1595→          )}
+  1596→        </SheetContent>
+  1597→      </Sheet>
+  1598→    </div>
+  1599→  )
+  1600→}
+  1601→

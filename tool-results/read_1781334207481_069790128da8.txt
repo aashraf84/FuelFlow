@@ -1,0 +1,801 @@
+     1→import { NextResponse } from 'next/server'
+     2→import { db } from '@/lib/db'
+     3→import { Prisma } from '@prisma/client'
+     4→
+     5→// =====================================================
+     6→// DEVICE TYPE REGISTRY
+     7→// Uses lazy accessor functions to avoid initialization timing issues
+     8→// with Prisma client model delegates
+     9→// =====================================================
+    10→
+    11→type DeviceDelegate = {
+    12→  findMany: (args?: Record<string, unknown>) => Promise<unknown[]>
+    13→  findUnique: (args: Record<string, unknown>) => Promise<unknown | null>
+    14→  create: (args: Record<string, unknown>) => Promise<unknown>
+    15→  update: (args: Record<string, unknown>) => Promise<unknown>
+    16→  delete: (args: Record<string, unknown>) => Promise<unknown>
+    17→  count: (args?: Record<string, unknown>) => Promise<number>
+    18→  groupBy: (args: Record<string, unknown>) => Promise<Record<string, unknown>[]>
+    19→}
+    20→
+    21→interface DeviceTypeInfo {
+    22→  key: string
+    23→  getModel: () => DeviceDelegate
+    24→  label: string
+    25→}
+    26→
+    27→const DEVICE_TYPES: DeviceTypeInfo[] = [
+    28→  { key: 'forecourt_controller', getModel: () => db.forecourtController as unknown as DeviceDelegate, label: 'Forecourt Controllers' },
+    29→  { key: 'payment_terminal', getModel: () => db.paymentTerminal as unknown as DeviceDelegate, label: 'Payment Terminals' },
+    30→  { key: 'generator', getModel: () => db.generator as unknown as DeviceDelegate, label: 'Generators' },
+    31→  { key: 'surveillance_camera', getModel: () => db.surveillanceCamera as unknown as DeviceDelegate, label: 'Surveillance Cameras' },
+    32→  { key: 'fire_alarm', getModel: () => db.fireAlarmSystem as unknown as DeviceDelegate, label: 'Fire Alarm Systems' },
+    33→  { key: 'utility_meter', getModel: () => db.utilityMeter as unknown as DeviceDelegate, label: 'Utility Meters' },
+    34→  { key: 'weather_station', getModel: () => db.weatherStation as unknown as DeviceDelegate, label: 'Weather Stations' },
+    35→  { key: 'tanker_tracker', getModel: () => db.tankerTracker as unknown as DeviceDelegate, label: 'Tanker Trackers' },
+    36→  { key: 'car_wash', getModel: () => db.carWashSystem as unknown as DeviceDelegate, label: 'Car Wash Systems' },
+    37→  { key: 'air_compressor', getModel: () => db.airCompressor as unknown as DeviceDelegate, label: 'Air Compressors' },
+    38→  { key: 'vacuum_station', getModel: () => db.vacuumStation as unknown as DeviceDelegate, label: 'Vacuum Stations' },
+    39→]
+    40→
+    41→const DEVICE_TYPE_MAP = new Map<string, DeviceTypeInfo>(
+    42→  DEVICE_TYPES.map((dt) => [dt.key, dt])
+    43→)
+    44→
+    45→const ALL_DEVICE_TYPE_KEYS = DEVICE_TYPES.map((dt) => dt.key)
+    46→
+    47→// =====================================================
+    48→// TYPE-SPECIFIC FIELD DEFINITIONS
+    49→// Whitelist of allowed fields per device type for create/update
+    50→// =====================================================
+    51→
+    52→const COMMON_FIELDS = [
+    53→  'name', 'code', 'manufacturer', 'model', 'serialNumber', 'firmwareVersion',
+    54→  'communicationType', 'ipAddress', 'port', 'comPort', 'protocol',
+    55→  'status', 'isActive', 'configJson',
+    56→] as const
+    57→
+    58→const TYPE_SPECIFIC_FIELDS: Record<string, string[]> = {
+    59→  forecourt_controller: [
+    60→    'controllerType', 'baudRate', 'pollingInterval', 'timeout',
+    61→    'maxDispensers', 'connectedDispensers', 'lastHeartbeat', 'lastCommunication',
+    62→  ],
+    63→  payment_terminal: [
+    64→    'terminalType', 'merchantId', 'terminalId', 'supportedCards',
+    65→    'supportedMethods', 'shiftId', 'transactionCount', 'lastTransaction',
+    66→  ],
+    67→  generator: [
+    68→    'fuelType', 'capacityKva', 'currentLoadKva', 'fuelLevel',
+    69→    'runHours', 'voltage', 'frequency', 'oilPressure', 'coolantTemp',
+    70→    'autoStart', 'autoTransfer', 'lastStartedAt', 'lastStoppedAt', 'nextServiceDate',
+    71→  ],
+    72→  surveillance_camera: [
+    73→    'cameraType', 'resolution', 'location', 'rtspUrl', 'httpUrl',
+    74→    'onvifSupported', 'ptzEnabled', 'nightVision', 'recordingEnabled',
+    75→    'storageDays', 'analyticsEnabled', 'analyticsType', 'lastRecordingAt',
+    76→  ],
+    77→  fire_alarm: [
+    78→    'systemType', 'zoneCount', 'detectorCount', 'suppressionType',
+    79→    'autoSuppress', 'linkedToDispensers', 'linkedToTanks',
+    80→    'lastAlarmAt', 'lastTestDate', 'nextTestDate',
+    81→  ],
+    82→  utility_meter: [
+    83→    'meterType', 'meterNumber', 'currentReading', 'previousReading',
+    84→    'consumption', 'unit', 'peakDemand', 'powerFactor',
+    85→    'billingCycle', 'tariffRate', 'lastReading',
+    86→  ],
+    87→  weather_station: [
+    88→    'temperature', 'humidity', 'windSpeed', 'windDirection',
+    89→    'pressure', 'rainfall', 'uvIndex', 'visibility', 'dewPoint', 'lastReading',
+    90→  ],
+    91→  tanker_tracker: [
+    92→    'trackerType', 'simCardNumber', 'imei', 'latitude', 'longitude',
+    93→    'speed', 'heading', 'altitude', 'odometer', 'fuelLevel',
+    94→    'ignitionStatus', 'doorStatus', 'geofenceEnabled', 'geofenceRadius', 'lastLocationAt',
+    95→  ],
+    96→  car_wash: [
+    97→    'systemType', 'bayCount', 'currentBay', 'waterPressure',
+    98→    'waterTemp', 'chemicalLevel', 'waxLevel', 'dailyCount',
+    99→    'monthlyCount', 'revenueToday', 'lastWashAt', 'nextServiceDate',
+   100→  ],
+   101→  air_compressor: [
+   102→    'pressure', 'maxPressure', 'tankCapacity', 'motorStatus',
+   103→    'runHours', 'coinOperated', 'pricePerUse', 'dailyUsage', 'revenueToday', 'lastUsedAt',
+   104→  ],
+   105→  vacuum_station: [
+   106→    'motorStatus', 'suctionPower', 'coinOperated', 'pricePerUse',
+   107→    'dailyUsage', 'revenueToday', 'runHours', 'lastUsedAt',
+   108→  ],
+   109→}
+   110→
+   111→// =====================================================
+   112→// HELPER: Get first station ID (singleton station pattern)
+   113→// =====================================================
+   114→
+   115→async function getFirstStationId(): Promise<string | null> {
+   116→  const station = await db.station.findFirst({
+   117→    select: { id: true },
+   118→    orderBy: { createdAt: 'asc' },
+   119→  })
+   120→  return station?.id ?? null
+   121→}
+   122→
+   123→// =====================================================
+   124→// HELPER: Validate and get device type info
+   125→// =====================================================
+   126→
+   127→function getDeviceInfo(type: string): DeviceTypeInfo | null {
+   128→  return DEVICE_TYPE_MAP.get(type) ?? null
+   129→}
+   130→
+   131→// =====================================================
+   132→// HELPER: Filter data to only allowed fields
+   133→// =====================================================
+   134→
+   135→function filterAllowedFields(
+   136→  data: Record<string, unknown>,
+   137→  deviceTypeKey: string,
+   138→  includeCommon: boolean = true
+   139→): Record<string, unknown> {
+   140→  const result: Record<string, unknown> = {}
+   141→  const allowedFields = new Set<string>()
+   142→
+   143→  if (includeCommon) {
+   144→    for (const f of COMMON_FIELDS) allowedFields.add(f)
+   145→  }
+   146→  for (const f of TYPE_SPECIFIC_FIELDS[deviceTypeKey] ?? []) allowedFields.add(f)
+   147→
+   148→  for (const [key, value] of Object.entries(data)) {
+   149→    if (allowedFields.has(key) && value !== undefined) {
+   150→      result[key] = value
+   151→    }
+   152→  }
+   153→
+   154→  return result
+   155→}
+   156→
+   157→// =====================================================
+   158→// HELPER: Standard error response
+   159→// =====================================================
+   160→
+   161→function errorResponse(message: string, status: number = 400, details?: unknown) {
+   162→  return NextResponse.json(
+   163→    { error: message, ...(details !== undefined ? { details } : {}) },
+   164→    { status }
+   165→  )
+   166→}
+   167→
+   168→// =====================================================
+   169→// GET /api/devices?type=...
+   170→// =====================================================
+   171→
+   172→export async function GET(request: Request) {
+   173→  try {
+   174→    const { searchParams } = new URL(request.url)
+   175→    const type = searchParams.get('type')
+   176→
+   177→    if (!type) {
+   178→      return errorResponse(
+   179→        'Missing required query param "type". Valid values: ' +
+   180→          ALL_DEVICE_TYPE_KEYS.join(', ') +
+   181→          ', event_logs, command_queue, configs, overview',
+   182→        400
+   183→      )
+   184→    }
+   185→
+   186→    // -------------------------------------------------
+   187→    // 1) OVERVIEW - summary counts of all device types
+   188→    // -------------------------------------------------
+   189→    if (type === 'overview') {
+   190→      const stationId = await getFirstStationId()
+   191→      if (!stationId) {
+   192→        return errorResponse('No station found', 404)
+   193→      }
+   194→
+   195→      const counts: Record<string, number> = {}
+   196→      const statusBreakdown: Record<string, Record<string, number>> = {}
+   197→
+   198→      for (const deviceType of DEVICE_TYPES) {
+   199→        const model = deviceType.getModel()
+   200→        const count = await model.count({
+   201→          where: { stationId },
+   202→        })
+   203→        counts[deviceType.key] = count
+   204→
+   205→        // Get status breakdown using groupBy
+   206→        try {
+   207→          const grouped = await model.groupBy({
+   208→            by: ['status'],
+   209→            where: { stationId },
+   210→            _count: { status: true },
+   211→          })
+   212→          statusBreakdown[deviceType.key] = {}
+   213→          for (const g of grouped) {
+   214→            statusBreakdown[deviceType.key][String(g.status)] =
+   215→              Number((g as Record<string, unknown>)._count?.status ?? 0)
+   216→          }
+   217→        } catch {
+   218→          // groupBy might not work for some models, skip gracefully
+   219→          statusBreakdown[deviceType.key] = {}
+   220→        }
+   221→      }
+   222→
+   223→      // Additional counts for event logs and command queue
+   224→      const eventLogCount = await db.deviceEventLog.count({
+   225→        where: { stationId },
+   226→      })
+   227→      const commandQueueCount = await db.deviceCommandQueue.count({
+   228→        where: { stationId },
+   229→      })
+   230→
+   231→      // Recent critical events
+   232→      const recentCriticalEvents = await db.deviceEventLog.findMany({
+   233→        where: { stationId, severity: { in: ['error', 'critical'] } },
+   234→        orderBy: { createdAt: 'desc' },
+   235→        take: 5,
+   236→      })
+   237→
+   238→      // Pending commands count
+   239→      const pendingCommands = await db.deviceCommandQueue.count({
+   240→        where: { stationId, status: 'queued' },
+   241→      })
+   242→
+   243→      return NextResponse.json({
+   244→        overview: {
+   245→          stationId,
+   246→          deviceCounts: counts,
+   247→          statusBreakdown,
+   248→          totalDevices: Object.values(counts).reduce((sum, c) => sum + c, 0),
+   249→          eventLogCount,
+   250→          commandQueueCount,
+   251→          pendingCommands,
+   252→          recentCriticalEvents,
+   253→        },
+   254→      })
+   255→    }
+   256→
+   257→    // -------------------------------------------------
+   258→    // 2) EVENT_LOGS - recent DeviceEventLog entries
+   259→    // -------------------------------------------------
+   260→    if (type === 'event_logs') {
+   261→      const stationId = await getFirstStationId()
+   262→      if (!stationId) {
+   263→        return errorResponse('No station found', 404)
+   264→      }
+   265→
+   266→      const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '50'), 1), 500)
+   267→      const offset = Math.max(parseInt(searchParams.get('offset') || '0'), 0)
+   268→      const deviceTypeFilter = searchParams.get('deviceType')
+   269→      const severity = searchParams.get('severity')
+   270→      const eventType = searchParams.get('eventType')
+   271→      const deviceId = searchParams.get('deviceId')
+   272→
+   273→      const where: Record<string, unknown> = { stationId }
+   274→      if (deviceTypeFilter) where.deviceType = deviceTypeFilter
+   275→      if (severity) where.severity = severity
+   276→      if (eventType) where.eventType = eventType
+   277→      if (deviceId) where.deviceId = deviceId
+   278→
+   279→      const [eventLogs, total] = await Promise.all([
+   280→        db.deviceEventLog.findMany({
+   281→          where,
+   282→          orderBy: { createdAt: 'desc' },
+   283→          take: limit,
+   284→          skip: offset,
+   285→        }),
+   286→        db.deviceEventLog.count({ where }),
+   287→      ])
+   288→
+   289→      return NextResponse.json({
+   290→        eventLogs,
+   291→        pagination: { total, limit, offset, hasMore: offset + limit < total },
+   292→      })
+   293→    }
+   294→
+   295→    // -------------------------------------------------
+   296→    // 3) COMMAND_QUEUE - DeviceCommandQueue entries
+   297→    // -------------------------------------------------
+   298→    if (type === 'command_queue') {
+   299→      const stationId = await getFirstStationId()
+   300→      if (!stationId) {
+   301→        return errorResponse('No station found', 404)
+   302→      }
+   303→
+   304→      const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '50'), 1), 500)
+   305→      const offset = Math.max(parseInt(searchParams.get('offset') || '0'), 0)
+   306→      const deviceTypeFilter = searchParams.get('deviceType')
+   307→      const statusFilter = searchParams.get('status')
+   308→      const priority = searchParams.get('priority')
+   309→      const deviceId = searchParams.get('deviceId')
+   310→
+   311→      const where: Record<string, unknown> = { stationId }
+   312→      if (deviceTypeFilter) where.deviceType = deviceTypeFilter
+   313→      if (statusFilter) where.status = statusFilter
+   314→      if (priority) where.priority = priority
+   315→      if (deviceId) where.deviceId = deviceId
+   316→
+   317→      const [commands, total] = await Promise.all([
+   318→        db.deviceCommandQueue.findMany({
+   319→          where,
+   320→          orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+   321→          take: limit,
+   322→          skip: offset,
+   323→        }),
+   324→        db.deviceCommandQueue.count({ where }),
+   325→      ])
+   326→
+   327→      return NextResponse.json({
+   328→        commands,
+   329→        pagination: { total, limit, offset, hasMore: offset + limit < total },
+   330→      })
+   331→    }
+   332→
+   333→    // -------------------------------------------------
+   334→    // 4) CONFIGS - DeviceConfig for a specific device
+   335→    // -------------------------------------------------
+   336→    if (type === 'configs') {
+   337→      const deviceTypeParam = searchParams.get('deviceType')
+   338→      const deviceId = searchParams.get('deviceId')
+   339→
+   340→      if (!deviceTypeParam || !deviceId) {
+   341→        return errorResponse('Missing required params: deviceType and deviceId', 400)
+   342→      }
+   343→
+   344→      const configs = await db.deviceConfig.findMany({
+   345→        where: { deviceType: deviceTypeParam, deviceId },
+   346→        orderBy: { configKey: 'asc' },
+   347→      })
+   348→
+   349→      return NextResponse.json({ configs, deviceType: deviceTypeParam, deviceId })
+   350→    }
+   351→
+   352→    // -------------------------------------------------
+   353→    // 5) DEVICE TYPE - fetch all devices of a specific type
+   354→    // -------------------------------------------------
+   355→    const deviceInfo = getDeviceInfo(type)
+   356→    if (!deviceInfo) {
+   357→      return errorResponse(
+   358→        `Invalid device type "${type}". Valid types: ${ALL_DEVICE_TYPE_KEYS.join(', ')}, event_logs, command_queue, configs, overview`,
+   359→        400
+   360→      )
+   361→    }
+   362→
+   363→    const stationId = await getFirstStationId()
+   364→    if (!stationId) {
+   365→      return errorResponse('No station found', 404)
+   366→    }
+   367→
+   368→    const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '100'), 1), 500)
+   369→    const offset = Math.max(parseInt(searchParams.get('offset') || '0'), 0)
+   370→    const statusFilter = searchParams.get('status')
+   371→    const isActiveFilter = searchParams.get('isActive')
+   372→
+   373→    const where: Record<string, unknown> = {
+   374→      stationId,
+   375→      ...(statusFilter ? { status: statusFilter } : {}),
+   376→      ...(isActiveFilter !== null ? { isActive: isActiveFilter === 'true' } : {}),
+   377→    }
+   378→
+   379→    const include = {
+   380→      eventLogs: {
+   381→        orderBy: { createdAt: 'desc' as const },
+   382→        take: 5,
+   383→      },
+   384→      commandQueue: {
+   385→        where: { status: 'queued' },
+   386→        orderBy: [{ priority: 'desc' as const }, { createdAt: 'asc' as const }],
+   387→        take: 5,
+   388→      },
+   389→      configs: {
+   390→        where: { isEditable: true },
+   391→        orderBy: { configKey: 'asc' as const },
+   392→      },
+   393→    }
+   394→
+   395→    const model = deviceInfo.getModel()
+   396→    const [devices, total] = await Promise.all([
+   397→      model.findMany({
+   398→        where,
+   399→        include,
+   400→        orderBy: { createdAt: 'desc' },
+   401→        take: limit,
+   402→        skip: offset,
+   403→      }),
+   404→      model.count({ where }),
+   405→    ])
+   406→
+   407→    return NextResponse.json({
+   408→      devices,
+   409→      deviceType: type,
+   410→      label: deviceInfo.label,
+   411→      pagination: { total, limit, offset, hasMore: offset + limit < total },
+   412→    })
+   413→  } catch (error) {
+   414→    console.error('Devices GET error:', error)
+   415→    return errorResponse(
+   416→      'Failed to fetch device data',
+   417→      500,
+   418→      error instanceof Error ? error.message : undefined
+   419→    )
+   420→  }
+   421→}
+   422→
+   423→// =====================================================
+   424→// POST /api/devices
+   425→// =====================================================
+   426→
+   427→export async function POST(request: Request) {
+   428→  try {
+   429→    const body = await request.json()
+   430→    const { action } = body
+   431→
+   432→    // -------------------------------------------------
+   433→    // Action: send_command - queue a command for a device
+   434→    // -------------------------------------------------
+   435→    if (action === 'send_command') {
+   436→      const { deviceType, deviceId, command, parameters, priority, createdBy } = body
+   437→
+   438→      if (!deviceType || !deviceId || !command) {
+   439→        return errorResponse('Missing required fields: deviceType, deviceId, command', 400)
+   440→      }
+   441→
+   442→      const deviceInfo = getDeviceInfo(deviceType)
+   443→      if (!deviceInfo) {
+   444→        return errorResponse(`Invalid device type "${deviceType}"`, 400)
+   445→      }
+   446→
+   447→      const stationId = await getFirstStationId()
+   448→      if (!stationId) {
+   449→        return errorResponse('No station found', 404)
+   450→      }
+   451→
+   452→      // Validate device exists
+   453→      const model = deviceInfo.getModel()
+   454→      const device = await model.findUnique({ where: { id: deviceId } })
+   455→      if (!device) {
+   456→        return errorResponse(`Device not found: ${deviceId}`, 404)
+   457→      }
+   458→
+   459→      const commandEntry = await db.deviceCommandQueue.create({
+   460→        data: {
+   461→          stationId,
+   462→          deviceType,
+   463→          deviceId,
+   464→          command,
+   465→          parameters: parameters ? JSON.stringify(parameters) : null,
+   466→          priority: priority || 'normal',
+   467→          status: 'queued',
+   468→          maxRetries: 3,
+   469→          retryCount: 0,
+   470→          createdBy: createdBy || null,
+   471→        },
+   472→      })
+   473→
+   474→      // Log the command event
+   475→      await db.deviceEventLog.create({
+   476→        data: {
+   477→          stationId,
+   478→          deviceType,
+   479→          deviceId,
+   480→          eventType: 'command',
+   481→          severity: 'info',
+   482→          message: `Command queued: ${command}`,
+   483→          dataJson: JSON.stringify({
+   484→            commandId: commandEntry.id,
+   485→            command,
+   486→            parameters,
+   487→            priority: priority || 'normal',
+   488→          }),
+   489→        },
+   490→      })
+   491→
+   492→      return NextResponse.json(
+   493→        { message: 'Command queued successfully', command: commandEntry },
+   494→        { status: 201 }
+   495→      )
+   496→    }
+   497→
+   498→    // -------------------------------------------------
+   499→    // Action: update_config - set a device config
+   500→    // -------------------------------------------------
+   501→    if (action === 'update_config') {
+   502→      const { deviceType, deviceId, configKey, configValue, dataType, description } = body
+   503→
+   504→      if (!deviceType || !deviceId || !configKey || configValue === undefined) {
+   505→        return errorResponse(
+   506→          'Missing required fields: deviceType, deviceId, configKey, configValue',
+   507→          400
+   508→        )
+   509→      }
+   510→
+   511→      const deviceInfo = getDeviceInfo(deviceType)
+   512→      if (!deviceInfo) {
+   513→        return errorResponse(`Invalid device type "${deviceType}"`, 400)
+   514→      }
+   515→
+   516→      // Validate device exists
+   517→      const model = deviceInfo.getModel()
+   518→      const device = await model.findUnique({ where: { id: deviceId } })
+   519→      if (!device) {
+   520→        return errorResponse(`Device not found: ${deviceId}`, 404)
+   521→      }
+   522→
+   523→      // Find existing config to determine upsert behavior
+   524→      const existingConfig = await db.deviceConfig.findFirst({
+   525→        where: { deviceType, deviceId, configKey },
+   526→      })
+   527→
+   528→      const config = await db.deviceConfig.upsert({
+   529→        where: { id: existingConfig?.id ?? 'nonexistent' },
+   530→        update: {
+   531→          configValue: String(configValue),
+   532→          dataType: dataType || 'string',
+   533→          description: description || undefined,
+   534→          isEditable: true,
+   535→        },
+   536→        create: {
+   537→          deviceType,
+   538→          deviceId,
+   539→          configKey,
+   540→          configValue: String(configValue),
+   541→          dataType: dataType || 'string',
+   542→          description: description || null,
+   543→          isEditable: true,
+   544→        },
+   545→      })
+   546→
+   547→      // Log the config update event
+   548→      const stationId = await getFirstStationId()
+   549→      if (stationId) {
+   550→        await db.deviceEventLog.create({
+   551→          data: {
+   552→            stationId,
+   553→            deviceType,
+   554→            deviceId,
+   555→            eventType: 'command',
+   556→            severity: 'info',
+   557→            message: `Config updated: ${configKey} = ${configValue}`,
+   558→            dataJson: JSON.stringify({ configKey, configValue, dataType }),
+   559→          },
+   560→        })
+   561→      }
+   562→
+   563→      return NextResponse.json(
+   564→        { message: 'Config updated successfully', config },
+   565→        { status: 201 }
+   566→      )
+   567→    }
+   568→
+   569→    // -------------------------------------------------
+   570→    // Default POST: Create a new device
+   571→    // -------------------------------------------------
+   572→    const { deviceType, data } = body
+   573→
+   574→    if (!deviceType || !data) {
+   575→      return errorResponse('Missing required fields: deviceType and data', 400)
+   576→    }
+   577→
+   578→    const deviceInfo = getDeviceInfo(deviceType)
+   579→    if (!deviceInfo) {
+   580→      return errorResponse(
+   581→        `Invalid device type "${deviceType}". Valid types: ${ALL_DEVICE_TYPE_KEYS.join(', ')}`,
+   582→        400
+   583→      )
+   584→    }
+   585→
+   586→    const stationId = await getFirstStationId()
+   587→    if (!stationId) {
+   588→      return errorResponse('No station found', 404)
+   589→    }
+   590→
+   591→    // Validate required fields
+   592→    if (!data.name || !data.code) {
+   593→      return errorResponse('Device data must include "name" and "code" fields', 400)
+   594→    }
+   595→
+   596→    // Filter to allowed fields only
+   597→    const createData = filterAllowedFields(data, deviceType, true)
+   598→    createData.stationId = stationId
+   599→
+   600→    const model = deviceInfo.getModel()
+   601→    const device = await model.create({ data: createData })
+   602→
+   603→    // Log the device creation event
+   604→    await db.deviceEventLog.create({
+   605→      data: {
+   606→        stationId,
+   607→        deviceType,
+   608→        deviceId: (device as { id: string }).id,
+   609→        eventType: 'status_change',
+   610→        severity: 'info',
+   611→        message: `Device created: ${data.name} (${data.code})`,
+   612→        dataJson: JSON.stringify({ name: data.name, code: data.code, deviceType }),
+   613→      },
+   614→    })
+   615→
+   616→    return NextResponse.json(
+   617→      { message: 'Device created successfully', device, deviceType },
+   618→      { status: 201 }
+   619→    )
+   620→  } catch (error) {
+   621→    console.error('Devices POST error:', error)
+   622→    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+   623→      if (error.code === 'P2002') {
+   624→        return errorResponse('A device with this code already exists', 409)
+   625→      }
+   626→      if (error.code === 'P2025') {
+   627→        return errorResponse('Related record not found', 404)
+   628→      }
+   629→    }
+   630→    return errorResponse(
+   631→      'Failed to process request',
+   632→      500,
+   633→      error instanceof Error ? error.message : undefined
+   634→    )
+   635→  }
+   636→}
+   637→
+   638→// =====================================================
+   639→// PUT /api/devices - Update a device
+   640→// =====================================================
+   641→
+   642→export async function PUT(request: Request) {
+   643→  try {
+   644→    const body = await request.json()
+   645→    const { deviceType, deviceId, data } = body
+   646→
+   647→    if (!deviceType || !deviceId || !data) {
+   648→      return errorResponse('Missing required fields: deviceType, deviceId, and data', 400)
+   649→    }
+   650→
+   651→    const deviceInfo = getDeviceInfo(deviceType)
+   652→    if (!deviceInfo) {
+   653→      return errorResponse(
+   654→        `Invalid device type "${deviceType}". Valid types: ${ALL_DEVICE_TYPE_KEYS.join(', ')}`,
+   655→        400
+   656→      )
+   657→    }
+   658→
+   659→    // Filter to allowed fields
+   660→    const updateData = filterAllowedFields(data, deviceType, true)
+   661→
+   662→    if (Object.keys(updateData).length === 0) {
+   663→      return errorResponse('No valid fields provided for update', 400)
+   664→    }
+   665→
+   666→    // Verify device exists and capture previous state
+   667→    const model = deviceInfo.getModel()
+   668→    const existingDevice = await model.findUnique({ where: { id: deviceId } })
+   669→    if (!existingDevice) {
+   670→      return errorResponse(`Device not found: ${deviceId}`, 404)
+   671→    }
+   672→
+   673→    const device = await model.update({
+   674→      where: { id: deviceId },
+   675→      data: updateData,
+   676→    })
+   677→
+   678→    // Log status change events
+   679→    if (data.status) {
+   680→      const stationId = await getFirstStationId()
+   681→      if (stationId) {
+   682→        const previousStatus = (existingDevice as Record<string, unknown>).status as string | undefined
+   683→        await db.deviceEventLog.create({
+   684→          data: {
+   685→            stationId,
+   686→            deviceType,
+   687→            deviceId,
+   688→            eventType: 'status_change',
+   689→            severity: data.status === 'error' || data.status === 'fault' ? 'warning' : 'info',
+   690→            message: `Device status changed to: ${data.status}`,
+   691→            dataJson: JSON.stringify({
+   692→              previousStatus,
+   693→              newStatus: data.status,
+   694→              updatedFields: Object.keys(updateData),
+   695→            }),
+   696→          },
+   697→        })
+   698→      }
+   699→    }
+   700→
+   701→    return NextResponse.json({
+   702→      message: 'Device updated successfully',
+   703→      device,
+   704→      deviceType,
+   705→      updatedFields: Object.keys(updateData),
+   706→    })
+   707→  } catch (error) {
+   708→    console.error('Devices PUT error:', error)
+   709→    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+   710→      if (error.code === 'P2025') {
+   711→        return errorResponse('Device not found', 404)
+   712→      }
+   713→    }
+   714→    return errorResponse(
+   715→      'Failed to update device',
+   716→      500,
+   717→      error instanceof Error ? error.message : undefined
+   718→    )
+   719→  }
+   720→}
+   721→
+   722→// =====================================================
+   723→// DELETE /api/devices - Delete a device
+   724→// =====================================================
+   725→
+   726→export async function DELETE(request: Request) {
+   727→  try {
+   728→    const body = await request.json()
+   729→    const { deviceType, deviceId } = body
+   730→
+   731→    if (!deviceType || !deviceId) {
+   732→      return errorResponse('Missing required fields: deviceType and deviceId', 400)
+   733→    }
+   734→
+   735→    const deviceInfo = getDeviceInfo(deviceType)
+   736→    if (!deviceInfo) {
+   737→      return errorResponse(
+   738→        `Invalid device type "${deviceType}". Valid types: ${ALL_DEVICE_TYPE_KEYS.join(', ')}`,
+   739→        400
+   740→      )
+   741→    }
+   742→
+   743→    // Verify device exists and capture info before deletion
+   744→    const model = deviceInfo.getModel()
+   745→    const existingDevice = await model.findUnique({ where: { id: deviceId } })
+   746→    if (!existingDevice) {
+   747→      return errorResponse(`Device not found: ${deviceId}`, 404)
+   748→    }
+   749→
+   750→    const existingData = existingDevice as Record<string, unknown>
+   751→
+   752→    // Delete related records first (configs, event logs, command queue)
+   753→    await db.deviceConfig.deleteMany({ where: { deviceType, deviceId } })
+   754→    await db.deviceEventLog.deleteMany({ where: { deviceType, deviceId } })
+   755→    await db.deviceCommandQueue.deleteMany({ where: { deviceType, deviceId } })
+   756→
+   757→    // Delete the device itself
+   758→    const device = await model.delete({ where: { id: deviceId } })
+   759→
+   760→    // Log the deletion
+   761→    const stationId = await getFirstStationId()
+   762→    if (stationId) {
+   763→      await db.deviceEventLog.create({
+   764→        data: {
+   765→          stationId,
+   766→          deviceType,
+   767→          deviceId: 'deleted',
+   768→          eventType: 'status_change',
+   769→          severity: 'warning',
+   770→          message: `Device deleted: ${existingData.name || deviceId}`,
+   771→          dataJson: JSON.stringify({
+   772→            deletedDeviceId: deviceId,
+   773→            deviceType,
+   774→            name: existingData.name,
+   775→            code: existingData.code,
+   776→          }),
+   777→        },
+   778→      })
+   779→    }
+   780→
+   781→    return NextResponse.json({
+   782→      message: 'Device deleted successfully',
+   783→      device,
+   784→      deviceType,
+   785→      deletedRelatedRecords: true,
+   786→    })
+   787→  } catch (error) {
+   788→    console.error('Devices DELETE error:', error)
+   789→    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+   790→      if (error.code === 'P2025') {
+   791→        return errorResponse('Device not found', 404)
+   792→      }
+   793→    }
+   794→    return errorResponse(
+   795→      'Failed to delete device',
+   796→      500,
+   797→      error instanceof Error ? error.message : undefined
+   798→    )
+   799→  }
+   800→}
+   801→

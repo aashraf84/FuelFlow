@@ -1,0 +1,560 @@
+     1→'use client'
+     2→
+     3→import { useState } from 'react'
+     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→import {
+     6→  Users,
+     7→  Clock,
+     8→  Wallet,
+     9→  Calendar,
+    10→  CheckCircle2,
+    11→  XCircle,
+    12→  UserPlus,
+    13→  TrendingUp,
+    14→  ArrowUpRight,
+    15→  Briefcase,
+    16→  Coffee,
+    17→  Shield,
+    18→  Wrench,
+    19→  Banknote,
+    20→  AlertCircle,
+    21→} from 'lucide-react'
+    22→
+    23→// ── Static Data ──────────────────────────────────────────
+    24→
+    25→const employees = [
+    26→  { id: 'EMP-001', name: 'Farhan Siddiqui', role: 'Manager', station: 'Downtown Station', shift: 'Morning', phone: '0300-1234567', salary: 85000, commission: 2.5, status: 'on-shift' as const, hireDate: '2021-03-15' },
+    27→  { id: 'EMP-002', name: 'Rizwan Khan', role: 'Supervisor', station: 'Downtown Station', shift: 'Morning', phone: '0321-9876543', salary: 65000, commission: 1.5, status: 'on-shift' as const, hireDate: '2022-06-01' },
+    28→  { id: 'EMP-003', name: 'Imran Bhatti', role: 'Attendant', station: 'Downtown Station', shift: 'Morning', phone: '0333-5551234', salary: 35000, commission: 0.5, status: 'on-shift' as const, hireDate: '2023-01-10' },
+    29→  { id: 'EMP-004', name: 'Sajid Mehmood', role: 'Cashier', station: 'Downtown Station', shift: 'Afternoon', phone: '0345-7778901', salary: 40000, commission: 0.75, status: 'on-shift' as const, hireDate: '2022-09-20' },
+    30→  { id: 'EMP-005', name: 'Tariq Anwar', role: 'Attendant', station: 'Downtown Station', shift: 'Afternoon', phone: '0301-2223344', salary: 35000, commission: 0.5, status: 'on-leave' as const, hireDate: '2023-05-15' },
+    31→  { id: 'EMP-006', name: 'Zubair Ahmed', role: 'Maintenance', station: 'Downtown Station', shift: 'Night', phone: '0312-4445566', salary: 38000, commission: 0, status: 'on-shift' as const, hireDate: '2021-11-01' },
+    32→  { id: 'EMP-007', name: 'Nasir Ali', role: 'Attendant', station: 'Downtown Station', shift: 'Night', phone: '0334-6667788', salary: 35000, commission: 0.5, status: 'on-shift' as const, hireDate: '2024-02-01' },
+    33→  { id: 'EMP-008', name: 'Waqar Hassan', role: 'Cashier', station: 'Highway Plaza', shift: 'Morning', phone: '0302-8889900', salary: 40000, commission: 0.75, status: 'off-duty' as const, hireDate: '2023-08-12' },
+    34→  { id: 'EMP-009', name: 'Amir Shahzad', role: 'Supervisor', station: 'Highway Plaza', shift: 'Afternoon', phone: '0315-1112233', salary: 65000, commission: 1.5, status: 'on-shift' as const, hireDate: '2022-01-05' },
+    35→  { id: 'EMP-010', name: 'Faisal Rana', role: 'Attendant', station: 'Highway Plaza', shift: 'Night', phone: '0346-3334455', salary: 35000, commission: 0.5, status: 'new' as const, hireDate: '2025-12-01' },
+    36→]
+    37→
+    38→const payrollOverview = {
+    39→  totalPayroll: 468000,
+    40→  totalOvertime: 45000,
+    41→  totalCommissions: 28500,
+    42→  totalDeductions: 52000,
+    43→  netPayable: 489500,
+    44→  period: 'Feb 2026',
+    45→  paidCount: 8,
+    46→  pendingCount: 2,
+    47→}
+    48→
+    49→const leaveRequests = [
+    50→  { id: 'LR-001', employee: 'Tariq Anwar', role: 'Attendant', type: 'Annual Leave', from: '2026-03-10', to: '2026-03-14', days: 5, reason: 'Family vacation', status: 'approved' as const },
+    51→  { id: 'LR-002', employee: 'Farhan Siddiqui', role: 'Manager', type: 'Personal', from: '2026-03-18', to: '2026-03-18', days: 1, reason: 'Doctor appointment', status: 'pending' as const },
+    52→  { id: 'LR-003', employee: 'Nasir Ali', type: 'Sick Leave', role: 'Attendant', from: '2026-03-05', to: '2026-03-06', days: 2, reason: 'Flu / fever', status: 'approved' as const },
+    53→  { id: 'LR-004', employee: 'Sajid Mehmood', role: 'Cashier', type: 'Annual Leave', from: '2026-03-20', to: '2026-03-25', days: 6, reason: 'Religious pilgrimage', status: 'pending' as const },
+    54→  { id: 'LR-005', employee: 'Zubair Ahmed', role: 'Maintenance', type: 'Sick Leave', from: '2026-03-02', to: '2026-03-02', days: 1, reason: 'Minor injury', status: 'rejected' as const },
+    55→]
+    56→
+    57→const attendanceSummary = {
+    58→  present: 7,
+    59→  onLeave: 1,
+    60→  offDuty: 1,
+    61→  late: 1,
+    62→  total: 10,
+    63→  rate: 70,
+    64→}
+    65→
+    66→// ── Helpers ───────────────────────────────────────────────
+    67→
+    68→const pkr = (n: number) => `PKR ${n.toLocaleString()}`
+    69→
+    70→const roleConfig: Record<string, { icon: React.ElementType; color: string; bg: string }> = {
+    71→  Manager: { icon: Briefcase, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10' },
+    72→  Supervisor: { icon: Shield, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/10' },
+    73→  Attendant: { icon: Users, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-500/10' },
+    74→  Cashier: { icon: Banknote, color: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-500/10' },
+    75→  Maintenance: { icon: Wrench, color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-500/10' },
+    76→}
+    77→
+    78→const statusConfig: Record<string, { dot: string; label: string; color: string }> = {
+    79→  'on-shift': { dot: 'macos-status-online', label: 'On Shift', color: 'text-emerald-600 dark:text-emerald-400' },
+    80→  'on-leave': { dot: 'macos-status-warning', label: 'On Leave', color: 'text-amber-500' },
+    81→  'off-duty': { dot: 'macos-status-offline', label: 'Off Duty', color: 'text-muted-foreground' },
+    82→  'new': { dot: 'macos-status-online', label: 'New', color: 'text-emerald-600 dark:text-emerald-400' },
+    83→}
+    84→
+    85→type TabKey = 'employees' | 'attendance' | 'payroll' | 'leave'
+    86→
+    87→const tabs: { key: TabKey; label: string; icon: React.ElementType }[] = [
+    88→  { key: 'employees', label: 'Employees', icon: Users },
+    89→  { key: 'attendance', label: 'Attendance', icon: Clock },
+    90→  { key: 'payroll', label: 'Payroll', icon: Wallet },
+    91→  { key: 'leave', label: 'Leave Requests', icon: Calendar },
+    92→]
+    93→
+    94→// ── Component ─────────────────────────────────────────────
+    95→
+    96→export default function EmployeesModule() {
+    97→  const [activeTab, setActiveTab] = useState<TabKey>('employees')
+    98→
+    99→  const totalEmp = employees.length
+   100→  const onShift = employees.filter(e => e.status === 'on-shift' || e.status === 'new').length
+   101→  const onLeave = employees.filter(e => e.status === 'on-leave').length
+   102→  const newEmp = employees.filter(e => e.status === 'new').length
+   103→
+   104→  return (
+   105→    <div className="space-y-5">
+   106→      {/* ── Summary Stats ── */}
+   107→      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+   108→        {[
+   109→          { label: 'Total Employees', value: totalEmp.toString(), icon: Users, accent: false },
+   110→          { label: 'On Shift', value: onShift.toString(), icon: Clock, accent: false },
+   111→          { label: 'On Leave', value: onLeave.toString(), icon: Coffee, accent: false },
+   112→          { label: 'New Hires', value: newEmp.toString(), icon: UserPlus, accent: true },
+   113→        ].map((stat, i) => (
+   114→          <motion.div
+   115→            key={stat.label}
+   116→            initial={{ opacity: 0, y: 8 }}
+   117→            animate={{ opacity: 1, y: 0 }}
+   118→            transition={{ delay: i * 0.05, duration: 0.3 }}
+   119→            className="macos-card p-4"
+   120→          >
+   121→            <div className="flex items-start justify-between">
+   122→              <div>
+   123→                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{stat.label}</p>
+   124→                <p className={`text-[20px] font-bold mt-1 ${stat.accent ? 'fuel-text-gradient' : 'text-foreground'}`}>
+   125→                  {stat.value}
+   126→                </p>
+   127→              </div>
+   128→              <div className={`size-8 rounded-lg flex items-center justify-center ${stat.accent ? 'bg-amber-500/10' : 'bg-black/[0.03] dark:bg-white/[0.05]'}`}>
+   129→                <stat.icon className={`size-4 ${stat.accent ? 'text-amber-500' : 'text-muted-foreground'}`} strokeWidth={1.5} />
+   130→              </div>
+   131→            </div>
+   132→          </motion.div>
+   133→        ))}
+   134→      </div>
+   135→
+   136→      {/* ── Tab Bar ── */}
+   137→      <div className="flex items-center gap-1 overflow-x-auto pb-1 -mb-1">
+   138→        {tabs.map((tab) => {
+   139→          const isActive = activeTab === tab.key
+   140→          const Icon = tab.icon
+   141→          return (
+   142→            <button
+   143→              key={tab.key}
+   144→              onClick={() => setActiveTab(tab.key)}
+   145→              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all duration-150 whitespace-nowrap ${
+   146→                isActive
+   147→                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+   148→                  : 'text-muted-foreground hover:bg-black/[0.03] dark:hover:bg-white/[0.05] hover:text-foreground'
+   149→              }`}
+   150→            >
+   151→              <Icon className="size-3.5" strokeWidth={isActive ? 2 : 1.5} />
+   152→              {tab.label}
+   153→            </button>
+   154→          )
+   155→        })}
+   156→      </div>
+   157→
+   158→      {/* ── Tab Content ── */}
+   159→      <AnimatePresence mode="wait">
+   160→        <motion.div
+   161→          key={activeTab}
+   162→          initial={{ opacity: 0, y: 6 }}
+   163→          animate={{ opacity: 1, y: 0 }}
+   164→          exit={{ opacity: 0, y: -4 }}
+   165→          transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+   166→        >
+   167→          {activeTab === 'employees' && <EmployeesTab />}
+   168→          {activeTab === 'attendance' && <AttendanceTab />}
+   169→          {activeTab === 'payroll' && <PayrollTab />}
+   170→          {activeTab === 'leave' && <LeaveTab />}
+   171→        </motion.div>
+   172→      </AnimatePresence>
+   173→    </div>
+   174→  )
+   175→}
+   176→
+   177→// ── Employees Tab ─────────────────────────────────────────
+   178→
+   179→function EmployeesTab() {
+   180→  return (
+   181→    <div className="macos-card overflow-hidden">
+   182→      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+   183→        <div>
+   184→          <h3 className="text-[13px] font-semibold">Employees</h3>
+   185→          <p className="text-[11px] text-muted-foreground mt-0.5">{employees.length} total employees across stations</p>
+   186→        </div>
+   187→        <button className="macos-btn gap-1">
+   188→          <UserPlus className="size-3.5" /> Add Employee
+   189→        </button>
+   190→      </div>
+   191→      <div className="overflow-x-auto">
+   192→        <table className="macos-table">
+   193→          <thead>
+   194→            <tr>
+   195→              <th>Employee</th>
+   196→              <th>Role</th>
+   197→              <th>Station</th>
+   198→              <th>Shift</th>
+   199→              <th className="text-right">Salary</th>
+   200→              <th className="text-right">Commission</th>
+   201→              <th>Status</th>
+   202→            </tr>
+   203→          </thead>
+   204→          <tbody>
+   205→            {employees.map((emp) => {
+   206→              const role = roleConfig[emp.role] || roleConfig['Attendant']
+   207→              const status = statusConfig[emp.status] || statusConfig['off-duty']
+   208→              const RoleIcon = role.icon
+   209→              return (
+   210→                <tr key={emp.id}>
+   211→                  <td>
+   212→                    <div className="flex items-center gap-2.5">
+   213→                      <div className={`size-8 rounded-lg flex items-center justify-center ${role.bg}`}>
+   214→                        <span className={`text-[11px] font-bold ${role.color}`}>
+   215→                          {emp.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+   216→                        </span>
+   217→                      </div>
+   218→                      <div>
+   219→                        <p className="text-[13px] font-semibold">{emp.name}</p>
+   220→                        <p className="text-[11px] text-muted-foreground">{emp.id} · {emp.phone}</p>
+   221→                      </div>
+   222→                    </div>
+   223→                  </td>
+   224→                  <td>
+   225→                    <div className="flex items-center gap-1.5">
+   226→                      <RoleIcon className={`size-3 ${role.color}`} />
+   227→                      <span className="text-[12px] font-medium">{emp.role}</span>
+   228→                    </div>
+   229→                  </td>
+   230→                  <td className="text-muted-foreground">{emp.station}</td>
+   231→                  <td>
+   232→                    <span className="macos-pill bg-black/[0.04] dark:bg-white/[0.06] text-muted-foreground">{emp.shift}</span>
+   233→                  </td>
+   234→                  <td className="text-right font-mono">{pkr(emp.salary)}</td>
+   235→                  <td className="text-right">
+   236→                    {emp.commission > 0 ? (
+   237→                      <span className="font-mono text-amber-600 dark:text-amber-400">{emp.commission}%</span>
+   238→                    ) : (
+   239→                      <span className="text-muted-foreground">—</span>
+   240→                    )}
+   241→                  </td>
+   242→                  <td>
+   243→                    <div className="flex items-center gap-1.5">
+   244→                      <div className={`macos-status-dot ${status.dot}`} />
+   245→                      <span className={`text-[11px] font-medium ${status.color}`}>{status.label}</span>
+   246→                    </div>
+   247→                  </td>
+   248→                </tr>
+   249→              )
+   250→            })}
+   251→          </tbody>
+   252→        </table>
+   253→      </div>
+   254→    </div>
+   255→  )
+   256→}
+   257→
+   258→// ── Attendance Tab ────────────────────────────────────────
+   259→
+   260→function AttendanceTab() {
+   261→  const att = attendanceSummary
+   262→
+   263→  return (
+   264→    <div className="space-y-4">
+   265→      {/* Attendance Stats */}
+   266→      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+   267→        {[
+   268→          { label: 'Present', value: att.present, total: att.total, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/10', dot: 'macos-status-online' },
+   269→          { label: 'On Leave', value: att.onLeave, total: att.total, color: 'text-amber-500', bg: 'bg-amber-500/10', dot: 'macos-status-warning' },
+   270→          { label: 'Off Duty', value: att.offDuty, total: att.total, color: 'text-muted-foreground', bg: 'bg-black/[0.03] dark:bg-white/[0.05]', dot: 'macos-status-offline' },
+   271→          { label: 'Late Check-in', value: att.late, total: att.total, color: 'text-red-500', bg: 'bg-red-500/10', dot: 'macos-status-error' },
+   272→        ].map((s, i) => (
+   273→          <motion.div
+   274→            key={s.label}
+   275→            initial={{ opacity: 0, y: 8 }}
+   276→            animate={{ opacity: 1, y: 0 }}
+   277→            transition={{ delay: i * 0.05, duration: 0.3 }}
+   278→            className="macos-card p-4"
+   279→          >
+   280→            <div className="flex items-center gap-2 mb-2">
+   281→              <div className={`macos-status-dot ${s.dot}`} />
+   282→              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{s.label}</span>
+   283→            </div>
+   284→            <p className={`text-[24px] font-bold ${s.color}`}>{s.value}</p>
+   285→            <p className="text-[11px] text-muted-foreground">{Math.round((s.value / s.total) * 100)}% of workforce</p>
+   286→          </motion.div>
+   287→        ))}
+   288→      </div>
+   289→
+   290→      {/* Attendance Rate Card */}
+   291→      <div className="macos-card p-5">
+   292→        <div className="flex items-center justify-between mb-4">
+   293→          <div>
+   294→            <h3 className="text-[13px] font-semibold">Attendance Rate</h3>
+   295→            <p className="text-[11px] text-muted-foreground mt-0.5">Current shift overview</p>
+   296→          </div>
+   297→          <div className="text-right">
+   298→            <p className="text-[28px] font-bold fuel-text-gradient">{att.rate}%</p>
+   299→            <div className="flex items-center gap-1 justify-end mt-0.5">
+   300→              <TrendingUp className="size-3 text-emerald-500" />
+   301→              <span className="text-[11px] font-medium text-emerald-500">+3% vs last week</span>
+   302→            </div>
+   303→          </div>
+   304→        </div>
+   305→        <div className="w-full h-2 rounded-full bg-black/[0.04] dark:bg-white/[0.06] overflow-hidden">
+   306→          <motion.div
+   307→            initial={{ width: 0 }}
+   308→            animate={{ width: `${att.rate}%` }}
+   309→            transition={{ duration: 0.8, ease: 'easeOut' }}
+   310→            className="h-full rounded-full fuel-gradient"
+   311→          />
+   312→        </div>
+   313→      </div>
+   314→
+   315→      {/* Who's On Shift */}
+   316→      <div className="macos-card overflow-hidden">
+   317→        <div className="px-4 py-3 border-b border-border">
+   318→          <h3 className="text-[13px] font-semibold">Currently On Shift</h3>
+   319→        </div>
+   320→        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-0">
+   321→          {employees.filter(e => e.status === 'on-shift' || e.status === 'new').map((emp) => {
+   322→            const role = roleConfig[emp.role] || roleConfig['Attendant']
+   323→            return (
+   324→              <div key={emp.id} className="macos-group-item !py-3 !px-4 flex items-center gap-2.5">
+   325→                <div className={`size-9 rounded-lg flex items-center justify-center ${role.bg} shrink-0`}>
+   326→                  <span className={`text-[11px] font-bold ${role.color}`}>
+   327→                    {emp.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+   328→                  </span>
+   329→                </div>
+   330→                <div className="min-w-0">
+   331→                  <p className="text-[13px] font-semibold truncate">{emp.name}</p>
+   332→                  <div className="flex items-center gap-1.5">
+   333→                    <span className={`text-[10px] font-medium ${role.color}`}>{emp.role}</span>
+   334→                    <span className="text-[10px] text-muted-foreground">· {emp.shift}</span>
+   335→                  </div>
+   336→                </div>
+   337→              </div>
+   338→            )
+   339→          })}
+   340→        </div>
+   341→      </div>
+   342→    </div>
+   343→  )
+   344→}
+   345→
+   346→// ── Payroll Tab ───────────────────────────────────────────
+   347→
+   348→function PayrollTab() {
+   349→  const pr = payrollOverview
+   350→
+   351→  return (
+   352→    <div className="space-y-4">
+   353→      {/* Payroll Overview Card */}
+   354→      <div className="macos-card p-5">
+   355→        <div className="flex items-start justify-between mb-5">
+   356→          <div>
+   357→            <h3 className="text-[13px] font-semibold">Payroll Overview</h3>
+   358→            <p className="text-[11px] text-muted-foreground mt-0.5">Period: {pr.period}</p>
+   359→          </div>
+   360→          <div className="text-right">
+   361→            <p className="text-[11px] text-muted-foreground uppercase font-semibold">Net Payable</p>
+   362→            <p className="text-[28px] font-bold fuel-text-gradient">{pkr(pr.netPayable)}</p>
+   363→          </div>
+   364→        </div>
+   365→
+   366→        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+   367→          {[
+   368→            { label: 'Base Salary', value: pr.totalPayroll, icon: Wallet },
+   369→            { label: 'Overtime', value: pr.totalOvertime, icon: Clock },
+   370→            { label: 'Commissions', value: pr.totalCommissions, icon: TrendingUp },
+   371→            { label: 'Deductions', value: pr.totalDeductions, icon: ArrowUpRight, negative: true },
+   372→          ].map((item) => (
+   373→            <div key={item.label}>
+   374→              <div className="flex items-center gap-1.5 mb-1">
+   375→                <item.icon className="size-3 text-muted-foreground" />
+   376→                <span className="text-[11px] text-muted-foreground font-medium">{item.label}</span>
+   377→              </div>
+   378→              <p className={`text-[16px] font-bold ${item.negative ? 'text-red-500' : 'text-foreground'}`}>
+   379→                {item.negative ? '-' : ''}{pkr(item.value)}
+   380→              </p>
+   381→            </div>
+   382→          ))}
+   383→        </div>
+   384→      </div>
+   385→
+   386→      {/* Payment Status */}
+   387→      <div className="grid grid-cols-2 gap-3">
+   388→        <div className="macos-card p-4">
+   389→          <div className="flex items-center gap-2 mb-2">
+   390→            <div className="macos-status-dot macos-status-online" />
+   391→            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Paid</span>
+   392→          </div>
+   393→          <p className="text-[24px] font-bold text-emerald-600 dark:text-emerald-400">{pr.paidCount}</p>
+   394→          <p className="text-[11px] text-muted-foreground">employees paid this period</p>
+   395→        </div>
+   396→        <div className="macos-card p-4">
+   397→          <div className="flex items-center gap-2 mb-2">
+   398→            <div className="macos-status-dot macos-status-warning" />
+   399→            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Pending</span>
+   400→          </div>
+   401→          <p className="text-[24px] font-bold text-amber-500">{pr.pendingCount}</p>
+   402→          <p className="text-[11px] text-muted-foreground">awaiting processing</p>
+   403→        </div>
+   404→      </div>
+   405→
+   406→      {/* Salary Breakdown by Role */}
+   407→      <div className="macos-card overflow-hidden">
+   408→        <div className="px-4 py-3 border-b border-border">
+   409→          <h3 className="text-[13px] font-semibold">Salary Breakdown by Role</h3>
+   410→        </div>
+   411→        {(() => {
+   412→          const roleGroups = employees.reduce<Record<string, { count: number; totalSalary: number }>>((acc, emp) => {
+   413→            if (!acc[emp.role]) acc[emp.role] = { count: 0, totalSalary: 0 }
+   414→            acc[emp.role].count++
+   415→            acc[emp.role].totalSalary += emp.salary
+   416→            return acc
+   417→          }, {})
+   418→
+   419→          return Object.entries(roleGroups).map(([role, data]) => {
+   420→            const rc = roleConfig[role] || roleConfig['Attendant']
+   421→            const RIcon = rc.icon
+   422→            return (
+   423→              <div key={role} className="macos-group-item flex items-center justify-between !px-4">
+   424→                <div className="flex items-center gap-3">
+   425→                  <div className={`size-8 rounded-lg flex items-center justify-center ${rc.bg}`}>
+   426→                    <RIcon className={`size-4 ${rc.color}`} />
+   427→                  </div>
+   428→                  <div>
+   429→                    <p className="text-[13px] font-semibold">{role}</p>
+   430→                    <p className="text-[11px] text-muted-foreground">{data.count} employees</p>
+   431→                  </div>
+   432→                </div>
+   433→                <div className="text-right">
+   434→                  <p className="text-[13px] font-semibold text-amber-600 dark:text-amber-400">{pkr(data.totalSalary)}</p>
+   435→                  <p className="text-[11px] text-muted-foreground">avg {pkr(Math.round(data.totalSalary / data.count))}/mo</p>
+   436→                </div>
+   437→              </div>
+   438→            )
+   439→          })
+   440→        })()}
+   441→      </div>
+   442→    </div>
+   443→  )
+   444→}
+   445→
+   446→// ── Leave Tab ─────────────────────────────────────────────
+   447→
+   448→function LeaveTab() {
+   449→  const pending = leaveRequests.filter(l => l.status === 'pending').length
+   450→  const approved = leaveRequests.filter(l => l.status === 'approved').length
+   451→  const rejected = leaveRequests.filter(l => l.status === 'rejected').length
+   452→
+   453→  return (
+   454→    <div className="space-y-4">
+   455→      {/* Leave Stats */}
+   456→      <div className="grid grid-cols-3 gap-3">
+   457→        <div className="macos-card p-4">
+   458→          <div className="flex items-center gap-2 mb-1">
+   459→            <div className="macos-status-dot macos-status-warning" />
+   460→            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Pending</span>
+   461→          </div>
+   462→          <p className="text-[20px] font-bold text-amber-500">{pending}</p>
+   463→        </div>
+   464→        <div className="macos-card p-4">
+   465→          <div className="flex items-center gap-2 mb-1">
+   466→            <div className="macos-status-dot macos-status-online" />
+   467→            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Approved</span>
+   468→          </div>
+   469→          <p className="text-[20px] font-bold text-emerald-600 dark:text-emerald-400">{approved}</p>
+   470→        </div>
+   471→        <div className="macos-card p-4">
+   472→          <div className="flex items-center gap-2 mb-1">
+   473→            <div className="macos-status-dot macos-status-error" />
+   474→            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Rejected</span>
+   475→          </div>
+   476→          <p className="text-[20px] font-bold text-red-500">{rejected}</p>
+   477→        </div>
+   478→      </div>
+   479→
+   480→      {/* Leave Requests List */}
+   481→      <div className="macos-card overflow-hidden">
+   482→        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+   483→          <h3 className="text-[13px] font-semibold">Leave Requests</h3>
+   484→          <span className="text-[11px] text-muted-foreground">{leaveRequests.length} total requests</span>
+   485→        </div>
+   486→        <div className="overflow-x-auto">
+   487→          <table className="macos-table">
+   488→            <thead>
+   489→              <tr>
+   490→                <th>Employee</th>
+   491→                <th>Role</th>
+   492→                <th>Type</th>
+   493→                <th>From</th>
+   494→                <th>To</th>
+   495→                <th className="text-center">Days</th>
+   496→                <th>Reason</th>
+   497→                <th>Status</th>
+   498→                <th>Actions</th>
+   499→              </tr>
+   500→            </thead>
+   501→            <tbody>
+   502→              {leaveRequests.map((lr) => (
+   503→                <tr key={lr.id}>
+   504→                  <td className="font-semibold">{lr.employee}</td>
+   505→                  <td className="text-muted-foreground">{lr.role}</td>
+   506→                  <td>
+   507→                    <span className={`macos-pill ${
+   508→                      lr.type === 'Sick Leave'
+   509→                        ? 'bg-red-500/10 text-red-500'
+   510→                        : lr.type === 'Annual Leave'
+   511→                          ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+   512→                          : 'bg-black/[0.04] dark:bg-white/[0.06] text-muted-foreground'
+   513→                    }`}>
+   514→                      {lr.type}
+   515→                    </span>
+   516→                  </td>
+   517→                  <td className="font-mono text-[12px]">{lr.from}</td>
+   518→                  <td className="font-mono text-[12px]">{lr.to}</td>
+   519→                  <td className="text-center">{lr.days}</td>
+   520→                  <td className="text-muted-foreground max-w-32 truncate">{lr.reason}</td>
+   521→                  <td>
+   522→                    {lr.status === 'approved' ? (
+   523→                      <div className="flex items-center gap-1.5">
+   524→                        <CheckCircle2 className="size-3 text-emerald-500" />
+   525→                        <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">Approved</span>
+   526→                      </div>
+   527→                    ) : lr.status === 'rejected' ? (
+   528→                      <div className="flex items-center gap-1.5">
+   529→                        <XCircle className="size-3 text-red-500" />
+   530→                        <span className="text-[11px] font-medium text-red-500">Rejected</span>
+   531→                      </div>
+   532→                    ) : (
+   533→                      <div className="flex items-center gap-1.5">
+   534→                        <AlertCircle className="size-3 text-amber-500" />
+   535→                        <span className="text-[11px] font-medium text-amber-500">Pending</span>
+   536→                      </div>
+   537→                    )}
+   538→                  </td>
+   539→                  <td>
+   540→                    {lr.status === 'pending' && (
+   541→                      <div className="flex items-center gap-1.5">
+   542→                        <button className="macos-btn-secondary !px-2.5 !py-1 text-[11px] text-emerald-600 dark:text-emerald-400 gap-1">
+   543→                          <CheckCircle2 className="size-3" /> Approve
+   544→                        </button>
+   545→                        <button className="macos-btn-secondary !px-2.5 !py-1 text-[11px] text-red-500 gap-1">
+   546→                          <XCircle className="size-3" /> Reject
+   547→                        </button>
+   548→                      </div>
+   549→                    )}
+   550→                  </td>
+   551→                </tr>
+   552→              ))}
+   553→            </tbody>
+   554→          </table>
+   555→        </div>
+   556→      </div>
+   557→    </div>
+   558→  )
+   559→}
+   560→

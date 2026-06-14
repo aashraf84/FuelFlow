@@ -1,0 +1,1057 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useCallback } from 'react'
+     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→import {
+     6→  Cpu, Wifi, WifiOff, CreditCard, Zap, Gauge, Droplets, Radio,
+     7→  RefreshCw, ChevronRight, Clock, AlertTriangle, CheckCircle2,
+     8→  XCircle, ArrowUpDown, Send, Command, Monitor, Server,
+     9→  Cable, Plug, Wrench, Fuel, Activity, HardDrive, Database,
+    10→  Play, Square, RotateCcw, Eye, Search, Filter, Loader2,
+    11→} from 'lucide-react'
+    12→import { Badge } from '@/components/ui/badge'
+    13→import { Button } from '@/components/ui/button'
+    14→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    15→import { Input } from '@/components/ui/input'
+    16→import { ScrollArea } from '@/components/ui/scroll-area'
+    17→import { useAppStore } from '@/stores/app-store'
+    18→
+    19→// ── Types ──────────────────────────────────────
+    20→
+    21→interface DeviceCategory {
+    22→  type: string
+    23→  icon: React.ElementType
+    24→  count: number
+    25→  online: number
+    26→  color: string
+    27→}
+    28→
+    29→interface ConnectedDevice {
+    30→  id: string
+    31→  name: string
+    32→  type: string
+    33→  brand: string
+    34→  protocol: string
+    35→  status: string
+    36→  lastSeen: string
+    37→  ip: string
+    38→}
+    39→
+    40→interface CommandEntry {
+    41→  id: string
+    42→  deviceType: string
+    43→  deviceId: string
+    44→  command: string
+    45→  priority: string
+    46→  status: string
+    47→  retryCount: number
+    48→  maxRetries: number
+    49→  createdAt: string
+    50→  parameters?: string | null
+    51→}
+    52→
+    53→interface EventEntry {
+    54→  id: string
+    55→  deviceType: string
+    56→  deviceId: string
+    57→  eventType: string
+    58→  severity: string
+    59→  message: string
+    60→  createdAt: string
+    61→}
+    62→
+    63→interface ForecourtController {
+    64→  id: string
+    65→  name: string
+    66→  manufacturer: string
+    67→  model: string
+    68→  ipAddress: string | null
+    69→  port: number | null
+    70→  protocol: string | null
+    71→  status: string
+    72→  firmwareVersion: string | null
+    73→  serialNumber: string | null
+    74→  lastHeartbeat: Date | null
+    75→  lastCommunication: Date | null
+    76→  connectedDispensers: number | null
+    77→  maxDispensers: number | null
+    78→  dispensers?: Array<{
+    79→    id: string
+    80→    name: string
+    81→    code: string
+    82→    status: string
+    83→    nozzleCount: number
+    84→  }>
+    85→  station?: { id: string; name: string; code: string }
+    86→}
+    87→
+    88→interface HardwareCatalogItem {
+    89→  id: string
+    90→  manufacturer: string
+    91→  modelName: string
+    92→  category: string
+    93→  supportedProtocols?: string
+    94→  communicationTypes?: string
+    95→  description?: string | null
+    96→  isActive: boolean
+    97→}
+    98→
+    99→interface CommProtocol {
+   100→  id: string
+   101→  name: string
+   102→  protocolType: string | null
+   103→  transportType: string | null
+   104→  version: string | null
+   105→  description: string | null
+   106→  isActive: boolean
+   107→  connections?: Array<Record<string, unknown>>
+   108→}
+   109→
+   110→// ── Helpers ──────────────────────────────────────
+   111→
+   112→const STATUS_MAP: Record<string, { dot: string; text: string }> = {
+   113→  online: { dot: 'macos-status-online', text: 'text-emerald-600 dark:text-emerald-400' },
+   114→  warning: { dot: 'macos-status-warning', text: 'text-teal-600 dark:text-teal-400' },
+   115→  offline: { dot: 'macos-status-offline', text: 'text-muted-foreground' },
+   116→  error: { dot: 'macos-status-error', text: 'text-red-600 dark:text-red-400' },
+   117→  idle: { dot: 'macos-status-online', text: 'text-emerald-600 dark:text-emerald-400' },
+   118→  active: { dot: 'macos-status-online', text: 'text-emerald-600 dark:text-emerald-400' },
+   119→  fueling: { dot: 'macos-status-warning', text: 'text-teal-600 dark:text-teal-400' },
+   120→  disabled: { dot: 'macos-status-offline', text: 'text-muted-foreground' },
+   121→  maintenance: { dot: 'macos-status-warning', text: 'text-teal-600 dark:text-teal-400' },
+   122→  busy: { dot: 'macos-status-warning', text: 'text-teal-600 dark:text-teal-400' },
+   123→  standby: { dot: 'macos-status-offline', text: 'text-muted-foreground' },
+   124→  recording: { dot: 'macos-status-online', text: 'text-emerald-600 dark:text-emerald-400' },
+   125→  moving: { dot: 'macos-status-online', text: 'text-emerald-600 dark:text-emerald-400' },
+   126→  parked: { dot: 'macos-status-offline', text: 'text-muted-foreground' },
+   127→  running: { dot: 'macos-status-online', text: 'text-emerald-600 dark:text-emerald-400' },
+   128→  normal: { dot: 'macos-status-online', text: 'text-emerald-600 dark:text-emerald-400' },
+   129→}
+   130→
+   131→const PRIORITY_MAP: Record<string, string> = {
+   132→  critical: 'bg-red-500/10 text-red-600 border-red-500/20',
+   133→  high: 'bg-teal-500/10 text-teal-600 border-teal-500/20',
+   134→  medium: 'bg-sky-500/10 text-sky-600 border-sky-500/20',
+   135→  low: 'bg-slate-500/10 text-slate-500 border-slate-500/20',
+   136→}
+   137→
+   138→const CMD_STATUS_MAP: Record<string, { icon: React.ElementType; color: string }> = {
+   139→  executing: { icon: Play, color: 'text-teal-500' },
+   140→  queued: { icon: Clock, color: 'text-sky-500' },
+   141→  completed: { icon: CheckCircle2, color: 'text-emerald-500' },
+   142→  retrying: { icon: RotateCcw, color: 'text-teal-500' },
+   143→  failed: { icon: XCircle, color: 'text-red-500' },
+   144→}
+   145→
+   146→const EVENT_LEVEL_MAP: Record<string, string> = {
+   147→  info: 'text-muted-foreground',
+   148→  success: 'text-emerald-600 dark:text-emerald-400',
+   149→  warning: 'text-teal-600 dark:text-teal-400',
+   150→  error: 'text-red-600 dark:text-red-400',
+   151→  critical: 'text-red-600 dark:text-red-400',
+   152→}
+   153→
+   154→const DEVICE_TYPE_ICONS: Record<string, { icon: React.ElementType; color: string; label: string }> = {
+   155→  forecourt_controller: { icon: Server, color: '#30d158', label: 'Forecourt Controllers' },
+   156→  payment_terminal: { icon: CreditCard, color: '#ff9f0a', label: 'Payment Terminals' },
+   157→  generator: { icon: Zap, color: '#ffd60a', label: 'Generators' },
+   158→  surveillance_camera: { icon: Eye, color: '#64d2ff', label: 'Surveillance Cameras' },
+   159→  fire_alarm: { icon: AlertTriangle, color: '#ff375f', label: 'Fire Alarm Systems' },
+   160→  utility_meter: { icon: Gauge, color: '#e8930c', label: 'Utility Meters' },
+   161→  weather_station: { icon: Activity, color: '#64d2ff', label: 'Weather Stations' },
+   162→  tanker_tracker: { icon: Radio, color: '#bf5af2', label: 'Tanker Trackers' },
+   163→  car_wash: { icon: Zap, color: '#ffd60a', label: 'Car Wash Systems' },
+   164→  air_compressor: { icon: Cpu, color: '#ff9f0a', label: 'Air Compressors' },
+   165→  vacuum_station: { icon: Cpu, color: '#bf5af2', label: 'Vacuum Stations' },
+   166→  dispenser: { icon: Fuel, color: '#e8930c', label: 'Dispensers' },
+   167→  anpr_camera: { icon: Eye, color: '#64d2ff', label: 'ANPR Cameras' },
+   168→  rfid_reader: { icon: Radio, color: '#bf5af2', label: 'RFID Readers' },
+   169→  price_board: { icon: Monitor, color: '#ff375f', label: 'Price Boards' },
+   170→  atg: { icon: Droplets, color: '#34c759', label: 'ATG Systems' },
+   171→}
+   172→
+   173→function timeAgo(date: Date | string | null): string {
+   174→  if (!date) return 'N/A'
+   175→  const d = typeof date === 'string' ? new Date(date) : date
+   176→  const diff = Date.now() - d.getTime()
+   177→  if (diff < 60000) return 'just now'
+   178→  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`
+   179→  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`
+   180→  return `${Math.floor(diff / 86400000)}d ago`
+   181→}
+   182→
+   183→// ── Skeleton ──────────────────────────────────────
+   184→
+   185→function Skeleton({ className }: { className?: string }) {
+   186→  return <div className={`animate-pulse rounded-md bg-muted ${className ?? ''}`} />
+   187→}
+   188→
+   189→// ── Component ──────────────────────────────────────
+   190→
+   191→export default function DeviceIntegrationModule() {
+   192→  const [activeTab, setActiveTab] = useState('overview')
+   193→  const [searchQuery, setSearchQuery] = useState('')
+   194→  const [typeFilter, setTypeFilter] = useState('all')
+   195→
+   196→  // Data states
+   197→  const [deviceCategories, setDeviceCategories] = useState<DeviceCategory[]>([])
+   198→  const [connectedDevices, setConnectedDevices] = useState<ConnectedDevice[]>([])
+   199→  const [commandQueue, setCommandQueue] = useState<CommandEntry[]>([])
+   200→  const [eventLog, setEventLog] = useState<EventEntry[]>([])
+   201→  const [forecourtControllers, setForecourtControllers] = useState<ForecourtController[]>([])
+   202→  const [hardwareCatalog, setHardwareCatalog] = useState<HardwareCatalogItem[]>([])
+   203→  const [commProtocols, setCommProtocols] = useState<CommProtocol[]>([])
+   204→  const [overviewStats, setOverviewStats] = useState<{
+   205→    totalDevices: number
+   206→    onlineDevices: number
+   207→    warningDevices: number
+   208→    offlineDevices: number
+   209→    eventLogCount: number
+   210→    commandQueueCount: number
+   211→    pendingCommands: number
+   212→  } | null>(null)
+   213→
+   214→  // Loading / error
+   215→  const [loading, setLoading] = useState(true)
+   216→  const [error, setError] = useState<string | null>(null)
+   217→
+   218→  const fetchData = useCallback(async () => {
+   219→    setLoading(true)
+   220→    setError(null)
+   221→    try {
+   222→      // Fetch all data in parallel
+   223→      const [
+   224→        overviewRes,
+   225→        eventLogsRes,
+   226→        commandsRes,
+   227→        controllersRes,
+   228→        catalogRes,
+   229→        commsProtocolsRes,
+   230→        dispensersRes,
+   231→        anprRes,
+   232→        rfidRes,
+   233→        priceBoardsRes,
+   234→        atgRes,
+   235→      ] = await Promise.allSettled([
+   236→        fetch('/api/devices?type=overview'),
+   237→        fetch('/api/devices?type=event_logs&limit=20'),
+   238→        fetch('/api/devices?type=command_queue&limit=20'),
+   239→        fetch('/api/hardware?action=controllers'),
+   240→        fetch('/api/hardware?action=catalog&limit=50'),
+   241→        fetch('/api/comms?section=protocols'),
+   242→        fetch('/api/dispensers'),
+   243→        fetch('/api/anpr-cameras'),
+   244→        fetch('/api/rfid-readers'),
+   245→        fetch('/api/price-boards'),
+   246→        fetch('/api/tanks'),
+   247→      ])
+   248→
+   249→      // Process overview
+   250→      if (overviewRes.status === 'fulfilled') {
+   251→        const data = await overviewRes.value.json()
+   252→        const ov = data.overview || {}
+   253→
+   254→        // Build device categories from overview counts
+   255→        const counts = ov.deviceCounts || {}
+   256→        const statusBreakdown = ov.statusBreakdown || {}
+   257→        const categories: DeviceCategory[] = []
+   258→        for (const [key, count] of Object.entries(counts)) {
+   259→          if ((count as number) > 0) {
+   260→            const info = DEVICE_TYPE_ICONS[key] || { icon: HardDrive, color: '#e8930c', label: key }
+   261→            const breakdown = statusBreakdown[key] || {}
+   262→            const online = (breakdown.online || 0) + (breakdown.active || 0) + (breakdown.idle || 0) + (breakdown.fueling || 0)
+   263→            categories.push({
+   264→              type: info.label,
+   265→              icon: info.icon,
+   266→              count: count as number,
+   267→              online: online as number,
+   268→              color: info.color,
+   269→            })
+   270→          }
+   271→        }
+   272→        setDeviceCategories(categories)
+   273→
+   274→        // Compute overview stats
+   275→        const totalDevices = ov.totalDevices || 0
+   276→        let onlineDevices = 0
+   277→        let warningDevices = 0
+   278→        let offlineDevices = 0
+   279→        for (const breakdown of Object.values(statusBreakdown) as Record<string, number>[]) {
+   280→          onlineDevices += (breakdown.online || 0) + (breakdown.active || 0) + (breakdown.idle || 0) + (breakdown.fueling || 0)
+   281→          warningDevices += (breakdown.warning || 0) + (breakdown.maintenance || 0)
+   282→          offlineDevices += (breakdown.offline || 0) + (breakdown.disabled || 0) + (breakdown.error || 0)
+   283→        }
+   284→        setOverviewStats({
+   285→          totalDevices,
+   286→          onlineDevices,
+   287→          warningDevices,
+   288→          offlineDevices,
+   289→          eventLogCount: ov.eventLogCount || 0,
+   290→          commandQueueCount: ov.commandQueueCount || 0,
+   291→          pendingCommands: ov.pendingCommands || 0,
+   292→        })
+   293→      }
+   294→
+   295→      // Process event logs
+   296→      if (eventLogsRes.status === 'fulfilled') {
+   297→        const data = await eventLogsRes.value.json()
+   298→        setEventLog(data.eventLogs || [])
+   299→      }
+   300→
+   301→      // Process command queue
+   302→      if (commandsRes.status === 'fulfilled') {
+   303→        const data = await commandsRes.value.json()
+   304→        setCommandQueue(data.commands || [])
+   305→      }
+   306→
+   307→      // Process forecourt controllers
+   308→      if (controllersRes.status === 'fulfilled') {
+   309→        const data = await controllersRes.value.json()
+   310→        setForecourtControllers(data.controllers || [])
+   311→      }
+   312→
+   313→      // Process hardware catalog
+   314→      if (catalogRes.status === 'fulfilled') {
+   315→        const data = await catalogRes.value.json()
+   316→        setHardwareCatalog(data.items || [])
+   317→      }
+   318→
+   319→      // Process comm protocols
+   320→      if (commsProtocolsRes.status === 'fulfilled') {
+   321→        const data = await commsProtocolsRes.value.json()
+   322→        setCommProtocols(data.protocols || [])
+   323→      }
+   324→
+   325→      // Build connected devices from multiple sources
+   326→      const allDevices: ConnectedDevice[] = []
+   327→
+   328→      // From dispensers
+   329→      if (dispensersRes.status === 'fulfilled') {
+   330→        const data = await dispensersRes.value.json()
+   331→        for (const d of data.dispensers || []) {
+   332→          allDevices.push({
+   333→            id: d.code || d.id,
+   334→            name: d.name,
+   335→            type: 'Dispenser',
+   336→            brand: d.manufacturer || 'Unknown',
+   337→            protocol: d.controllerType || d.communicationType || 'IFSF',
+   338→            status: d.status || 'offline',
+   339→            lastSeen: timeAgo(d.lastCommunication || d.updatedAt),
+   340→            ip: d.ipAddress || 'N/A',
+   341→          })
+   342→        }
+   343→      }
+   344→
+   345→      // From ANPR cameras
+   346→      if (anprRes.status === 'fulfilled') {
+   347→        const data = await anprRes.value.json()
+   348→        for (const c of data.cameras || []) {
+   349→          allDevices.push({
+   350→            id: c.code || c.id,
+   351→            name: c.name,
+   352→            type: 'ANPR',
+   353→            brand: c.manufacturer || 'Unknown',
+   354→            protocol: c.communicationType || 'HTTP',
+   355→            status: c.status || 'offline',
+   356→            lastSeen: timeAgo(c.lastRecordingAt || c.updatedAt),
+   357→            ip: c.ipAddress || 'N/A',
+   358→          })
+   359→        }
+   360→      }
+   361→
+   362→      // From RFID readers
+   363→      if (rfidRes.status === 'fulfilled') {
+   364→        const data = await rfidRes.value.json()
+   365→        for (const r of data.readers || []) {
+   366→          allDevices.push({
+   367→            id: r.code || r.id,
+   368→            name: r.name,
+   369→            type: 'RFID',
+   370→            brand: r.manufacturer || 'Unknown',
+   371→            protocol: r.communicationType || 'Wiegand',
+   372→            status: r.status || 'offline',
+   373→            lastSeen: timeAgo(r.updatedAt),
+   374→            ip: r.ipAddress || 'N/A',
+   375→          })
+   376→        }
+   377→      }
+   378→
+   379→      // From price boards
+   380→      if (priceBoardsRes.status === 'fulfilled') {
+   381→        const data = await priceBoardsRes.value.json()
+   382→        for (const pb of data.boards || []) {
+   383→          allDevices.push({
+   384→            id: pb.code || pb.id,
+   385→            name: pb.name,
+   386→            type: 'Price Board',
+   387→            brand: pb.manufacturer || 'Unknown',
+   388→            protocol: pb.communicationType || 'RS485',
+   389→            status: pb.status || 'offline',
+   390→            lastSeen: timeAgo(pb.updatedAt),
+   391→            ip: pb.ipAddress || 'N/A',
+   392→          })
+   393→        }
+   394→      }
+   395→
+   396→      // From ATG/tanks
+   397→      if (atgRes.status === 'fulfilled') {
+   398→        const data = await atgRes.value.json()
+   399→        for (const t of data.tanks || []) {
+   400→          allDevices.push({
+   401→            id: t.code || t.id,
+   402→            name: t.name || `ATG Tank ${t.code || t.id}`,
+   403→            type: 'ATG',
+   404→            brand: t.atgType ? String(t.atgType).charAt(0).toUpperCase() + String(t.atgType).slice(1) : 'Unknown',
+   405→            protocol: 'TLS-350',
+   406→            status: t.status || 'offline',
+   407→            lastSeen: timeAgo(t.lastReading || t.updatedAt),
+   408→            ip: 'N/A',
+   409→          })
+   410→        }
+   411→      }
+   412→
+   413→      // From forecourt controllers
+   414→      if (controllersRes.status === 'fulfilled') {
+   415→        const data = await controllersRes.value.json()
+   416→        for (const fc of data.controllers || []) {
+   417→          allDevices.push({
+   418→            id: fc.code || fc.id,
+   419→            name: fc.name,
+   420→            type: 'Controller',
+   421→            brand: fc.manufacturer || 'Unknown',
+   422→            protocol: fc.protocol || fc.controllerType || 'IFSF',
+   423→            status: fc.status || 'offline',
+   424→            lastSeen: timeAgo(fc.lastHeartbeat || fc.lastCommunication || fc.updatedAt),
+   425→            ip: fc.ipAddress || 'N/A',
+   426→          })
+   427→        }
+   428→      }
+   429→
+   430→      // Fetch payment terminals
+   431→      try {
+   432→        const ptRes = await fetch('/api/devices?type=payment_terminal')
+   433→        if (ptRes.ok) {
+   434→          const data = await ptRes.json()
+   435→          for (const pt of data.devices || []) {
+   436→            allDevices.push({
+   437→              id: pt.code || pt.id,
+   438→              name: pt.name,
+   439→              type: 'Payment',
+   440→              brand: pt.manufacturer || 'Unknown',
+   441→              protocol: pt.communicationType || 'ISO 8583',
+   442→              status: pt.status || 'offline',
+   443→              lastSeen: timeAgo(pt.lastTransaction || pt.updatedAt),
+   444→              ip: pt.ipAddress || 'N/A',
+   445→            })
+   446→          }
+   447→        }
+   448→      } catch { /* ignore */ }
+   449→
+   450→      setConnectedDevices(allDevices)
+   451→    } catch (err) {
+   452→      console.error('DeviceIntegration fetchData error:', err)
+   453→      setError(err instanceof Error ? err.message : 'Failed to load device data')
+   454→    } finally {
+   455→      setLoading(false)
+   456→    }
+   457→  }, [])
+   458→
+   459→  useEffect(() => {
+   460→    fetchData()
+   461→  }, [fetchData])
+   462→
+   463→  const filteredDevices = connectedDevices.filter(d => {
+   464→    const matchesSearch = !searchQuery ||
+   465→      d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+   466→      d.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+   467→      d.brand.toLowerCase().includes(searchQuery.toLowerCase())
+   468→    const matchesType = typeFilter === 'all' || d.type === typeFilter
+   469→    return matchesSearch && matchesType
+   470→  })
+   471→
+   472→  // ── Loading state ──
+   473→  if (loading) {
+   474→    return (
+   475→      <div className="space-y-4" style={{ fontStyle: 'normal !important' } as React.CSSProperties}>
+   476→        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   477→          {Array.from({ length: 8 }).map((_, i) => (
+   478→            <div key={i} className="macos-card p-4">
+   479→              <Skeleton className="h-4 w-16 mb-2" />
+   480→              <Skeleton className="h-6 w-12" />
+   481→            </div>
+   482→          ))}
+   483→        </div>
+   484→        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   485→          {Array.from({ length: 4 }).map((_, i) => (
+   486→            <div key={i} className="macos-card p-4">
+   487→              <Skeleton className="h-4 w-20 mb-2" />
+   488→              <Skeleton className="h-8 w-16" />
+   489→            </div>
+   490→          ))}
+   491→        </div>
+   492→        <div className="macos-card p-4 flex items-center justify-center gap-2 text-muted-foreground">
+   493→          <Loader2 className="size-4 animate-spin" />
+   494→          <span className="text-[13px]">Loading device data from database…</span>
+   495→        </div>
+   496→      </div>
+   497→    )
+   498→  }
+   499→
+   500→  // ── Error state ──
+   501→  if (error) {
+   502→    return (
+   503→      <div className="macos-card p-6 text-center" style={{ fontStretch: 'normal' }}>
+   504→        <AlertTriangle className="size-8 text-red-500 mx-auto mb-3" />
+   505→        <p className="text-[14px] font-semibold mb-1">Failed to Load Device Data</p>
+   506→        <p className="text-[12px] text-muted-foreground mb-4">{error}</p>
+   507→        <button onClick={fetchData} className="macos-btn text-[12px] px-4 py-1.5 flex items-center gap-2 mx-auto">
+   508→          <RefreshCw className="size-3.5" /> Retry
+   509→        </button>
+   510→      </div>
+   511→    )
+   512→  }
+   513→
+   514→  return (
+   515→    <div className="space-y-4" style={{ fontStretch: 'normal' }}>
+   516→      <Tabs value={activeTab} onValueChange={setActiveTab}>
+   517→        <div className="overflow-x-auto pb-1">
+   518→          <TabsList className="h-8 w-max gap-0.5 bg-muted/50">
+   519→            <TabsTrigger value="overview" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Overview</TabsTrigger>
+   520→            <TabsTrigger value="devices" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Connected Devices</TabsTrigger>
+   521→            <TabsTrigger value="controllers" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Controllers</TabsTrigger>
+   522→            <TabsTrigger value="commands" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Command Queue</TabsTrigger>
+   523→            <TabsTrigger value="events" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Event Log</TabsTrigger>
+   524→            <TabsTrigger value="catalog" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Hardware Catalog</TabsTrigger>
+   525→            <TabsTrigger value="protocols" className="text-[11px] px-3 h-6 data-[state=active]:bg-teal-500/15 data-[state=active]:text-teal-600">Protocols</TabsTrigger>
+   526→          </TabsList>
+   527→        </div>
+   528→
+   529→        {/* ── Overview ── */}
+   530→        <TabsContent value="overview" className="mt-4 space-y-4">
+   531→          {/* Device Type Cards */}
+   532→          <div>
+   533→            <div className="macos-section-header">Device Categories</div>
+   534→            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-1">
+   535→              {deviceCategories.length > 0 ? deviceCategories.map((dt, i) => (
+   536→                <motion.div
+   537→                  key={dt.type}
+   538→                  initial={{ opacity: 0, y: 8 }}
+   539→                  animate={{ opacity: 1, y: 0 }}
+   540→                  transition={{ delay: i * 0.04 }}
+   541→                  className="macos-card p-4 cursor-pointer"
+   542→                  onClick={() => {
+   543→                    const typeMap: Record<string, string> = {
+   544→                      'Dispensers': 'Dispenser',
+   545→                      'ATG Systems': 'ATG',
+   546→                      'Payment Terminals': 'Payment',
+   547→                      'Forecourt Controllers': 'Controller',
+   548→                      'Price Boards': 'Price Board',
+   549→                      'RFID Readers': 'RFID',
+   550→                      'ANPR Cameras': 'ANPR',
+   551→                    }
+   552→                    setTypeFilter(typeMap[dt.type] || dt.type)
+   553→                    setActiveTab('devices')
+   554→                  }}
+   555→                >
+   556→                  <div className="flex items-start justify-between">
+   557→                    <div className="size-9 rounded-[10px] flex items-center justify-center" style={{ backgroundColor: `${dt.color}15` }}>
+   558→                      <dt.icon className="size-4" style={{ color: dt.color }} />
+   559→                    </div>
+   560→                    <div className="flex items-center gap-1.5">
+   561→                      <div className={`macos-status-dot ${dt.online === dt.count ? 'macos-status-online' : 'macos-status-warning'}`} />
+   562→                      <span className="text-[11px] text-muted-foreground">{dt.online}/{dt.count}</span>
+   563→                    </div>
+   564→                  </div>
+   565→                  <div className="mt-3">
+   566→                    <p className="text-[13px] font-semibold">{dt.type}</p>
+   567→                    <p className="text-[11px] text-muted-foreground">{dt.count} devices registered</p>
+   568→                  </div>
+   569→                </motion.div>
+   570→              )) : (
+   571→                <div className="col-span-full macos-card p-6 text-center text-[13px] text-muted-foreground">
+   572→                  No devices found in the system
+   573→                </div>
+   574→              )}
+   575→            </div>
+   576→          </div>
+   577→
+   578→          {/* Quick Stats */}
+   579→          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   580→            {[
+   581→              { label: 'Total Devices', value: overviewStats?.totalDevices ?? 0, icon: HardDrive, accent: '#e8930c' },
+   582→              { label: 'Online', value: overviewStats?.onlineDevices ?? 0, icon: Wifi, accent: '#34c759' },
+   583→              { label: 'Warnings', value: overviewStats?.warningDevices ?? 0, icon: AlertTriangle, accent: '#ff9f0a' },
+   584→              { label: 'Offline', value: overviewStats?.offlineDevices ?? 0, icon: WifiOff, accent: '#ff3b30' },
+   585→            ].map((stat) => (
+   586→              <div key={stat.label} className="macos-card p-4">
+   587→                <div className="flex items-center justify-between">
+   588→                  <div>
+   589→                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">{stat.label}</p>
+   590→                    <p className="text-2xl font-bold mt-0.5" style={{ color: stat.accent }}>{stat.value}</p>
+   591→                  </div>
+   592→                  <div className="size-9 rounded-[10px] flex items-center justify-center" style={{ backgroundColor: `${stat.accent}12` }}>
+   593→                    <stat.icon className="size-4" style={{ color: stat.accent }} />
+   594→                  </div>
+   595→                </div>
+   596→              </div>
+   597→            ))}
+   598→          </div>
+   599→
+   600→          {/* Recent Events */}
+   601→          <div>
+   602→            <div className="flex items-center justify-between">
+   603→              <div className="macos-section-header">Recent Events</div>
+   604→              <button onClick={fetchData} className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+   605→                <RefreshCw className="size-3" /> Refresh
+   606→              </button>
+   607→            </div>
+   608→            <div className="macos-group mt-1">
+   609→              {eventLog.length > 0 ? eventLog.slice(0, 5).map((ev, i) => (
+   610→                <div key={ev.id || i} className="macos-group-item flex items-center gap-3">
+   611→                  <div className={`macos-status-dot ${
+   612→                    ev.severity === 'error' || ev.severity === 'critical' ? 'macos-status-error' :
+   613→                    ev.severity === 'warning' ? 'macos-status-warning' :
+   614→                    ev.severity === 'success' || ev.severity === 'info' ? 'macos-status-online' : 'macos-status-offline'
+   615→                  }`} />
+   616→                  <div className="flex-1 min-w-0">
+   617→                    <div className="flex items-center gap-2">
+   618→                      <span className="text-[13px] font-medium">{ev.deviceId}</span>
+   619→                      <span className={`text-[11px] ${EVENT_LEVEL_MAP[ev.severity] || ''}`}>{ev.message}</span>
+   620→                    </div>
+   621→                  </div>
+   622→                  <span className="text-[11px] text-muted-foreground whitespace-nowrap font-mono">{timeAgo(ev.createdAt)}</span>
+   623→                  <ChevronRight className="size-3 text-muted-foreground/50" />
+   624→                </div>
+   625→              )) : (
+   626→                <div className="macos-group-item text-center text-[13px] text-muted-foreground py-4">
+   627→                  No recent events
+   628→                </div>
+   629→              )}
+   630→            </div>
+   631→          </div>
+   632→        </TabsContent>
+   633→
+   634→        {/* ── Connected Devices ── */}
+   635→        <TabsContent value="devices" className="mt-4 space-y-3">
+   636→          <div className="flex items-center gap-3">
+   637→            <div className="relative flex-1 max-w-xs">
+   638→              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+   639→              <input
+   640→                className="macos-search pl-8 py-1.5 text-[12px]"
+   641→                placeholder="Search devices..."
+   642→                value={searchQuery}
+   643→                onChange={e => setSearchQuery(e.target.value)}
+   644→              />
+   645→            </div>
+   646→            <div className="flex items-center gap-1.5 flex-wrap">
+   647→              {['all', 'Dispenser', 'ATG', 'Payment', 'Controller', 'RFID', 'ANPR'].map(t => (
+   648→                <button
+   649→                  key={t}
+   650→                  onClick={() => setTypeFilter(t)}
+   651→                  className={`text-[11px] px-2.5 py-1 rounded-md font-medium transition-colors ${
+   652→                    typeFilter === t
+   653→                      ? 'bg-teal-500/15 text-teal-600 dark:text-teal-400'
+   654→                      : 'text-muted-foreground hover:bg-black/[0.03] dark:hover:bg-white/[0.04]'
+   655→                  }`}
+   656→                >
+   657→                  {t === 'all' ? 'All' : t}
+   658→                </button>
+   659→              ))}
+   660→            </div>
+   661→          </div>
+   662→
+   663→          <div className="macos-card overflow-hidden">
+   664→            <div className="max-h-[480px] overflow-y-auto">
+   665→              <table className="macos-table">
+   666→                <thead>
+   667→                  <tr>
+   668→                    <th>Device ID</th>
+   669→                    <th>Name</th>
+   670→                    <th>Type</th>
+   671→                    <th>Brand</th>
+   672→                    <th>Protocol</th>
+   673→                    <th>Status</th>
+   674→                    <th>Last Seen</th>
+   675→                    <th>IP</th>
+   676→                  </tr>
+   677→                </thead>
+   678→                <tbody>
+   679→                  {filteredDevices.map(d => {
+   680→                    const st = STATUS_MAP[d.status] || STATUS_MAP.offline
+   681→                    return (
+   682→                      <tr key={d.id}>
+   683→                        <td className="font-mono text-[12px] text-teal-600 dark:text-teal-400">{d.id}</td>
+   684→                        <td className="font-medium text-[13px]">{d.name}</td>
+   685→                        <td><Badge variant="outline" className="text-[10px] px-1.5 py-0 font-medium">{d.type}</Badge></td>
+   686→                        <td className="text-[13px]">{d.brand}</td>
+   687→                        <td className="text-[12px] font-mono text-muted-foreground">{d.protocol}</td>
+   688→                        <td>
+   689→                          <div className="flex items-center gap-1.5">
+   690→                            <div className={`macos-status-dot ${st.dot}`} />
+   691→                            <span className={`text-[11px] font-medium capitalize ${st.text}`}>{d.status}</span>
+   692→                          </div>
+   693→                        </td>
+   694→                        <td className="text-[12px] text-muted-foreground whitespace-nowrap">{d.lastSeen}</td>
+   695→                        <td className="text-[12px] font-mono text-muted-foreground">{d.ip}</td>
+   696→                      </tr>
+   697→                    )
+   698→                  })}
+   699→                  {filteredDevices.length === 0 && (
+   700→                    <tr>
+   701→                      <td colSpan={8} className="text-center text-[13px] text-muted-foreground py-8">No devices match your filters</td>
+   702→                    </tr>
+   703→                  )}
+   704→                </tbody>
+   705→              </table>
+   706→            </div>
+   707→          </div>
+   708→          <p className="text-[11px] text-muted-foreground">{filteredDevices.length} of {connectedDevices.length} devices shown</p>
+   709→        </TabsContent>
+   710→
+   711→        {/* ── Forecourt Controllers ── */}
+   712→        <TabsContent value="controllers" className="mt-4 space-y-4">
+   713→          <div className="flex items-center justify-between">
+   714→            <div className="macos-section-header">Forecourt Controllers</div>
+   715→            <button onClick={fetchData} className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+   716→              <RefreshCw className="size-3" /> Refresh
+   717→            </button>
+   718→          </div>
+   719→          {forecourtControllers.length > 0 ? (
+   720→            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+   721→              {forecourtControllers.map(fc => {
+   722→                const dispensers = fc.dispensers || []
+   723→                const connectedPumps = dispensers.length
+   724→                const totalPumps = fc.maxDispensers || dispensers.length
+   725→                return (
+   726→                  <motion.div
+   727→                    key={fc.id}
+   728→                    initial={{ opacity: 0, y: 8 }}
+   729→                    animate={{ opacity: 1, y: 0 }}
+   730→                    className="macos-card p-5 space-y-4"
+   731→                  >
+   732→                    <div className="flex items-start justify-between">
+   733→                      <div className="flex items-center gap-3">
+   734→                        <div className="size-10 rounded-[10px] bg-teal-500/10 flex items-center justify-center">
+   735→                          <Server className="size-5 text-teal-500" />
+   736→                        </div>
+   737→                        <div>
+   738→                          <h3 className="text-[13px] font-semibold">{fc.name}</h3>
+   739→                          <p className="text-[11px] text-muted-foreground">{fc.manufacturer || ''} {fc.model || ''}</p>
+   740→                        </div>
+   741→                      </div>
+   742→                      <div className="flex items-center gap-1.5">
+   743→                        <div className={`macos-status-dot ${STATUS_MAP[fc.status]?.dot || 'macos-status-offline'}`} />
+   744→                        <span className={`text-[11px] font-medium capitalize ${STATUS_MAP[fc.status]?.text || 'text-muted-foreground'}`}>{fc.status}</span>
+   745→                      </div>
+   746→                    </div>
+   747→
+   748→                    <div className="grid grid-cols-2 gap-3">
+   749→                      <div className="macos-group">
+   750→                        <div className="macos-group-item">
+   751→                          <div className="flex items-center justify-between">
+   752→                            <span className="text-[11px] text-muted-foreground">IP Address</span>
+   753→                            <span className="text-[13px] font-mono">{fc.ipAddress || 'N/A'}{fc.port ? `:${fc.port}` : ''}</span>
+   754→                          </div>
+   755→                        </div>
+   756→                        <div className="macos-group-item">
+   757→                          <div className="flex items-center justify-between">
+   758→                            <span className="text-[11px] text-muted-foreground">Protocol</span>
+   759→                            <span className="text-[13px]">{fc.protocol || fc.controllerType || 'N/A'}</span>
+   760→                          </div>
+   761→                        </div>
+   762→                        <div className="macos-group-item">
+   763→                          <div className="flex items-center justify-between">
+   764→                            <span className="text-[11px] text-muted-foreground">Firmware</span>
+   765→                            <span className="text-[13px] font-mono">{fc.firmwareVersion ? `v${fc.firmwareVersion}` : 'N/A'}</span>
+   766→                          </div>
+   767→                        </div>
+   768→                        <div className="macos-group-item">
+   769→                          <div className="flex items-center justify-between">
+   770→                            <span className="text-[11px] text-muted-foreground">Serial</span>
+   771→                            <span className="text-[12px] font-mono">{fc.serialNumber || 'N/A'}</span>
+   772→                          </div>
+   773→                        </div>
+   774→                      </div>
+   775→
+   776→                      <div className="macos-group">
+   777→                        <div className="macos-group-item">
+   778→                          <div className="flex items-center justify-between">
+   779→                            <span className="text-[11px] text-muted-foreground">Last Heartbeat</span>
+   780→                            <span className="text-[13px]">{timeAgo(fc.lastHeartbeat)}</span>
+   781→                          </div>
+   782→                        </div>
+   783→                        <div className="macos-group-item">
+   784→                          <div className="flex items-center justify-between">
+   785→                            <span className="text-[11px] text-muted-foreground">Pumps</span>
+   786→                            <span className="text-[13px]">{connectedPumps}/{totalPumps}</span>
+   787→                          </div>
+   788→                        </div>
+   789→                        <div className="macos-group-item">
+   790→                          <div className="flex items-center justify-between">
+   791→                            <span className="text-[11px] text-muted-foreground">Station</span>
+   792→                            <span className="text-[12px]">{fc.station?.name || 'N/A'}</span>
+   793→                          </div>
+   794→                        </div>
+   795→                        <div className="macos-group-item">
+   796→                          <div className="flex items-center justify-between">
+   797→                            <span className="text-[11px] text-muted-foreground">Last Comm</span>
+   798→                            <span className="text-[13px]">{timeAgo(fc.lastCommunication)}</span>
+   799→                          </div>
+   800→                        </div>
+   801→                      </div>
+   802→                    </div>
+   803→
+   804→                    <div className="flex items-center justify-between pt-1">
+   805→                      <span className="text-[11px] text-muted-foreground">Last heartbeat: {timeAgo(fc.lastHeartbeat)}</span>
+   806→                      <div className="flex gap-2">
+   807→                        <button className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+   808→                          <RefreshCw className="size-3" /> Restart
+   809→                        </button>
+   810→                        <button className="macos-btn text-[11px] px-2.5 py-1 flex items-center gap-1">
+   811→                          <Activity className="size-3" /> Diagnostics
+   812→                        </button>
+   813→                      </div>
+   814→                    </div>
+   815→                  </motion.div>
+   816→                )
+   817→              })}
+   818→            </div>
+   819→          ) : (
+   820→            <div className="macos-card p-6 text-center text-[13px] text-muted-foreground">
+   821→              No forecourt controllers configured
+   822→            </div>
+   823→          )}
+   824→        </TabsContent>
+   825→
+   826→        {/* ── Command Queue ── */}
+   827→        <TabsContent value="commands" className="mt-4 space-y-3">
+   828→          <div className="flex items-center justify-between">
+   829→            <div className="macos-section-header">Device Command Queue</div>
+   830→            <div className="flex gap-2">
+   831→              <button className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+   832→                <Square className="size-3" /> Clear Completed
+   833→              </button>
+   834→              <button className="macos-btn text-[11px] px-2.5 py-1 flex items-center gap-1">
+   835→                <Command className="size-3" /> New Command
+   836→              </button>
+   837→            </div>
+   838→          </div>
+   839→          <div className="macos-card overflow-hidden">
+   840→            <div className="max-h-[420px] overflow-y-auto">
+   841→              <table className="macos-table">
+   842→                <thead>
+   843→                  <tr>
+   844→                    <th>Command ID</th>
+   845→                    <th>Device</th>
+   846→                    <th>Command</th>
+   847→                    <th>Priority</th>
+   848→                    <th>Status</th>
+   849→                    <th>Retries</th>
+   850→                    <th>Created At</th>
+   851→                  </tr>
+   852→                </thead>
+   853→                <tbody>
+   854→                  {commandQueue.length > 0 ? commandQueue.map(cmd => {
+   855→                    const st = CMD_STATUS_MAP[cmd.status] || CMD_STATUS_MAP.queued
+   856→                    const StatusIcon = st?.icon || Clock
+   857→                    return (
+   858→                      <tr key={cmd.id}>
+   859→                        <td className="font-mono text-[12px] text-teal-600 dark:text-teal-400">{cmd.id.slice(0, 12)}</td>
+   860→                        <td className="font-mono text-[12px]">{cmd.deviceId}</td>
+   861→                        <td className="text-[13px] font-medium">{cmd.command}</td>
+   862→                        <td>
+   863→                          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-semibold capitalize ${PRIORITY_MAP[cmd.priority] || PRIORITY_MAP.medium}`}>
+   864→                            {cmd.priority}
+   865→                          </Badge>
+   866→                        </td>
+   867→                        <td>
+   868→                          <div className="flex items-center gap-1.5">
+   869→                            <StatusIcon className={`size-3.5 ${st?.color}`} />
+   870→                            <span className="text-[12px] capitalize">{cmd.status}</span>
+   871→                          </div>
+   872→                        </td>
+   873→                        <td className="text-[12px]">
+   874→                          <span className={cmd.retryCount > 0 ? 'text-teal-600 dark:text-teal-400 font-medium' : 'text-muted-foreground'}>
+   875→                            {cmd.retryCount}/{cmd.maxRetries}
+   876→                          </span>
+   877→                        </td>
+   878→                        <td className="text-[12px] text-muted-foreground font-mono">{timeAgo(cmd.createdAt)}</td>
+   879→                      </tr>
+   880→                    )
+   881→                  }) : (
+   882→                    <tr>
+   883→                      <td colSpan={7} className="text-center text-[13px] text-muted-foreground py-8">No commands in queue</td>
+   884→                    </tr>
+   885→                  )}
+   886→                </tbody>
+   887→              </table>
+   888→            </div>
+   889→          </div>
+   890→        </TabsContent>
+   891→
+   892→        {/* ── Event Log ── */}
+   893→        <TabsContent value="events" className="mt-4 space-y-3">
+   894→          <div className="flex items-center justify-between">
+   895→            <div className="macos-section-header">Recent Device Events</div>
+   896→            <button onClick={fetchData} className="macos-btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">
+   897→              <RefreshCw className="size-3" /> Refresh
+   898→            </button>
+   899→          </div>
+   900→          <div className="macos-group">
+   901→            {eventLog.length > 0 ? eventLog.map((ev, i) => (
+   902→              <motion.div
+   903→                key={ev.id || i}
+   904→                initial={{ opacity: 0, x: -4 }}
+   905→                animate={{ opacity: 1, x: 0 }}
+   906→                transition={{ delay: i * 0.03 }}
+   907→                className="macos-group-item flex items-center gap-3"
+   908→              >
+   909→                <div className={`macos-status-dot ${
+   910→                  ev.severity === 'error' || ev.severity === 'critical' ? 'macos-status-error' :
+   911→                  ev.severity === 'warning' ? 'macos-status-warning' :
+   912→                  ev.severity === 'success' || ev.severity === 'info' ? 'macos-status-online' : 'macos-status-offline'
+   913→                }`} />
+   914→                <div className="flex-1 min-w-0">
+   915→                  <div className="flex items-center gap-2">
+   916→                    <span className="text-[12px] font-mono font-medium text-teal-600 dark:text-teal-400">{ev.deviceId}</span>
+   917→                    <span className={`text-[13px] ${EVENT_LEVEL_MAP[ev.severity] || ''}`}>{ev.message}</span>
+   918→                  </div>
+   919→                </div>
+   920→                <span className="text-[11px] text-muted-foreground font-mono whitespace-nowrap">{timeAgo(ev.createdAt)}</span>
+   921→              </motion.div>
+   922→            )) : (
+   923→              <div className="macos-group-item text-center text-[13px] text-muted-foreground py-4">
+   924→                No events recorded
+   925→              </div>
+   926→            )}
+   927→          </div>
+   928→        </TabsContent>
+   929→
+   930→        {/* ── Hardware Catalog ── */}
+   931→        <TabsContent value="catalog" className="mt-4 space-y-3">
+   932→          <div className="macos-section-header">Hardware Catalog</div>
+   933→          {hardwareCatalog.length > 0 ? (
+   934→            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+   935→              {hardwareCatalog.map((item, i) => (
+   936→                <motion.div
+   937→                  key={item.id}
+   938→                  initial={{ opacity: 0, y: 8 }}
+   939→                  animate={{ opacity: 1, y: 0 }}
+   940→                  transition={{ delay: i * 0.05 }}
+   941→                  className="macos-card p-4"
+   942→                >
+   943→                  <div className="flex items-start justify-between mb-3">
+   944→                    <div className="flex items-center gap-2.5">
+   945→                      <div className="size-9 rounded-[10px] bg-teal-500/10 flex items-center justify-center">
+   946→                        <Fuel className="size-4 text-teal-500" />
+   947→                      </div>
+   948→                      <div>
+   949→                        <h3 className="text-[13px] font-semibold">{item.manufacturer}</h3>
+   950→                        <p className="text-[11px] text-muted-foreground">{item.modelName}</p>
+   951→                      </div>
+   952→                    </div>
+   953→                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
+   954→                      {item.category}
+   955→                    </Badge>
+   956→                  </div>
+   957→                  <div className="space-y-2">
+   958→                    {item.supportedProtocols && (
+   959→                      <div className="flex items-center justify-between text-[12px]">
+   960→                        <span className="text-muted-foreground">Protocols</span>
+   961→                        <span className="font-mono text-teal-600 dark:text-teal-400">
+   962→                          {Array.isArray(item.supportedProtocols) ? item.supportedProtocols.join(', ') : item.supportedProtocols}
+   963→                        </span>
+   964→                      </div>
+   965→                    )}
+   966→                    {item.communicationTypes && (
+   967→                      <div className="flex items-center justify-between text-[12px]">
+   968→                        <span className="text-muted-foreground">Transport</span>
+   969→                        <span className="font-medium">
+   970→                          {Array.isArray(item.communicationTypes) ? item.communicationTypes.join(', ') : item.communicationTypes}
+   971→                        </span>
+   972→                      </div>
+   973→                    )}
+   974→                  </div>
+   975→                </motion.div>
+   976→              ))}
+   977→            </div>
+   978→          ) : (
+   979→            <div className="macos-card p-6 text-center text-[13px] text-muted-foreground">
+   980→              No hardware catalog entries found
+   981→            </div>
+   982→          )}
+   983→        </TabsContent>
+   984→
+   985→        {/* ── Communication Protocols ── */}
+   986→        <TabsContent value="protocols" className="mt-4 space-y-3">
+   987→          <div className="macos-section-header">Communication Protocols</div>
+   988→          {commProtocols.length > 0 ? (
+   989→            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+   990→              {commProtocols.map((proto, i) => (
+   991→                <motion.div
+   992→                  key={proto.id}
+   993→                  initial={{ opacity: 0, y: 8 }}
+   994→                  animate={{ opacity: 1, y: 0 }}
+   995→                  transition={{ delay: i * 0.04 }}
+   996→                  className="macos-card p-4"
+   997→                >
+   998→                  <div className="flex items-start justify-between mb-2">
+   999→                    <div className="flex items-center gap-2.5">
+  1000→                      <div className="size-9 rounded-[10px] bg-teal-500/10 flex items-center justify-center">
+  1001→                        <Cable className="size-4 text-teal-500" />
+  1002→                      </div>
+  1003→                      <div>
+  1004→                        <h3 className="text-[13px] font-semibold">{proto.name}</h3>
+  1005→                        <p className="text-[11px] text-muted-foreground">{proto.description || proto.protocolType || ''}</p>
+  1006→                      </div>
+  1007→                    </div>
+  1008→                    <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${proto.isActive ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-slate-500/10 text-slate-500 border-slate-500/20'}`}>
+  1009→                      {proto.isActive ? 'Active' : 'Inactive'}
+  1010→                    </Badge>
+  1011→                  </div>
+  1012→                  <div className="macos-group mt-2">
+  1013→                    {proto.protocolType && (
+  1014→                      <div className="macos-group-item">
+  1015→                        <div className="flex justify-between text-[12px]">
+  1016→                          <span className="text-muted-foreground">Type</span>
+  1017→                          <span className="font-medium">{proto.protocolType}</span>
+  1018→                        </div>
+  1019→                      </div>
+  1020→                    )}
+  1021→                    {proto.transportType && (
+  1022→                      <div className="macos-group-item">
+  1023→                        <div className="flex justify-between text-[12px]">
+  1024→                          <span className="text-muted-foreground">Transport</span>
+  1025→                          <span className="font-mono">{proto.transportType}</span>
+  1026→                        </div>
+  1027→                      </div>
+  1028→                    )}
+  1029→                    {proto.version && (
+  1030→                      <div className="macos-group-item">
+  1031→                        <div className="flex justify-between text-[12px]">
+  1032→                          <span className="text-muted-foreground">Version</span>
+  1033→                          <span className="font-mono">{proto.version}</span>
+  1034→                        </div>
+  1035→                      </div>
+  1036→                    )}
+  1037→                    <div className="macos-group-item">
+  1038→                      <div className="flex justify-between text-[12px]">
+  1039→                        <span className="text-muted-foreground">Connections</span>
+  1040→                        <span className="font-semibold text-teal-600 dark:text-teal-400">{proto.connections?.length || 0}</span>
+  1041→                      </div>
+  1042→                    </div>
+  1043→                  </div>
+  1044→                </motion.div>
+  1045→              ))}
+  1046→            </div>
+  1047→          ) : (
+  1048→            <div className="macos-card p-6 text-center text-[13px] text-muted-foreground">
+  1049→              No communication protocols configured
+  1050→            </div>
+  1051→          )}
+  1052→        </TabsContent>
+  1053→      </Tabs>
+  1054→    </div>
+  1055→  )
+  1056→}
+  1057→

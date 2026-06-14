@@ -1,0 +1,736 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useMemo, useCallback } from 'react'
+     4→import {
+     5→  DollarSign,
+     6→  Fuel,
+     7→  Activity,
+     8→  Droplets,
+     9→  ArrowUpRight,
+    10→  ArrowDownRight,
+    11→  TrendingUp,
+    12→  AlertTriangle,
+    13→  Brain,
+    14→  Clock,
+    15→  Truck,
+    16→  Zap,
+    17→  ChevronRight,
+    18→  RefreshCw,
+    19→  Loader2,
+    20→} from 'lucide-react'
+    21→import {
+    22→  AreaChart,
+    23→  Area,
+    24→  XAxis,
+    25→  YAxis,
+    26→  Tooltip,
+    27→  ResponsiveContainer,
+    28→} from 'recharts'
+    29→
+    30→// ── Types ──────────────────────────────────────────────────
+    31→
+    32→interface DashboardKPIs {
+    33→  revenue: { today: number; week: number; month: number; currency: string }
+    34→  fuelSold: { value: number; unit: string }
+    35→  activePumps: { value: number; total: number }
+    36→  alerts: { value: number; critical: number; warning: number }
+    37→  netProfit: { value: number; currency: string }
+    38→}
+    39→
+    40→interface TankLevel {
+    41→  id: string
+    42→  product: string
+    43→  level: number
+    44→  capacity: number
+    45→  currentLitres: number
+    46→  status: string
+    47→  temperature: number
+    48→  waterLevel: number
+    49→}
+    50→
+    51→interface RecentTransaction {
+    52→  id: string
+    53→  time: string
+    54→  pump: string
+    55→  product: string
+    56→  litres: number
+    57→  amount: number
+    58→  payment: string
+    59→  attendant: string
+    60→}
+    61→
+    62→interface RevenueChartPoint {
+    63→  hour: string
+    64→  value: number
+    65→}
+    66→
+    67→interface FuelBreakdownItem {
+    68→  type: string
+    69→  volume: number
+    70→  revenue: number
+    71→}
+    72→
+    73→interface StationInfo {
+    74→  name: string
+    75→  code: string
+    76→  status: string
+    77→  shift: string
+    78→  attendant: string
+    79→  supervisor: string
+    80→}
+    81→
+    82→interface DashboardData {
+    83→  kpis: DashboardKPIs
+    84→  tankLevels: TankLevel[]
+    85→  recentTransactions: RecentTransaction[]
+    86→  revenueChart: RevenueChartPoint[]
+    87→  fuelBreakdown: FuelBreakdownItem[]
+    88→  stationInfo: StationInfo
+    89→  shiftInfo: Record<string, unknown> | null
+    90→  allStations: unknown[]
+    91→  notifications: unknown[]
+    92→  carWash: { sessionsToday: number; revenue: number }
+    93→  lottery: { salesToday: number; revenue: number; commission: number }
+    94→  fleetSummary: Record<string, unknown>
+    95→  totalCustomers: number
+    96→  employeeOnDuty: number
+    97→}
+    98→
+    99→// ── Formatting Helpers ──────────────────────────────────────
+   100→
+   101→function formatPKR(value: number): string {
+   102→  return `PKR ${value.toLocaleString('en-PK')}`
+   103→}
+   104→
+   105→function formatCompactPKR(value: number): string {
+   106→  if (value >= 1000000) return `PKR ${(value / 1000000).toFixed(1)}M`
+   107→  if (value >= 1000) return `PKR ${(value / 1000).toFixed(0)}K`
+   108→  return `PKR ${value}`
+   109→}
+   110→
+   111→// ── Custom Tooltip ──────────────────────────────────────────
+   112→
+   113→function RevenueTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) {
+   114→  if (!active || !payload?.length) return null
+   115→  return (
+   116→    <div className="macos-card px-3 py-2 text-[13px] shadow-lg">
+   117→      <p className="text-[11px] text-muted-foreground font-medium">{label}</p>
+   118→      <p className="font-semibold text-foreground">{formatPKR(payload[0].value)}</p>
+   119→    </div>
+   120→  )
+   121→}
+   122→
+   123→// ── Sub-Components ──────────────────────────────────────────
+   124→
+   125→function StatCard({
+   126→  label,
+   127→  value,
+   128→  change,
+   129→  icon: Icon,
+   130→  accent = 'amber',
+   131→}: {
+   132→  label: string
+   133→  value: string
+   134→  change?: { value: number; label: string }
+   135→  icon: React.ElementType
+   136→  accent?: 'amber' | 'green' | 'red'
+   137→}) {
+   138→  const isPositive = change ? change.value >= 0 : true
+   139→  const iconBg = accent === 'amber'
+   140→    ? 'bg-teal-500/10'
+   141→    : accent === 'green'
+   142→      ? 'bg-emerald-500/10'
+   143→      : 'bg-red-500/10'
+   144→  const iconColor = accent === 'amber'
+   145→    ? 'text-teal-500'
+   146→    : accent === 'green'
+   147→      ? 'text-emerald-500'
+   148→      : 'text-red-500'
+   149→
+   150→  return (
+   151→    <div className="macos-card p-4 flex flex-col gap-3">
+   152→      <div className="flex items-start justify-between">
+   153→        <div className="flex flex-col gap-0.5">
+   154→          <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{label}</span>
+   155→          <span className="text-[22px] font-bold text-foreground leading-tight tracking-tight">{value}</span>
+   156→        </div>
+   157→        <div className={`flex size-9 items-center justify-center rounded-lg ${iconBg}`}>
+   158→          <Icon className={`size-[18px] ${iconColor}`} strokeWidth={1.8} />
+   159→        </div>
+   160→      </div>
+   161→      {change && (
+   162→        <div className="flex items-center gap-1.5">
+   163→          {isPositive ? (
+   164→            <ArrowUpRight className="size-3 text-emerald-500" strokeWidth={2.5} />
+   165→          ) : (
+   166→            <ArrowDownRight className="size-3 text-red-500" strokeWidth={2.5} />
+   167→          )}
+   168→          <span className={`text-[11px] font-semibold ${isPositive ? 'text-emerald-500' : 'text-red-500'}`}>
+   169→            {Math.abs(change.value)}%
+   170→          </span>
+   171→          <span className="text-[11px] text-muted-foreground">{change.label}</span>
+   172→        </div>
+   173→      )}
+   174→    </div>
+   175→  )
+   176→}
+   177→
+   178→interface DispenserData {
+   179→  id: string
+   180→  name: string
+   181→  status: string
+   182→  fuelType: string
+   183→  volume: number
+   184→  nozzle: string
+   185→}
+   186→
+   187→function DispenserCard({ dispenser }: { dispenser: DispenserData }) {
+   188→  const statusConfig: Record<string, { dot: string; label: string; badgeBg: string }> = {
+   189→    dispensing: { dot: 'macos-status-online', label: 'Dispensing', badgeBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
+   190→    active: { dot: 'macos-status-online', label: 'Active', badgeBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
+   191→    idle: { dot: 'macos-status-warning', label: 'Idle', badgeBg: 'bg-teal-500/10 text-teal-600 dark:text-teal-400' },
+   192→    maintenance: { dot: 'macos-status-error', label: 'Maintenance', badgeBg: 'bg-red-500/10 text-red-600 dark:text-red-400' },
+   193→    error: { dot: 'macos-status-error', label: 'Error', badgeBg: 'bg-red-500/10 text-red-600 dark:text-red-400' },
+   194→  }
+   195→  const config = statusConfig[dispenser.status] || statusConfig.idle
+   196→  const isError = dispenser.status === 'error' || dispenser.status === 'maintenance'
+   197→
+   198→  return (
+   199→    <div className="macos-card p-4 flex flex-col gap-2 transition-shadow duration-200">
+   200→      <div className="flex items-center justify-between">
+   201→        <div className="flex items-center gap-2">
+   202→          <div className={`macos-status-dot ${config.dot}`} />
+   203→          <span className="text-[13px] font-semibold text-foreground">{dispenser.name}</span>
+   204→        </div>
+   205→        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${config.badgeBg}`}>
+   206→          {config.label}
+   207→        </span>
+   208→      </div>
+   209→      <div className="flex items-center justify-between text-[11px]">
+   210→        <span className="text-muted-foreground">{dispenser.fuelType}</span>
+   211→        <span className="font-mono text-muted-foreground">Nozzle {dispenser.nozzle}</span>
+   212→      </div>
+   213→      {!isError ? (
+   214→        <div className="flex items-baseline gap-1 mt-0.5">
+   215→          <span className="text-[18px] font-bold text-foreground">{dispenser.volume.toLocaleString()}</span>
+   216→          <span className="text-[11px] text-muted-foreground">L today</span>
+   217→        </div>
+   218→      ) : (
+   219→        <div className="flex items-center gap-1.5 mt-0.5">
+   220→          <AlertTriangle className="size-3 text-red-500" />
+   221→          <span className="text-[11px] text-red-500 font-medium">Maintenance required</span>
+   222→        </div>
+   223→      )}
+   224→    </div>
+   225→  )
+   226→}
+   227→
+   228→function TankLevelBar({ tank }: { tank: TankLevel }) {
+   229→  const barColor = tank.level > 50
+   230→    ? 'bg-emerald-500'
+   231→    : tank.level >= 25
+   232→      ? 'bg-teal-500'
+   233→      : 'bg-red-500'
+   234→  const trackColor = tank.level > 50
+   235→    ? 'bg-emerald-500/10'
+   236→    : tank.level >= 25
+   237→      ? 'bg-teal-500/10'
+   238→      : 'bg-red-500/10'
+   239→  const textColor = tank.level > 50
+   240→    ? 'text-emerald-600 dark:text-emerald-400'
+   241→    : tank.level >= 25
+   242→      ? 'text-teal-600 dark:text-teal-400'
+   243→      : 'text-red-600 dark:text-red-400'
+   244→
+   245→  return (
+   246→    <div className="macos-group-item">
+   247→      <div className="flex items-center justify-between mb-1.5">
+   248→        <div className="flex items-center gap-2">
+   249→          <Droplets className={`size-3.5 ${textColor}`} strokeWidth={1.8} />
+   250→          <span className="text-[13px] font-medium text-foreground">{tank.product}</span>
+   251→        </div>
+   252→        <div className="flex items-center gap-3">
+   253→          <span className="text-[11px] text-muted-foreground">
+   254→            {tank.currentLitres.toLocaleString()} / {tank.capacity.toLocaleString()} L
+   255→          </span>
+   256→          <span className={`text-[13px] font-bold ${textColor} tabular-nums min-w-[40px] text-right`}>
+   257→            {tank.level}%
+   258→          </span>
+   259→        </div>
+   260→      </div>
+   261→      <div className={`h-1.5 w-full rounded-full ${trackColor} overflow-hidden`}>
+   262→        <div
+   263→          className={`h-full rounded-full ${barColor} transition-all duration-500 ease-out`}
+   264→          style={{ width: `${Math.min(tank.level, 100)}%` }}
+   265→        />
+   266→      </div>
+   267→      <div className="flex items-center justify-between mt-1">
+   268→        <span className="text-[10px] text-muted-foreground">Tank {tank.id.slice(0, 8)}</span>
+   269→        <span className="text-[10px] text-muted-foreground">{tank.temperature}°C · {tank.waterLevel}mm water</span>
+   270→      </div>
+   271→    </div>
+   272→  )
+   273→}
+   274→
+   275→// ── AI Insight derived from dashboard data ──────────────────
+   276→
+   277→interface AIInsight {
+   278→  id: string
+   279→  type: 'critical' | 'warning' | 'info'
+   280→  icon: React.ElementType
+   281→  title: string
+   282→  description: string
+   283→}
+   284→
+   285→function generateInsights(data: DashboardData): AIInsight[] {
+   286→  const insights: AIInsight[] = []
+   287→
+   288→  // Tank level alerts
+   289→  data.tankLevels.forEach((tank) => {
+   290→    if (tank.level < 20) {
+   291→      insights.push({
+   292→        id: `tank-critical-${tank.id}`,
+   293→        type: 'critical',
+   294→        icon: Droplets,
+   295→        title: `${tank.product} tank below 20% — schedule delivery`,
+   296→        description: `${tank.product} tank at ${tank.level}%. ${tank.currentLitres.toLocaleString()} L remaining. Recommend scheduling delivery immediately.`,
+   297→      })
+   298→    } else if (tank.level < 30) {
+   299→      insights.push({
+   300→        id: `tank-warning-${tank.id}`,
+   301→        type: 'warning',
+   302→        icon: Droplets,
+   303→        title: `${tank.product} tank at ${tank.level}% — monitor closely`,
+   304→        description: `${tank.currentLitres.toLocaleString()} L remaining out of ${tank.capacity.toLocaleString()} L capacity. Consider scheduling a top-up.`,
+   305→      })
+   306→    }
+   307→  })
+   308→
+   309→  // Revenue trend insight
+   310→  if (data.kpis.revenue.today > 0 && data.kpis.revenue.week > 0) {
+   311→    const dailyAvg = data.kpis.revenue.week / 7
+   312→    const pctChange = ((data.kpis.revenue.today - dailyAvg) / dailyAvg) * 100
+   313→    if (Math.abs(pctChange) > 5) {
+   314→      insights.push({
+   315→        id: 'revenue-trend',
+   316→        type: pctChange > 0 ? 'info' : 'warning',
+   317→        icon: TrendingUp,
+   318→        title: `Today's revenue ${pctChange > 0 ? 'up' : 'down'} ${Math.abs(pctChange).toFixed(1)}% vs weekly avg`,
+   319→        description: `Today: ${formatPKR(data.kpis.revenue.today)}. Weekly average: ${formatPKR(Math.round(dailyAvg))}. ${pctChange > 0 ? 'Strong performance, ensure adequate staffing.' : 'Consider promotional activities to boost sales.'}`,
+   320→      })
+   321→    }
+   322→  }
+   323→
+   324→  // Alerts from KPIs
+   325→  if (data.kpis.alerts.critical > 0) {
+   326→    insights.push({
+   327→      id: 'alerts-critical',
+   328→      type: 'critical',
+   329→      icon: Zap,
+   330→      title: `${data.kpis.alerts.critical} critical alert${data.kpis.alerts.critical > 1 ? 's' : ''} require attention`,
+   331→      description: `${data.kpis.alerts.critical} critical and ${data.kpis.alerts.warning} warning alerts are active. Review and resolve immediately.`,
+   332→    })
+   333→  }
+   334→
+   335→  // Always add at least one info insight if we have data
+   336→  if (insights.length === 0) {
+   337→    insights.push({
+   338→      id: 'all-clear',
+   339→      type: 'info',
+   340→      icon: TrendingUp,
+   341→      title: 'All systems operating normally',
+   342→      description: `Station ${data.stationInfo.name} is operational. Shift ${data.stationInfo.shift} is active with ${data.employeeOnDuty} employees on duty.`,
+   343→    })
+   344→  }
+   345→
+   346→  return insights
+   347→}
+   348→
+   349→// ── Main Component ──────────────────────────────────────────
+   350→
+   351→export default function DashboardOverview() {
+   352→  const [data, setData] = useState<DashboardData | null>(null)
+   353→  const [loading, setLoading] = useState(true)
+   354→  const [error, setError] = useState<string | null>(null)
+   355→
+   356→  const fetchData = useCallback(async () => {
+   357→    setLoading(true)
+   358→    setError(null)
+   359→    try {
+   360→      const res = await fetch('/api/dashboard')
+   361→      if (!res.ok) throw new Error('Failed to load dashboard data')
+   362→      const json = await res.json()
+   363→      setData(json)
+   364→    } catch (err) {
+   365→      setError(err instanceof Error ? err.message : 'Unknown error')
+   366→    } finally {
+   367→      setLoading(false)
+   368→    }
+   369→  }, [])
+   370→
+   371→  useEffect(() => {
+   372→    fetchData()
+   373→  }, [fetchData])
+   374→
+   375→  const aiInsights = useMemo(() => {
+   376→    if (!data) return []
+   377→    return generateInsights(data)
+   378→  }, [data])
+   379→
+   380→  const avgTankLevel = useMemo(() => {
+   381→    if (!data || data.tankLevels.length === 0) return 0
+   382→    const total = data.tankLevels.reduce((sum, t) => sum + t.level, 0)
+   383→    return Math.round(total / data.tankLevels.length)
+   384→  }, [data])
+   385→
+   386→  // Build dispenser data from KPIs (we don't have full dispenser list from /api/dashboard)
+   387→  // The API returns activePumps count, we'll show that
+   388→  const activeDispenserCount = data?.kpis.activePumps.value ?? 0
+   389→  const totalDispensers = data?.kpis.activePumps.total ?? 0
+   390→
+   391→  // ── Loading State ──
+   392→  if (loading && !data) {
+   393→    return (
+   394→      <div className="space-y-6 macos-fade-in">
+   395→        <div className="flex items-end justify-between">
+   396→          <div>
+   397→            <div className="h-6 w-40 bg-muted/30 rounded animate-pulse" />
+   398→            <div className="h-4 w-64 bg-muted/20 rounded animate-pulse mt-2" />
+   399→          </div>
+   400→        </div>
+   401→        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+   402→          {[...Array(4)].map((_, i) => (
+   403→            <div key={i} className="macos-card p-4 h-[100px] animate-pulse bg-muted/10" />
+   404→          ))}
+   405→        </div>
+   406→        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+   407→          <div className="macos-card p-5 lg:col-span-2 h-[280px] animate-pulse bg-muted/10" />
+   408→          <div className="macos-card p-5 h-[280px] animate-pulse bg-muted/10" />
+   409→        </div>
+   410→        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+   411→          {[...Array(5)].map((_, i) => (
+   412→            <div key={i} className="macos-card p-4 h-[100px] animate-pulse bg-muted/10" />
+   413→          ))}
+   414→        </div>
+   415→      </div>
+   416→    )
+   417→  }
+   418→
+   419→  // ── Error State ──
+   420→  if (error && !data) {
+   421→    return (
+   422→      <div className="macos-card p-8 flex flex-col items-center justify-center text-center min-h-[300px]">
+   423→        <AlertTriangle className="size-10 text-teal-500 mb-4" />
+   424→        <h3 className="text-[15px] font-semibold text-foreground mb-1">Failed to load dashboard</h3>
+   425→        <p className="text-[13px] text-muted-foreground mb-4">{error}</p>
+   426→        <button
+   427→          onClick={fetchData}
+   428→          className="macos-btn flex items-center gap-1.5"
+   429→        >
+   430→          <RefreshCw className="size-3.5" />
+   431→          Retry
+   432→        </button>
+   433→      </div>
+   434→    )
+   435→  }
+   436→
+   437→  if (!data) return null
+   438→
+   439→  const revenueChartData = data.revenueChart.map((p) => ({
+   440→    day: p.hour,
+   441→    revenue: p.value,
+   442→  }))
+   443→
+   444→  return (
+   445→    <div className="space-y-6 macos-fade-in">
+   446→      {/* ── Page Header ── */}
+   447→      <div className="flex items-end justify-between">
+   448→        <div>
+   449→          <h2 className="text-[20px] font-bold text-foreground tracking-tight">Dashboard</h2>
+   450→          <p className="text-[13px] text-muted-foreground mt-0.5">{data.stationInfo.name} — {data.stationInfo.shift}</p>
+   451→        </div>
+   452→        <div className="flex items-center gap-2">
+   453→          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/[0.03] dark:bg-white/[0.04]">
+   454→            <div className="macos-status-dot macos-status-online" />
+   455→            <span className="text-[11px] font-medium text-muted-foreground">Live</span>
+   456→          </div>
+   457→          <button
+   458→            onClick={fetchData}
+   459→            disabled={loading}
+   460→            className="macos-btn-secondary text-[11px] flex items-center gap-1.5 px-3 py-1.5"
+   461→          >
+   462→            {loading ? (
+   463→              <Loader2 className="size-3 animate-spin" strokeWidth={1.8} />
+   464→            ) : (
+   465→              <RefreshCw className="size-3" strokeWidth={1.8} />
+   466→            )}
+   467→            Refresh
+   468→          </button>
+   469→        </div>
+   470→      </div>
+   471→
+   472→      {/* ── Top Stats Row ── */}
+   473→      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+   474→        <StatCard
+   475→          label="Today's Revenue"
+   476→          value={formatPKR(data.kpis.revenue.today)}
+   477→          icon={DollarSign}
+   478→          accent="amber"
+   479→        />
+   480→        <StatCard
+   481→          label="Fuel Sales"
+   482→          value={`${data.kpis.fuelSold.value.toLocaleString()} L`}
+   483→          icon={Fuel}
+   484→          accent="amber"
+   485→        />
+   486→        <StatCard
+   487→          label="Active Pumps"
+   488→          value={`${activeDispenserCount}/${totalDispensers}`}
+   489→          icon={Activity}
+   490→          accent="green"
+   491→        />
+   492→        <StatCard
+   493→          label="Tank Levels"
+   494→          value={`${avgTankLevel}% Avg`}
+   495→          icon={Droplets}
+   496→          accent={avgTankLevel > 50 ? 'amber' : 'red'}
+   497→        />
+   498→      </div>
+   499→
+   500→      {/* ── Revenue Chart + AI Insights ── */}
+   501→      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+   502→        {/* Revenue Chart */}
+   503→        <div className="macos-card p-5 lg:col-span-2">
+   504→          <div className="flex items-center justify-between mb-4">
+   505→            <div>
+   506→              <h3 className="text-[13px] font-semibold text-foreground">Revenue — Today</h3>
+   507→              <p className="text-[11px] text-muted-foreground mt-0.5">Hourly revenue across all fuel types</p>
+   508→            </div>
+   509→            {data.kpis.netProfit.value > 0 && (
+   510→              <div className="flex items-center gap-1.5">
+   511→                <TrendingUp className="size-3.5 text-emerald-500" strokeWidth={2} />
+   512→                <span className="text-[11px] font-semibold text-emerald-500">Net Profit</span>
+   513→                <span className="text-[11px] text-muted-foreground">{formatCompactPKR(data.kpis.netProfit.value)}</span>
+   514→              </div>
+   515→            )}
+   516→          </div>
+   517→          {revenueChartData.length > 0 ? (
+   518→            <div className="h-[220px]">
+   519→              <ResponsiveContainer width="100%" height="100%">
+   520→                <AreaChart data={revenueChartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+   521→                  <defs>
+   522→                    <linearGradient id="amberGradient" x1="0" y1="0" x2="0" y2="1">
+   523→                      <stop offset="0%" stopColor="#e8930c" stopOpacity={0.2} />
+   524→                      <stop offset="100%" stopColor="#e8930c" stopOpacity={0} />
+   525→                    </linearGradient>
+   526→                  </defs>
+   527→                  <XAxis
+   528→                    dataKey="day"
+   529→                    tick={{ fontSize: 11, fill: '#86868b' }}
+   530→                    axisLine={false}
+   531→                    tickLine={false}
+   532→                    dy={8}
+   533→                  />
+   534→                  <YAxis
+   535→                    tick={{ fontSize: 11, fill: '#86868b' }}
+   536→                    axisLine={false}
+   537→                    tickLine={false}
+   538→                    tickFormatter={(v: number) => formatCompactPKR(v)}
+   539→                    dx={-4}
+   540→                  />
+   541→                  <Tooltip content={<RevenueTooltip />} cursor={{ stroke: '#e8930c', strokeWidth: 1, strokeDasharray: '4 4' }} />
+   542→                  <Area
+   543→                    type="monotone"
+   544→                    dataKey="revenue"
+   545→                    stroke="#e8930c"
+   546→                    strokeWidth={2}
+   547→                    fill="url(#amberGradient)"
+   548→                    dot={false}
+   549→                    activeDot={{ r: 4, fill: '#e8930c', stroke: '#ffffff', strokeWidth: 2 }}
+   550→                  />
+   551→                </AreaChart>
+   552→              </ResponsiveContainer>
+   553→            </div>
+   554→          ) : (
+   555→            <div className="h-[220px] flex items-center justify-center text-muted-foreground text-[13px]">
+   556→              No revenue data available yet today
+   557→            </div>
+   558→          )}
+   559→        </div>
+   560→
+   561→        {/* AI Insights */}
+   562→        <div className="macos-card p-5 flex flex-col">
+   563→          <div className="flex items-center gap-2 mb-4">
+   564→            <div className="flex size-7 items-center justify-center rounded-lg bg-teal-500/10">
+   565→              <Brain className="size-4 text-teal-500" strokeWidth={1.8} />
+   566→            </div>
+   567→            <div>
+   568→              <h3 className="text-[13px] font-semibold text-foreground">AI Insights</h3>
+   569→              <p className="text-[10px] text-muted-foreground">{aiInsights.length} active alert{aiInsights.length !== 1 ? 's' : ''}</p>
+   570→            </div>
+   571→          </div>
+   572→          <div className="flex flex-col gap-2.5 flex-1">
+   573→            {aiInsights.map((insight) => {
+   574→              const typeStyles = {
+   575→                critical: 'border-l-red-500 bg-red-500/[0.03] dark:bg-red-500/[0.05]',
+   576→                warning: 'border-l-teal-500 bg-teal-500/[0.03] dark:bg-teal-500/[0.05]',
+   577→                info: 'border-l-emerald-500 bg-emerald-500/[0.03] dark:bg-emerald-500/[0.05]',
+   578→              }
+   579→              const iconColor = {
+   580→                critical: 'text-red-500',
+   581→                warning: 'text-teal-500',
+   582→                info: 'text-emerald-500',
+   583→              }
+   584→              const Icon = insight.icon
+   585→              return (
+   586→                <div key={insight.id} className={`border-l-2 rounded-r-lg p-3 ${typeStyles[insight.type]} transition-colors duration-150`}>
+   587→                  <div className="flex items-start gap-2.5">
+   588→                    <Icon className={`size-4 mt-0.5 shrink-0 ${iconColor[insight.type]}`} strokeWidth={1.8} />
+   589→                    <div className="flex-1 min-w-0">
+   590→                      <p className="text-[13px] font-semibold text-foreground leading-snug">{insight.title}</p>
+   591→                      <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{insight.description}</p>
+   592→                    </div>
+   593→                  </div>
+   594→                </div>
+   595→              )
+   596→            })}
+   597→          </div>
+   598→          <button className="macos-btn-secondary mt-4 w-full flex items-center justify-center gap-1.5 text-[11px] py-2">
+   599→            View All Insights
+   600→            <ChevronRight className="size-3" strokeWidth={2} />
+   601→          </button>
+   602→        </div>
+   603→      </div>
+   604→
+   605→      {/* ── Fuel Breakdown ── */}
+   606→      {data.fuelBreakdown.length > 0 && (
+   607→        <div>
+   608→          <div className="macos-section-header px-0 mb-3">Fuel Sales Breakdown</div>
+   609→          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+   610→            {data.fuelBreakdown.map((fuel) => (
+   611→              <div key={fuel.type} className="macos-card p-4 flex flex-col gap-2">
+   612→                <div className="flex items-center gap-2">
+   613→                  <Fuel className="size-3.5 text-teal-500" strokeWidth={1.8} />
+   614→                  <span className="text-[13px] font-semibold text-foreground">{fuel.type}</span>
+   615→                </div>
+   616→                <div className="text-[18px] font-bold text-foreground">{fuel.volume.toLocaleString()}<span className="text-[11px] text-muted-foreground ml-1">L</span></div>
+   617→                <div className="text-[12px] text-muted-foreground">{formatCompactPKR(fuel.revenue)}</div>
+   618→              </div>
+   619→            ))}
+   620→          </div>
+   621→        </div>
+   622→      )}
+   623→
+   624→      {/* ── Tank Overview + Recent Transactions ── */}
+   625→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+   626→        {/* Tank Overview */}
+   627→        <div>
+   628→          <div className="macos-section-header px-0 mb-3">Tank Overview</div>
+   629→          {data.tankLevels.length > 0 ? (
+   630→            <div className="macos-group">
+   631→              {data.tankLevels.map((tank) => (
+   632→                <TankLevelBar key={tank.id} tank={tank} />
+   633→              ))}
+   634→            </div>
+   635→          ) : (
+   636→            <div className="macos-card p-6 text-center text-muted-foreground text-[13px]">
+   637→              No tank data available
+   638→            </div>
+   639→          )}
+   640→        </div>
+   641→
+   642→        {/* Recent Transactions */}
+   643→        <div>
+   644→          <div className="flex items-center justify-between mb-3">
+   645→            <div className="macos-section-header px-0">Recent Transactions</div>
+   646→            <button className="text-[11px] font-medium text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 flex items-center gap-1 transition-colors">
+   647→              View All
+   648→              <ChevronRight className="size-3" strokeWidth={2} />
+   649→            </button>
+   650→          </div>
+   651→          {data.recentTransactions.length > 0 ? (
+   652→            <div className="macos-card overflow-hidden">
+   653→              <div className="overflow-x-auto">
+   654→                <table className="macos-table">
+   655→                  <thead>
+   656→                    <tr>
+   657→                      <th>Time</th>
+   658→                      <th>Pump</th>
+   659→                      <th>Product</th>
+   660→                      <th className="text-right">Litres</th>
+   661→                      <th className="text-right">Amount</th>
+   662→                      <th>Payment</th>
+   663→                    </tr>
+   664→                  </thead>
+   665→                  <tbody>
+   666→                    {data.recentTransactions.map((tx) => (
+   667→                      <tr key={tx.id}>
+   668→                        <td>
+   669→                          <span className="font-mono text-[12px] text-foreground">{tx.time}</span>
+   670→                        </td>
+   671→                        <td>
+   672→                          <span className="text-[12px] text-foreground">{tx.pump}</span>
+   673→                        </td>
+   674→                        <td>
+   675→                          <span className="text-[12px] text-foreground">{tx.product}</span>
+   676→                        </td>
+   677→                        <td className="text-right">
+   678→                          <span className="text-[12px] text-foreground tabular-nums">{tx.litres} L</span>
+   679→                        </td>
+   680→                        <td className="text-right">
+   681→                          <span className="text-[12px] font-semibold text-foreground tabular-nums">
+   682→                            {formatPKR(tx.amount)}
+   683→                          </span>
+   684→                        </td>
+   685→                        <td>
+   686→                          <span className={`macos-pill ${
+   687→                            tx.payment === 'Cash'
+   688→                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+   689→                              : tx.payment === 'Fleet card' || tx.payment === 'Fleet Card'
+   690→                                ? 'bg-teal-500/10 text-teal-600 dark:text-teal-400'
+   691→                                : 'bg-secondary text-secondary-foreground'
+   692→                          }`}>
+   693→                            {tx.payment}
+   694→                          </span>
+   695→                        </td>
+   696→                      </tr>
+   697→                    ))}
+   698→                  </tbody>
+   699→                </table>
+   700→              </div>
+   701→            </div>
+   702→          ) : (
+   703→            <div className="macos-card p-6 text-center text-muted-foreground text-[13px]">
+   704→              No recent transactions
+   705→            </div>
+   706→          )}
+   707→        </div>
+   708→      </div>
+   709→
+   710→      {/* ── Quick Actions Footer ── */}
+   711→      <div className="macos-card p-4">
+   712→        <div className="flex items-center justify-between flex-wrap gap-3">
+   713→          <div className="flex items-center gap-2">
+   714→            <Truck className="size-4 text-teal-500" strokeWidth={1.8} />
+   715→            <span className="text-[13px] font-medium text-foreground">Quick Actions</span>
+   716→          </div>
+   717→          <div className="flex items-center gap-2 flex-wrap">
+   718→            <button className="macos-btn text-[12px] py-1.5 px-3">
+   719→              Schedule Delivery
+   720→            </button>
+   721→            <button className="macos-btn-secondary text-[12px] py-1.5 px-3">
+   722→              Run Shift Report
+   723→            </button>
+   724→            <button className="macos-btn-secondary text-[12px] py-1.5 px-3">
+   725→              Update Prices
+   726→            </button>
+   727→            <button className="macos-btn-secondary text-[12px] py-1.5 px-3">
+   728→              Emergency Stop
+   729→            </button>
+   730→          </div>
+   731→        </div>
+   732→      </div>
+   733→    </div>
+   734→  )
+   735→}
+   736→

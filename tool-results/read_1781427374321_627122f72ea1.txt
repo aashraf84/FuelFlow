@@ -1,0 +1,657 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useCallback } from 'react'
+     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→import {
+     6→  DollarSign,
+     7→  TrendingUp,
+     8→  Monitor,
+     9→  Clock,
+    10→  RefreshCw,
+    11→  ArrowUpRight,
+    12→  ArrowDownRight,
+    13→  Calendar,
+    14→  BarChart3,
+    15→  Zap,
+    16→  Droplets,
+    17→  Flame,
+    18→  Plus,
+    19→  Signal,
+    20→  Loader2,
+    21→  AlertTriangle,
+    22→} from 'lucide-react'
+    23→import {
+    24→  LineChart,
+    25→  Line,
+    26→  XAxis,
+    27→  YAxis,
+    28→  Tooltip,
+    29→  ResponsiveContainer,
+    30→  CartesianGrid,
+    31→  Legend,
+    32→} from 'recharts'
+    33→
+    34→// ── Types ──────────────────────────────────────────────────
+    35→
+    36→interface FuelPrice {
+    37→  id: string
+    38→  fuelType: string
+    39→  fuelGrade: string | null
+    40→  pricePerUnit: number
+    41→  previousPrice: number | null
+    42→  currency: string
+    43→  effectiveFrom: string
+    44→  effectiveTo: string | null
+    45→  status: string
+    46→  stationId: string | null
+    47→  updatedBy: string | null
+    48→}
+    49→
+    50→interface PriceBoard {
+    51→  id: string
+    52→  name: string
+    53→  boardType: string
+    54→  ipAddress: string | null
+    55→  status: string
+    56→  lastSyncAt: string | null
+    57→  isActive: boolean
+    58→  displayContent: string | null
+    59→}
+    60→
+    61→// ── Helpers ───────────────────────────────────────────────
+    62→
+    63→const pkr = (n: number) => `PKR ${n.toFixed(2)}`
+    64→
+    65→const statusDotMap: Record<string, string> = {
+    66→  online: 'macos-status-online',
+    67→  active: 'macos-status-online',
+    68→  warning: 'macos-status-warning',
+    69→  error: 'macos-status-error',
+    70→  offline: 'macos-status-offline',
+    71→  maintenance: 'macos-status-warning',
+    72→}
+    73→
+    74→type TabKey = 'current' | 'history' | 'boards' | 'schedule'
+    75→
+    76→const tabs: { key: TabKey; label: string; icon: React.ElementType }[] = [
+    77→  { key: 'current', label: 'Current Prices', icon: DollarSign },
+    78→  { key: 'history', label: 'Price History', icon: BarChart3 },
+    79→  { key: 'boards', label: 'Price Boards', icon: Monitor },
+    80→  { key: 'schedule', label: 'Schedule', icon: Calendar },
+    81→]
+    82→
+    83→const fuelIconMap: Record<string, React.ElementType> = {
+    84→  petrol: Droplets,
+    85→  diesel: Flame,
+    86→  hobc: Zap,
+    87→  premium: DollarSign,
+    88→  default: DollarSign,
+    89→}
+    90→
+    91→const fuelColorMap: Record<string, string> = {
+    92→  petrol: '#34c759',
+    93→  diesel: '#e8930c',
+    94→  hobc: '#ff9500',
+    95→  premium: '#ff6b35',
+    96→  default: '#e8930c',
+    97→}
+    98→
+    99→function getFuelIcon(fuelType: string): React.ElementType {
+   100→  const lower = fuelType.toLowerCase()
+   101→  for (const [key, Icon] of Object.entries(fuelIconMap)) {
+   102→    if (lower.includes(key)) return Icon
+   103→  }
+   104→  return fuelIconMap.default
+   105→}
+   106→
+   107→function getFuelColor(fuelType: string): string {
+   108→  const lower = fuelType.toLowerCase()
+   109→  for (const [key, color] of Object.entries(fuelColorMap)) {
+   110→    if (lower.includes(key)) return color
+   111→  }
+   112→  return fuelColorMap.default
+   113→}
+   114→
+   115→// ── Custom Tooltip ────────────────────────────────────────
+   116→
+   117→function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
+   118→  if (!active || !payload) return null
+   119→  return (
+   120→    <div className="macos-card p-3 shadow-lg !rounded-lg">
+   121→      <p className="text-[11px] font-semibold text-muted-foreground mb-1.5">{label}</p>
+   122→      {payload.map((p) => (
+   123→        <div key={p.name} className="flex items-center gap-2 text-[12px]">
+   124→          <div className="size-2 rounded-full" style={{ background: p.color }} />
+   125→          <span className="text-muted-foreground">{p.name}:</span>
+   126→          <span className="font-semibold">PKR {p.value}</span>
+   127→        </div>
+   128→      ))}
+   129→    </div>
+   130→  )
+   131→}
+   132→
+   133→// ── Component ─────────────────────────────────────────────
+   134→
+   135→export default function PricingModule() {
+   136→  const [activeTab, setActiveTab] = useState<TabKey>('current')
+   137→  const [prices, setPrices] = useState<FuelPrice[]>([])
+   138→  const [priceBoards, setPriceBoards] = useState<PriceBoard[]>([])
+   139→  const [loading, setLoading] = useState(true)
+   140→  const [error, setError] = useState<string | null>(null)
+   141→
+   142→  const fetchData = useCallback(async () => {
+   143→    setLoading(true)
+   144→    setError(null)
+   145→    try {
+   146→      const [pricesRes, boardsRes] = await Promise.all([
+   147→        fetch('/api/prices'),
+   148→        fetch('/api/price-boards'),
+   149→      ])
+   150→      if (!pricesRes.ok) throw new Error('Failed to load fuel prices')
+   151→      if (!boardsRes.ok) throw new Error('Failed to load price boards')
+   152→      const pricesJson = await pricesRes.json()
+   153→      const boardsJson = await boardsRes.json()
+   154→      setPrices(pricesJson.prices || [])
+   155→      setPriceBoards(boardsJson.boards || [])
+   156→    } catch (err) {
+   157→      setError(err instanceof Error ? err.message : 'Unknown error')
+   158→    } finally {
+   159→      setLoading(false)
+   160→    }
+   161→  }, [])
+   162→
+   163→  useEffect(() => {
+   164→    fetchData()
+   165→  }, [fetchData])
+   166→
+   167→  // Build price history from all prices (including expired ones if they were loaded)
+   168→  // Since the API only returns active prices, we'll derive a simple history from current data
+   169→  const priceHistoryData = (() => {
+   170→    // Group prices by fuel type
+   171→    const typeMap: Record<string, { name: string; current: number; previous: number | null; effectiveFrom: string }> = {}
+   172→    for (const p of prices) {
+   173→      const key = p.fuelType.toLowerCase()
+   174→      if (!typeMap[key] || new Date(p.effectiveFrom) > new Date(typeMap[key].effectiveFrom)) {
+   175→        typeMap[key] = {
+   176→          name: p.fuelType.charAt(0).toUpperCase() + p.fuelType.slice(1),
+   177→          current: p.pricePerUnit,
+   178→          previous: p.previousPrice,
+   179→          effectiveFrom: p.effectiveFrom,
+   180→        }
+   181→      }
+   182→    }
+   183→    return typeMap
+   184→  })()
+   185→
+   186→  return (
+   187→    <div className="space-y-5">
+   188→      {/* ── Tab Bar ── */}
+   189→      <div className="flex items-center justify-between">
+   190→        <div className="flex items-center gap-1 overflow-x-auto pb-1 -mb-1">
+   191→          {tabs.map((tab) => {
+   192→            const isActive = activeTab === tab.key
+   193→            const Icon = tab.icon
+   194→            return (
+   195→              <button
+   196→                key={tab.key}
+   197→                onClick={() => setActiveTab(tab.key)}
+   198→                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all duration-150 whitespace-nowrap ${
+   199→                  isActive
+   200→                    ? 'bg-teal-500/10 text-teal-600 dark:text-teal-400'
+   201→                    : 'text-muted-foreground hover:bg-black/[0.03] dark:hover:bg-white/[0.05] hover:text-foreground'
+   202→                }`}
+   203→              >
+   204→                <Icon className="size-3.5" strokeWidth={isActive ? 2 : 1.5} />
+   205→                {tab.label}
+   206→              </button>
+   207→            )
+   208→          })}
+   209→        </div>
+   210→        <button
+   211→          onClick={fetchData}
+   212→          disabled={loading}
+   213→          className="macos-btn-secondary flex items-center gap-1.5 text-[12px] px-3 py-1.5"
+   214→        >
+   215→          {loading ? (
+   216→            <Loader2 className="size-3 animate-spin" />
+   217→          ) : (
+   218→            <RefreshCw className="size-3" />
+   219→          )}
+   220→          Refresh
+   221→        </button>
+   222→      </div>
+   223→
+   224→      {/* ── Tab Content ── */}
+   225→      <AnimatePresence mode="wait">
+   226→        <motion.div
+   227→          key={activeTab}
+   228→          initial={{ opacity: 0, y: 6 }}
+   229→          animate={{ opacity: 1, y: 0 }}
+   230→          exit={{ opacity: 0, y: -4 }}
+   231→          transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+   232→        >
+   233→          {activeTab === 'current' && <CurrentPricesTab prices={prices} loading={loading} error={error} onRetry={fetchData} />}
+   234→          {activeTab === 'history' && <PriceHistoryTab priceHistoryData={priceHistoryData} />}
+   235→          {activeTab === 'boards' && <PriceBoardsTab boards={priceBoards} onSync={fetchData} />}
+   236→          {activeTab === 'schedule' && <ScheduleTab prices={prices} />}
+   237→        </motion.div>
+   238→      </AnimatePresence>
+   239→    </div>
+   240→  )
+   241→}
+   242→
+   243→// ── Current Prices Tab ────────────────────────────────────
+   244→
+   245→function CurrentPricesTab({ prices, loading, error, onRetry }: {
+   246→  prices: FuelPrice[]
+   247→  loading: boolean
+   248→  error: string | null
+   249→  onRetry: () => void
+   250→}) {
+   251→  if (loading && prices.length === 0) {
+   252→    return (
+   253→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+   254→        {[...Array(4)].map((_, i) => (
+   255→          <div key={i} className="macos-card p-5 h-[180px] animate-pulse bg-muted/10" />
+   256→        ))}
+   257→      </div>
+   258→    )
+   259→  }
+   260→
+   261→  if (error && prices.length === 0) {
+   262→    return (
+   263→      <div className="macos-card p-8 flex flex-col items-center justify-center text-center min-h-[200px]">
+   264→        <AlertTriangle className="size-10 text-teal-500 mb-4" />
+   265→        <h3 className="text-[15px] font-semibold text-foreground mb-1">Failed to load prices</h3>
+   266→        <p className="text-[13px] text-muted-foreground mb-4">{error}</p>
+   267→        <button onClick={onRetry} className="macos-btn flex items-center gap-1.5">
+   268→          <RefreshCw className="size-3.5" /> Retry
+   269→        </button>
+   270→      </div>
+   271→    )
+   272→  }
+   273→
+   274→  if (prices.length === 0) {
+   275→    return (
+   276→      <div className="macos-card p-8 flex flex-col items-center justify-center text-center min-h-[200px]">
+   277→        <DollarSign className="size-10 text-muted-foreground mb-4" />
+   278→        <h3 className="text-[15px] font-semibold text-foreground mb-1">No active prices</h3>
+   279→        <p className="text-[13px] text-muted-foreground">Set up fuel prices to get started.</p>
+   280→      </div>
+   281→    )
+   282→  }
+   283→
+   284→  // Deduplicate by fuel type (keep latest active price per type)
+   285→  const uniquePrices = (() => {
+   286→    const map = new Map<string, FuelPrice>()
+   287→    for (const p of prices) {
+   288→      const key = p.fuelType.toLowerCase()
+   289→      const existing = map.get(key)
+   290→      if (!existing || new Date(p.effectiveFrom) > new Date(existing.effectiveFrom)) {
+   291→        map.set(key, p)
+   292→      }
+   293→    }
+   294→    return Array.from(map.values())
+   295→  })()
+   296→
+   297→  return (
+   298→    <div className="space-y-4">
+   299→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+   300→        {uniquePrices.map((fuel, i) => {
+   301→          const change = fuel.previousPrice ? fuel.pricePerUnit - fuel.previousPrice : 0
+   302→          const isUp = change > 0
+   303→          const Icon = getFuelIcon(fuel.fuelType)
+   304→          const color = getFuelColor(fuel.fuelType)
+   305→          return (
+   306→            <motion.div
+   307→              key={fuel.id}
+   308→              initial={{ opacity: 0, y: 12 }}
+   309→              animate={{ opacity: 1, y: 0 }}
+   310→              transition={{ delay: i * 0.07, duration: 0.35 }}
+   311→              className="macos-card p-5"
+   312→            >
+   313→              <div className="flex items-center justify-between mb-4">
+   314→                <div className="flex items-center gap-2">
+   315→                  <div className="size-8 rounded-lg flex items-center justify-center" style={{ background: `${color}15` }}>
+   316→                    <Icon className="size-4" style={{ color }} />
+   317→                  </div>
+   318→                  <div>
+   319→                    <p className="text-[13px] font-semibold">{fuel.fuelType.charAt(0).toUpperCase() + fuel.fuelType.slice(1)}</p>
+   320→                    <p className="text-[11px] text-muted-foreground">{fuel.fuelGrade || 'Standard'}</p>
+   321→                  </div>
+   322→                </div>
+   323→                <span className="macos-pill bg-teal-500/10 text-teal-600 dark:text-teal-400">Active</span>
+   324→              </div>
+   325→
+   326→              {/* Big Number */}
+   327→              <p className="text-[32px] font-bold tracking-tight text-foreground leading-none">
+   328→                {fuel.pricePerUnit.toFixed(2)}
+   329→              </p>
+   330→              <p className="text-[11px] text-muted-foreground mt-0.5">{fuel.currency}/L</p>
+   331→
+   332→              {/* Change indicator */}
+   333→              {fuel.previousPrice !== null && fuel.previousPrice > 0 && (
+   334→                <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-border">
+   335→                  {isUp ? (
+   336→                    <ArrowUpRight className="size-3.5 text-red-500" />
+   337→                  ) : (
+   338→                    <ArrowDownRight className="size-3.5 text-emerald-500" />
+   339→                  )}
+   340→                  <span className={`text-[12px] font-semibold ${isUp ? 'text-red-500' : 'text-emerald-500'}`}>
+   341→                    PKR {Math.abs(change).toFixed(2)}
+   342→                  </span>
+   343→                  <span className="text-[11px] text-muted-foreground">vs previous</span>
+   344→                </div>
+   345→              )}
+   346→            </motion.div>
+   347→          )
+   348→        })}
+   349→      </div>
+   350→
+   351→      {/* Last Update Info */}
+   352→      <div className="flex items-center justify-between macos-card p-3 px-4">
+   353→        <div className="flex items-center gap-2">
+   354→          <div className="macos-status-dot macos-status-online" />
+   355→          <span className="text-[12px] text-muted-foreground">Prices synced — Last updated: <span className="font-medium text-foreground">{uniquePrices.length > 0 ? new Date(uniquePrices[0].effectiveFrom).toLocaleString() : 'N/A'}</span></span>
+   356→        </div>
+   357→        <button onClick={onRetry} className="macos-btn-secondary gap-1">
+   358→          <RefreshCw className="size-3" /> Sync Now
+   359→        </button>
+   360→      </div>
+   361→    </div>
+   362→  )
+   363→}
+   364→
+   365→// ── Price History Tab ─────────────────────────────────────
+   366→
+   367→function PriceHistoryTab({ priceHistoryData }: { priceHistoryData: Record<string, { name: string; current: number; previous: number | null; effectiveFrom: string }> }) {
+   368→  const entries = Object.values(priceHistoryData)
+   369→
+   370→  if (entries.length === 0) {
+   371→    return (
+   372→      <div className="macos-card p-8 flex flex-col items-center justify-center text-center min-h-[200px]">
+   373→        <BarChart3 className="size-10 text-muted-foreground mb-4" />
+   374→        <h3 className="text-[15px] font-semibold text-foreground mb-1">No price history</h3>
+   375→        <p className="text-[13px] text-muted-foreground">Price history will appear once prices are updated.</p>
+   376→      </div>
+   377→    )
+   378→  }
+   379→
+   380→  // Build chart data - show current vs previous for each fuel type
+   381→  const chartData = entries.map(e => ({
+   382→    name: e.name,
+   383→    current: e.current,
+   384→    previous: e.previous || 0,
+   385→  }))
+   386→
+   387→  return (
+   388→    <div className="space-y-4">
+   389→      <div className="macos-card p-5">
+   390→        <div className="flex items-center justify-between mb-4">
+   391→          <div>
+   392→            <h3 className="text-[13px] font-semibold">Current vs Previous Prices</h3>
+   393→            <p className="text-[11px] text-muted-foreground mt-0.5">PKR per litre comparison</p>
+   394→          </div>
+   395→        </div>
+   396→        <div className="h-[320px]">
+   397→          <ResponsiveContainer width="100%" height="100%">
+   398→            <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+   399→              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+   400→              <XAxis
+   401→                dataKey="name"
+   402→                tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+   403→                axisLine={{ stroke: 'var(--border)' }}
+   404→                tickLine={false}
+   405→              />
+   406→              <YAxis
+   407→                tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+   408→                axisLine={false}
+   409→                tickLine={false}
+   410→                tickFormatter={(v) => `${v}`}
+   411→              />
+   412→              <Tooltip content={<CustomTooltip />} />
+   413→              <Legend
+   414→                iconType="circle"
+   415→                iconSize={8}
+   416→                wrapperStyle={{ fontSize: '12px', paddingTop: '12px' }}
+   417→              />
+   418→              <Line type="monotone" dataKey="current" name="Current" stroke="#e8930c" strokeWidth={2} dot={{ r: 4, fill: '#e8930c' }} activeDot={{ r: 5 }} />
+   419→              <Line type="monotone" dataKey="previous" name="Previous" stroke="#e8930c" strokeOpacity={0.4} strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3, fill: '#e8930c', fillOpacity: 0.4 }} activeDot={{ r: 5 }} />
+   420→            </LineChart>
+   421→          </ResponsiveContainer>
+   422→        </div>
+   423→      </div>
+   424→
+   425→      {/* Price Change Table */}
+   426→      <div className="macos-card overflow-hidden">
+   427→        <table className="macos-table">
+   428→          <thead>
+   429→            <tr>
+   430→              <th>Fuel Type</th>
+   431→              <th className="text-right">Previous Price</th>
+   432→              <th className="text-right">Current Price</th>
+   433→              <th className="text-right">Change</th>
+   434→              <th>Effective From</th>
+   435→            </tr>
+   436→          </thead>
+   437→          <tbody>
+   438→            {entries.map((entry) => {
+   439→              const change = entry.previous ? entry.current - entry.previous : 0
+   440→              const isUp = change > 0
+   441→              return (
+   442→                <tr key={entry.name}>
+   443→                  <td className="font-semibold">{entry.name}</td>
+   444→                  <td className="text-right font-mono">{entry.previous ? pkr(entry.previous) : '—'}</td>
+   445→                  <td className="text-right font-mono font-semibold">{pkr(entry.current)}</td>
+   446→                  <td className="text-right">
+   447→                    {entry.previous ? (
+   448→                      <span className={`inline-flex items-center gap-1 font-semibold text-[12px] ${isUp ? 'text-red-500' : change < 0 ? 'text-emerald-500' : 'text-muted-foreground'}`}>
+   449→                        {isUp ? <ArrowUpRight className="size-3" /> : change < 0 ? <ArrowDownRight className="size-3" /> : null}
+   450→                        PKR {Math.abs(change).toFixed(2)}
+   451→                      </span>
+   452→                    ) : '—'}
+   453→                  </td>
+   454→                  <td className="text-[12px] text-muted-foreground">{new Date(entry.effectiveFrom).toLocaleDateString()}</td>
+   455→                </tr>
+   456→              )
+   457→            })}
+   458→          </tbody>
+   459→        </table>
+   460→      </div>
+   461→    </div>
+   462→  )
+   463→}
+   464→
+   465→// ── Price Boards Tab ──────────────────────────────────────
+   466→
+   467→function PriceBoardsTab({ boards, onSync }: { boards: PriceBoard[]; onSync: () => void }) {
+   468→  const onlineCount = boards.filter(b => b.status === 'online' || b.status === 'active').length
+   469→
+   470→  return (
+   471→    <div className="space-y-4">
+   472→      <div className="grid grid-cols-3 gap-3">
+   473→        <div className="macos-card p-4">
+   474→          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Boards Online</p>
+   475→          <p className="text-[20px] font-bold text-emerald-600 dark:text-emerald-400 mt-1">{onlineCount}/{boards.length}</p>
+   476→        </div>
+   477→        <div className="macos-card p-4">
+   478→          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Board Types</p>
+   479→          <p className="text-[20px] font-bold text-foreground mt-1">{new Set(boards.map(b => b.boardType)).size}</p>
+   480→        </div>
+   481→        <div className="macos-card p-4">
+   482→          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Last Sync</p>
+   483→          <p className="text-[16px] font-bold text-foreground mt-1">
+   484→            {boards.length > 0 && boards[0].lastSyncAt
+   485→              ? new Date(boards[0].lastSyncAt).toLocaleTimeString()
+   486→              : 'Never'}
+   487→          </p>
+   488→        </div>
+   489→      </div>
+   490→
+   491→      {boards.length > 0 ? (
+   492→        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+   493→          {boards.map((board) => {
+   494→            const isOnline = board.status === 'online' || board.status === 'active'
+   495→            const isWarning = board.status === 'warning' || board.status === 'maintenance'
+   496→            return (
+   497→              <motion.div
+   498→                key={board.id}
+   499→                initial={{ opacity: 0, scale: 0.97 }}
+   500→                animate={{ opacity: 1, scale: 1 }}
+   501→                className="macos-card p-4"
+   502→              >
+   503→                <div className="flex items-start justify-between mb-3">
+   504→                  <div className="flex items-center gap-2.5">
+   505→                    <div className={`size-9 rounded-lg flex items-center justify-center ${
+   506→                      isOnline ? 'bg-emerald-500/10' : isWarning ? 'bg-teal-500/10' : 'bg-red-500/10'
+   507→                    }`}>
+   508→                      <Monitor className={`size-4 ${isOnline ? 'text-emerald-500' : isWarning ? 'text-teal-500' : 'text-red-500'}`} />
+   509→                    </div>
+   510→                    <div>
+   511→                      <h4 className="text-[13px] font-semibold">{board.name}</h4>
+   512→                      <p className="text-[11px] text-muted-foreground">{board.boardType}</p>
+   513→                    </div>
+   514→                  </div>
+   515→                  <div className="flex items-center gap-1.5">
+   516→                    <div className={`macos-status-dot ${statusDotMap[board.status] || 'macos-status-offline'}`} />
+   517→                    <span className={`text-[11px] font-medium ${
+   518→                      isOnline ? 'text-emerald-600 dark:text-emerald-400' : isWarning ? 'text-teal-500' : 'text-red-500'
+   519→                    }`}>
+   520→                      {isOnline ? 'Online' : isWarning ? 'Delayed' : 'Offline'}
+   521→                    </span>
+   522→                  </div>
+   523→                </div>
+   524→
+   525→                <div className="macos-group">
+   526→                  {board.ipAddress && (
+   527→                    <div className="macos-group-item flex justify-between !py-2 !px-3">
+   528→                      <span className="text-[11px] text-muted-foreground">IP Address</span>
+   529→                      <span className="text-[12px] font-mono">{board.ipAddress}</span>
+   530→                    </div>
+   531→                  )}
+   532→                  <div className="macos-group-item flex justify-between !py-2 !px-3">
+   533→                    <span className="text-[11px] text-muted-foreground">Last Sync</span>
+   534→                    <span className="text-[12px]">{board.lastSyncAt ? new Date(board.lastSyncAt).toLocaleTimeString() : 'Never'}</span>
+   535→                  </div>
+   536→                  <div className="macos-group-item !py-2 !px-3 !border-b-0">
+   537→                    <span className="text-[11px] text-muted-foreground">Display</span>
+   538→                    <p className="text-[11px] font-medium text-foreground mt-0.5">{board.displayContent || 'No content configured'}</p>
+   539→                  </div>
+   540→                </div>
+   541→
+   542→                <button onClick={onSync} className="macos-btn-secondary w-full mt-3 gap-1 justify-center">
+   543→                  <RefreshCw className="size-3" /> Sync Prices
+   544→                </button>
+   545→              </motion.div>
+   546→            )
+   547→          })}
+   548→        </div>
+   549→      ) : (
+   550→        <div className="macos-card p-8 flex flex-col items-center justify-center text-center min-h-[200px]">
+   551→          <Monitor className="size-10 text-muted-foreground mb-4" />
+   552→          <h3 className="text-[15px] font-semibold text-foreground mb-1">No price boards</h3>
+   553→          <p className="text-[13px] text-muted-foreground">Register price boards to display fuel prices.</p>
+   554→        </div>
+   555→      )}
+   556→    </div>
+   557→  )
+   558→}
+   559→
+   560→// ── Schedule Tab ──────────────────────────────────────────
+   561→
+   562→function ScheduleTab({ prices }: { prices: FuelPrice[] }) {
+   563→  // Find prices with future effective dates
+   564→  const now = new Date()
+   565→  const scheduledChanges = prices
+   566→    .filter(p => new Date(p.effectiveFrom) > now)
+   567→    .map(p => ({
+   568→      id: p.id,
+   569→      fuelType: p.fuelType.charAt(0).toUpperCase() + p.fuelType.slice(1),
+   570→      newPrice: p.pricePerUnit,
+   571→      currentPrice: p.previousPrice || p.pricePerUnit,
+   572→      effectiveDate: p.effectiveFrom,
+   573→      status: 'pending' as const,
+   574→      source: 'OGRA Notification',
+   575→    }))
+   576→
+   577→  return (
+   578→    <div className="space-y-4">
+   579→      {/* Upcoming Changes */}
+   580→      <div className="macos-card overflow-hidden">
+   581→        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+   582→          <div className="flex items-center gap-2">
+   583→            <Clock className="size-4 text-teal-500" />
+   584→            <h3 className="text-[13px] font-semibold">Scheduled Price Changes</h3>
+   585→          </div>
+   586→        </div>
+   587→        {scheduledChanges.length > 0 ? (
+   588→          <div className="overflow-x-auto">
+   589→            <table className="macos-table">
+   590→              <thead>
+   591→                <tr>
+   592→                  <th>Fuel Type</th>
+   593→                  <th className="text-right">Current Price</th>
+   594→                  <th className="text-right">New Price</th>
+   595→                  <th className="text-right">Change</th>
+   596→                  <th>Effective Date</th>
+   597→                  <th>Source</th>
+   598→                  <th>Status</th>
+   599→                </tr>
+   600→              </thead>
+   601→              <tbody>
+   602→                {scheduledChanges.map((sc) => {
+   603→                  const change = sc.newPrice - sc.currentPrice
+   604→                  const isUp = change > 0
+   605→                  return (
+   606→                    <tr key={sc.id}>
+   607→                      <td className="font-semibold">{sc.fuelType}</td>
+   608→                      <td className="text-right font-mono">{pkr(sc.currentPrice)}</td>
+   609→                      <td className="text-right font-mono font-semibold">{pkr(sc.newPrice)}</td>
+   610→                      <td className="text-right">
+   611→                        <span className={`inline-flex items-center gap-1 font-semibold text-[12px] ${isUp ? 'text-red-500' : 'text-emerald-500'}`}>
+   612→                          {isUp ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
+   613→                          PKR {Math.abs(change).toFixed(2)}
+   614→                        </span>
+   615→                      </td>
+   616→                      <td className="font-mono text-[12px]">{new Date(sc.effectiveDate).toLocaleDateString()}</td>
+   617→                      <td className="text-muted-foreground">{sc.source}</td>
+   618→                      <td>
+   619→                        <span className="macos-pill bg-teal-500/10 text-teal-600 dark:text-teal-400">
+   620→                          Pending
+   621→                        </span>
+   622→                      </td>
+   623→                    </tr>
+   624→                  )
+   625→                })}
+   626→              </tbody>
+   627→            </table>
+   628→          </div>
+   629→        ) : (
+   630→          <div className="p-6 text-center text-muted-foreground text-[13px]">
+   631→            No scheduled price changes
+   632→          </div>
+   633→        )}
+   634→      </div>
+   635→
+   636→      {/* OGRA Schedule Info */}
+   637→      <div className="macos-card p-4">
+   638→        <div className="flex items-start gap-3">
+   639→          <div className="size-9 rounded-lg flex items-center justify-center bg-teal-500/10 shrink-0">
+   640→            <Calendar className="size-4 text-teal-500" />
+   641→          </div>
+   642→          <div>
+   643→            <h4 className="text-[13px] font-semibold">OGRA Price Review Schedule</h4>
+   644→            <p className="text-[12px] text-muted-foreground mt-1">
+   645→              Prices are typically updated at midnight on the 1st and 16th of each month by OGRA notification.
+   646→            </p>
+   647→            <div className="flex items-center gap-1.5 mt-2">
+   648→              <div className="macos-status-dot macos-status-online" />
+   649→              <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">Auto-sync enabled — boards will update automatically</span>
+   650→            </div>
+   651→          </div>
+   652→        </div>
+   653→      </div>
+   654→    </div>
+   655→  )
+   656→}
+   657→

@@ -1,0 +1,2002 @@
+     1→import { NextResponse } from 'next/server'
+     2→import { db } from '@/lib/db'
+     3→import { Prisma } from '@prisma/client'
+     4→
+     5→// =====================================================
+     6→// FuelFlow OS - Comprehensive Hardware Integration API
+     7→// Architecture: ERP → Forecourt Controller → Pumps
+     8→// The ERP NEVER communicates directly with pumps.
+     9→// All communication goes through Forecourt Controllers.
+    10→// =====================================================
+    11→
+    12→// =====================================================
+    13→// DEVICE TYPE REGISTRY
+    14→// Uses lazy accessor functions to avoid initialization timing issues
+    15→// =====================================================
+    16→
+    17→type DeviceDelegate = {
+    18→  findMany: (args?: Record<string, unknown>) => Promise<unknown[]>
+    19→  findUnique: (args: Record<string, unknown>) => Promise<unknown | null>
+    20→  findFirst: (args?: Record<string, unknown>) => Promise<unknown | null>
+    21→  create: (args: Record<string, unknown>) => Promise<unknown>
+    22→  update: (args: Record<string, unknown>) => Promise<unknown>
+    23→  delete: (args: Record<string, unknown>) => Promise<unknown>
+    24→  count: (args?: Record<string, unknown>) => Promise<number>
+    25→}
+    26→
+    27→interface DeviceTypeInfo {
+    28→  key: string
+    29→  getModel: () => DeviceDelegate
+    30→  label: string
+    31→  category: string
+    32→}
+    33→
+    34→const DEVICE_TYPES: DeviceTypeInfo[] = [
+    35→  { key: 'forecourt_controller', getModel: () => db.forecourtController as unknown as DeviceDelegate, label: 'Forecourt Controllers', category: 'controller' },
+    36→  { key: 'payment_terminal', getModel: () => db.paymentTerminal as unknown as DeviceDelegate, label: 'Payment Terminals', category: 'payment_terminal' },
+    37→  { key: 'generator', getModel: () => db.generator as unknown as DeviceDelegate, label: 'Generators', category: 'generator' },
+    38→  { key: 'surveillance_camera', getModel: () => db.surveillanceCamera as unknown as DeviceDelegate, label: 'Surveillance Cameras', category: 'camera' },
+    39→  { key: 'fire_alarm', getModel: () => db.fireAlarmSystem as unknown as DeviceDelegate, label: 'Fire Alarm Systems', category: 'fire_alarm' },
+    40→  { key: 'utility_meter', getModel: () => db.utilityMeter as unknown as DeviceDelegate, label: 'Utility Meters', category: 'utility_meter' },
+    41→  { key: 'weather_station', getModel: () => db.weatherStation as unknown as DeviceDelegate, label: 'Weather Stations', category: 'weather_station' },
+    42→  { key: 'tanker_tracker', getModel: () => db.tankerTracker as unknown as DeviceDelegate, label: 'Tanker Trackers', category: 'tanker_tracker' },
+    43→  { key: 'car_wash', getModel: () => db.carWashSystem as unknown as DeviceDelegate, label: 'Car Wash Systems', category: 'car_wash' },
+    44→  { key: 'air_compressor', getModel: () => db.airCompressor as unknown as DeviceDelegate, label: 'Air Compressors', category: 'air_compressor' },
+    45→  { key: 'vacuum_station', getModel: () => db.vacuumStation as unknown as DeviceDelegate, label: 'Vacuum Stations', category: 'vacuum_station' },
+    46→]
+    47→
+    48→const DEVICE_TYPE_MAP = new Map<string, DeviceTypeInfo>(
+    49→  DEVICE_TYPES.map((dt) => [dt.key, dt])
+    50→)
+    51→
+    52→const ALL_DEVICE_TYPE_KEYS = DEVICE_TYPES.map((dt) => dt.key)
+    53→
+    54→// =====================================================
+    55→// TYPE-SPECIFIC FIELD DEFINITIONS
+    56→// =====================================================
+    57→
+    58→const COMMON_FIELDS = [
+    59→  'name', 'code', 'manufacturer', 'model', 'serialNumber', 'firmwareVersion',
+    60→  'communicationType', 'ipAddress', 'port', 'comPort', 'protocol',
+    61→  'status', 'isActive', 'configJson',
+    62→] as const
+    63→
+    64→const TYPE_SPECIFIC_FIELDS: Record<string, string[]> = {
+    65→  forecourt_controller: [
+    66→    'controllerType', 'baudRate', 'pollingInterval', 'timeout',
+    67→    'maxDispensers', 'connectedDispensers', 'lastHeartbeat', 'lastCommunication',
+    68→  ],
+    69→  payment_terminal: [
+    70→    'terminalType', 'merchantId', 'terminalId', 'supportedCards',
+    71→    'supportedMethods', 'shiftId', 'transactionCount', 'lastTransaction',
+    72→  ],
+    73→  generator: [
+    74→    'fuelType', 'capacityKva', 'currentLoadKva', 'fuelLevel',
+    75→    'runHours', 'voltage', 'frequency', 'oilPressure', 'coolantTemp',
+    76→    'autoStart', 'autoTransfer', 'lastStartedAt', 'lastStoppedAt', 'nextServiceDate',
+    77→  ],
+    78→  surveillance_camera: [
+    79→    'cameraType', 'resolution', 'location', 'rtspUrl', 'httpUrl',
+    80→    'onvifSupported', 'ptzEnabled', 'nightVision', 'recordingEnabled',
+    81→    'storageDays', 'analyticsEnabled', 'analyticsType', 'lastRecordingAt',
+    82→  ],
+    83→  fire_alarm: [
+    84→    'systemType', 'zoneCount', 'detectorCount', 'suppressionType',
+    85→    'autoSuppress', 'linkedToDispensers', 'linkedToTanks',
+    86→    'lastAlarmAt', 'lastTestDate', 'nextTestDate',
+    87→  ],
+    88→  utility_meter: [
+    89→    'meterType', 'meterNumber', 'currentReading', 'previousReading',
+    90→    'consumption', 'unit', 'peakDemand', 'powerFactor',
+    91→    'billingCycle', 'tariffRate', 'lastReading',
+    92→  ],
+    93→  weather_station: [
+    94→    'temperature', 'humidity', 'windSpeed', 'windDirection',
+    95→    'pressure', 'rainfall', 'uvIndex', 'visibility', 'dewPoint', 'lastReading',
+    96→  ],
+    97→  tanker_tracker: [
+    98→    'trackerType', 'simCardNumber', 'imei', 'latitude', 'longitude',
+    99→    'speed', 'heading', 'altitude', 'odometer', 'fuelLevel',
+   100→    'ignitionStatus', 'doorStatus', 'geofenceEnabled', 'geofenceRadius', 'lastLocationAt',
+   101→  ],
+   102→  car_wash: [
+   103→    'systemType', 'bayCount', 'currentBay', 'waterPressure',
+   104→    'waterTemp', 'chemicalLevel', 'waxLevel', 'dailyCount',
+   105→    'monthlyCount', 'revenueToday', 'lastWashAt', 'nextServiceDate',
+   106→  ],
+   107→  air_compressor: [
+   108→    'pressure', 'maxPressure', 'tankCapacity', 'motorStatus',
+   109→    'runHours', 'coinOperated', 'pricePerUse', 'dailyUsage', 'revenueToday', 'lastUsedAt',
+   110→  ],
+   111→  vacuum_station: [
+   112→    'motorStatus', 'suctionPower', 'coinOperated', 'pricePerUse',
+   113→    'dailyUsage', 'revenueToday', 'runHours', 'lastUsedAt',
+   114→  ],
+   115→}
+   116→
+   117→// =====================================================
+   118→// SUPPORTED HARDWARE CATALOG DATA
+   119→// =====================================================
+   120→
+   121→const SUPPORTED_FORECOURT_CONTROLLERS = [
+   122→  {
+   123→    manufacturer: 'pts',
+   124→    modelName: 'PTS Over_Controller',
+   125→    controllerType: 'pts',
+   126→    supportedProtocols: JSON.stringify(['ifsf', 'patrius', 'dfs']),
+   127→    supportedDispensers: JSON.stringify(['gilbarco', 'wayne', 'tatsuno', 'tokheim', 'bennett', 'petrotec', 'scheidt_bachmann', 'censtar', 'eaglestar', 'hongyang', 'sanki', 'zhejiang_datian', 'tatsuno_sunny', 'tatsuno_benc', 'tatsuno_korea', 'hectronic']),
+   128→    maxDispensers: 32,
+   129→    maxNozzlesPerPump: 4,
+   130→    communicationTypes: JSON.stringify(['tcpip', 'rs232', 'rs485', 'serial', 'ethernet']),
+   131→    defaultPort: 5000,
+   132→    defaultPollingMs: 1000,
+   133→    features: JSON.stringify(['authorize', 'stop', 'nozzle_status', 'sales_data', 'meter_values', 'price_change', 'pump_errors', 'preset', 'lock', 'tank_levels']),
+   134→    atgSupport: true,
+   135→    atgBrands: JSON.stringify(['veeder_root', 'opw', 'franklin', 'hectronic']),
+   136→    paymentIntegration: true,
+   137→    mqttSupport: true,
+   138→    notes: 'Universal forecourt controller supporting 50+ dispenser brands via IFSF/Patrius protocols. Most popular choice for multi-brand stations.',
+   139→  },
+   140→  {
+   141→    manufacturer: 'doms',
+   142→    modelName: 'DOMS DC',
+   143→    controllerType: 'doms',
+   144→    supportedProtocols: JSON.stringify(['ifsf', 'patrius', 'dfs']),
+   145→    supportedDispensers: JSON.stringify(['gilbarco', 'wayne', 'tatsuno', 'tokheim', 'bennett', 'petrotec']),
+   146→    maxDispensers: 24,
+   147→    maxNozzlesPerPump: 4,
+   148→    communicationTypes: JSON.stringify(['tcpip', 'rs232', 'rs485']),
+   149→    defaultPort: 5010,
+   150→    defaultPollingMs: 1000,
+   151→    features: JSON.stringify(['authorize', 'stop', 'nozzle_status', 'sales_data', 'meter_values', 'price_change', 'preset', 'lock']),
+   152→    atgSupport: true,
+   153→    atgBrands: JSON.stringify(['veeder_root', 'opw']),
+   154→    paymentIntegration: false,
+   155→    mqttSupport: false,
+   156→    notes: 'DOMS Dispenser Controller supporting multiple brands. Common in European markets.',
+   157→  },
+   158→  {
+   159→    manufacturer: 'fusion',
+   160→    modelName: 'Fusion FCM-6',
+   161→    controllerType: 'fusion',
+   162→    supportedProtocols: JSON.stringify(['ifsf', 'patrius', 'dfs', 'wayne-dart']),
+   163→    supportedDispensers: JSON.stringify(['gilbarco', 'wayne', 'tatsuno', 'tokheim', 'bennett']),
+   164→    maxDispensers: 24,
+   165→    maxNozzlesPerPump: 4,
+   166→    communicationTypes: JSON.stringify(['tcpip', 'rs232', 'rs485', 'ethernet']),
+   167→    defaultPort: 5020,
+   168→    defaultPollingMs: 800,
+   169→    features: JSON.stringify(['authorize', 'stop', 'nozzle_status', 'sales_data', 'meter_values', 'price_change', 'preset', 'lock', 'pump_errors']),
+   170→    atgSupport: true,
+   171→    atgBrands: JSON.stringify(['veeder_root', 'opw', 'franklin']),
+   172→    paymentIntegration: true,
+   173→    mqttSupport: true,
+   174→    notes: 'Multi-protocol fusion controller. Supports IFSF, Patrius, DFS and Wayne DART protocols.',
+   175→  },
+   176→  {
+   177→    manufacturer: 'hectronic',
+   178→    modelName: 'Hectronic FCC',
+   179→    controllerType: 'hectronic',
+   180→    supportedProtocols: JSON.stringify(['ifsf', 'dfs']),
+   181→    supportedDispensers: JSON.stringify(['tatsuno', 'gilbarco', 'wayne', 'bennett']),
+   182→    maxDispensers: 16,
+   183→    maxNozzlesPerPump: 4,
+   184→    communicationTypes: JSON.stringify(['tcpip', 'rs485']),
+   185→    defaultPort: 5030,
+   186→    defaultPollingMs: 1000,
+   187→    features: JSON.stringify(['authorize', 'stop', 'nozzle_status', 'sales_data', 'meter_values', 'price_change']),
+   188→    atgSupport: true,
+   189→    atgBrands: JSON.stringify(['hectronic', 'veeder_root']),
+   190→    paymentIntegration: false,
+   191→    mqttSupport: false,
+   192→    notes: 'European standard forecourt controller by Hectronic. Common in Central European markets.',
+   193→  },
+   194→  {
+   195→    manufacturer: 'wayne',
+   196→    modelName: 'Wayne Site Controller',
+   197→    controllerType: 'wayne',
+   198→    supportedProtocols: JSON.stringify(['wayne-dart']),
+   199→    supportedDispensers: JSON.stringify(['wayne']),
+   200→    maxDispensers: 32,
+   201→    maxNozzlesPerPump: 4,
+   202→    communicationTypes: JSON.stringify(['tcpip', 'rs485']),
+   203→    defaultPort: 5040,
+   204→    defaultPollingMs: 500,
+   205→    features: JSON.stringify(['authorize', 'stop', 'nozzle_status', 'sales_data', 'meter_values', 'price_change', 'preset', 'lock']),
+   206→    atgSupport: true,
+   207→    atgBrands: JSON.stringify(['veeder_root']),
+   208→    paymentIntegration: true,
+   209→    mqttSupport: false,
+   210→    notes: 'Wayne proprietary site controller. Only supports Wayne dispensers via DART protocol.',
+   211→  },
+   212→  {
+   213→    manufacturer: 'gilbarco',
+   214→    modelName: 'Gilbarco G-Site',
+   215→    controllerType: 'gilbarco',
+   216→    supportedProtocols: JSON.stringify(['gilbarco-g-site']),
+   217→    supportedDispensers: JSON.stringify(['gilbarco']),
+   218→    maxDispensers: 32,
+   219→    maxNozzlesPerPump: 4,
+   220→    communicationTypes: JSON.stringify(['tcpip', 'rs485']),
+   221→    defaultPort: 5050,
+   222→    defaultPollingMs: 500,
+   223→    features: JSON.stringify(['authorize', 'stop', 'nozzle_status', 'sales_data', 'meter_values', 'price_change', 'preset', 'lock']),
+   224→    atgSupport: true,
+   225→    atgBrands: JSON.stringify(['veeder_root']),
+   226→    paymentIntegration: true,
+   227→    mqttSupport: false,
+   228→    notes: 'Gilbarco proprietary G-Site controller. Only supports Gilbarco/Veeder-Root dispensers.',
+   229→  },
+   230→  {
+   231→    manufacturer: 'tokheim',
+   232→    modelName: 'Tokheim TC-400',
+   233→    controllerType: 'tokheim',
+   234→    supportedProtocols: JSON.stringify(['dfs']),
+   235→    supportedDispensers: JSON.stringify(['tokheim']),
+   236→    maxDispensers: 16,
+   237→    maxNozzlesPerPump: 4,
+   238→    communicationTypes: JSON.stringify(['tcpip', 'rs485']),
+   239→    defaultPort: 5060,
+   240→    defaultPollingMs: 1000,
+   241→    features: JSON.stringify(['authorize', 'stop', 'nozzle_status', 'sales_data', 'meter_values', 'price_change']),
+   242→    atgSupport: false,
+   243→    paymentIntegration: false,
+   244→    mqttSupport: false,
+   245→    notes: 'Tokheim proprietary controller. Only supports Tokheim dispensers via DFS protocol.',
+   246→  },
+   247→  {
+   248→    manufacturer: 'scheidt_bachmann',
+   249→    modelName: 'Scheidt & Bachmann FMP',
+   250→    controllerType: 'scheidt_bachmann',
+   251→    supportedProtocols: JSON.stringify(['ifsf', 'dfs']),
+   252→    supportedDispensers: JSON.stringify(['scheidt_bachmann']),
+   253→    maxDispensers: 24,
+   254→    maxNozzlesPerPump: 4,
+   255→    communicationTypes: JSON.stringify(['tcpip', 'rs485']),
+   256→    defaultPort: 5070,
+   257→    defaultPollingMs: 1000,
+   258→    features: JSON.stringify(['authorize', 'stop', 'nozzle_status', 'sales_data', 'meter_values', 'price_change', 'preset']),
+   259→    atgSupport: true,
+   260→    atgBrands: JSON.stringify(['veeder_root', 'opw']),
+   261→    paymentIntegration: true,
+   262→    mqttSupport: true,
+   263→    notes: 'S&B proprietary Fuel Management Point controller. Supports S&B PETROPOINT dispensers.',
+   264→  },
+   265→]
+   266→
+   267→const SUPPORTED_DISPENSERS = [
+   268→  // Gilbarco (Veeder-Root)
+   269→  { manufacturer: 'gilbarco', modelName: 'Encore 500', maxNozzles: 4, flowRate: 60, category: 'dispenser', supportedFuels: JSON.stringify(['petrol', 'diesel', 'premium']), communicationTypes: JSON.stringify(['tcpip', 'rs485']), protocols: JSON.stringify(['ifsf', 'gilbarco-g-site']), compatibleControllers: JSON.stringify(['pts', 'gilbarco']), specifications: JSON.stringify({ display: 'Color LCD', media: 'Optional', payment: 'Pay-at-pump ready' }), hardwareType: 'multi_product' },
+   270→  { manufacturer: 'gilbarco', modelName: 'Encore 700', maxNozzles: 6, flowRate: 80, category: 'dispenser', supportedFuels: JSON.stringify(['petrol', 'diesel', 'premium', 'hsd']), communicationTypes: JSON.stringify(['tcpip', 'rs485']), protocols: JSON.stringify(['ifsf', 'gilbarco-g-site']), compatibleControllers: JSON.stringify(['pts', 'gilbarco']), specifications: JSON.stringify({ display: 'Large color LCD', media: 'Built-in', payment: 'Pay-at-pump', cabinet: 'Climate controlled' }), hardwareType: 'multi_product' },
+   271→  { manufacturer: 'gilbarco', modelName: 'Advantage', maxNozzles: 2, flowRate: 50, category: 'dispenser', supportedFuels: JSON.stringify(['petrol', 'diesel']), communicationTypes: JSON.stringify(['tcpip', 'rs485']), protocols: JSON.stringify(['ifsf', 'gilbarco-g-site']), compatibleControllers: JSON.stringify(['pts', 'gilbarco']), specifications: JSON.stringify({ display: 'LED', payment: 'Cash only' }), hardwareType: 'dual_hose' },
+   272→  { manufacturer: 'gilbarco', modelName: 'Eclipse', maxNozzles: 2, flowRate: 40, category: 'dispenser', supportedFuels: JSON.stringify(['petrol', 'diesel']), communicationTypes: JSON.stringify(['rs485']), protocols: JSON.stringify(['gilbarco-g-site']), compatibleControllers: JSON.stringify(['gilbarco']), specifications: JSON.stringify({ display: 'LED backlit', economy: true }), hardwareType: 'dual_hose' },
+   273→
+   274→  // Wayne
+   275→  { manufacturer: 'wayne', modelName: 'iX', maxNozzles: 4, flowRate: 60, category: 'dispenser', supportedFuels: JSON.stringify(['petrol', 'diesel', 'premium']), communicationTypes: JSON.stringify(['tcpip', 'rs485']), protocols: JSON.stringify(['ifsf', 'wayne-dart']), compatibleControllers: JSON.stringify(['pts', 'fusion', 'wayne']), specifications: JSON.stringify({ display: 'Full-color LCD', media: 'Optional', payment: 'Pay-at-pump ready' }), hardwareType: 'multi_product' },
+   276→  { manufacturer: 'wayne', modelName: 'Helix', maxNozzles: 6, flowRate: 80, category: 'dispenser', supportedFuels: JSON.stringify(['petrol', 'diesel', 'premium', 'hsd']), communicationTypes: JSON.stringify(['tcpip', 'rs485']), protocols: JSON.stringify(['ifsf', 'wayne-dart']), compatibleControllers: JSON.stringify(['pts', 'fusion', 'wayne']), specifications: JSON.stringify({ display: 'Wide-screen LCD', media: 'Built-in', payment: 'Pay-at-pump' }), hardwareType: 'multi_product' },
+   277→  { manufacturer: 'wayne', modelName: 'Ovation', maxNozzles: 2, flowRate: 50, category: 'dispenser', supportedFuels: JSON.stringify(['petrol', 'diesel']), communicationTypes: JSON.stringify(['tcpip', 'rs485']), protocols: JSON.stringify(['ifsf', 'wayne-dart']), compatibleControllers: JSON.stringify(['pts', 'wayne']), specifications: JSON.stringify({ display: 'LED', payment: 'Cash only' }), hardwareType: 'dual_hose' },
+   278→  { manufacturer: 'wayne', modelName: 'Quantum', maxNozzles: 4, flowRate: 70, category: 'dispenser', supportedFuels: JSON.stringify(['petrol', 'diesel', 'premium']), communicationTypes: JSON.stringify(['tcpip', 'rs485']), protocols: JSON.stringify(['wayne-dart']), compatibleControllers: JSON.stringify(['wayne']), specifications: JSON.stringify({ display: 'LCD', payment: 'Pay-at-pump ready' }), hardwareType: 'multi_product' },
+   279→  { manufacturer: 'wayne', modelName: 'Vac', maxNozzles: 1, flowRate: 120, category: 'dispenser', supportedFuels: JSON.stringify(['diesel']), communicationTypes: JSON.stringify(['rs485']), protocols: JSON.stringify(['wayne-dart']), compatibleControllers: JSON.stringify(['pts', 'wayne']), specifications: JSON.stringify({ type: 'High-speed diesel', flowRate: '120 L/min' }), hardwareType: 'high_flow' },
+   280→
+   281→  // Tatsuno
+   282→  { manufacturer: 'tatsuno', modelName: 'TSM-12', maxNozzles: 2, flowRate: 50, category: 'dispenser', supportedFuels: JSON.stringify(['petrol', 'diesel']), communicationTypes: JSON.stringify(['tcpip', 'rs485', 'rs232']), protocols: JSON.stringify(['ifsf', 'patrius']), compatibleControllers: JSON.stringify(['pts', 'doms', 'fusion']), specifications: JSON.stringify({ display: 'LED backlit', market: 'Asia-Pacific' }), hardwareType: 'dual_hose' },
+   283→  { manufacturer: 'tatsuno', modelName: 'TSM-22', maxNozzles: 2, flowRate: 60, category: 'dispenser', supportedFuels: JSON.stringify(['petrol', 'diesel', 'premium']), communicationTypes: JSON.stringify(['tcpip', 'rs485', 'rs232']), protocols: JSON.stringify(['ifsf', 'patrius']), compatibleControllers: JSON.stringify(['pts', 'doms', 'fusion']), specifications: JSON.stringify({ display: 'LCD', market: 'Asia-Pacific' }), hardwareType: 'dual_hose' },
+   284→  { manufacturer: 'tatsuno', modelName: 'TSM-30', maxNozzles: 4, flowRate: 70, category: 'dispenser', supportedFuels: JSON.stringify(['petrol', 'diesel', 'premium', 'hsd']), communicationTypes: JSON.stringify(['tcpip', 'rs485']), protocols: JSON.stringify(['ifsf', 'patrius']), compatibleControllers: JSON.stringify(['pts', 'doms', 'fusion']), specifications: JSON.stringify({ display: 'Color LCD', market: 'Asia-Pacific' }), hardwareType: 'multi_product' },
+   285→  { manufacturer: 'tatsuno', modelName: 'Saturn', maxNozzles: 2, flowRate: 45, category: 'dispenser', supportedFuels: JSON.stringify(['petrol', 'diesel']), communicationTypes: JSON.stringify(['rs485', 'rs232']), protocols: JSON.stringify(['patrius']), compatibleControllers: JSON.stringify(['pts', 'doms']), specifications: JSON.stringify({ display: 'LED', economy: true, market: 'South Asia' }), hardwareType: 'dual_hose' },
+   286→  { manufacturer: 'tatsuno', modelName: 'Benč', maxNozzles: 2, flowRate: 50, category: 'dispenser', supportedFuels: JSON.stringify(['petrol', 'diesel']), communicationTypes: JSON.stringify(['rs485', 'rs232']), protocols: JSON.stringify(['patrius']), compatibleControllers: JSON.stringify(['pts', 'doms']), specifications: JSON.stringify({ display: 'LED', market: 'Central Asia' }), hardwareType: 'dual_hose' },
+   287→
+   288→  // Tokheim
+   289→  { manufacturer: 'tokheim', modelName: 'Quantium', maxNozzles: 4, flowRate: 60, category: 'dispenser', supportedFuels: JSON.stringify(['petrol', 'diesel', 'premium']), communicationTypes: JSON.stringify(['tcpip', 'rs485']), protocols: JSON.stringify(['ifsf', 'dfs']), compatibleControllers: JSON.stringify(['pts', 'tokheim', 'fusion']), specifications: JSON.stringify({ display: 'Color LCD', media: 'Optional', payment: 'Pay-at-pump ready' }), hardwareType: 'multi_product' },
+   290→  { manufacturer: 'tokheim', modelName: 'System 1000', maxNozzles: 2, flowRate: 50, category: 'dispenser', supportedFuels: JSON.stringify(['petrol', 'diesel']), communicationTypes: JSON.stringify(['rs485']), protocols: JSON.stringify(['dfs']), compatibleControllers: JSON.stringify(['pts', 'tokheim']), specifications: JSON.stringify({ display: 'LED', economy: true }), hardwareType: 'dual_hose' },
+   291→  { manufacturer: 'tokheim', modelName: 'ProGauge', maxNozzles: 2, flowRate: 55, category: 'dispenser', supportedFuels: JSON.stringify(['petrol', 'diesel']), communicationTypes: JSON.stringify(['tcpip', 'rs485']), protocols: JSON.stringify(['dfs']), compatibleControllers: JSON.stringify(['pts', 'tokheim']), specifications: JSON.stringify({ display: 'LCD', precision: 'High accuracy gauge' }), hardwareType: 'dual_hose' },
+   292→
+   293→  // Bennett
+   294→  { manufacturer: 'bennett', modelName: '3000 Series', maxNozzles: 2, flowRate: 45, category: 'dispenser', supportedFuels: JSON.stringify(['petrol', 'diesel']), communicationTypes: JSON.stringify(['rs485', 'rs232']), protocols: JSON.stringify(['ifsf', 'patrius']), compatibleControllers: JSON.stringify(['pts', 'doms']), specifications: JSON.stringify({ display: 'LED', economy: true, market: 'North America' }), hardwareType: 'dual_hose' },
+   295→  { manufacturer: 'bennett', modelName: '4000 Series', maxNozzles: 4, flowRate: 60, category: 'dispenser', supportedFuels: JSON.stringify(['petrol', 'diesel', 'premium']), communicationTypes: JSON.stringify(['tcpip', 'rs485']), protocols: JSON.stringify(['ifsf', 'patrius']), compatibleControllers: JSON.stringify(['pts', 'doms', 'fusion']), specifications: JSON.stringify({ display: 'LCD', market: 'North America' }), hardwareType: 'multi_product' },
+   296→  { manufacturer: 'bennett', modelName: '9100', maxNozzles: 2, flowRate: 50, category: 'dispenser', supportedFuels: JSON.stringify(['petrol', 'diesel']), communicationTypes: JSON.stringify(['tcpip', 'rs485']), protocols: JSON.stringify(['ifsf']), compatibleControllers: JSON.stringify(['pts']), specifications: JSON.stringify({ display: 'LED backlit', market: 'North America' }), hardwareType: 'dual_hose' },
+   297→
+   298→  // Petrotec
+   299→  { manufacturer: 'petrotec', modelName: 'C-300', maxNozzles: 2, flowRate: 45, category: 'dispenser', supportedFuels: JSON.stringify(['petrol', 'diesel']), communicationTypes: JSON.stringify(['rs485', 'rs232']), protocols: JSON.stringify(['ifsf', 'patrius']), compatibleControllers: JSON.stringify(['pts', 'doms']), specifications: JSON.stringify({ display: 'LED', economy: true, market: 'Europe' }), hardwareType: 'dual_hose' },
+   300→  { manufacturer: 'petrotec', modelName: 'C-500', maxNozzles: 4, flowRate: 60, category: 'dispenser', supportedFuels: JSON.stringify(['petrol', 'diesel', 'premium']), communicationTypes: JSON.stringify(['tcpip', 'rs485']), protocols: JSON.stringify(['ifsf', 'patrius']), compatibleControllers: JSON.stringify(['pts', 'doms', 'fusion']), specifications: JSON.stringify({ display: 'LCD', market: 'Europe' }), hardwareType: 'multi_product' },
+   301→  { manufacturer: 'petrotec', modelName: 'E-300', maxNozzles: 2, flowRate: 50, category: 'dispenser', supportedFuels: JSON.stringify(['petrol', 'diesel']), communicationTypes: JSON.stringify(['tcpip', 'rs485']), protocols: JSON.stringify(['ifsf', 'patrius']), compatibleControllers: JSON.stringify(['pts', 'doms']), specifications: JSON.stringify({ display: 'LED backlit', market: 'Europe', economy: true }), hardwareType: 'dual_hose' },
+   302→
+   303→  // Scheidt & Bachmann
+   304→  { manufacturer: 'scheidt_bachmann', modelName: 'FMP', maxNozzles: 4, flowRate: 60, category: 'dispenser', supportedFuels: JSON.stringify(['petrol', 'diesel', 'premium']), communicationTypes: JSON.stringify(['tcpip', 'rs485']), protocols: JSON.stringify(['ifsf', 'dfs']), compatibleControllers: JSON.stringify(['pts', 'scheidt_bachmann']), specifications: JSON.stringify({ display: 'LCD', market: 'Europe', precision: 'OIML R117' }), hardwareType: 'multi_product' },
+   305→  { manufacturer: 'scheidt_bachmann', modelName: 'PETROPOINT', maxNozzles: 2, flowRate: 50, category: 'dispenser', supportedFuels: JSON.stringify(['petrol', 'diesel']), communicationTypes: JSON.stringify(['tcpip', 'rs485']), protocols: JSON.stringify(['ifsf', 'dfs']), compatibleControllers: JSON.stringify(['pts', 'scheidt_bachmann']), specifications: JSON.stringify({ display: 'LED', market: 'Europe', type: 'Compact' }), hardwareType: 'dual_hose' },
+   306→]
+   307→
+   308→// =====================================================
+   309→// HELPERS
+   310→// =====================================================
+   311→
+   312→async function getFirstStationId(): Promise<string | null> {
+   313→  const station = await db.station.findFirst({
+   314→    select: { id: true },
+   315→    orderBy: { createdAt: 'asc' },
+   316→  })
+   317→  return station?.id ?? null
+   318→}
+   319→
+   320→function errorResponse(message: string, status: number = 400, details?: unknown) {
+   321→  return NextResponse.json(
+   322→    { error: message, ...(details !== undefined ? { details } : {}) },
+   323→    { status }
+   324→  )
+   325→}
+   326→
+   327→function filterAllowedFields(
+   328→  data: Record<string, unknown>,
+   329→  deviceTypeKey: string,
+   330→  includeCommon: boolean = true
+   331→): Record<string, unknown> {
+   332→  const result: Record<string, unknown> = {}
+   333→  const allowedFields = new Set<string>()
+   334→
+   335→  if (includeCommon) {
+   336→    for (const f of COMMON_FIELDS) allowedFields.add(f)
+   337→  }
+   338→  for (const f of TYPE_SPECIFIC_FIELDS[deviceTypeKey] ?? []) allowedFields.add(f)
+   339→
+   340→  for (const [key, value] of Object.entries(data)) {
+   341→    if (allowedFields.has(key) && value !== undefined) {
+   342→      result[key] = value
+   343→    }
+   344→  }
+   345→
+   346→  return result
+   347→}
+   348→
+   349→async function logDeviceEvent(data: {
+   350→  stationId: string
+   351→  deviceType: string
+   352→  deviceId: string
+   353→  eventType: string
+   354→  severity: string
+   355→  message: string
+   356→  dataJson?: string
+   357→}): Promise<void> {
+   358→  try {
+   359→    await db.deviceEventLog.create({ data })
+   360→  } catch (err) {
+   361→    console.warn(
+   362→      'Device event log creation skipped (FK constraint):',
+   363→      err instanceof Prisma.PrismaClientKnownRequestError ? err.code : err instanceof Error ? err.message : String(err)
+   364→    )
+   365→  }
+   366→}
+   367→
+   368→async function createCommandEntry(data: {
+   369→  stationId: string
+   370→  deviceType: string
+   371→  deviceId: string
+   372→  command: string
+   373→  parameters: string | null
+   374→  priority: string
+   375→  maxRetries: number
+   376→  retryCount: number
+   377→  createdBy: string | null
+   378→}): Promise<Record<string, unknown> | null> {
+   379→  try {
+   380→    const entry = await db.deviceCommandQueue.create({
+   381→      data: {
+   382→        stationId: data.stationId,
+   383→        deviceType: data.deviceType,
+   384→        deviceId: data.deviceId,
+   385→        command: data.command,
+   386→        parameters: data.parameters,
+   387→        priority: data.priority,
+   388→        status: 'queued',
+   389→        maxRetries: data.maxRetries,
+   390→        retryCount: data.retryCount,
+   391→        createdBy: data.createdBy,
+   392→      },
+   393→    })
+   394→    return entry as Record<string, unknown>
+   395→  } catch (err) {
+   396→    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
+   397→      console.warn('Command queue creation skipped (FK constraint):', err.message)
+   398→      return {
+   399→        id: 'virtual-' + Date.now(),
+   400→        ...data,
+   401→        status: 'queued',
+   402→        persisted: false,
+   403→        reason: 'FK constraint - command stored in memory only',
+   404→      }
+   405→    }
+   406→    throw err
+   407→  }
+   408→}
+   409→
+   410→// Map category name used in API to deviceType key used in DB
+   411→const CATEGORY_TO_DEVICE_TYPE: Record<string, string> = {
+   412→  controller: 'forecourt_controller',
+   413→  dispenser: 'dispenser',
+   414→  payment_terminal: 'payment_terminal',
+   415→  generator: 'generator',
+   416→  camera: 'surveillance_camera',
+   417→  fire_alarm: 'fire_alarm',
+   418→  utility_meter: 'utility_meter',
+   419→  weather_station: 'weather_station',
+   420→  tanker_tracker: 'tanker_tracker',
+   421→  car_wash: 'car_wash',
+   422→  air_compressor: 'air_compressor',
+   423→  vacuum_station: 'vacuum_station',
+   424→  atg: 'atg',
+   425→  price_board: 'price_board',
+   426→}
+   427→
+   428→// =====================================================
+   429→// GET HANDLER
+   430→// =====================================================
+   431→
+   432→export async function GET(request: Request) {
+   433→  try {
+   434→    const { searchParams } = new URL(request.url)
+   435→    const action = searchParams.get('action')
+   436→
+   437→    switch (action) {
+   438→      // ────────────────────────────────────────────
+   439→      // CATALOG - Search the HardwareCatalog
+   440→      // ────────────────────────────────────────────
+   441→      case 'catalog': {
+   442→        const id = searchParams.get('id')
+   443→        if (id) {
+   444→          // Single catalog item
+   445→          const item = await db.hardwareCatalog.findUnique({
+   446→            where: { id },
+   447→          })
+   448→          if (!item) {
+   449→            return errorResponse('Catalog item not found', 404)
+   450→          }
+   451→          return NextResponse.json({ item })
+   452→        }
+   453→
+   454→        // Search with filters
+   455→        const category = searchParams.get('category')
+   456→        const manufacturer = searchParams.get('manufacturer')
+   457→        const q = searchParams.get('q')
+   458→        const page = parseInt(searchParams.get('page') || '1')
+   459→        const limit = parseInt(searchParams.get('limit') || '50')
+   460→        const skip = (page - 1) * limit
+   461→
+   462→        const where: Record<string, unknown> = { isActive: true }
+   463→        if (category) where.category = category
+   464→        if (manufacturer) where.manufacturer = { contains: manufacturer }
+   465→        if (q) {
+   466→          where.OR = [
+   467→            { modelName: { contains: q } },
+   468→            { manufacturer: { contains: q } },
+   469→            { description: { contains: q } },
+   470→            { modelCode: { contains: q } },
+   471→          ]
+   472→        }
+   473→
+   474→        const [items, total] = await Promise.all([
+   475→          db.hardwareCatalog.findMany({
+   476→            where,
+   477→            orderBy: [
+   478→              { popularity: 'desc' },
+   479→              { manufacturer: 'asc' },
+   480→              { modelName: 'asc' },
+   481→            ],
+   482→            skip,
+   483→            take: limit,
+   484→          }),
+   485→          db.hardwareCatalog.count({ where }),
+   486→        ])
+   487→
+   488→        return NextResponse.json({
+   489→          items,
+   490→          pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+   491→        })
+   492→      }
+   493→
+   494→      // ────────────────────────────────────────────
+   495→      // CONTROLLERS - List all ForecourtControllers
+   496→      // ────────────────────────────────────────────
+   497→      case 'controllers': {
+   498→        const id = searchParams.get('id')
+   499→        if (id) {
+   500→          // Single controller with dispensers, config, recent events
+   501→          const controller = await db.forecourtController.findUnique({
+   502→            where: { id },
+   503→            include: {
+   504→              station: { select: { id: true, name: true, code: true, city: true } },
+   505→              configs: { orderBy: { configKey: 'asc' } },
+   506→              eventLogs: {
+   507→                orderBy: { createdAt: 'desc' },
+   508→                take: 20,
+   509→              },
+   510→            },
+   511→          })
+   512→          if (!controller) {
+   513→            return errorResponse('Forecourt controller not found', 404)
+   514→          }
+   515→
+   516→          // Fetch dispensers separately (avoids Prisma relation include issue)
+   517→          const controllerDispensers = await db.dispenser.findMany({
+   518→            where: { forecourtControllerId: id, isActive: true },
+   519→            include: {
+   520→              nozzles: {
+   521→                where: { isActive: true },
+   522→                orderBy: { nozzleNumber: 'asc' },
+   523→              },
+   524→            },
+   525→            orderBy: { pumpAddress: 'asc' },
+   526→          })
+   527→
+   528→          return NextResponse.json({ controller, dispensers: controllerDispensers })
+   529→        }
+   530→
+   531→        // List all controllers
+   532→        const stationId = searchParams.get('stationId')
+   533→        const status = searchParams.get('status')
+   534→        const controllerType = searchParams.get('controllerType')
+   535→
+   536→        const where: Record<string, unknown> = { isActive: true }
+   537→        if (stationId) where.stationId = stationId
+   538→        if (status) where.status = status
+   539→        if (controllerType) where.controllerType = controllerType
+   540→
+   541→        const controllers = await db.forecourtController.findMany({
+   542→          where,
+   543→          include: {
+   544→            station: { select: { id: true, name: true, code: true } },
+   545→          },
+   546→          orderBy: { name: 'asc' },
+   547→        })
+   548→
+   549→        // Fetch all dispensers linked to these controllers in one query
+   550→        const controllerIds = controllers.map(c => c.id)
+   551→        const allDispensers = await db.dispenser.findMany({
+   552→          where: {
+   553→            forecourtControllerId: { in: controllerIds },
+   554→            isActive: true,
+   555→          },
+   556→          select: {
+   557→            id: true,
+   558→            name: true,
+   559→            code: true,
+   560→            pumpAddress: true,
+   561→            nozzleCount: true,
+   562→            status: true,
+   563→            manufacturer: true,
+   564→            model: true,
+   565→            forecourtControllerId: true,
+   566→          },
+   567→          orderBy: { pumpAddress: 'asc' },
+   568→        })
+   569→
+   570→        // Group dispensers by controller
+   571→        const dispensersByController = new Map<string, typeof allDispensers>()
+   572→        for (const d of allDispensers) {
+   573→          const cId = d.forecourtControllerId || 'unassigned'
+   574→          if (!dispensersByController.has(cId)) dispensersByController.set(cId, [])
+   575→          dispensersByController.get(cId)!.push(d)
+   576→        }
+   577→
+   578→        // Attach dispensers to controllers
+   579→        const controllersWithDispensers = controllers.map(c => ({
+   580→          ...c,
+   581→          dispensers: dispensersByController.get(c.id) || [],
+   582→        }))
+   583→
+   584→        // Stats
+   585→        const totalControllers = controllers.length
+   586→        const onlineControllers = controllers.filter(c => c.status === 'online').length
+   587→        const offlineControllers = controllers.filter(c => c.status === 'offline').length
+   588→        const errorControllers = controllers.filter(c => c.status === 'error').length
+   589→
+   590→        return NextResponse.json({
+   591→          controllers: controllersWithDispensers,
+   592→          stats: {
+   593→            total: totalControllers,
+   594→            online: onlineControllers,
+   595→            offline: offlineControllers,
+   596→            error: errorControllers,
+   597→            totalDispensers: allDispensers.length,
+   598→          },
+   599→        })
+   600→      }
+   601→
+   602→      // ────────────────────────────────────────────
+   603→      // DISPENSERS - List all dispensers
+   604→      // ────────────────────────────────────────────
+   605→      case 'dispensers': {
+   606→        const id = searchParams.get('id')
+   607→        if (id) {
+   608→          // Single dispenser with nozzles, controller info, config
+   609→          const dispenser = await db.dispenser.findUnique({
+   610→            where: { id },
+   611→            include: {
+   612→              station: { select: { id: true, name: true, code: true } },
+   613→              forecourtController: {
+   614→                select: {
+   615→                  id: true,
+   616→                  name: true,
+   617→                  code: true,
+   618→                  controllerType: true,
+   619→                  status: true,
+   620→                  manufacturer: true,
+   621→                  model: true,
+   622→                  ipAddress: true,
+   623→                  port: true,
+   624→                  protocol: true,
+   625→                },
+   626→              },
+   627→              nozzles: {
+   628→                where: { isActive: true },
+   629→                orderBy: { nozzleNumber: 'asc' },
+   630→              },
+   631→            },
+   632→          })
+   633→          if (!dispenser) {
+   634→            return errorResponse('Dispenser not found', 404)
+   635→          }
+   636→
+   637→          // Get configs for dispenser
+   638→          const configs = await db.deviceConfig.findMany({
+   639→            where: { deviceType: 'dispenser', deviceId: id },
+   640→            orderBy: { configKey: 'asc' },
+   641→          })
+   642→
+   643→          return NextResponse.json({ dispenser, configs })
+   644→        }
+   645→
+   646→        // List all dispensers
+   647→        const stationId = searchParams.get('stationId')
+   648→        const status = searchParams.get('status')
+   649→        const manufacturer = searchParams.get('manufacturer')
+   650→        const controllerId = searchParams.get('controllerId')
+   651→
+   652→        const where: Record<string, unknown> = { isActive: true }
+   653→        if (stationId) where.stationId = stationId
+   654→        if (status) where.status = status
+   655→        if (manufacturer) where.manufacturer = manufacturer
+   656→        if (controllerId) where.forecourtControllerId = controllerId
+   657→
+   658→        const dispensers = await db.dispenser.findMany({
+   659→          where,
+   660→          include: {
+   661→            station: { select: { id: true, name: true, code: true } },
+   662→            forecourtController: {
+   663→              select: {
+   664→                id: true,
+   665→                name: true,
+   666→                code: true,
+   667→                controllerType: true,
+   668→                status: true,
+   669→              },
+   670→            },
+   671→            nozzles: {
+   672→              where: { isActive: true },
+   673→              select: {
+   674→                id: true,
+   675→                nozzleNumber: true,
+   676→                fuelType: true,
+   677→                fuelGrade: true,
+   678→                meterReading: true,
+   679→                status: true,
+   680→              },
+   681→              orderBy: { nozzleNumber: 'asc' },
+   682→            },
+   683→          },
+   684→          orderBy: [{ pumpLane: 'asc' }, { pumpAddress: 'asc' }],
+   685→        })
+   686→
+   687→        // Stats
+   688→        const totalDispensers = dispensers.length
+   689→        const dispensersByStatus: Record<string, number> = {}
+   690→        for (const d of dispensers) {
+   691→          const s = (d as Record<string, unknown>).status as string
+   692→          dispensersByStatus[s] = (dispensersByStatus[s] || 0) + 1
+   693→        }
+   694→
+   695→        return NextResponse.json({
+   696→          dispensers,
+   697→          stats: { total: totalDispensers, byStatus: dispensersByStatus },
+   698→        })
+   699→      }
+   700→
+   701→      // ────────────────────────────────────────────
+   702→      // CONTROLLER PROFILES
+   703→      // ────────────────────────────────────────────
+   704→      case 'controller_profiles': {
+   705→        const controllerType = searchParams.get('controllerType')
+   706→        const where: Record<string, unknown> = { isActive: true }
+   707→        if (controllerType) where.controllerType = controllerType
+   708→
+   709→        const profiles = await db.controllerProfile.findMany({
+   710→          where,
+   711→          orderBy: [{ manufacturer: 'asc' }, { modelName: 'asc' }],
+   712→        })
+   713→
+   714→        return NextResponse.json({ profiles })
+   715→      }
+   716→
+   717→      // ────────────────────────────────────────────
+   718→      // DISPENSER PROFILES
+   719→      // ────────────────────────────────────────────
+   720→      case 'dispenser_profiles': {
+   721→        const manufacturer = searchParams.get('manufacturer')
+   722→        const where: Record<string, unknown> = { isActive: true }
+   723→        if (manufacturer) where.manufacturer = manufacturer
+   724→
+   725→        const profiles = await db.dispenserProfile.findMany({
+   726→          where,
+   727→          orderBy: [{ manufacturer: 'asc' }, { modelName: 'asc' }],
+   728→        })
+   729→
+   730→        return NextResponse.json({ profiles })
+   731→      }
+   732→
+   733→      // ────────────────────────────────────────────
+   734→      // ATG PROFILES
+   735→      // ────────────────────────────────────────────
+   736→      case 'atg_profiles': {
+   737→        const manufacturer = searchParams.get('manufacturer')
+   738→        const where: Record<string, unknown> = { isActive: true }
+   739→        if (manufacturer) where.manufacturer = manufacturer
+   740→
+   741→        const profiles = await db.aTGProfile.findMany({
+   742→          where,
+   743→          orderBy: [{ manufacturer: 'asc' }, { modelName: 'asc' }],
+   744→        })
+   745→
+   746→        return NextResponse.json({ profiles })
+   747→      }
+   748→
+   749→      // ────────────────────────────────────────────
+   750→      // OVERVIEW - Dashboard overview
+   751→      // ────────────────────────────────────────────
+   752→      case 'overview': {
+   753→        try {
+   754→          // Simplified counts - use fewer parallel queries to avoid memory issues
+   755→          const controllerCount = await db.forecourtController.count({ where: { isActive: true } })
+   756→          const dispenserCount = await db.dispenser.count({ where: { isActive: true } })
+   757→          const paymentTerminalCount = await db.paymentTerminal.count({ where: { isActive: true } })
+   758→          const generatorCount = await db.generator.count({ where: { isActive: true } })
+   759→          const cameraCount = await db.surveillanceCamera.count({ where: { isActive: true } })
+   760→          const fireAlarmCount = await db.fireAlarmSystem.count({ where: { isActive: true } })
+   761→
+   762→          const countsByCategory = {
+   763→            forecourt_controllers: controllerCount,
+   764→            dispensers: dispenserCount,
+   765→            payment_terminals: paymentTerminalCount,
+   766→            generators: generatorCount,
+   767→            surveillance_cameras: cameraCount,
+   768→            fire_alarm_systems: fireAlarmCount,
+   769→            utility_meters: await db.utilityMeter.count({ where: { isActive: true } }),
+   770→            weather_stations: await db.weatherStation.count({ where: { isActive: true } }),
+   771→            tanker_trackers: await db.tankerTracker.count({ where: { isActive: true } }),
+   772→            car_wash_systems: await db.carWashSystem.count({ where: { isActive: true } }),
+   773→            air_compressors: await db.airCompressor.count({ where: { isActive: true } }),
+   774→            vacuum_stations: await db.vacuumStation.count({ where: { isActive: true } }),
+   775→          }
+   776→
+   777→          // Controller/dispenser stats
+   778→          const onlineControllers = await db.forecourtController.count({ where: { isActive: true, status: 'online' } })
+   779→          const offlineControllers = controllerCount - onlineControllers
+   780→          const idleDispensers = await db.dispenser.count({ where: { isActive: true, status: 'idle' } })
+   781→          const fuelingDispensers = await db.dispenser.count({ where: { isActive: true, status: 'fueling' } })
+   782→
+   783→          // Recent events (limited)
+   784→          const recentEvents = await db.deviceEventLog.findMany({
+   785→            orderBy: { createdAt: 'desc' },
+   786→            take: 15,
+   787→          })
+   788→
+   789→          // Pending commands
+   790→          const pendingCommands = await db.deviceCommandQueue.count({
+   791→            where: { status: 'queued' },
+   792→          })
+   793→
+   794→          return NextResponse.json({
+   795→            countsByCategory,
+   796→            totalDevices: Object.values(countsByCategory).reduce((sum: number, c) => sum + c, 0),
+   797→            controllerStats: {
+   798→              online: onlineControllers,
+   799→              offline: offlineControllers,
+   800→              error: 0,
+   801→              total: controllerCount,
+   802→            },
+   803→            dispenserStats: {
+   804→              idle: idleDispensers,
+   805→              fueling: fuelingDispensers,
+   806→              error: 0,
+   807→              offline: dispenserCount - idleDispensers - fuelingDispensers,
+   808→              total: dispenserCount,
+   809→            },
+   810→            recentEvents,
+   811→            pendingCommands,
+   812→          })
+   813→        } catch (err) {
+   814→          console.error('Overview error:', err)
+   815→          return NextResponse.json({
+   816→            countsByCategory: {},
+   817→            totalDevices: 0,
+   818→            controllerStats: { online: 0, offline: 0, error: 0, total: 0 },
+   819→            dispenserStats: { idle: 0, fueling: 0, error: 0, offline: 0, total: 0 },
+   820→            recentEvents: [],
+   821→            pendingCommands: 0,
+   822→          })
+   823→        }
+   824→      }
+   825→
+   826→      // ────────────────────────────────────────────
+   827→      // EVENT LOGS
+   828→      // ────────────────────────────────────────────
+   829→      case 'event_logs': {
+   830→        const deviceType = searchParams.get('deviceType')
+   831→        const deviceId = searchParams.get('deviceId')
+   832→        const severity = searchParams.get('severity')
+   833→        const eventType = searchParams.get('eventType')
+   834→        const stationId = searchParams.get('stationId')
+   835→        const page = parseInt(searchParams.get('page') || '1')
+   836→        const limit = parseInt(searchParams.get('limit') || '50')
+   837→        const skip = (page - 1) * limit
+   838→
+   839→        const where: Record<string, unknown> = {}
+   840→        if (stationId) where.stationId = stationId
+   841→        if (deviceType) where.deviceType = deviceType
+   842→        if (deviceId) where.deviceId = deviceId
+   843→        if (severity) where.severity = severity
+   844→        if (eventType) where.eventType = eventType
+   845→
+   846→        const [logs, total] = await Promise.all([
+   847→          db.deviceEventLog.findMany({
+   848→            where,
+   849→            orderBy: { createdAt: 'desc' },
+   850→            skip,
+   851→            take: limit,
+   852→          }),
+   853→          db.deviceEventLog.count({ where }),
+   854→        ])
+   855→
+   856→        return NextResponse.json({
+   857→          logs,
+   858→          pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+   859→        })
+   860→      }
+   861→
+   862→      // ────────────────────────────────────────────
+   863→      // COMMAND QUEUE
+   864→      // ────────────────────────────────────────────
+   865→      case 'command_queue': {
+   866→        const deviceType = searchParams.get('deviceType')
+   867→        const deviceId = searchParams.get('deviceId')
+   868→        const status = searchParams.get('status')
+   869→        const priority = searchParams.get('priority')
+   870→        const stationId = searchParams.get('stationId')
+   871→        const page = parseInt(searchParams.get('page') || '1')
+   872→        const limit = parseInt(searchParams.get('limit') || '50')
+   873→        const skip = (page - 1) * limit
+   874→
+   875→        const where: Record<string, unknown> = {}
+   876→        if (stationId) where.stationId = stationId
+   877→        if (deviceType) where.deviceType = deviceType
+   878→        if (deviceId) where.deviceId = deviceId
+   879→        if (status) where.status = status
+   880→        if (priority) where.priority = priority
+   881→
+   882→        const [commands, total] = await Promise.all([
+   883→          db.deviceCommandQueue.findMany({
+   884→            where,
+   885→            orderBy: [
+   886→              { priority: 'desc' },
+   887→              { createdAt: 'asc' },
+   888→            ],
+   889→            skip,
+   890→            take: limit,
+   891→          }),
+   892→          db.deviceCommandQueue.count({ where }),
+   893→        ])
+   894→
+   895→        return NextResponse.json({
+   896→          commands,
+   897→          pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+   898→        })
+   899→      }
+   900→
+   901→      // ────────────────────────────────────────────
+   902→      // CONFIGS - Get device configs
+   903→      // ────────────────────────────────────────────
+   904→      case 'configs': {
+   905→        const deviceType = searchParams.get('deviceType')
+   906→        const deviceId = searchParams.get('deviceId')
+   907→
+   908→        if (!deviceType || !deviceId) {
+   909→          return errorResponse('deviceType and deviceId are required')
+   910→        }
+   911→
+   912→        const configs = await db.deviceConfig.findMany({
+   913→          where: { deviceType, deviceId },
+   914→          orderBy: { configKey: 'asc' },
+   915→        })
+   916→
+   917→        return NextResponse.json({ configs })
+   918→      }
+   919→
+   920→      // ────────────────────────────────────────────
+   921→      // SEARCH - Advanced search across all hardware
+   922→      // ────────────────────────────────────────────
+   923→      case 'search': {
+   924→        const q = searchParams.get('q')
+   925→        const category = searchParams.get('category')
+   926→
+   927→        if (!q) {
+   928→          return errorResponse('Search query (q) is required')
+   929→        }
+   930→
+   931→        const results: Record<string, unknown[]> = {}
+   932→
+   933→        // Search catalog
+   934→        if (!category || category === 'catalog') {
+   935→          const catalogResults = await db.hardwareCatalog.findMany({
+   936→            where: {
+   937→              isActive: true,
+   938→              OR: [
+   939→                { modelName: { contains: q } },
+   940→                { manufacturer: { contains: q } },
+   941→                { description: { contains: q } },
+   942→                { modelCode: { contains: q } },
+   943→              ],
+   944→            },
+   945→            take: 20,
+   946→          })
+   947→          results.catalog = catalogResults
+   948→        }
+   949→
+   950→        // Search controllers
+   951→        if (!category || category === 'controller') {
+   952→          const controllers = await db.forecourtController.findMany({
+   953→            where: {
+   954→              isActive: true,
+   955→              OR: [
+   956→                { name: { contains: q } },
+   957→                { code: { contains: q } },
+   958→                { manufacturer: { contains: q } },
+   959→                { model: { contains: q } },
+   960→                { controllerType: { contains: q } },
+   961→                { ipAddress: { contains: q } },
+   962→                { serialNumber: { contains: q } },
+   963→              ],
+   964→            },
+   965→            take: 20,
+   966→          })
+   967→          results.controllers = controllers
+   968→        }
+   969→
+   970→        // Search dispensers
+   971→        if (!category || category === 'dispenser') {
+   972→          const dispensers = await db.dispenser.findMany({
+   973→            where: {
+   974→              isActive: true,
+   975→              OR: [
+   976→                { name: { contains: q } },
+   977→                { code: { contains: q } },
+   978→                { manufacturer: { contains: q } },
+   979→                { model: { contains: q } },
+   980→                { serialNumber: { contains: q } },
+   981→                { ipAddress: { contains: q } },
+   982→              ],
+   983→            },
+   984→            include: {
+   985→              forecourtController: {
+   986→                select: { id: true, name: true, code: true, controllerType: true, status: true },
+   987→              },
+   988→            },
+   989→            take: 20,
+   990→          })
+   991→          results.dispensers = dispensers
+   992→        }
+   993→
+   994→        // Search other device types
+   995→        if (!category || CATEGORY_TO_DEVICE_TYPE[category || '']) {
+   996→          const typesToSearch = category
+   997→            ? [CATEGORY_TO_DEVICE_TYPE[category]].filter(Boolean)
+   998→            : ALL_DEVICE_TYPE_KEYS
+   999→
+  1000→          for (const dtKey of typesToSearch) {
+  1001→            if (dtKey === 'forecourt_controller' || dtKey === 'dispenser') continue // Already handled above
+  1002→            const info = DEVICE_TYPE_MAP.get(dtKey)
+  1003→            if (!info) continue
+  1004→
+  1005→            try {
+  1006→              const devices = await info.getModel().findMany({
+  1007→                where: {
+  1008→                  isActive: true,
+  1009→                  OR: [
+  1010→                    { name: { contains: q } },
+  1011→                    { code: { contains: q } },
+  1012→                    { manufacturer: { contains: q } },
+  1013→                    { model: { contains: q } },
+  1014→                    { serialNumber: { contains: q } },
+  1015→                  ],
+  1016→                } as Record<string, unknown>,
+  1017→                take: 20,
+  1018→              })
+  1019→              if (devices.length > 0) {
+  1020→                results[dtKey] = devices as Record<string, unknown>[]
+  1021→              }
+  1022→            } catch {
+  1023→              // Skip device types that might have query issues
+  1024→            }
+  1025→          }
+  1026→        }
+  1027→
+  1028→        return NextResponse.json({ results, query: q })
+  1029→      }
+  1030→
+  1031→      // ────────────────────────────────────────────
+  1032→      // ATGS - List tanks with ATG info
+  1033→      // ────────────────────────────────────────────
+  1034→      case 'atgs': {
+  1035→        const tanks = await db.tank.findMany({
+  1036→          where: { isActive: true },
+  1037→          include: { station: { select: { id: true, name: true, code: true } } },
+  1038→          orderBy: { name: 'asc' },
+  1039→        })
+  1040→        const atgProfs = await db.aTGProfile.findMany({
+  1041→          where: { isActive: true },
+  1042→          orderBy: [{ manufacturer: 'asc' }, { modelName: 'asc' }],
+  1043→        })
+  1044→        return NextResponse.json({ tanks, atgProfiles: atgProfs })
+  1045→      }
+  1046→
+  1047→      // ────────────────────────────────────────────
+  1048→      // PAYMENT_TERMINALS - List payment terminals
+  1049→      // ────────────────────────────────────────────
+  1050→      case 'payment_terminals': {
+  1051→        const terminals = await db.paymentTerminal.findMany({
+  1052→          where: { isActive: true },
+  1053→          include: { station: { select: { id: true, name: true, code: true } } },
+  1054→          orderBy: { name: 'asc' },
+  1055→        })
+  1056→        return NextResponse.json({ terminals })
+  1057→      }
+  1058→
+  1059→      // ────────────────────────────────────────────
+  1060→      // GENERIC DEVICE TYPE LIST ACTIONS
+  1061→      // ────────────────────────────────────────────
+  1062→      case 'generators':
+  1063→      case 'cameras':
+  1064→      case 'fire_alarms':
+  1065→      case 'utility_meters':
+  1066→      case 'weather_stations':
+  1067→      case 'tanker_trackers':
+  1068→      case 'car_washes':
+  1069→      case 'air_compressors':
+  1070→      case 'vacuum_stations': {
+  1071→        const deviceTypeKey = action === 'cameras' ? 'surveillance_camera'
+  1072→          : action === 'fire_alarms' ? 'fire_alarm'
+  1073→          : action === 'utility_meters' ? 'utility_meter'
+  1074→          : action === 'weather_stations' ? 'weather_station'
+  1075→          : action === 'tanker_trackers' ? 'tanker_tracker'
+  1076→          : action === 'car_washes' ? 'car_wash'
+  1077→          : action === 'air_compressors' ? 'air_compressor'
+  1078→          : action === 'vacuum_stations' ? 'vacuum_station'
+  1079→          : action
+  1080→        const info = DEVICE_TYPE_MAP.get(deviceTypeKey)
+  1081→        if (!info) return errorResponse(`Device type "${deviceTypeKey}" not found`, 400)
+  1082→        const devices = await info.getModel().findMany({
+  1083→          where: { isActive: true } as Record<string, unknown>,
+  1084→          orderBy: { name: 'asc' },
+  1085→        })
+  1086→        return NextResponse.json({ devices })
+  1087→      }
+  1088→
+  1089→      // ────────────────────────────────────────────
+  1090→      // COMMANDS - Alias for command_queue
+  1091→      // ────────────────────────────────────────────
+  1092→      case 'commands':
+  1093→      case 'events': {
+  1094→        const isEvents = action === 'events'
+  1095→        const deviceType = searchParams.get('deviceType')
+  1096→        const severity = searchParams.get('severity')
+  1097→        const status = searchParams.get('status')
+  1098→        const page = parseInt(searchParams.get('page') || '1')
+  1099→        const limit = parseInt(searchParams.get('limit') || '50')
+  1100→        const skip = (page - 1) * limit
+  1101→
+  1102→        if (isEvents) {
+  1103→          const where: Record<string, unknown> = {}
+  1104→          if (deviceType) where.deviceType = deviceType
+  1105→          if (severity) where.severity = severity
+  1106→
+  1107→          const [logs, total] = await Promise.all([
+  1108→            db.deviceEventLog.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take: limit }),
+  1109→            db.deviceEventLog.count({ where }),
+  1110→          ])
+  1111→          return NextResponse.json({ logs, pagination: { page, limit, total, pages: Math.ceil(total / limit) } })
+  1112→        } else {
+  1113→          const where: Record<string, unknown> = {}
+  1114→          if (deviceType) where.deviceType = deviceType
+  1115→          if (status) where.status = status
+  1116→
+  1117→          const [cmds, total] = await Promise.all([
+  1118→            db.deviceCommandQueue.findMany({ where, orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }], skip, take: limit }),
+  1119→            db.deviceCommandQueue.count({ where }),
+  1120→          ])
+  1121→          return NextResponse.json({ commands: cmds, pagination: { page, limit, total, pages: Math.ceil(total / limit) } })
+  1122→        }
+  1123→      }
+  1124→
+  1125→      // ────────────────────────────────────────────
+  1126→      // TEST_CONNECTION - GET alias (redirects to POST logic)
+  1127→      // ────────────────────────────────────────────
+  1128→      case 'test_connection': {
+  1129→        const deviceType = searchParams.get('deviceType')
+  1130→        const id = searchParams.get('id')
+  1131→        if (!deviceType || !id) return errorResponse('deviceType and id are required')
+  1132→
+  1133→        let device: Record<string, unknown> | null = null
+  1134→        if (deviceType === 'forecourt_controller') {
+  1135→          const dev = await db.forecourtController.findUnique({ where: { id } })
+  1136→          if (!dev) return errorResponse('Device not found', 404)
+  1137→          device = dev as unknown as Record<string, unknown>
+  1138→        } else if (deviceType === 'dispenser') {
+  1139→          const dev = await db.dispenser.findUnique({ where: { id } })
+  1140→          if (!dev) return errorResponse('Device not found', 404)
+  1141→          device = dev as unknown as Record<string, unknown>
+  1142→        } else {
+  1143→          const info = DEVICE_TYPE_MAP.get(deviceType)
+  1144→          if (!info) return errorResponse(`Unknown device type: "${deviceType}"`)
+  1145→          const dev = await info.getModel().findUnique({ where: { id } })
+  1146→          if (!dev) return errorResponse('Device not found', 404)
+  1147→          device = dev as Record<string, unknown>
+  1148→        }
+  1149→
+  1150→        const isReachable = ['online', 'idle', 'fueling', 'running', 'normal', 'recording'].includes(device.status as string)
+  1151→        return NextResponse.json({
+  1152→          success: true,
+  1153→          testResult: {
+  1154→            deviceId: id, deviceType,
+  1155→            deviceName: device.name,
+  1156→            status: device.status,
+  1157→            ipAddress: device.ipAddress,
+  1158→            port: device.port,
+  1159→            communicationType: device.communicationType,
+  1160→            reachable: !!isReachable,
+  1161→            latency: isReachable ? Math.floor(Math.random() * 30 + 5) : 0,
+  1162→            message: isReachable ? `Device "${device.name}" appears reachable (status: ${device.status})` : `Device "${device.name}" appears unreachable (status: ${device.status})`,
+  1163→          },
+  1164→        })
+  1165→      }
+  1166→
+  1167→      default:
+  1168→        return errorResponse(
+  1169→          `Unknown action: "${action}". Valid GET actions: catalog, controllers, dispensers, atgs, payment_terminals, generators, cameras, fire_alarms, utility_meters, weather_stations, tanker_trackers, car_washes, air_compressors, vacuum_stations, controller_profiles, dispenser_profiles, atg_profiles, overview, event_logs, events, command_queue, commands, configs, search, test_connection`,
+  1170→          400
+  1171→        )
+  1172→    }
+  1173→  } catch (error) {
+  1174→    console.error('Hardware API GET error:', error)
+  1175→    return NextResponse.json(
+  1176→      { error: 'Internal server error', details: error instanceof Error ? error.message : String(error) },
+  1177→      { status: 500 }
+  1178→    )
+  1179→  }
+  1180→}
+  1181→
+  1182→// =====================================================
+  1183→// POST HANDLER
+  1184→// =====================================================
+  1185→
+  1186→export async function POST(request: Request) {
+  1187→  try {
+  1188→    const body = await request.json()
+  1189→    const { action } = body
+  1190→
+  1191→    switch (action) {
+  1192→      // ────────────────────────────────────────────
+  1193→      // ADD_CONTROLLER - Create a new ForecourtController
+  1194→      // ────────────────────────────────────────────
+  1195→      case 'add_controller': {
+  1196→        const { stationId, name, code, controllerType, manufacturer, model, serialNumber, firmwareVersion, communicationType, ipAddress, port, baudRate, comPort, protocol, pollingInterval, timeout, maxDispensers, configJson } = body
+  1197→
+  1198→        if (!stationId || !name || !code || !controllerType) {
+  1199→          return errorResponse('stationId, name, code, and controllerType are required')
+  1200→        }
+  1201→
+  1202→        // Verify station exists
+  1203→        const station = await db.station.findUnique({ where: { id: stationId } })
+  1204→        if (!station) {
+  1205→          return errorResponse('Station not found', 404)
+  1206→        }
+  1207→
+  1208→        // Check for duplicate code
+  1209→        const existing = await db.forecourtController.findFirst({
+  1210→          where: { stationId, code },
+  1211→        })
+  1212→        if (existing) {
+  1213→          return errorResponse(`Controller with code "${code}" already exists at this station`, 409)
+  1214→        }
+  1215→
+  1216→        const controller = await db.forecourtController.create({
+  1217→          data: {
+  1218→            stationId,
+  1219→            name,
+  1220→            code,
+  1221→            controllerType,
+  1222→            manufacturer,
+  1223→            model,
+  1224→            serialNumber,
+  1225→            firmwareVersion,
+  1226→            communicationType: communicationType || 'tcpip',
+  1227→            ipAddress,
+  1228→            port,
+  1229→            baudRate,
+  1230→            comPort,
+  1231→            protocol,
+  1232→            pollingInterval: pollingInterval || 1000,
+  1233→            timeout: timeout || 5000,
+  1234→            maxDispensers: maxDispensers || 32,
+  1235→            connectedDispensers: 0,
+  1236→            status: 'offline',
+  1237→            isActive: true,
+  1238→            configJson,
+  1239→          },
+  1240→          include: {
+  1241→            station: { select: { id: true, name: true, code: true } },
+  1242→            dispensers: true,
+  1243→          },
+  1244→        })
+  1245→
+  1246→        // Log event
+  1247→        await logDeviceEvent({
+  1248→          stationId,
+  1249→          deviceType: 'forecourt_controller',
+  1250→          deviceId: controller.id,
+  1251→          eventType: 'status_change',
+  1252→          severity: 'info',
+  1253→          message: `Forecourt controller "${name}" (${controllerType}) created and registered`,
+  1254→          dataJson: JSON.stringify({ controllerType, ipAddress, port, protocol }),
+  1255→        })
+  1256→
+  1257→        return NextResponse.json({ controller }, { status: 201 })
+  1258→      }
+  1259→
+  1260→      // ────────────────────────────────────────────
+  1261→      // ADD_DISPENSER - Create a new Dispenser linked to a controller
+  1262→      // ────────────────────────────────────────────
+  1263→      case 'add_dispenser': {
+  1264→        const { stationId, name, code, manufacturer, model, serialNumber, forecourtControllerId, communicationType, ipAddress, port, pumpLane, pumpAddress, protocol, nozzleCount, flowRate, supportedFuels, firmwareVersion, configJson } = body
+  1265→
+  1266→        if (!stationId || !name || !code) {
+  1267→          return errorResponse('stationId, name, and code are required')
+  1268→        }
+  1269→
+  1270→        if (!forecourtControllerId) {
+  1271→          return errorResponse('forecourtControllerId is required. All dispensers must be linked to a forecourt controller. ERP never communicates directly with pumps.')
+  1272→        }
+  1273→
+  1274→        // Verify controller exists and is active
+  1275→        const controller = await db.forecourtController.findUnique({
+  1276→          where: { id: forecourtControllerId },
+  1277→        })
+  1278→        if (!controller) {
+  1279→          return errorResponse('Forecourt controller not found', 404)
+  1280→        }
+  1281→        if (!controller.isActive) {
+  1282→          return errorResponse('Forecourt controller is inactive. Cannot add dispensers to an inactive controller.')
+  1283→        }
+  1284→
+  1285→        // Check controller capacity
+  1286→        if (controller.connectedDispensers >= controller.maxDispensers) {
+  1287→          return errorResponse(`Controller "${controller.name}" has reached its maximum capacity of ${controller.maxDispensers} dispensers`)
+  1288→        }
+  1289→
+  1290→        // Check for duplicate code
+  1291→        const existing = await db.dispenser.findFirst({
+  1292→          where: { stationId, code },
+  1293→        })
+  1294→        if (existing) {
+  1295→          return errorResponse(`Dispenser with code "${code}" already exists at this station`, 409)
+  1296→        }
+  1297→
+  1298→        // Validate pump address within controller range
+  1299→        if (pumpAddress && (pumpAddress < 1 || pumpAddress > controller.maxDispensers)) {
+  1300→          return errorResponse(`pumpAddress must be between 1 and ${controller.maxDispensers}`)
+  1301→        }
+  1302→
+  1303→        // Validate protocol compatibility with controller
+  1304→        if (protocol && controller.protocol) {
+  1305→          const controllerProtocols = JSON.parse(controller.protocol || '[]')
+  1306→          if (Array.isArray(controllerProtocols) && controllerProtocols.length > 0 && !controllerProtocols.includes(protocol)) {
+  1307→            return errorResponse(`Protocol "${protocol}" is not supported by controller "${controller.name}". Supported protocols: ${controllerProtocols.join(', ')}`)
+  1308→          }
+  1309→        }
+  1310→
+  1311→        const dispenser = await db.dispenser.create({
+  1312→          data: {
+  1313→            stationId,
+  1314→            name,
+  1315→            code,
+  1316→            manufacturer,
+  1317→            model,
+  1318→            serialNumber,
+  1319→            forecourtControllerId,
+  1320→            communicationType: communicationType || 'tcpip',
+  1321→            ipAddress,
+  1322→            port,
+  1323→            pumpLane: pumpLane || 1,
+  1324→            pumpAddress,
+  1325→            protocol,
+  1326→            nozzleCount: nozzleCount || 2,
+  1327→            flowRate,
+  1328→            supportedFuels: typeof supportedFuels === 'object' ? JSON.stringify(supportedFuels) : supportedFuels,
+  1329→            firmwareVersion,
+  1330→            lastMeterReading: 0,
+  1331→            status: 'idle',
+  1332→            isActive: true,
+  1333→            configJson,
+  1334→          },
+  1335→          include: {
+  1336→            station: { select: { id: true, name: true, code: true } },
+  1337→            forecourtController: {
+  1338→              select: { id: true, name: true, code: true, controllerType: true, status: true },
+  1339→            },
+  1340→            nozzles: true,
+  1341→          },
+  1342→        })
+  1343→
+  1344→        // Update controller's connected dispenser count
+  1345→        await db.forecourtController.update({
+  1346→          where: { id: forecourtControllerId },
+  1347→          data: { connectedDispensers: { increment: 1 } },
+  1348→        })
+  1349→
+  1350→        // Log event
+  1351→        await logDeviceEvent({
+  1352→          stationId,
+  1353→          deviceType: 'forecourt_controller',
+  1354→          deviceId: forecourtControllerId,
+  1355→          eventType: 'status_change',
+  1356→          severity: 'info',
+  1357→          message: `Dispenser "${name}" (pump address ${pumpAddress || 'N/A'}) added to controller "${controller.name}"`,
+  1358→          dataJson: JSON.stringify({ dispenserId: dispenser.id, pumpAddress, manufacturer, model }),
+  1359→        })
+  1360→
+  1361→        return NextResponse.json({ dispenser }, { status: 201 })
+  1362→      }
+  1363→
+  1364→      // ────────────────────────────────────────────
+  1365→      // ADD_HARDWARE - Generic add for any device type
+  1366→      // ────────────────────────────────────────────
+  1367→      case 'add_hardware': {
+  1368→        const { category, stationId, name, code, ...rest } = body
+  1369→
+  1370→        if (!category || !stationId || !name || !code) {
+  1371→          return errorResponse('category, stationId, name, and code are required')
+  1372→        }
+  1373→
+  1374→        // Verify station exists
+  1375→        const station = await db.station.findUnique({ where: { id: stationId } })
+  1376→        if (!station) {
+  1377→          return errorResponse('Station not found', 404)
+  1378→        }
+  1379→
+  1380→        // Handle dispenser specially (must have forecourtControllerId)
+  1381→        if (category === 'dispenser') {
+  1382→          if (!rest.forecourtControllerId) {
+  1383→            return errorResponse('forecourtControllerId is required for dispensers. All dispensers must be linked to a forecourt controller.')
+  1384→          }
+  1385→          const controller = await db.forecourtController.findUnique({
+  1386→            where: { id: rest.forecourtControllerId },
+  1387→          })
+  1388→          if (!controller) {
+  1389→            return errorResponse('Forecourt controller not found', 404)
+  1390→          }
+  1391→        }
+  1392→
+  1393→        const deviceTypeKey = CATEGORY_TO_DEVICE_TYPE[category]
+  1394→        if (!deviceTypeKey) {
+  1395→          return errorResponse(`Unknown category: "${category}". Valid categories: ${Object.keys(CATEGORY_TO_DEVICE_TYPE).join(', ')}`)
+  1396→        }
+  1397→
+  1398→        // Handle dispenser with special Prisma model
+  1399→        if (category === 'dispenser') {
+  1400→          const filteredData = filterAllowedFields({ name, code, ...rest }, 'forecourt_controller', false)
+  1401→          const dispenserData: Record<string, unknown> = {
+  1402→            stationId,
+  1403→            name,
+  1404→            code,
+  1405→            status: 'idle',
+  1406→            isActive: true,
+  1407→            ...rest,
+  1408→            supportedFuels: typeof rest.supportedFuels === 'object' ? JSON.stringify(rest.supportedFuels) : rest.supportedFuels,
+  1409→          }
+  1410→          const dispenser = await db.dispenser.create({
+  1411→            data: dispenserData as Record<string, unknown>,
+  1412→            include: {
+  1413→              station: { select: { id: true, name: true, code: true } },
+  1414→              forecourtController: {
+  1415→                select: { id: true, name: true, code: true, controllerType: true, status: true },
+  1416→              },
+  1417→              nozzles: true,
+  1418→            },
+  1419→          })
+  1420→
+  1421→          // Update controller count
+  1422→          if (rest.forecourtControllerId) {
+  1423→            await db.forecourtController.update({
+  1424→              where: { id: rest.forecourtControllerId as string },
+  1425→              data: { connectedDispensers: { increment: 1 } },
+  1426→            })
+  1427→          }
+  1428→
+  1429→          return NextResponse.json({ device: dispenser, category }, { status: 201 })
+  1430→        }
+  1431→
+  1432→        // Handle other device types
+  1433→        const info = DEVICE_TYPE_MAP.get(deviceTypeKey)
+  1434→        if (!info) {
+  1435→          return errorResponse(`Device type "${deviceTypeKey}" is not supported`)
+  1436→        }
+  1437→
+  1438→        const filteredData = filterAllowedFields(rest, deviceTypeKey)
+  1439→        const createData: Record<string, unknown> = {
+  1440→          stationId,
+  1441→          name,
+  1442→          code,
+  1443→          status: rest.status || 'offline',
+  1444→          isActive: true,
+  1445→          ...filteredData,
+  1446→        }
+  1447→
+  1448→        const device = await info.getModel().create({ data: createData })
+  1449→
+  1450→        // Log event
+  1451→        await logDeviceEvent({
+  1452→          stationId,
+  1453→          deviceType: deviceTypeKey,
+  1454→          deviceId: (device as Record<string, unknown>).id as string,
+  1455→          eventType: 'status_change',
+  1456→          severity: 'info',
+  1457→          message: `${info.label.slice(0, -1)} "${name}" created and registered`,
+  1458→          dataJson: JSON.stringify({ category, manufacturer: rest.manufacturer, model: rest.model }),
+  1459→        })
+  1460→
+  1461→        return NextResponse.json({ device, category }, { status: 201 })
+  1462→      }
+  1463→
+  1464→      // ────────────────────────────────────────────
+  1465→      // UPDATE_DEVICE - Update any device
+  1466→      // ────────────────────────────────────────────
+  1467→      case 'update_device': {
+  1468→        const { deviceType, id, ...updateFields } = body
+  1469→
+  1470→        if (!deviceType || !id) {
+  1471→          return errorResponse('deviceType and id are required')
+  1472→        }
+  1473→
+  1474→        // Handle forecourt_controller type
+  1475→        if (deviceType === 'forecourt_controller') {
+  1476→          const existing = await db.forecourtController.findUnique({ where: { id } })
+  1477→          if (!existing) {
+  1478→            return errorResponse('Forecourt controller not found', 404)
+  1479→          }
+  1480→
+  1481→          const filteredData = filterAllowedFields(updateFields, 'forecourt_controller')
+  1482→          const controller = await db.forecourtController.update({
+  1483→            where: { id },
+  1484→            data: filteredData,
+  1485→            include: {
+  1486→              station: { select: { id: true, name: true } },
+  1487→              dispensers: { where: { isActive: true }, select: { id: true, name: true, code: true, status: true } },
+  1488→            },
+  1489→          })
+  1490→
+  1491→          await logDeviceEvent({
+  1492→            stationId: existing.stationId,
+  1493→            deviceType: 'forecourt_controller',
+  1494→            deviceId: id,
+  1495→            eventType: 'status_change',
+  1496→            severity: 'info',
+  1497→            message: `Forecourt controller "${existing.name}" updated`,
+  1498→            dataJson: JSON.stringify({ updatedFields: Object.keys(filteredData) }),
+  1499→          })
+  1500→
+  1501→          return NextResponse.json({ device: controller })
+  1502→        }
+  1503→
+  1504→        // Handle dispenser type
+  1505→        if (deviceType === 'dispenser') {
+  1506→          const existing = await db.dispenser.findUnique({ where: { id } })
+  1507→          if (!existing) {
+  1508→            return errorResponse('Dispenser not found', 404)
+  1509→          }
+  1510→
+  1511→          const allowedDispenserFields = [
+  1512→            'name', 'code', 'manufacturer', 'model', 'serialNumber', 'controllerType',
+  1513→            'forecourtControllerId', 'communicationType', 'ipAddress', 'port',
+  1514→            'pumpLane', 'pumpAddress', 'protocol', 'nozzleCount', 'flowRate',
+  1515→            'supportedFuels', 'firmwareVersion', 'lastMeterReading', 'status',
+  1516→            'isActive', 'lastCommunication', 'configJson',
+  1517→          ]
+  1518→          const filteredData: Record<string, unknown> = {}
+  1519→          for (const key of allowedDispenserFields) {
+  1520→            if (updateFields[key] !== undefined) {
+  1521→              filteredData[key] = updateFields[key]
+  1522→            }
+  1523→          }
+  1524→
+  1525→          // If changing forecourtControllerId, validate the new controller
+  1526→          if (filteredData.forecourtControllerId && filteredData.forecourtControllerId !== existing.forecourtControllerId) {
+  1527→            const newController = await db.forecourtController.findUnique({
+  1528→              where: { id: filteredData.forecourtControllerId as string },
+  1529→            })
+  1530→            if (!newController) {
+  1531→              return errorResponse('New forecourt controller not found', 404)
+  1532→            }
+  1533→          }
+  1534→
+  1535→          if (filteredData.supportedFuels && typeof filteredData.supportedFuels === 'object') {
+  1536→            filteredData.supportedFuels = JSON.stringify(filteredData.supportedFuels)
+  1537→          }
+  1538→
+  1539→          const dispenser = await db.dispenser.update({
+  1540→            where: { id },
+  1541→            data: filteredData,
+  1542→            include: {
+  1543→              station: { select: { id: true, name: true } },
+  1544→              forecourtController: { select: { id: true, name: true, code: true, controllerType: true } },
+  1545→              nozzles: { where: { isActive: true }, orderBy: { nozzleNumber: 'asc' } },
+  1546→            },
+  1547→          })
+  1548→
+  1549→          return NextResponse.json({ device: dispenser })
+  1550→        }
+  1551→
+  1552→        // Handle other device types
+  1553→        const info = DEVICE_TYPE_MAP.get(deviceType)
+  1554→        if (!info) {
+  1555→          return errorResponse(`Unknown device type: "${deviceType}". Valid types: ${ALL_DEVICE_TYPE_KEYS.join(', ')}`)
+  1556→        }
+  1557→
+  1558→        const existing = await info.getModel().findUnique({ where: { id } })
+  1559→        if (!existing) {
+  1560→          return errorResponse(`${info.label.slice(0, -1)} not found`, 404)
+  1561→        }
+  1562→
+  1563→        const filteredData = filterAllowedFields(updateFields, deviceType)
+  1564→        const device = await info.getModel().update({
+  1565→          where: { id },
+  1566→          data: filteredData,
+  1567→        })
+  1568→
+  1569→        return NextResponse.json({ device })
+  1570→      }
+  1571→
+  1572→      // ────────────────────────────────────────────
+  1573→      // REMOVE_DEVICE - Delete/deactivate a device
+  1574→      // ────────────────────────────────────────────
+  1575→      case 'remove_device': {
+  1576→        const { deviceType, id, permanent } = body
+  1577→
+  1578→        if (!deviceType || !id) {
+  1579→          return errorResponse('deviceType and id are required')
+  1580→        }
+  1581→
+  1582→        // Handle forecourt_controller type - check for connected dispensers
+  1583→        if (deviceType === 'forecourt_controller') {
+  1584→          const controller = await db.forecourtController.findUnique({
+  1585→            where: { id },
+  1586→            include: { dispensers: { where: { isActive: true } } },
+  1587→          })
+  1588→          if (!controller) {
+  1589→            return errorResponse('Forecourt controller not found', 404)
+  1590→          }
+  1591→          if (controller.dispensers.length > 0) {
+  1592→            return errorResponse(
+  1593→              `Cannot deactivate controller "${controller.name}" - it has ${controller.dispensers.length} active dispenser(s) connected. Please reassign or deactivate dispensers first.`,
+  1594→              409
+  1595→            )
+  1596→          }
+  1597→
+  1598→          if (permanent) {
+  1599→            await db.forecourtController.delete({ where: { id } })
+  1600→          } else {
+  1601→            await db.forecourtController.update({
+  1602→              where: { id },
+  1603→              data: { isActive: false, status: 'offline' },
+  1604→            })
+  1605→          }
+  1606→
+  1607→          await logDeviceEvent({
+  1608→            stationId: controller.stationId,
+  1609→            deviceType: 'forecourt_controller',
+  1610→            deviceId: id,
+  1611→            eventType: 'status_change',
+  1612→            severity: 'warning',
+  1613→            message: `Forecourt controller "${controller.name}" ${permanent ? 'permanently deleted' : 'deactivated'}`,
+  1614→          })
+  1615→
+  1616→          return NextResponse.json({ success: true, action: permanent ? 'deleted' : 'deactivated' })
+  1617→        }
+  1618→
+  1619→        // Handle dispenser type
+  1620→        if (deviceType === 'dispenser') {
+  1621→          const dispenser = await db.dispenser.findUnique({
+  1622→            where: { id },
+  1623→          })
+  1624→          if (!dispenser) {
+  1625→            return errorResponse('Dispenser not found', 404)
+  1626→          }
+  1627→
+  1628→          if (permanent) {
+  1629→            await db.dispenser.delete({ where: { id } })
+  1630→          } else {
+  1631→            await db.dispenser.update({
+  1632→              where: { id },
+  1633→              data: { isActive: false, status: 'offline' },
+  1634→            })
+  1635→          }
+  1636→
+  1637→          // Update controller's connected dispenser count
+  1638→          if (dispenser.forecourtControllerId) {
+  1639→            await db.forecourtController.update({
+  1640→              where: { id: dispenser.forecourtControllerId },
+  1641→              data: { connectedDispensers: { decrement: 1 } },
+  1642→            })
+  1643→          }
+  1644→
+  1645→          return NextResponse.json({ success: true, action: permanent ? 'deleted' : 'deactivated' })
+  1646→        }
+  1647→
+  1648→        // Handle other device types
+  1649→        const info = DEVICE_TYPE_MAP.get(deviceType)
+  1650→        if (!info) {
+  1651→          return errorResponse(`Unknown device type: "${deviceType}". Valid types: ${ALL_DEVICE_TYPE_KEYS.join(', ')}`)
+  1652→        }
+  1653→
+  1654→        const existing = await info.getModel().findUnique({ where: { id } })
+  1655→        if (!existing) {
+  1656→          return errorResponse(`${info.label.slice(0, -1)} not found`, 404)
+  1657→        }
+  1658→
+  1659→        if (permanent) {
+  1660→          await info.getModel().delete({ where: { id } })
+  1661→        } else {
+  1662→          await info.getModel().update({
+  1663→            where: { id },
+  1664→            data: { isActive: false, status: 'offline' } as Record<string, unknown>,
+  1665→          })
+  1666→        }
+  1667→
+  1668→        return NextResponse.json({ success: true, action: permanent ? 'deleted' : 'deactivated' })
+  1669→      }
+  1670→
+  1671→      // ────────────────────────────────────────────
+  1672→      // SEND_COMMAND - Queue a command for a device
+  1673→      // ────────────────────────────────────────────
+  1674→      case 'send_command': {
+  1675→        const { deviceType, deviceId, command, params, priority, maxRetries, createdBy } = body
+  1676→
+  1677→        if (!deviceType || !deviceId || !command) {
+  1678→          return errorResponse('deviceType, deviceId, and command are required')
+  1679→        }
+  1680→
+  1681→        // Get station ID from device
+  1682→        let stationId: string | null = null
+  1683→        if (deviceType === 'forecourt_controller') {
+  1684→          const dev = await db.forecourtController.findUnique({ where: { id: deviceId } })
+  1685→          if (!dev) return errorResponse('Forecourt controller not found', 404)
+  1686→          stationId = dev.stationId
+  1687→          if (dev.status === 'offline') {
+  1688→            return errorResponse(`Controller "${dev.name}" is offline. Cannot send commands.`, 400)
+  1689→          }
+  1690→        } else if (deviceType === 'dispenser') {
+  1691→          const dev = await db.dispenser.findUnique({ where: { id: deviceId } })
+  1692→          if (!dev) return errorResponse('Dispenser not found', 404)
+  1693→          stationId = dev.stationId
+  1694→        } else {
+  1695→          const info = DEVICE_TYPE_MAP.get(deviceType)
+  1696→          if (!info) return errorResponse(`Unknown device type: "${deviceType}"`)
+  1697→          const dev = await info.getModel().findUnique({ where: { id: deviceId } })
+  1698→          if (!dev) return errorResponse('Device not found', 404)
+  1699→          stationId = (dev as Record<string, unknown>).stationId as string
+  1700→        }
+  1701→
+  1702→        const entry = await createCommandEntry({
+  1703→          stationId: stationId || '',
+  1704→          deviceType,
+  1705→          deviceId,
+  1706→          command,
+  1707→          parameters: params ? JSON.stringify(params) : null,
+  1708→          priority: priority || 'normal',
+  1709→          maxRetries: maxRetries || 3,
+  1710→          retryCount: 0,
+  1711→          createdBy: createdBy || null,
+  1712→        })
+  1713→
+  1714→        await logDeviceEvent({
+  1715→          stationId: stationId || '',
+  1716→          deviceType,
+  1717→          deviceId,
+  1718→          eventType: 'command',
+  1719→          severity: 'info',
+  1720→          message: `Command "${command}" queued for ${deviceType}`,
+  1721→          dataJson: JSON.stringify({ command, params, priority }),
+  1722→        })
+  1723→
+  1724→        return NextResponse.json({ command: entry }, { status: 201 })
+  1725→      }
+  1726→
+  1727→      // ────────────────────────────────────────────
+  1728→      // UPDATE_CONFIG - Set device configuration
+  1729→      // ────────────────────────────────────────────
+  1730→      case 'update_config': {
+  1731→        const { deviceType, deviceId, key, value, dataType, description, isEditable, updatedBy } = body
+  1732→
+  1733→        if (!deviceType || !deviceId || !key || value === undefined) {
+  1734→          return errorResponse('deviceType, deviceId, key, and value are required')
+  1735→        }
+  1736→
+  1737→        // Check if config already exists
+  1738→        const existing = await db.deviceConfig.findFirst({
+  1739→          where: { deviceType, deviceId, configKey: key },
+  1740→        })
+  1741→
+  1742→        if (existing) {
+  1743→          const config = await db.deviceConfig.update({
+  1744→            where: { id: existing.id },
+  1745→            data: {
+  1746→              configValue: String(value),
+  1747→              dataType: dataType || existing.dataType,
+  1748→              description: description ?? existing.description,
+  1749→              isEditable: isEditable ?? existing.isEditable,
+  1750→              updatedBy: updatedBy || null,
+  1751→            },
+  1752→          })
+  1753→          return NextResponse.json({ config })
+  1754→        }
+  1755→
+  1756→        // Create new config - handle FK constraint issues
+  1757→        try {
+  1758→          const config = await db.deviceConfig.create({
+  1759→            data: {
+  1760→              deviceType,
+  1761→              deviceId,
+  1762→              configKey: key,
+  1763→              configValue: String(value),
+  1764→              dataType: dataType || 'string',
+  1765→              description: description || null,
+  1766→              isEditable: isEditable !== undefined ? isEditable : true,
+  1767→              updatedBy: updatedBy || null,
+  1768→            },
+  1769→          })
+  1770→          return NextResponse.json({ config }, { status: 201 })
+  1771→        } catch (err) {
+  1772→          if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
+  1773→            // FK constraint - return virtual config
+  1774→            return NextResponse.json({
+  1775→              config: {
+  1776→                id: 'virtual-' + Date.now(),
+  1777→                deviceType,
+  1778→                deviceId,
+  1779→                configKey: key,
+  1780→                configValue: String(value),
+  1781→                dataType: dataType || 'string',
+  1782→                description: description || null,
+  1783→                isEditable: isEditable !== undefined ? isEditable : true,
+  1784→                persisted: false,
+  1785→                reason: 'FK constraint - config not persisted to database',
+  1786→              },
+  1787→            }, { status: 201 })
+  1788→          }
+  1789→          throw err
+  1790→        }
+  1791→      }
+  1792→
+  1793→      // ────────────────────────────────────────────
+  1794→      // AUTHORIZE_PUMP - Authorize a pump through its forecourt controller
+  1795→      // Architecture: ERP → Forecourt Controller → Pump
+  1796→      // ────────────────────────────────────────────
+  1797→      case 'authorize_pump': {
+  1798→        const { controllerId, pumpAddress, nozzleNumber, presetVolume, presetAmount, createdBy } = body
+  1799→
+  1800→        if (!controllerId) {
+  1801→          return errorResponse('controllerId is required. Pumps can only be authorized through their forecourt controller.')
+  1802→        }
+  1803→        if (!pumpAddress || pumpAddress < 1) {
+  1804→          return errorResponse('pumpAddress is required and must be >= 1')
+  1805→        }
+  1806→
+  1807→        // Verify controller exists and is online
+  1808→        const controller = await db.forecourtController.findUnique({
+  1809→          where: { id: controllerId },
+  1810→        })
+  1811→        if (!controller) {
+  1812→          return errorResponse('Forecourt controller not found', 404)
+  1813→        }
+  1814→        if (controller.status === 'offline') {
+  1815→          return errorResponse(`Controller "${controller.name}" is offline. Cannot authorize pumps.`, 400)
+  1816→        }
+  1817→        if (controller.status === 'error') {
+  1818→          return errorResponse(`Controller "${controller.name}" is in error state. Cannot authorize pumps.`, 400)
+  1819→        }
+  1820→
+  1821→        // Find the dispenser at this pump address on this controller
+  1822→        const dispenser = await db.dispenser.findFirst({
+  1823→          where: {
+  1824→            forecourtControllerId: controllerId,
+  1825→            pumpAddress,
+  1826→            isActive: true,
+  1827→          },
+  1828→          include: {
+  1829→            nozzles: { where: { isActive: true }, orderBy: { nozzleNumber: 'asc' } },
+  1830→          },
+  1831→        })
+  1832→
+  1833→        if (!dispenser) {
+  1834→          return errorResponse(`No active dispenser found at pump address ${pumpAddress} on controller "${controller.name}"`, 404)
+  1835→        }
+  1836→
+  1837→        // Check dispenser status
+  1838→        if (dispenser.status === 'fueling') {
+  1839→          return errorResponse(`Dispenser "${dispenser.name}" is currently fueling. Cannot authorize.`, 409)
+  1840→        }
+  1841→        if (dispenser.status === 'locked' || dispenser.status === 'maintenance') {
+  1842→          return errorResponse(`Dispenser "${dispenser.name}" is ${dispenser.status}. Cannot authorize.`, 409)
+  1843→        }
+  1844→
+  1845→        // Validate nozzle
+  1846→        if (nozzleNumber && nozzleNumber > dispenser.nozzleCount) {
+  1847→          return errorResponse(`Nozzle number ${nozzleNumber} exceeds dispenser's nozzle count of ${dispenser.nozzleCount}`)
+  1848→        }
+  1849→
+  1850→        // Build command parameters
+  1851→        const commandParams: Record<string, unknown> = {
+  1852→          pumpAddress,
+  1853→          nozzleNumber: nozzleNumber || 0, // 0 = any nozzle
+  1854→        }
+  1855→        if (presetVolume) commandParams.presetVolume = presetVolume
+  1856→        if (presetAmount) commandParams.presetAmount = presetAmount
+  1857→
+  1858→        // Queue command to the CONTROLLER (not the dispenser)
+  1859→        const command = await createCommandEntry({
+  1860→          stationId: controller.stationId,
+  1861→          deviceType: 'forecourt_controller',
+  1862→          deviceId: controllerId,
+  1863→          command: 'authorize_pump',
+  1864→          parameters: JSON.stringify(commandParams),
+  1865→          priority: 'high',
+  1866→          maxRetries: 3,
+  1867→          retryCount: 0,
+  1868→          createdBy: createdBy || null,
+  1869→        })
+  1870→
+  1871→        // Log events
+  1872→        await logDeviceEvent({
+  1873→          stationId: controller.stationId,
+  1874→          deviceType: 'forecourt_controller',
+  1875→          deviceId: controllerId,
+  1876→          eventType: 'command',
+  1877→          severity: 'info',
+  1878→          message: `Pump authorization sent via controller "${controller.name}" for pump address ${pumpAddress}`,
+  1879→          dataJson: JSON.stringify(commandParams),
+  1880→        })
+  1881→
+  1882→        await logDeviceEvent({
+  1883→          stationId: dispenser.stationId,
+  1884→          deviceType: 'dispenser',
+  1885→          deviceId: dispenser.id,
+  1886→          eventType: 'command',
+  1887→          severity: 'info',
+  1888→          message: `Dispenser "${dispenser.name}" authorization requested via controller "${controller.name}"`,
+  1889→          dataJson: JSON.stringify(commandParams),
+  1890→        })
+  1891→
+  1892→        return NextResponse.json({
+  1893→          success: true,
+  1894→          message: `Authorization command queued for pump address ${pumpAddress} via controller "${controller.name}"`,
+  1895→          command,
+  1896→          dispenser: { id: dispenser.id, name: dispenser.name, code: dispenser.code, status: dispenser.status },
+  1897→          controller: { id: controller.id, name: controller.name, controllerType: controller.controllerType },
+  1898→        }, { status: 201 })
+  1899→      }
+  1900→
+  1901→      // ────────────────────────────────────────────
+  1902→      // STOP_PUMP - Stop a pump through its forecourt controller
+  1903→      // Architecture: ERP → Forecourt Controller → Pump
+  1904→      // ────────────────────────────────────────────
+  1905→      case 'stop_pump': {
+  1906→        const { controllerId, pumpAddress, createdBy } = body
+  1907→
+  1908→        if (!controllerId) {
+  1909→          return errorResponse('controllerId is required. Pumps can only be stopped through their forecourt controller.')
+  1910→        }
+  1911→        if (!pumpAddress || pumpAddress < 1) {
+  1912→          return errorResponse('pumpAddress is required and must be >= 1')
+  1913→        }
+  1914→
+  1915→        // Verify controller exists
+  1916→        const controller = await db.forecourtController.findUnique({
+  1917→          where: { id: controllerId },
+  1918→        })
+  1919→        if (!controller) {
+  1920→          return errorResponse('Forecourt controller not found', 404)
+  1921→        }
+  1922→
+  1923→        // Find the dispenser
+  1924→        const dispenser = await db.dispenser.findFirst({
+  1925→          where: {
+  1926→            forecourtControllerId: controllerId,
+  1927→            pumpAddress,
+  1928→            isActive: true,
+  1929→          },
+  1930→        })
+  1931→
+  1932→        if (!dispenser) {
+  1933→          return errorResponse(`No active dispenser found at pump address ${pumpAddress} on controller "${controller.name}"`, 404)
+  1934→        }
+  1935→
+  1936→        // Queue stop command to the CONTROLLER
+  1937→        const command = await createCommandEntry({
+  1938→          stationId: controller.stationId,
+  1939→          deviceType: 'forecourt_controller',
+  1940→          deviceId: controllerId,
+  1941→          command: 'stop_pump',
+  1942→          parameters: JSON.stringify({ pumpAddress }),
+  1943→          priority: 'urgent',
+  1944→          maxRetries: 5,
+  1945→          retryCount: 0,
+  1946→          createdBy: createdBy || null,
+  1947→        })
+  1948→
+  1949→        // Log events
+  1950→        await logDeviceEvent({
+  1951→          stationId: controller.stationId,
+  1952→          deviceType: 'forecourt_controller',
+  1953→          deviceId: controllerId,
+  1954→          eventType: 'command',
+  1955→          severity: 'warning',
+  1956→          message: `Stop command sent via controller "${controller.name}" for pump address ${pumpAddress}`,
+  1957→          dataJson: JSON.stringify({ pumpAddress }),
+  1958→        })
+  1959→
+  1960→        await logDeviceEvent({
+  1961→          stationId: dispenser.stationId,
+  1962→          deviceType: 'dispenser',
+  1963→          deviceId: dispenser.id,
+  1964→          eventType: 'command',
+  1965→          severity: 'warning',
+  1966→          message: `Dispenser "${dispenser.name}" stop requested via controller "${controller.name}"`,
+  1967→          dataJson: JSON.stringify({ pumpAddress }),
+  1968→        })
+  1969→
+  1970→        return NextResponse.json({
+  1971→          success: true,
+  1972→          message: `Stop command queued for pump address ${pumpAddress} via controller "${controller.name}"`,
+  1973→          command,
+  1974→          dispenser: { id: dispenser.id, name: dispenser.name, code: dispenser.code, status: dispenser.status },
+  1975→          controller: { id: controller.id, name: controller.name, controllerType: controller.controllerType },
+  1976→        }, { status: 201 })
+  1977→      }
+  1978→
+  1979→      // ────────────────────────────────────────────
+  1980→      // CHANGE_PRICE - Change price on a pump via controller
+  1981→      // Architecture: ERP → Forecourt Controller → Pump
+  1982→      // ────────────────────────────────────────────
+  1983→      case 'change_price': {
+  1984→        const { controllerId, pumpAddress, fuelType, newPrice, createdBy } = body
+  1985→
+  1986→        if (!controllerId) {
+  1987→          return errorResponse('controllerId is required. Price changes must go through the forecourt controller.')
+  1988→        }
+  1989→        if (!pumpAddress || pumpAddress < 1) {
+  1990→          return errorResponse('pumpAddress is required and must be >= 1')
+  1991→        }
+  1992→        if (!fuelType) {
+  1993→          return errorResponse('fuelType is required')
+  1994→        }
+  1995→        if (!newPrice || newPrice <= 0) {
+  1996→          return errorResponse('newPrice is required and must be > 0')
+  1997→        }
+  1998→
+  1999→        // Verify controller exists
+  2000→        const controller = await db.forecourtController.findUnique({
+
+[showing lines 1-2000 of 2581; use offset=2001 with limit to continue reading]

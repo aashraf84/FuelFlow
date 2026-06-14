@@ -1,0 +1,596 @@
+     1→     1→'use client'
+     2→     2→
+     3→     3→import { useState } from 'react'
+     4→     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→     5→import {
+     6→     6→  ShoppingCart,
+     7→     7→  Package,
+     8→     8→  Car,
+     9→     9→  Ticket,
+    10→    10→  Droplets,
+    11→    11→  Tag,
+    12→    12→  Plus,
+    13→    13→  TrendingUp,
+    14→    14→  CreditCard,
+    15→    15→  Banknote,
+    16→    16→  Coffee,
+    17→    17→  Cigarette,
+    18→    18→  Cookie,
+    19→    19→  SprayCan,
+    20→    20→  Gift,
+    21→    21→  Star,
+    22→    22→  Clock,
+    23→    23→  CheckCircle2,
+    24→    24→  Sparkles,
+    25→    25→  type LucideIcon,
+    26→    26→} from 'lucide-react'
+    27→    27→
+    28→    28→// ── Static Data ──────────────────────────────────────────
+    29→    29→
+    30→    30→const retailStats = {
+    31→    31→  revenue: 847500,
+    32→    32→  itemsSold: 3241,
+    33→    33→  avgBasket: 261,
+    34→    34→  topCategory: 'Beverages',
+    35→    35→  revenueChange: 12.4,
+    36→    36→  itemsChange: 8.2,
+    37→    37→  basketChange: -2.1,
+    38→    38→}
+    39→    39→
+    40→    40→const categories: { name: string; icon: LucideIcon; items: number; revenue: number; color: string }[] = [
+    41→    41→  { name: 'Beverages', icon: Coffee, items: 48, revenue: 245000, color: '#34c759' },
+    42→    42→  { name: 'Snacks', icon: Cookie, items: 35, revenue: 178000, color: '#e8930c' },
+    43→    43→  { name: 'Tobacco', icon: Cigarette, items: 22, revenue: 312000, color: '#ff9500' },
+    44→    44→  { name: 'Car Care', icon: SprayCan, items: 18, revenue: 45000, color: '#ff6b35' },
+    45→    45→  { name: 'Confectionery', icon: Gift, items: 28, revenue: 38000, color: '#30d158' },
+    46→    46→  { name: 'Essentials', icon: Package, items: 41, revenue: 29500, color: '#8e8e93' },
+    47→    47→]
+    48→    48→
+    49→    49→const topProducts = [
+    50→    50→  { rank: 1, name: 'Red Bull 250ml', sku: 'BEV-001', category: 'Beverages', sold: 284, revenue: 85200, inStock: 156 },
+    51→    51→  { rank: 2, name: 'Marlboro Gold 20s', sku: 'TOB-003', category: 'Tobacco', sold: 198, revenue: 79200, inStock: 84 },
+    52→    52→  { rank: 3, name: 'Coca-Cola 500ml', sku: 'BEV-012', category: 'Beverages', sold: 245, revenue: 49000, inStock: 320 },
+    53→    53→  { rank: 4, name: 'Lays Classic 52g', sku: 'SNK-005', category: 'Snacks', sold: 210, revenue: 31500, inStock: 180 },
+    54→    54→  { rank: 5, name: 'Nestle Water 1.5L', sku: 'BEV-008', category: 'Beverages', sold: 188, revenue: 18800, inStock: 450 },
+    55→    55→  { rank: 6, name: 'Dunhill Fine Cut', sku: 'TOB-007', category: 'Tobacco', sold: 142, revenue: 71000, inStock: 56 },
+    56→    56→  { rank: 7, name: 'Cadbury Dairy Milk', sku: 'CON-002', category: 'Confectionery', sold: 156, revenue: 23400, inStock: 92 },
+    57→    57→  { rank: 8, name: 'Shell Helix 1L', sku: 'CAR-001', category: 'Car Care', sold: 67, revenue: 33500, inStock: 24 },
+    58→    58→]
+    59→    59→
+    60→    60→const recentTransactions = [
+    61→    61→  { id: 'RT-4821', time: '14:35', items: 3, total: 890, payment: 'Cash', attendant: 'Farhan S.' },
+    62→    62→  { id: 'RT-4820', time: '14:28', items: 1, total: 400, payment: 'Card', attendant: 'Rizwan K.' },
+    63→    63→  { id: 'RT-4819', time: '14:15', items: 5, total: 1250, payment: 'Card', attendant: 'Farhan S.' },
+    64→    64→  { id: 'RT-4818', time: '14:02', items: 2, total: 350, payment: 'Cash', attendant: 'Imran B.' },
+    65→    65→  { id: 'RT-4817', time: '13:55', items: 1, total: 500, payment: 'Cash', attendant: 'Rizwan K.' },
+    66→    66→  { id: 'RT-4816', time: '13:42', items: 4, total: 1680, payment: 'JazzCash', attendant: 'Farhan S.' },
+    67→    67→  { id: 'RT-4815', time: '13:30', items: 2, total: 620, payment: 'Card', attendant: 'Imran B.' },
+    68→    68→  { id: 'RT-4814', time: '13:18', items: 1, total: 300, payment: 'Cash', attendant: 'Farhan S.' },
+    69→    69→]
+    70→    70→
+    71→    71→const carWashSessions = [
+    72→    72→  { id: 'CW-034', plate: 'ABC-1234', type: 'Premium Wash', amount: 1500, status: 'in-progress' as const, started: '14:30', bay: 'Bay 1' },
+    73→    73→  { id: 'CW-033', plate: 'DEF-5678', type: 'Standard Wash', amount: 800, status: 'completed' as const, started: '14:10', bay: 'Bay 2' },
+    74→    74→  { id: 'CW-032', plate: 'GHI-9012', type: 'Quick Rinse', amount: 400, status: 'completed' as const, started: '13:55', bay: 'Bay 1' },
+    75→    75→  { id: 'CW-031', plate: 'JKL-3456', type: 'Premium Wash', amount: 1500, status: 'completed' as const, started: '13:30', bay: 'Bay 2' },
+    76→    76→  { id: 'CW-030', plate: 'MNO-7890', type: 'Full Detail', amount: 3500, status: 'completed' as const, started: '12:45', bay: 'Bay 1' },
+    77→    77→]
+    78→    78→
+    79→    79→const lotterySales = [
+    80→    80→  { id: 'LS-101', game: 'Bol Cash', tickets: 5, amount: 500, time: '14:32', status: 'sold' as const },
+    81→    81→  { id: 'LS-100', game: 'Lucky Draw', tickets: 2, amount: 200, time: '14:15', status: 'sold' as const },
+    82→    82→  { id: 'LS-099', game: 'Gold Rush', tickets: 1, amount: 100, time: '13:58', status: 'claimed' as const },
+    83→    83→  { id: 'LS-098', game: 'Bol Cash', tickets: 3, amount: 300, time: '13:40', status: 'sold' as const },
+    84→    84→  { id: 'LS-097', game: 'Maha Jackpot', tickets: 1, amount: 500, time: '13:21', status: 'sold' as const },
+    85→    85→  { id: 'LS-096', game: 'Lucky Draw', tickets: 4, amount: 400, time: '12:55', status: 'claimed' as const },
+    86→    86→]
+    87→    87→
+    88→    88→// ── Helpers ───────────────────────────────────────────────
+    89→    89→
+    90→    90→const pkr = (n: number) => `PKR ${n.toLocaleString()}`
+    91→    91→
+    92→    92→type TabKey = 'overview' | 'products' | 'transactions' | 'carwash' | 'lottery'
+    93→    93→
+    94→    94→const tabs: { key: TabKey; label: string; icon: React.ElementType }[] = [
+    95→    95→  { key: 'overview', label: 'Overview', icon: ShoppingCart },
+    96→    96→  { key: 'products', label: 'Top Products', icon: Star },
+    97→    97→  { key: 'transactions', label: 'Transactions', icon: CreditCard },
+    98→    98→  { key: 'carwash', label: 'Car Wash', icon: Car },
+    99→    99→  { key: 'lottery', label: 'Lottery', icon: Ticket },
+   100→   100→]
+   101→   101→
+   102→   102→// ── Component ─────────────────────────────────────────────
+   103→   103→
+   104→   104→export default function RetailModule() {
+   105→   105→  const [activeTab, setActiveTab] = useState<TabKey>('overview')
+   106→   106→
+   107→   107→  return (
+   108→   108→    <div className="space-y-5">
+   109→   109→      {/* ── Tab Bar ── */}
+   110→   110→      <div className="flex items-center gap-1 overflow-x-auto pb-1 -mb-1">
+   111→   111→        {tabs.map((tab) => {
+   112→   112→          const isActive = activeTab === tab.key
+   113→   113→          const Icon = tab.icon
+   114→   114→          return (
+   115→   115→            <button
+   116→   116→              key={tab.key}
+   117→   117→              onClick={() => setActiveTab(tab.key)}
+   118→   118→              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all duration-150 whitespace-nowrap ${
+   119→   119→                isActive
+   120→   120→                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+   121→   121→                  : 'text-muted-foreground hover:bg-black/[0.03] dark:hover:bg-white/[0.05] hover:text-foreground'
+   122→   122→              }`}
+   123→   123→            >
+   124→   124→              <Icon className="size-3.5" strokeWidth={isActive ? 2 : 1.5} />
+   125→   125→              {tab.label}
+   126→   126→            </button>
+   127→   127→          )
+   128→   128→        })}
+   129→   129→      </div>
+   130→   130→
+   131→   131→      {/* ── Tab Content ── */}
+   132→   132→      <AnimatePresence mode="wait">
+   133→   133→        <motion.div
+   134→   134→          key={activeTab}
+   135→   135→          initial={{ opacity: 0, y: 6 }}
+   136→   136→          animate={{ opacity: 1, y: 0 }}
+   137→   137→          exit={{ opacity: 0, y: -4 }}
+   138→   138→          transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+   139→   139→        >
+   140→   140→          {activeTab === 'overview' && <OverviewTab />}
+   141→   141→          {activeTab === 'products' && <ProductsTab />}
+   142→   142→          {activeTab === 'transactions' && <TransactionsTab />}
+   143→   143→          {activeTab === 'carwash' && <CarWashTab />}
+   144→   144→          {activeTab === 'lottery' && <LotteryTab />}
+   145→   145→        </motion.div>
+   146→   146→      </AnimatePresence>
+   147→   147→    </div>
+   148→   148→  )
+   149→   149→}
+   150→   150→
+   151→   151→// ── Overview Tab ──────────────────────────────────────────
+   152→   152→
+   153→   153→function OverviewTab() {
+   154→   154→  const stats = [
+   155→   155→    { label: 'Revenue', value: pkr(retailStats.revenue), change: retailStats.revenueChange, icon: Banknote, accent: true },
+   156→   156→    { label: 'Items Sold', value: retailStats.itemsSold.toLocaleString(), change: retailStats.itemsChange, icon: Package, accent: false },
+   157→   157→    { label: 'Avg Basket', value: pkr(retailStats.avgBasket), change: retailStats.basketChange, icon: ShoppingCart, accent: false },
+   158→   158→    { label: 'Top Category', value: retailStats.topCategory, change: null, icon: Tag, accent: false },
+   159→   159→  ]
+   160→   160→
+   161→   161→  return (
+   162→   162→    <div className="space-y-5">
+   163→   163→      {/* Stats Cards */}
+   164→   164→      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+   165→   165→        {stats.map((stat, i) => (
+   166→   166→          <motion.div
+   167→   167→            key={stat.label}
+   168→   168→            initial={{ opacity: 0, y: 8 }}
+   169→   169→            animate={{ opacity: 1, y: 0 }}
+   170→   170→            transition={{ delay: i * 0.05, duration: 0.3 }}
+   171→   171→            className="macos-card p-4"
+   172→   172→          >
+   173→   173→            <div className="flex items-start justify-between">
+   174→   174→              <div>
+   175→   175→                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{stat.label}</p>
+   176→   176→                <p className={`text-[20px] font-bold mt-1 ${stat.accent ? 'fuel-text-gradient' : 'text-foreground'}`}>
+   177→   177→                  {stat.value}
+   178→   178→                </p>
+   179→   179→                {stat.change !== null && (
+   180→   180→                  <div className="flex items-center gap-1 mt-1">
+   181→   181→                    {stat.change > 0 ? (
+   182→   182→                      <TrendingUp className="size-3 text-emerald-500" />
+   183→   183→                    ) : (
+   184→   184→                      <TrendingUp className="size-3 text-red-500 rotate-180" />
+   185→   185→                    )}
+   186→   186→                    <span className={`text-[11px] font-medium ${stat.change > 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+   187→   187→                      {Math.abs(stat.change)}%
+   188→   188→                    </span>
+   189→   189→                    <span className="text-[10px] text-muted-foreground">vs last week</span>
+   190→   190→                  </div>
+   191→   191→                )}
+   192→   192→              </div>
+   193→   193→              <div className={`size-8 rounded-lg flex items-center justify-center ${stat.accent ? 'bg-amber-500/10' : 'bg-black/[0.03] dark:bg-white/[0.05]'}`}>
+   194→   194→                <stat.icon className={`size-4 ${stat.accent ? 'text-amber-500' : 'text-muted-foreground'}`} strokeWidth={1.5} />
+   195→   195→              </div>
+   196→   196→            </div>
+   197→   197→          </motion.div>
+   198→   198→        ))}
+   199→   199→      </div>
+   200→   200→
+   201→   201→      {/* Product Categories Grid */}
+   202→   202→      <div>
+   203→   203→        <div className="macos-section-header px-1 mb-2">Product Categories</div>
+   204→   204→        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+   205→   205→          {categories.map((cat, i) => {
+   206→   206→            const Icon = cat.icon
+   207→   207→            return (
+   208→   208→              <motion.div
+   209→   209→                key={cat.name}
+   210→   210→                initial={{ opacity: 0, scale: 0.95 }}
+   211→   211→                animate={{ opacity: 1, scale: 1 }}
+   212→   212→                transition={{ delay: i * 0.04, duration: 0.25 }}
+   213→   213→                className="macos-card p-4 text-center"
+   214→   214→              >
+   215→   215→                <div className="size-10 rounded-xl flex items-center justify-center mx-auto mb-2.5" style={{ background: `${cat.color}15` }}>
+   216→   216→                  <Icon className="size-5" style={{ color: cat.color }} />
+   217→   217→                </div>
+   218→   218→                <p className="text-[13px] font-semibold">{cat.name}</p>
+   219→   219→                <p className="text-[11px] text-muted-foreground mt-0.5">{cat.items} items</p>
+   220→   220→                <p className="text-[12px] font-bold mt-1.5 fuel-text-gradient">{pkr(cat.revenue)}</p>
+   221→   221→              </motion.div>
+   222→   222→            )
+   223→   223→          })}
+   224→   224→        </div>
+   225→   225→      </div>
+   226→   226→
+   227→   227→      {/* Quick: Recent Transactions & Top Products side by side */}
+   228→   228→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+   229→   229→        {/* Recent Transactions */}
+   230→   230→        <div className="macos-card overflow-hidden">
+   231→   231→          <div className="px-4 py-3 border-b border-border">
+   232→   232→            <h3 className="text-[13px] font-semibold">Recent Transactions</h3>
+   233→   233→          </div>
+   234→   234→          <div className="max-h-64 overflow-y-auto">
+   235→   235→            {recentTransactions.slice(0, 5).map((tx) => (
+   236→   236→              <div key={tx.id} className="macos-group-item flex items-center justify-between !px-4">
+   237→   237→                <div className="flex items-center gap-3">
+   238→   238→                  <div className="size-8 rounded-lg flex items-center justify-center bg-black/[0.03] dark:bg-white/[0.05]">
+   239→   239→                    <ShoppingCart className="size-3.5 text-muted-foreground" />
+   240→   240→                  </div>
+   241→   241→                  <div>
+   242→   242→                    <p className="text-[13px] font-medium">{tx.id}</p>
+   243→   243→                    <p className="text-[11px] text-muted-foreground">{tx.items} items · {tx.attendant}</p>
+   244→   244→                  </div>
+   245→   245→                </div>
+   246→   246→                <div className="text-right">
+   247→   247→                  <p className="text-[13px] font-semibold">{pkr(tx.total)}</p>
+   248→   248→                  <p className="text-[11px] text-muted-foreground">{tx.time}</p>
+   249→   249→                </div>
+   250→   250→              </div>
+   251→   251→            ))}
+   252→   252→          </div>
+   253→   253→        </div>
+   254→   254→
+   255→   255→        {/* Top Products Quick View */}
+   256→   256→        <div className="macos-card overflow-hidden">
+   257→   257→          <div className="px-4 py-3 border-b border-border">
+   258→   258→            <h3 className="text-[13px] font-semibold">Top Selling Products</h3>
+   259→   259→          </div>
+   260→   260→          <div className="max-h-64 overflow-y-auto">
+   261→   261→            {topProducts.slice(0, 5).map((p) => (
+   262→   262→              <div key={p.sku} className="macos-group-item flex items-center justify-between !px-4">
+   263→   263→                <div className="flex items-center gap-3">
+   264→   264→                  <div className="size-7 rounded-full flex items-center justify-center bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[11px] font-bold">
+   265→   265→                    {p.rank}
+   266→   266→                  </div>
+   267→   267→                  <div>
+   268→   268→                    <p className="text-[13px] font-medium">{p.name}</p>
+   269→   269→                    <p className="text-[11px] text-muted-foreground">{p.sold} sold · {p.inStock} in stock</p>
+   270→   270→                  </div>
+   271→   271→                </div>
+   272→   272→                <p className="text-[13px] font-semibold text-amber-600 dark:text-amber-400">{pkr(p.revenue)}</p>
+   273→   273→              </div>
+   274→   274→            ))}
+   275→   275→          </div>
+   276→   276→        </div>
+   277→   277→      </div>
+   278→   278→    </div>
+   279→   279→  )
+   280→   280→}
+   281→   281→
+   282→   282→// ── Products Tab ──────────────────────────────────────────
+   283→   283→
+   284→   284→function ProductsTab() {
+   285→   285→  return (
+   286→   286→    <div className="macos-card overflow-hidden">
+   287→   287→      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+   288→   288→        <div>
+   289→   289→          <h3 className="text-[13px] font-semibold">Top Selling Products</h3>
+   290→   290→          <p className="text-[11px] text-muted-foreground mt-0.5">Ranked by revenue this week</p>
+   291→   291→        </div>
+   292→   292→        <button className="macos-btn gap-1">
+   293→   293→          <Plus className="size-3.5" /> Add Product
+   294→   294→        </button>
+   295→   295→      </div>
+   296→   296→      <div className="overflow-x-auto">
+   297→   297→        <table className="macos-table">
+   298→   298→          <thead>
+   299→   299→            <tr>
+   300→   300→              <th className="w-10">#</th>
+   301→   301→              <th>Product</th>
+   302→   302→              <th>SKU</th>
+   303→   303→              <th>Category</th>
+   304→   304→              <th className="text-right">Qty Sold</th>
+   305→   305→              <th className="text-right">Revenue</th>
+   306→   306→              <th className="text-right">In Stock</th>
+   307→   307→            </tr>
+   308→   308→          </thead>
+   309→   309→          <tbody>
+   310→   310→            {topProducts.map((p) => (
+   311→   311→              <tr key={p.sku}>
+   312→   312→                <td>
+   313→   313→                  <div className={`size-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
+   314→   314→                    p.rank <= 3 ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'bg-black/[0.03] dark:bg-white/[0.05] text-muted-foreground'
+   315→   315→                  }`}>
+   316→   316→                    {p.rank}
+   317→   317→                  </div>
+   318→   318→                </td>
+   319→   319→                <td className="font-semibold">{p.name}</td>
+   320→   320→                <td className="font-mono text-[12px] text-muted-foreground">{p.sku}</td>
+   321→   321→                <td>
+   322→   322→                  <span className="macos-pill bg-black/[0.04] dark:bg-white/[0.06] text-muted-foreground">{p.category}</span>
+   323→   323→                </td>
+   324→   324→                <td className="text-right font-mono">{p.sold}</td>
+   325→   325→                <td className="text-right font-mono font-semibold text-amber-600 dark:text-amber-400">{pkr(p.revenue)}</td>
+   326→   326→                <td className="text-right">
+   327→   327→                  <span className={`font-mono ${p.inStock < 30 ? 'text-red-500' : p.inStock < 100 ? 'text-amber-500' : 'text-muted-foreground'}`}>
+   328→   328→                    {p.inStock}
+   329→   329→                  </span>
+   330→   330→                </td>
+   331→   331→              </tr>
+   332→   332→            ))}
+   333→   333→          </tbody>
+   334→   334→        </table>
+   335→   335→      </div>
+   336→   336→    </div>
+   337→   337→  )
+   338→   338→}
+   339→   339→
+   340→   340→// ── Transactions Tab ──────────────────────────────────────
+   341→   341→
+   342→   342→function TransactionsTab() {
+   343→   343→  const totalRevenue = recentTransactions.reduce((s, t) => s + t.total, 0)
+   344→   344→
+   345→   345→  return (
+   346→   346→    <div className="space-y-4">
+   347→   347→      <div className="grid grid-cols-3 gap-3">
+   348→   348→        <div className="macos-card p-4">
+   349→   349→          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Transactions</p>
+   350→   350→          <p className="text-[20px] font-bold text-foreground mt-1">{recentTransactions.length}</p>
+   351→   351→        </div>
+   352→   352→        <div className="macos-card p-4">
+   353→   353→          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Total Revenue</p>
+   354→   354→          <p className="text-[20px] font-bold fuel-text-gradient mt-1">{pkr(totalRevenue)}</p>
+   355→   355→        </div>
+   356→   356→        <div className="macos-card p-4">
+   357→   357→          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Payment Mix</p>
+   358→   358→          <p className="text-[16px] font-bold text-foreground mt-1">Cash 50% · Card 38%</p>
+   359→   359→        </div>
+   360→   360→      </div>
+   361→   361→
+   362→   362→      <div className="macos-card overflow-hidden">
+   363→   363→        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+   364→   364→          <h3 className="text-[13px] font-semibold">Recent Transactions</h3>
+   365→   365→          <span className="text-[11px] text-muted-foreground">Today&apos;s transactions</span>
+   366→   366→        </div>
+   367→   367→        <div className="overflow-x-auto">
+   368→   368→          <table className="macos-table">
+   369→   369→            <thead>
+   370→   370→              <tr>
+   371→   371→                <th>ID</th>
+   372→   372→                <th>Time</th>
+   373→   373→                <th className="text-center">Items</th>
+   374→   374→                <th className="text-right">Total</th>
+   375→   375→                <th>Payment</th>
+   376→   376→                <th>Attendant</th>
+   377→   377→              </tr>
+   378→   378→            </thead>
+   379→   379→            <tbody>
+   380→   380→              {recentTransactions.map((tx) => (
+   381→   381→                <tr key={tx.id}>
+   382→   382→                  <td className="font-mono text-[12px] text-muted-foreground">{tx.id}</td>
+   383→   383→                  <td className="font-mono text-[12px]">{tx.time}</td>
+   384→   384→                  <td className="text-center">{tx.items}</td>
+   385→   385→                  <td className="text-right font-mono font-semibold text-amber-600 dark:text-amber-400">{pkr(tx.total)}</td>
+   386→   386→                  <td>
+   387→   387→                    <span className={`macos-pill ${
+   388→   388→                      tx.payment === 'Cash'
+   389→   389→                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+   390→   390→                        : tx.payment === 'Card'
+   391→   391→                          ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+   392→   392→                          : 'bg-black/[0.04] dark:bg-white/[0.06] text-muted-foreground'
+   393→   393→                    }`}>
+   394→   394→                      {tx.payment}
+   395→   395→                    </span>
+   396→   396→                  </td>
+   397→   397→                  <td className="text-muted-foreground">{tx.attendant}</td>
+   398→   398→                </tr>
+   399→   399→              ))}
+   400→   400→            </tbody>
+   401→   401→          </table>
+   402→   402→        </div>
+   403→   403→      </div>
+   404→   404→    </div>
+   405→   405→  )
+   406→   406→}
+   407→   407→
+   408→   408→// ── Car Wash Tab ──────────────────────────────────────────
+   409→   409→
+   410→   410→function CarWashTab() {
+   411→   411→  const todayRevenue = carWashSessions.reduce((s, c) => s + c.amount, 0)
+   412→   412→  const completed = carWashSessions.filter(c => c.status === 'completed').length
+   413→   413→
+   414→   414→  return (
+   415→   415→    <div className="space-y-4">
+   416→   416→      <div className="grid grid-cols-3 gap-3">
+   417→   417→        <div className="macos-card p-4">
+   418→   418→          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Today&apos;s Sessions</p>
+   419→   419→          <p className="text-[20px] font-bold text-foreground mt-1">{carWashSessions.length}</p>
+   420→   420→        </div>
+   421→   421→        <div className="macos-card p-4">
+   422→   422→          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Revenue</p>
+   423→   423→          <p className="text-[20px] font-bold fuel-text-gradient mt-1">{pkr(todayRevenue)}</p>
+   424→   424→        </div>
+   425→   425→        <div className="macos-card p-4">
+   426→   426→          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Completed</p>
+   427→   427→          <p className="text-[20px] font-bold text-emerald-600 dark:text-emerald-400 mt-1">{completed}/{carWashSessions.length}</p>
+   428→   428→        </div>
+   429→   429→      </div>
+   430→   430→
+   431→   431→      {/* Bay Status */}
+   432→   432→      <div className="grid grid-cols-2 gap-3">
+   433→   433→        <div className="macos-card p-4">
+   434→   434→          <div className="flex items-center gap-2 mb-2">
+   435→   435→            <div className="macos-status-dot macos-status-warning" />
+   436→   436→            <h4 className="text-[13px] font-semibold">Bay 1</h4>
+   437→   437→          </div>
+   438→   438→          <p className="text-[12px] text-muted-foreground">Currently: Premium Wash</p>
+   439→   439→          <p className="text-[12px] font-medium mt-0.5">Plate: ABC-1234</p>
+   440→   440→          <div className="mt-2 flex items-center gap-1.5">
+   441→   441→            <Clock className="size-3 text-amber-500" />
+   442→   442→            <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400">In Progress</span>
+   443→   443→          </div>
+   444→   444→        </div>
+   445→   445→        <div className="macos-card p-4">
+   446→   446→          <div className="flex items-center gap-2 mb-2">
+   447→   447→            <div className="macos-status-dot macos-status-online" />
+   448→   448→            <h4 className="text-[13px] font-semibold">Bay 2</h4>
+   449→   449→          </div>
+   450→   450→          <p className="text-[12px] text-muted-foreground">Available</p>
+   451→   451→          <p className="text-[11px] text-muted-foreground mt-0.5">Last wash: 14:10</p>
+   452→   452→          <div className="mt-2 flex items-center gap-1.5">
+   453→   453→            <CheckCircle2 className="size-3 text-emerald-500" />
+   454→   454→            <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">Ready</span>
+   455→   455→          </div>
+   456→   456→        </div>
+   457→   457→      </div>
+   458→   458→
+   459→   459→      {/* Sessions Table */}
+   460→   460→      <div className="macos-card overflow-hidden">
+   461→   461→        <div className="px-4 py-3 border-b border-border">
+   462→   462→          <h3 className="text-[13px] font-semibold">Car Wash Sessions</h3>
+   463→   463→        </div>
+   464→   464→        <div className="overflow-x-auto">
+   465→   465→          <table className="macos-table">
+   466→   466→            <thead>
+   467→   467→              <tr>
+   468→   468→                <th>ID</th>
+   469→   469→                <th>Plate</th>
+   470→   470→                <th>Wash Type</th>
+   471→   471→                <th>Bay</th>
+   472→   472→                <th>Started</th>
+   473→   473→                <th className="text-right">Amount</th>
+   474→   474→                <th>Status</th>
+   475→   475→              </tr>
+   476→   476→            </thead>
+   477→   477→            <tbody>
+   478→   478→              {carWashSessions.map((s) => (
+   479→   479→                <tr key={s.id}>
+   480→   480→                  <td className="font-mono text-[12px] text-muted-foreground">{s.id}</td>
+   481→   481→                  <td className="font-mono font-semibold">{s.plate}</td>
+   482→   482→                  <td>{s.type}</td>
+   483→   483→                  <td className="text-muted-foreground">{s.bay}</td>
+   484→   484→                  <td className="font-mono text-[12px]">{s.started}</td>
+   485→   485→                  <td className="text-right font-mono font-semibold text-amber-600 dark:text-amber-400">{pkr(s.amount)}</td>
+   486→   486→                  <td>
+   487→   487→                    <div className="flex items-center gap-1.5">
+   488→   488→                      <div className={`macos-status-dot ${s.status === 'in-progress' ? 'macos-status-warning' : 'macos-status-online'}`} />
+   489→   489→                      <span className={`text-[11px] font-medium ${s.status === 'in-progress' ? 'text-amber-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
+   490→   490→                        {s.status === 'in-progress' ? 'In Progress' : 'Completed'}
+   491→   491→                      </span>
+   492→   492→                    </div>
+   493→   493→                  </td>
+   494→   494→                </tr>
+   495→   495→              ))}
+   496→   496→            </tbody>
+   497→   497→          </table>
+   498→   498→        </div>
+   499→   499→      </div>
+   500→   500→    </div>
+   501→   501→  )
+   502→   502→}
+   503→   503→
+   504→   504→// ── Lottery Tab ───────────────────────────────────────────
+   505→   505→
+   506→   506→function LotteryTab() {
+   507→   507→  const totalSales = lotterySales.reduce((s, l) => s + l.amount, 0)
+   508→   508→  const totalTickets = lotterySales.reduce((s, l) => s + l.tickets, 0)
+   509→   509→  const claimed = lotterySales.filter(l => l.status === 'claimed').length
+   510→   510→
+   511→   511→  return (
+   512→   512→    <div className="space-y-4">
+   513→   513→      <div className="grid grid-cols-3 gap-3">
+   514→   514→        <div className="macos-card p-4">
+   515→   515→          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Tickets Sold</p>
+   516→   516→          <p className="text-[20px] font-bold text-foreground mt-1">{totalTickets}</p>
+   517→   517→        </div>
+   518→   518→        <div className="macos-card p-4">
+   519→   519→          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Revenue</p>
+   520→   520→          <p className="text-[20px] font-bold fuel-text-gradient mt-1">{pkr(totalSales)}</p>
+   521→   521→        </div>
+   522→   522→        <div className="macos-card p-4">
+   523→   523→          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Prizes Claimed</p>
+   524→   524→          <p className="text-[20px] font-bold text-foreground mt-1">{claimed}</p>
+   525→   525→        </div>
+   526→   526→      </div>
+   527→   527→
+   528→   528→      {/* Active Games */}
+   529→   529→      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+   530→   530→        {[
+   531→   531→          { name: 'Bol Cash', price: 100, color: '#e8930c' },
+   532→   532→          { name: 'Lucky Draw', price: 100, color: '#34c759' },
+   533→   533→          { name: 'Gold Rush', price: 100, color: '#ff9500' },
+   534→   534→        ].map((game) => (
+   535→   535→          <div key={game.name} className="macos-card p-4">
+   536→   536→            <div className="flex items-center gap-2.5 mb-2">
+   537→   537→              <div className="size-8 rounded-lg flex items-center justify-center" style={{ background: `${game.color}15` }}>
+   538→   538→                <Sparkles className="size-4" style={{ color: game.color }} />
+   539→   539→              </div>
+   540→   540→              <div>
+   541→   541→                <p className="text-[13px] font-semibold">{game.name}</p>
+   542→   542→                <p className="text-[11px] text-muted-foreground">PKR {game.price}/ticket</p>
+   543→   543→              </div>
+   544→   544→            </div>
+   545→   545→            <div className="flex items-center gap-1.5">
+   546→   546→              <div className="macos-status-dot macos-status-online" />
+   547→   547→              <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">Active</span>
+   548→   548→            </div>
+   549→   549→          </div>
+   550→   550→        ))}
+   551→   551→      </div>
+   552→   552→
+   553→   553→      {/* Sales Table */}
+   554→   554→      <div className="macos-card overflow-hidden">
+   555→   555→        <div className="px-4 py-3 border-b border-border">
+   556→   556→          <h3 className="text-[13px] font-semibold">Recent Lottery Sales</h3>
+   557→   557→        </div>
+   558→   558→        <div className="overflow-x-auto">
+   559→   559→          <table className="macos-table">
+   560→   560→            <thead>
+   561→   561→              <tr>
+   562→   562→                <th>ID</th>
+   563→   563→                <th>Game</th>
+   564→   564→                <th className="text-center">Tickets</th>
+   565→   565→                <th className="text-right">Amount</th>
+   566→   566→                <th>Time</th>
+   567→   567→                <th>Status</th>
+   568→   568→              </tr>
+   569→   569→            </thead>
+   570→   570→            <tbody>
+   571→   571→              {lotterySales.map((ls) => (
+   572→   572→                <tr key={ls.id}>
+   573→   573→                  <td className="font-mono text-[12px] text-muted-foreground">{ls.id}</td>
+   574→   574→                  <td className="font-semibold">{ls.game}</td>
+   575→   575→                  <td className="text-center">{ls.tickets}</td>
+   576→   576→                  <td className="text-right font-mono font-semibold text-amber-600 dark:text-amber-400">{pkr(ls.amount)}</td>
+   577→   577→                  <td className="font-mono text-[12px]">{ls.time}</td>
+   578→   578→                  <td>
+   579→   579→                    <span className={`macos-pill ${
+   580→   580→                      ls.status === 'sold'
+   581→   581→                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+   582→   582→                        : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+   583→   583→                    }`}>
+   584→   584→                      {ls.status === 'sold' ? 'Sold' : 'Claimed'}
+   585→   585→                    </span>
+   586→   586→                  </td>
+   587→   587→                </tr>
+   588→   588→              ))}
+   589→   589→            </tbody>
+   590→   590→          </table>
+   591→   591→        </div>
+   592→   592→      </div>
+   593→   593→    </div>
+   594→   594→  )
+   595→   595→}
+   596→   596→
