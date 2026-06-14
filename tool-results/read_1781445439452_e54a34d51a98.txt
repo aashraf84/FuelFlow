@@ -1,0 +1,961 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect } from 'react'
+     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→import {
+     6→  Fuel,
+     7→  Key,
+     8→  Mail,
+     9→  Lock,
+    10→  Eye,
+    11→  EyeOff,
+    12→  ArrowRight,
+    13→  Shield,
+    14→  CheckCircle2,
+    15→  AlertCircle,
+    16→  Loader2,
+    17→  Monitor,
+    18→  Zap,
+    19→  Building2,
+    20→  Users,
+    21→  Gauge,
+    22→  ChevronRight,
+    23→  Fingerprint,
+    24→  Crown,
+    25→  Phone,
+    26→  User,
+    27→  Cpu,
+    28→  Copy,
+    29→  Check,
+    30→} from 'lucide-react'
+    31→import { Input } from '@/components/ui/input'
+    32→import { Label } from '@/components/ui/label'
+    33→import { Badge } from '@/components/ui/badge'
+    34→import { Separator } from '@/components/ui/separator'
+    35→import { useAppStore, type AuthUser, type AccessLevel } from '@/stores/app-store'
+    36→
+    37→type LoginStep = 'serial-key' | 'credentials' | 'register-admin' | 'registration-success'
+    38→
+    39→interface SerialKeyValidation {
+    40→  valid: boolean
+    41→  status?: string
+    42→  plan?: string
+    43→  maxStations?: number
+    44→  maxDispensers?: number
+    45→  maxUsers?: number
+    46→  message?: string
+    47→  error?: string
+    48→  tenant?: { id: string; name: string; slug: string } | null
+    49→}
+    50→
+    51→interface RegistrationResult {
+    52→  credentials: {
+    53→    email: string
+    54→    password: string
+    55→    apiKey: string
+    56→    userId: string
+    57→    ownerId: string
+    58→  }
+    59→  serialKey: {
+    60→    key: string
+    61→    plan: string
+    62→    maxStations: number
+    63→    maxDispensers: number
+    64→    maxUsers: number
+    65→    expiresAt: string
+    66→    status: string
+    67→  }
+    68→  licenseKey: {
+    69→    key: string
+    70→    status: string
+    71→    expiresAt: string
+    72→  }
+    73→  device: {
+    74→    id: string
+    75→    name: string
+    76→    type: string
+    77→    status: string
+    78→  }
+    79→  tenant: {
+    80→    id: string
+    81→    name: string
+    82→    slug: string
+    83→    subscription: string
+    84→  }
+    85→}
+    86→
+    87→export default function LoginPage() {
+    88→  const { login } = useAppStore()
+    89→  const [step, setStep] = useState<LoginStep>('serial-key')
+    90→  const [serialKey, setSerialKey] = useState('')
+    91→  const [serialKeyValidation, setSerialKeyValidation] = useState<SerialKeyValidation | null>(null)
+    92→  const [validatingKey, setValidatingKey] = useState(false)
+    93→  const [email, setEmail] = useState('')
+    94→  const [password, setPassword] = useState('')
+    95→  const [showPassword, setShowPassword] = useState(false)
+    96→  const [loading, setLoading] = useState(false)
+    97→  const [error, setError] = useState<string | null>(null)
+    98→  const [demoLoading, setDemoLoading] = useState(false)
+    99→
+   100→  // Registration form state
+   101→  const [regName, setRegName] = useState('')
+   102→  const [regEmail, setRegEmail] = useState('')
+   103→  const [regPhone, setRegPhone] = useState('')
+   104→  const [regCompany, setRegCompany] = useState('')
+   105→  const [regDeviceName, setRegDeviceName] = useState('')
+   106→  const [regDeviceType, setRegDeviceType] = useState('pos')
+   107→  const [regLoading, setRegLoading] = useState(false)
+   108→  const [registrationResult, setRegistrationResult] = useState<RegistrationResult | null>(null)
+   109→  const [copiedField, setCopiedField] = useState<string | null>(null)
+   110→
+   111→  // Auto-validate serial key with debounce
+   112→  useEffect(() => {
+   113→    if (!serialKey || serialKey.length < 8) {
+   114→      setSerialKeyValidation(null)
+   115→      return
+   116→    }
+   117→    const timer = setTimeout(async () => {
+   118→      setValidatingKey(true)
+   119→      try {
+   120→        const res = await fetch('/api/auth/validate-serial', {
+   121→          method: 'POST',
+   122→          headers: { 'Content-Type': 'application/json' },
+   123→          body: JSON.stringify({ key: serialKey }),
+   124→        })
+   125→        const data = await res.json()
+   126→        setSerialKeyValidation(data)
+   127→      } catch {
+   128→        setSerialKeyValidation({ valid: false, error: 'Validation failed' })
+   129→      } finally {
+   130→        setValidatingKey(false)
+   131→      }
+   132→    }, 600)
+   133→    return () => clearTimeout(timer)
+   134→  }, [serialKey])
+   135→
+   136→  const handleSerialKeySubmit = () => {
+   137→    if (!serialKeyValidation?.valid) return
+   138→    setError(null)
+   139→    setStep('credentials')
+   140→  }
+   141→
+   142→  const handleLogin = async () => {
+   143→    if (!email || !password) {
+   144→      setError('Please enter both email and password')
+   145→      return
+   146→    }
+   147→    setLoading(true)
+   148→    setError(null)
+   149→    try {
+   150→      const res = await fetch('/api/auth/login', {
+   151→        method: 'POST',
+   152→        headers: { 'Content-Type': 'application/json' },
+   153→        body: JSON.stringify({ email: email.trim().toLowerCase(), password, serialKey: serialKey || undefined }),
+   154→      })
+   155→      const data = await res.json()
+   156→      if (!res.ok) {
+   157→        setError(data.error || 'Login failed')
+   158→        return
+   159→      }
+   160→      login(data.user as AuthUser, data.accessLevel as AccessLevel)
+   161→    } catch {
+   162→      setError('Network error. Please try again.')
+   163→    } finally {
+   164→      setLoading(false)
+   165→    }
+   166→  }
+   167→
+   168→  const handleDemoLogin = async () => {
+   169→    setDemoLoading(true)
+   170→    setError(null)
+   171→    try {
+   172→      const res = await fetch('/api/auth/demo-login', {
+   173→        method: 'POST',
+   174→        headers: { 'Content-Type': 'application/json' },
+   175→      })
+   176→      const data = await res.json()
+   177→      if (!res.ok) {
+   178→        setError(data.error || 'Demo login failed')
+   179→        return
+   180→      }
+   181→      login(data.user as AuthUser, data.accessLevel as AccessLevel)
+   182→    } catch {
+   183→      setError('Network error. Please try again.')
+   184→    } finally {
+   185→      setDemoLoading(false)
+   186→    }
+   187→  }
+   188→
+   189→  const handleSuperAdminRegister = async () => {
+   190→    if (!regName || !regEmail || !regCompany || !regDeviceName) {
+   191→      setError('Please fill in all required fields')
+   192→      return
+   193→    }
+   194→    setRegLoading(true)
+   195→    setError(null)
+   196→    try {
+   197→      const res = await fetch('/api/auth/setup-super-admin', {
+   198→        method: 'POST',
+   199→        headers: { 'Content-Type': 'application/json' },
+   200→        body: JSON.stringify({
+   201→          name: regName.trim(),
+   202→          email: regEmail.trim().toLowerCase(),
+   203→          phone: regPhone.trim() || undefined,
+   204→          companyName: regCompany.trim(),
+   205→          deviceName: regDeviceName.trim(),
+   206→          deviceType: regDeviceType,
+   207→        }),
+   208→      })
+   209→      const data = await res.json()
+   210→      if (!res.ok) {
+   211→        setError(data.error || 'Registration failed')
+   212→        return
+   213→      }
+   214→      setRegistrationResult(data)
+   215→      setStep('registration-success')
+   216→    } catch {
+   217→      setError('Network error. Please try again.')
+   218→    } finally {
+   219→      setRegLoading(false)
+   220→    }
+   221→  }
+   222→
+   223→  const handleLoginWithCredentials = async () => {
+   224→    if (!registrationResult) return
+   225→    setLoading(true)
+   226→    setError(null)
+   227→    try {
+   228→      const res = await fetch('/api/auth/login', {
+   229→        method: 'POST',
+   230→        headers: { 'Content-Type': 'application/json' },
+   231→        body: JSON.stringify({
+   232→          email: registrationResult.credentials.email,
+   233→          password: registrationResult.credentials.password,
+   234→          serialKey: registrationResult.serialKey.key,
+   235→        }),
+   236→      })
+   237→      const data = await res.json()
+   238→      if (!res.ok) {
+   239→        setError(data.error || 'Auto-login failed')
+   240→        return
+   241→      }
+   242→      login(data.user as AuthUser, data.accessLevel as AccessLevel)
+   243→    } catch {
+   244→      setError('Network error during auto-login.')
+   245→    } finally {
+   246→      setLoading(false)
+   247→    }
+   248→  }
+   249→
+   250→  const copyToClipboard = (text: string, field: string) => {
+   251→    navigator.clipboard.writeText(text)
+   252→    setCopiedField(field)
+   253→    setTimeout(() => setCopiedField(null), 2000)
+   254→  }
+   255→
+   256→  const handleKeyDown = (e: React.KeyboardEvent, action: () => void) => {
+   257→    if (e.key === 'Enter') action()
+   258→  }
+   259→
+   260→  const planColors: Record<string, string> = {
+   261→    starter: 'bg-slate-500',
+   262→    professional: 'bg-teal-500',
+   263→    enterprise: 'bg-orange-600',
+   264→  }
+   265→  const planLabels: Record<string, string> = {
+   266→    starter: 'Starter',
+   267→    professional: 'Professional',
+   268→    enterprise: 'Enterprise',
+   269→  }
+   270→
+   271→  return (
+   272→    <div className="min-h-screen flex macos-login-gradient relative overflow-hidden">
+   273→      {/* Animated Background Orbs */}
+   274→      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+   275→        <div className="absolute top-[10%] left-[15%] w-[500px] h-[500px] bg-teal-500/[0.04] rounded-full blur-[120px] animate-pulse" />
+   276→        <div className="absolute bottom-[10%] right-[10%] w-[600px] h-[600px] bg-orange-500/[0.03] rounded-full blur-[150px]" />
+   277→        <div className="absolute top-[50%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-teal-400/[0.02] rounded-full blur-[200px]" />
+   278→      </div>
+   279→
+   280→      {/* Grid Pattern */}
+   281→      <div className="absolute inset-0 opacity-[0.015]" style={{
+   282→        backgroundImage: 'linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px)',
+   283→        backgroundSize: '64px 64px'
+   284→      }} />
+   285→
+   286→      {/* Left Panel - Branding */}
+   287→      <div className="hidden lg:flex lg:w-[45%] relative z-10 flex-col justify-between p-10">
+   288→        {/* Logo */}
+   289→        <div>
+   290→          <div className="flex items-center gap-3 mb-10">
+   291→            <div className="flex size-12 items-center justify-center rounded-2xl fuel-gradient shadow-lg shadow-teal-500/20">
+   292→              <Fuel className="size-6 text-white" />
+   293→            </div>
+   294→            <div>
+   295→              <h1 className="text-xl font-bold text-white tracking-tight">FuelFlow OS</h1>
+   296→              <p className="text-[12px] text-white/40">ApexFlow Ecosystem</p>
+   297→            </div>
+   298→          </div>
+   299→
+   300→          <h2 className="text-4xl font-bold text-white leading-tight mb-4">
+   301→            Enterprise-Grade<br />
+   302→            <span className="fuel-text-gradient">Fuel Station OS</span>
+   303→          </h2>
+   304→          <p className="text-white/40 text-[14px] leading-relaxed max-w-sm">
+   305→            Complete ERP solution for modern fuel stations. Real-time forecourt control,
+   306→            tank monitoring, fleet management, and AI-powered analytics.
+   307→          </p>
+   308→        </div>
+   309→
+   310→        {/* Feature Cards */}
+   311→        <div className="grid grid-cols-2 gap-3">
+   312→          {[
+   313→            { icon: Gauge, label: 'Forecourt Control', desc: 'Real-time pump monitoring' },
+   314→            { icon: Fuel, label: 'Wet Stock Mgmt', desc: 'Tank & delivery tracking' },
+   315→            { icon: Users, label: 'Fleet & CRM', desc: 'Customer management' },
+   316→            { icon: Zap, label: 'AI Analytics', desc: 'Predictive insights' },
+   317→          ].map((feature) => (
+   318→            <div
+   319→              key={feature.label}
+   320→              className="rounded-xl bg-white/[0.04] backdrop-blur-sm border border-white/[0.06] p-4 hover:bg-white/[0.06] transition-colors group"
+   321→            >
+   322→              <feature.icon className="size-5 text-teal-400 mb-2 group-hover:text-teal-300 transition-colors" />
+   323→              <p className="text-[13px] font-medium text-white/80">{feature.label}</p>
+   324→              <p className="text-[11px] text-white/30">{feature.desc}</p>
+   325→            </div>
+   326→          ))}
+   327→        </div>
+   328→
+   329→        {/* Bottom */}
+   330→        <div className="flex items-center gap-2 text-[11px] text-white/25">
+   331→          <Building2 className="size-3.5" />
+   332→          <span>Trusted by 500+ fuel stations across Pakistan</span>
+   333→        </div>
+   334→      </div>
+   335→
+   336→      {/* Right Panel - Login Form */}
+   337→      <div className="flex-1 flex items-center justify-center p-6 sm:p-8 lg:p-12 relative z-10">
+   338→        <div className={`w-full ${step === 'registration-success' ? 'max-w-[520px]' : 'max-w-[400px]'}`}>
+   339→          {/* macOS-style login card */}
+   340→          <div className="rounded-2xl bg-white/[0.06] backdrop-blur-2xl border border-white/[0.08] p-8 shadow-2xl">
+   341→            {/* Mobile Logo */}
+   342→            <div className="lg:hidden flex items-center gap-3 mb-6">
+   343→              <div className="flex size-10 items-center justify-center rounded-xl fuel-gradient shadow-lg shadow-teal-500/20">
+   344→                <Fuel className="size-5 text-white" />
+   345→              </div>
+   346→              <div>
+   347→                <h1 className="text-lg font-bold text-white">FuelFlow OS</h1>
+   348→                <p className="text-[11px] text-white/40">ApexFlow Ecosystem</p>
+   349→              </div>
+   350→            </div>
+   351→
+   352→            {/* Form Header */}
+   353→            <AnimatePresence mode="wait">
+   354→              {step === 'serial-key' && (
+   355→                <motion.div key="serial-header" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} transition={{ duration: 0.2 }}>
+   356→                  <div className="flex items-center gap-3 mb-1">
+   357→                    <div className="flex size-9 items-center justify-center rounded-xl bg-teal-500/10">
+   358→                      <Key className="size-4 text-teal-400" />
+   359→                    </div>
+   360→                    <div>
+   361→                      <h2 className="text-[17px] font-bold text-white">Device Registration</h2>
+   362→                      <p className="text-[12px] text-white/40">Enter your serial key to activate this device</p>
+   363→                    </div>
+   364→                  </div>
+   365→                </motion.div>
+   366→              )}
+   367→              {step === 'credentials' && (
+   368→                <motion.div key="creds-header" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} transition={{ duration: 0.2 }}>
+   369→                  <div className="flex items-center gap-3 mb-1">
+   370→                    <div className="flex size-9 items-center justify-center rounded-xl bg-teal-500/10">
+   371→                      <Lock className="size-4 text-teal-400" />
+   372→                    </div>
+   373→                    <div>
+   374→                      <h2 className="text-[17px] font-bold text-white">Sign In</h2>
+   375→                      <p className="text-[12px] text-white/40">Enter your credentials to continue</p>
+   376→                    </div>
+   377→                  </div>
+   378→                </motion.div>
+   379→              )}
+   380→              {step === 'register-admin' && (
+   381→                <motion.div key="reg-header" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} transition={{ duration: 0.2 }}>
+   382→                  <div className="flex items-center gap-3 mb-1">
+   383→                    <div className="flex size-9 items-center justify-center rounded-xl bg-orange-500/10">
+   384→                      <Crown className="size-4 text-orange-400" />
+   385→                    </div>
+   386→                    <div>
+   387→                      <h2 className="text-[17px] font-bold text-white">Super Admin Setup</h2>
+   388→                      <p className="text-[12px] text-white/40">Register as owner with lifetime enterprise access</p>
+   389→                    </div>
+   390→                  </div>
+   391→                </motion.div>
+   392→              )}
+   393→              {step === 'registration-success' && (
+   394→                <motion.div key="success-header" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} transition={{ duration: 0.2 }}>
+   395→                  <div className="flex items-center gap-3 mb-1">
+   396→                    <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-500/10">
+   397→                      <CheckCircle2 className="size-4 text-emerald-400" />
+   398→                    </div>
+   399→                    <div>
+   400→                      <h2 className="text-[17px] font-bold text-white">Registration Complete!</h2>
+   401→                      <p className="text-[12px] text-white/40">Save your credentials — they are shown only once</p>
+   402→                    </div>
+   403→                  </div>
+   404→                </motion.div>
+   405→              )}
+   406→            </AnimatePresence>
+   407→
+   408→            {/* Step: Serial Key */}
+   409→            <AnimatePresence mode="wait">
+   410→              {step === 'serial-key' && (
+   411→                <motion.div
+   412→                  key="serial-form"
+   413→                  initial={{ opacity: 0, x: 16 }}
+   414→                  animate={{ opacity: 1, x: 0 }}
+   415→                  exit={{ opacity: 0, x: -16 }}
+   416→                  transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+   417→                  className="mt-6 space-y-4"
+   418→                >
+   419→                  <div className="space-y-2">
+   420→                    <Label htmlFor="serial-key" className="text-[12px] font-medium text-white/60">
+   421→                      Serial Key
+   422→                    </Label>
+   423→                    <div className="relative">
+   424→                      <Key className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-white/30" />
+   425→                      <input
+   426→                        id="serial-key"
+   427→                        type="text"
+   428→                        placeholder="FF-XXXX-XXXX-XXXX"
+   429→                        value={serialKey}
+   430→                        onChange={(e) => {
+   431→                          setSerialKey(e.target.value.toUpperCase())
+   432→                          setError(null)
+   433→                        }}
+   434→                        onKeyDown={(e) => handleKeyDown(e, handleSerialKeySubmit)}
+   435→                        className="w-full h-10 rounded-lg bg-white/[0.06] border border-white/[0.08] pl-10 pr-10 text-[13px] font-mono tracking-wider text-white placeholder:text-white/20 focus:outline-none focus:border-teal-500/40 focus:ring-2 focus:ring-teal-500/15 transition-all"
+   436→                        autoComplete="off"
+   437→                        autoFocus
+   438→                      />
+   439→                      {validatingKey && (
+   440→                        <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-white/30" />
+   441→                      )}
+   442→                    </div>
+   443→
+   444→                    {/* Validation Result */}
+   445→                    <AnimatePresence>
+   446→                      {serialKeyValidation && (
+   447→                        <motion.div
+   448→                          initial={{ opacity: 0, height: 0 }}
+   449→                          animate={{ opacity: 1, height: 'auto' }}
+   450→                          exit={{ opacity: 0, height: 0 }}
+   451→                          transition={{ duration: 0.2 }}
+   452→                        >
+   453→                          {serialKeyValidation.valid ? (
+   454→                            <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-2">
+   455→                              <div className="flex items-center gap-2">
+   456→                                <CheckCircle2 className="size-3.5 text-emerald-400" />
+   457→                                <span className="text-[12px] font-semibold text-emerald-400">Valid Serial Key</span>
+   458→                                {serialKeyValidation.plan && (
+   459→                                  <span className={`text-[9px] font-bold rounded-md px-1.5 py-0.5 text-white ${planColors[serialKeyValidation.plan] || 'bg-slate-500'}`}>
+   460→                                    {planLabels[serialKeyValidation.plan] || serialKeyValidation.plan}
+   461→                                  </span>
+   462→                                )}
+   463→                              </div>
+   464→                              <div className="grid grid-cols-3 gap-2 text-[11px] text-white/40">
+   465→                                <div className="flex items-center gap-1">
+   466→                                  <Building2 className="size-3" />
+   467→                                  <span>{serialKeyValidation.maxStations} Stn</span>
+   468→                                </div>
+   469→                                <div className="flex items-center gap-1">
+   470→                                  <Fuel className="size-3" />
+   471→                                  <span>{serialKeyValidation.maxDispensers} Disp</span>
+   472→                                </div>
+   473→                                <div className="flex items-center gap-1">
+   474→                                  <Users className="size-3" />
+   475→                                  <span>{serialKeyValidation.maxUsers} Users</span>
+   476→                                </div>
+   477→                              </div>
+   478→                            </div>
+   479→                          ) : (
+   480→                            <div className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/5 p-3">
+   481→                              <AlertCircle className="size-3.5 text-red-400 shrink-0" />
+   482→                              <span className="text-[12px] text-red-400">
+   483→                                {serialKeyValidation.error || 'Invalid serial key'}
+   484→                              </span>
+   485→                            </div>
+   486→                          )}
+   487→                        </motion.div>
+   488→                      )}
+   489→                    </AnimatePresence>
+   490→                  </div>
+   491→
+   492→                  {/* Continue Button */}
+   493→                  <button
+   494→                    onClick={handleSerialKeySubmit}
+   495→                    disabled={!serialKeyValidation?.valid || validatingKey}
+   496→                    className="w-full h-10 rounded-lg fuel-gradient text-white text-[13px] font-semibold flex items-center justify-center gap-2 shadow-lg shadow-teal-500/15 hover:shadow-teal-500/25 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+   497→                  >
+   498→                    Continue
+   499→                    <ChevronRight className="size-4" />
+   500→                  </button>
+   501→
+   502→                  {/* Separator */}
+   503→                  <div className="relative py-1">
+   504→                    <div className="absolute inset-0 flex items-center">
+   505→                      <div className="w-full border-t border-white/[0.06]" />
+   506→                    </div>
+   507→                    <div className="relative flex justify-center">
+   508→                      <span className="bg-transparent px-3 text-[11px] text-white/20">or</span>
+   509→                    </div>
+   510→                  </div>
+   511→
+   512→                  {/* Super Admin Registration */}
+   513→                  <button
+   514→                    onClick={() => { setStep('register-admin'); setError(null) }}
+   515→                    className="w-full h-10 rounded-lg bg-orange-500/10 border border-orange-500/20 hover:bg-orange-500/15 hover:border-orange-500/30 text-orange-400 text-[13px] font-semibold flex items-center justify-center gap-2 transition-all"
+   516→                  >
+   517→                    <Crown className="size-4" />
+   518→                    Register as Super Admin
+   519→                  </button>
+   520→
+   521→                  {/* Separator */}
+   522→                  <div className="relative py-1">
+   523→                    <div className="absolute inset-0 flex items-center">
+   524→                      <div className="w-full border-t border-white/[0.06]" />
+   525→                    </div>
+   526→                    <div className="relative flex justify-center">
+   527→                      <span className="bg-transparent px-3 text-[11px] text-white/20">or explore</span>
+   528→                    </div>
+   529→                  </div>
+   530→
+   531→                  {/* Demo Login Button */}
+   532→                  <button
+   533→                    onClick={handleDemoLogin}
+   534→                    disabled={demoLoading}
+   535→                    className="w-full h-10 rounded-lg border border-dashed border-teal-500/25 hover:border-teal-500/40 hover:bg-teal-500/5 text-teal-400 text-[13px] font-medium flex items-center justify-center gap-2 transition-all disabled:opacity-40"
+   536→                  >
+   537→                    {demoLoading ? (
+   538→                      <Loader2 className="size-4 animate-spin" />
+   539→                    ) : (
+   540→                      <Monitor className="size-4" />
+   541→                    )}
+   542→                    Demo Login (View Only)
+   543→                  </button>
+   544→
+   545→                  <p className="text-center text-[11px] text-white/20">
+   546→                    Demo account provides view-only access to explore the platform
+   547→                  </p>
+   548→                </motion.div>
+   549→              )}
+   550→
+   551→              {/* Step: Credentials */}
+   552→              {step === 'credentials' && (
+   553→                <motion.div
+   554→                  key="credentials-form"
+   555→                  initial={{ opacity: 0, x: 16 }}
+   556→                  animate={{ opacity: 1, x: 0 }}
+   557→                  exit={{ opacity: 0, x: -16 }}
+   558→                  transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+   559→                  className="mt-6 space-y-4"
+   560→                >
+   561→                  {/* Serial Key Summary */}
+   562→                  <div className="flex items-center justify-between rounded-lg bg-teal-500/5 border border-teal-500/15 px-3 py-2">
+   563→                    <div className="flex items-center gap-2">
+   564→                      <CheckCircle2 className="size-3.5 text-emerald-400" />
+   565→                      <span className="text-[11px] font-medium text-white/60">Serial Key Verified</span>
+   566→                      {serialKeyValidation?.plan && (
+   567→                        <span className={`text-[9px] font-bold rounded-md px-1.5 py-0.5 text-white ${planColors[serialKeyValidation.plan] || 'bg-slate-500'}`}>
+   568→                          {planLabels[serialKeyValidation.plan]}
+   569→                        </span>
+   570→                      )}
+   571→                    </div>
+   572→                    <button
+   573→                      onClick={() => { setStep('serial-key'); setError(null) }}
+   574→                      className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors"
+   575→                    >
+   576→                      Change
+   577→                    </button>
+   578→                  </div>
+   579→
+   580→                  {/* Email */}
+   581→                  <div className="space-y-1.5">
+   582→                    <Label htmlFor="email" className="text-[12px] font-medium text-white/60">
+   583→                      Email Address
+   584→                    </Label>
+   585→                    <div className="relative">
+   586→                      <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-white/30" />
+   587→                      <input
+   588→                        id="email"
+   589→                        type="email"
+   590→                        placeholder="you@station.com"
+   591→                        value={email}
+   592→                        onChange={(e) => { setEmail(e.target.value); setError(null) }}
+   593→                        onKeyDown={(e) => handleKeyDown(e, handleLogin)}
+   594→                        className="w-full h-10 rounded-lg bg-white/[0.06] border border-white/[0.08] pl-10 pr-3 text-[13px] text-white placeholder:text-white/20 focus:outline-none focus:border-teal-500/40 focus:ring-2 focus:ring-teal-500/15 transition-all"
+   595→                        autoComplete="email"
+   596→                        autoFocus
+   597→                      />
+   598→                    </div>
+   599→                  </div>
+   600→
+   601→                  {/* Password */}
+   602→                  <div className="space-y-1.5">
+   603→                    <Label htmlFor="password" className="text-[12px] font-medium text-white/60">
+   604→                      Password
+   605→                    </Label>
+   606→                    <div className="relative">
+   607→                      <Lock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-white/30" />
+   608→                      <input
+   609→                        id="password"
+   610→                        type={showPassword ? 'text' : 'password'}
+   611→                        placeholder="Enter your password"
+   612→                        value={password}
+   613→                        onChange={(e) => { setPassword(e.target.value); setError(null) }}
+   614→                        onKeyDown={(e) => handleKeyDown(e, handleLogin)}
+   615→                        className="w-full h-10 rounded-lg bg-white/[0.06] border border-white/[0.08] pl-10 pr-10 text-[13px] text-white placeholder:text-white/20 focus:outline-none focus:border-teal-500/40 focus:ring-2 focus:ring-teal-500/15 transition-all"
+   616→                        autoComplete="current-password"
+   617→                      />
+   618→                      <button
+   619→                        type="button"
+   620→                        onClick={() => setShowPassword(!showPassword)}
+   621→                        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+   622→                      >
+   623→                        {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+   624→                      </button>
+   625→                    </div>
+   626→                  </div>
+   627→
+   628→                  {/* Error */}
+   629→                  <AnimatePresence>
+   630→                    {error && (
+   631→                      <motion.div
+   632→                        initial={{ opacity: 0, height: 0 }}
+   633→                        animate={{ opacity: 1, height: 'auto' }}
+   634→                        exit={{ opacity: 0, height: 0 }}
+   635→                        className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/5 p-3"
+   636→                      >
+   637→                        <AlertCircle className="size-3.5 text-red-400 shrink-0" />
+   638→                        <span className="text-[12px] text-red-400">{error}</span>
+   639→                      </motion.div>
+   640→                    )}
+   641→                  </AnimatePresence>
+   642→
+   643→                  {/* Login Button */}
+   644→                  <button
+   645→                    onClick={handleLogin}
+   646→                    disabled={loading || !email || !password}
+   647→                    className="w-full h-10 rounded-lg fuel-gradient text-white text-[13px] font-semibold flex items-center justify-center gap-2 shadow-lg shadow-teal-500/15 hover:shadow-teal-500/25 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+   648→                  >
+   649→                    {loading ? <Loader2 className="size-4 animate-spin" /> : null}
+   650→                    Sign In
+   651→                    {!loading && <ChevronRight className="size-4" />}
+   652→                  </button>
+   653→
+   654→                  {/* Back + Demo */}
+   655→                  <div className="flex gap-2">
+   656→                    <button
+   657→                      onClick={() => { setStep('serial-key'); setError(null) }}
+   658→                      className="flex-1 h-9 rounded-lg border border-white/[0.06] text-white/40 text-[12px] font-medium hover:bg-white/[0.03] transition-colors"
+   659→                    >
+   660→                      Back
+   661→                    </button>
+   662→                    <button
+   663→                      onClick={handleDemoLogin}
+   664→                      disabled={demoLoading}
+   665→                      className="flex-1 h-9 rounded-lg border border-dashed border-teal-500/20 hover:border-teal-500/35 hover:bg-teal-500/5 text-teal-400 text-[12px] font-medium flex items-center justify-center gap-1.5 transition-all disabled:opacity-40"
+   666→                    >
+   667→                      {demoLoading ? <Loader2 className="size-3 animate-spin" /> : <Monitor className="size-3" />}
+   668→                      Demo
+   669→                    </button>
+   670→                  </div>
+   671→                </motion.div>
+   672→              )}
+   673→
+   674→              {/* Step: Register Super Admin */}
+   675→              {step === 'register-admin' && (
+   676→                <motion.div
+   677→                  key="register-form"
+   678→                  initial={{ opacity: 0, x: 16 }}
+   679→                  animate={{ opacity: 1, x: 0 }}
+   680→                  exit={{ opacity: 0, x: -16 }}
+   681→                  transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+   682→                  className="mt-6 space-y-3"
+   683→                >
+   684→                  {/* Lifetime Badge */}
+   685→                  <div className="flex items-center gap-2 rounded-lg bg-orange-500/5 border border-orange-500/15 px-3 py-2">
+   686→                    <Crown className="size-3.5 text-orange-400" />
+   687→                    <span className="text-[11px] font-semibold text-orange-400">LIFETIME Enterprise Access</span>
+   688→                    <span className="text-[9px] font-bold rounded-md px-1.5 py-0.5 text-white bg-orange-600">UNLIMITED</span>
+   689→                  </div>
+   690→
+   691→                  {/* Full Name */}
+   692→                  <div className="space-y-1">
+   693→                    <Label className="text-[11px] font-medium text-white/50">Full Name *</Label>
+   694→                    <div className="relative">
+   695→                      <User className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-white/30" />
+   696→                      <input
+   697→                        type="text"
+   698→                        placeholder="Your full name"
+   699→                        value={regName}
+   700→                        onChange={(e) => { setRegName(e.target.value); setError(null) }}
+   701→                        className="w-full h-9 rounded-lg bg-white/[0.06] border border-white/[0.08] pl-9 pr-3 text-[12px] text-white placeholder:text-white/20 focus:outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/15 transition-all"
+   702→                        autoFocus
+   703→                      />
+   704→                    </div>
+   705→                  </div>
+   706→
+   707→                  {/* Email */}
+   708→                  <div className="space-y-1">
+   709→                    <Label className="text-[11px] font-medium text-white/50">Email *</Label>
+   710→                    <div className="relative">
+   711→                      <Mail className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-white/30" />
+   712→                      <input
+   713→                        type="email"
+   714→                        placeholder="you@company.com"
+   715→                        value={regEmail}
+   716→                        onChange={(e) => { setRegEmail(e.target.value); setError(null) }}
+   717→                        className="w-full h-9 rounded-lg bg-white/[0.06] border border-white/[0.08] pl-9 pr-3 text-[12px] text-white placeholder:text-white/20 focus:outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/15 transition-all"
+   718→                      />
+   719→                    </div>
+   720→                  </div>
+   721→
+   722→                  {/* Phone */}
+   723→                  <div className="space-y-1">
+   724→                    <Label className="text-[11px] font-medium text-white/50">Phone</Label>
+   725→                    <div className="relative">
+   726→                      <Phone className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-white/30" />
+   727→                      <input
+   728→                        type="tel"
+   729→                        placeholder="+92-XXX-XXXXXXX"
+   730→                        value={regPhone}
+   731→                        onChange={(e) => { setRegPhone(e.target.value); setError(null) }}
+   732→                        className="w-full h-9 rounded-lg bg-white/[0.06] border border-white/[0.08] pl-9 pr-3 text-[12px] text-white placeholder:text-white/20 focus:outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/15 transition-all"
+   733→                      />
+   734→                    </div>
+   735→                  </div>
+   736→
+   737→                  {/* Company Name */}
+   738→                  <div className="space-y-1">
+   739→                    <Label className="text-[11px] font-medium text-white/50">Company Name *</Label>
+   740→                    <div className="relative">
+   741→                      <Building2 className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-white/30" />
+   742→                      <input
+   743→                        type="text"
+   744→                        placeholder="Your fuel station company"
+   745→                        value={regCompany}
+   746→                        onChange={(e) => { setRegCompany(e.target.value); setError(null) }}
+   747→                        className="w-full h-9 rounded-lg bg-white/[0.06] border border-white/[0.08] pl-9 pr-3 text-[12px] text-white placeholder:text-white/20 focus:outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/15 transition-all"
+   748→                      />
+   749→                    </div>
+   750→                  </div>
+   751→
+   752→                  {/* Device Name */}
+   753→                  <div className="space-y-1">
+   754→                    <Label className="text-[11px] font-medium text-white/50">Device Name *</Label>
+   755→                    <div className="relative">
+   756→                      <Monitor className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-white/30" />
+   757→                      <input
+   758→                        type="text"
+   759→                        placeholder="e.g., Main Office Terminal"
+   760→                        value={regDeviceName}
+   761→                        onChange={(e) => { setRegDeviceName(e.target.value); setError(null) }}
+   762→                        className="w-full h-9 rounded-lg bg-white/[0.06] border border-white/[0.08] pl-9 pr-3 text-[12px] text-white placeholder:text-white/20 focus:outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/15 transition-all"
+   763→                      />
+   764→                    </div>
+   765→                  </div>
+   766→
+   767→                  {/* Device Type */}
+   768→                  <div className="space-y-1">
+   769→                    <Label className="text-[11px] font-medium text-white/50">Device Type</Label>
+   770→                    <div className="relative">
+   771→                      <Cpu className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-white/30" />
+   772→                      <select
+   773→                        value={regDeviceType}
+   774→                        onChange={(e) => setRegDeviceType(e.target.value)}
+   775→                        className="w-full h-9 rounded-lg bg-white/[0.06] border border-white/[0.08] pl-9 pr-3 text-[12px] text-white focus:outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/15 transition-all appearance-none"
+   776→                      >
+   777→                        <option value="pos" className="bg-neutral-900">POS Terminal</option>
+   778→                        <option value="dispenser_controller" className="bg-neutral-900">Dispenser Controller</option>
+   779→                        <option value="atg" className="bg-neutral-900">ATG System</option>
+   780→                        <option value="payment_terminal" className="bg-neutral-900">Payment Terminal</option>
+   781→                        <option value="scanner" className="bg-neutral-900">Scanner / Reader</option>
+   782→                        <option value="other" className="bg-neutral-900">Other</option>
+   783→                      </select>
+   784→                    </div>
+   785→                  </div>
+   786→
+   787→                  {/* Error */}
+   788→                  <AnimatePresence>
+   789→                    {error && (
+   790→                      <motion.div
+   791→                        initial={{ opacity: 0, height: 0 }}
+   792→                        animate={{ opacity: 1, height: 'auto' }}
+   793→                        exit={{ opacity: 0, height: 0 }}
+   794→                        className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/5 p-2.5"
+   795→                      >
+   796→                        <AlertCircle className="size-3.5 text-red-400 shrink-0" />
+   797→                        <span className="text-[11px] text-red-400">{error}</span>
+   798→                      </motion.div>
+   799→                    )}
+   800→                  </AnimatePresence>
+   801→
+   802→                  {/* Register Button */}
+   803→                  <button
+   804→                    onClick={handleSuperAdminRegister}
+   805→                    disabled={regLoading || !regName || !regEmail || !regCompany || !regDeviceName}
+   806→                    className="w-full h-10 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 text-white text-[13px] font-semibold flex items-center justify-center gap-2 shadow-lg shadow-orange-500/15 hover:shadow-orange-500/25 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+   807→                  >
+   808→                    {regLoading ? <Loader2 className="size-4 animate-spin" /> : <Crown className="size-4" />}
+   809→                    {regLoading ? 'Setting up...' : 'Register as Super Admin'}
+   810→                  </button>
+   811→
+   812→                  {/* Back */}
+   813→                  <button
+   814→                    onClick={() => { setStep('serial-key'); setError(null) }}
+   815→                    className="w-full h-9 rounded-lg border border-white/[0.06] text-white/40 text-[12px] font-medium hover:bg-white/[0.03] transition-colors"
+   816→                  >
+   817→                    Back to Login
+   818→                  </button>
+   819→                </motion.div>
+   820→              )}
+   821→
+   822→              {/* Step: Registration Success */}
+   823→              {step === 'registration-success' && registrationResult && (
+   824→                <motion.div
+   825→                  key="success-form"
+   826→                  initial={{ opacity: 0, x: 16 }}
+   827→                  animate={{ opacity: 1, x: 0 }}
+   828→                  exit={{ opacity: 0, x: -16 }}
+   829→                  transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+   830→                  className="mt-6 space-y-3"
+   831→                >
+   832→                  {/* Success Badge */}
+   833→                  <div className="flex items-center gap-2 rounded-lg bg-emerald-500/5 border border-emerald-500/15 px-3 py-2">
+   834→                    <CheckCircle2 className="size-3.5 text-emerald-400" />
+   835→                    <span className="text-[11px] font-semibold text-emerald-400">Super Admin — LIFETIME Enterprise</span>
+   836→                  </div>
+   837→
+   838→                  {/* Credentials Card */}
+   839→                  <div className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-3 space-y-2.5">
+   840→                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Login Credentials</p>
+   841→
+   842→                    {/* Email */}
+   843→                    <div className="flex items-center justify-between">
+   844→                      <div className="flex items-center gap-2 min-w-0 flex-1">
+   845→                        <Mail className="size-3 text-white/30 shrink-0" />
+   846→                        <span className="text-[11px] text-white/50 shrink-0">Email:</span>
+   847→                        <span className="text-[11px] text-white font-mono truncate">{registrationResult.credentials.email}</span>
+   848→                      </div>
+   849→                      <button onClick={() => copyToClipboard(registrationResult.credentials.email, 'email')} className="shrink-0 ml-2">
+   850→                        {copiedField === 'email' ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3 text-white/30 hover:text-white/60" />}
+   851→                      </button>
+   852→                    </div>
+   853→
+   854→                    {/* Password */}
+   855→                    <div className="flex items-center justify-between">
+   856→                      <div className="flex items-center gap-2 min-w-0 flex-1">
+   857→                        <Lock className="size-3 text-white/30 shrink-0" />
+   858→                        <span className="text-[11px] text-white/50 shrink-0">Password:</span>
+   859→                        <span className="text-[11px] text-white font-mono truncate">{registrationResult.credentials.password}</span>
+   860→                      </div>
+   861→                      <button onClick={() => copyToClipboard(registrationResult.credentials.password, 'password')} className="shrink-0 ml-2">
+   862→                        {copiedField === 'password' ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3 text-white/30 hover:text-white/60" />}
+   863→                      </button>
+   864→                    </div>
+   865→
+   866→                    {/* Serial Key */}
+   867→                    <div className="flex items-center justify-between">
+   868→                      <div className="flex items-center gap-2 min-w-0 flex-1">
+   869→                        <Key className="size-3 text-white/30 shrink-0" />
+   870→                        <span className="text-[11px] text-white/50 shrink-0">Serial Key:</span>
+   871→                        <span className="text-[11px] text-teal-400 font-mono truncate">{registrationResult.serialKey.key}</span>
+   872→                      </div>
+   873→                      <button onClick={() => copyToClipboard(registrationResult.serialKey.key, 'serial')} className="shrink-0 ml-2">
+   874→                        {copiedField === 'serial' ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3 text-white/30 hover:text-white/60" />}
+   875→                      </button>
+   876→                    </div>
+   877→
+   878→                    {/* API Key */}
+   879→                    <div className="flex items-center justify-between">
+   880→                      <div className="flex items-center gap-2 min-w-0 flex-1">
+   881→                        <Shield className="size-3 text-white/30 shrink-0" />
+   882→                        <span className="text-[11px] text-white/50 shrink-0">API Key:</span>
+   883→                        <span className="text-[10px] text-orange-400 font-mono truncate">{registrationResult.credentials.apiKey}</span>
+   884→                      </div>
+   885→                      <button onClick={() => copyToClipboard(registrationResult.credentials.apiKey, 'apikey')} className="shrink-0 ml-2">
+   886→                        {copiedField === 'apikey' ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3 text-white/30 hover:text-white/60" />}
+   887→                      </button>
+   888→                    </div>
+   889→                  </div>
+   890→
+   891→                  {/* Plan Details */}
+   892→                  <div className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-3 space-y-1.5">
+   893→                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Plan Details</p>
+   894→                    <div className="grid grid-cols-3 gap-2 text-[11px]">
+   895→                      <div className="flex items-center gap-1 text-white/40">
+   896→                        <Building2 className="size-3" />
+   897→                        <span>{registrationResult.serialKey.maxStations === 999 ? '∞' : registrationResult.serialKey.maxStations} Stations</span>
+   898→                      </div>
+   899→                      <div className="flex items-center gap-1 text-white/40">
+   900→                        <Fuel className="size-3" />
+   901→                        <span>{registrationResult.serialKey.maxDispensers === 9999 ? '∞' : registrationResult.serialKey.maxDispensers} Dispensers</span>
+   902→                      </div>
+   903→                      <div className="flex items-center gap-1 text-white/40">
+   904→                        <Users className="size-3" />
+   905→                        <span>{registrationResult.serialKey.maxUsers === 999 ? '∞' : registrationResult.serialKey.maxUsers} Users</span>
+   906→                      </div>
+   907→                    </div>
+   908→                    <div className="flex items-center gap-1.5 text-[11px]">
+   909→                      <Crown className="size-3 text-orange-400" />
+   910→                      <span className="text-orange-400 font-semibold">{registrationResult.serialKey.expiresAt}</span>
+   911→                    </div>
+   912→                  </div>
+   913→
+   914→                  {/* Warning */}
+   915→                  <div className="flex items-start gap-2 rounded-lg border border-amber-500/15 bg-amber-500/5 p-2.5">
+   916→                    <AlertCircle className="size-3.5 text-amber-400 shrink-0 mt-0.5" />
+   917→                    <span className="text-[11px] text-amber-400/80 leading-relaxed">
+   918→                      <strong>Save these credentials now!</strong> Your password and API key will not be shown again. Copy them to a secure location.
+   919→                    </span>
+   920→                  </div>
+   921→
+   922→                  {/* Auto-Login Button */}
+   923→                  <button
+   924→                    onClick={handleLoginWithCredentials}
+   925→                    disabled={loading}
+   926→                    className="w-full h-10 rounded-lg fuel-gradient text-white text-[13px] font-semibold flex items-center justify-center gap-2 shadow-lg shadow-teal-500/15 hover:shadow-teal-500/25 transition-all disabled:opacity-40"
+   927→                  >
+   928→                    {loading ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
+   929→                    {loading ? 'Signing in...' : 'Enter FuelFlow OS'}
+   930→                  </button>
+   931→                </motion.div>
+   932→              )}
+   933→            </AnimatePresence>
+   934→          </div>
+   935→
+   936→          {/* Footer */}
+   937→          <div className="mt-6 space-y-3">
+   938→            <div className="flex items-center justify-center gap-4 text-[11px] text-white/20">
+   939→              <div className="flex items-center gap-1">
+   940→                <Shield className="size-3" />
+   941→                <span>Encrypted</span>
+   942→              </div>
+   943→              <div className="flex items-center gap-1">
+   944→                <Lock className="size-3" />
+   945→                <span>Secure</span>
+   946→              </div>
+   947→              <div className="flex items-center gap-1">
+   948→                <Fingerprint className="size-3" />
+   949→                <span>Device Bound</span>
+   950→              </div>
+   951→            </div>
+   952→            <p className="text-center text-[10px] text-white/15">
+   953→              © {new Date().getFullYear()} ApexFlow Ecosystem. All rights reserved.
+   954→            </p>
+   955→          </div>
+   956→        </div>
+   957→      </div>
+   958→    </div>
+   959→  )
+   960→}
+   961→

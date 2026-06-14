@@ -186,6 +186,10 @@ function SidebarNavContent({
   selectedStation,
   setSelectedStation,
   isViewOnly,
+  isSuperAdmin,
+  userName,
+  userInitials,
+  userRole,
   onNavClick,
 }: {
   activeModule: ModuleKey
@@ -193,6 +197,10 @@ function SidebarNavContent({
   selectedStation: string
   setSelectedStation: (s: string) => void
   isViewOnly: boolean
+  isSuperAdmin: boolean
+  userName: string
+  userInitials: string
+  userRole: string
   onNavClick?: () => void
 }) {
   // Group nav items by section
@@ -393,6 +401,10 @@ export default function Home() {
             selectedStation={selectedStation}
             setSelectedStation={setSelectedStation}
             isViewOnly={isViewOnly}
+            isSuperAdmin={isSuperAdmin}
+            userName={userName}
+            userInitials={userInitials}
+            userRole={userRole}
           />
         </motion.aside>
       )}
@@ -410,6 +422,10 @@ export default function Home() {
               selectedStation={selectedStation}
               setSelectedStation={setSelectedStation}
               isViewOnly={isViewOnly}
+              isSuperAdmin={isSuperAdmin}
+              userName={userName}
+              userInitials={userInitials}
+              userRole={userRole}
               onNavClick={() => setSidebarOpen(false)}
             />
           </SheetContent>

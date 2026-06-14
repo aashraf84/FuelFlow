@@ -1,28 +1,30 @@
 ---
 Task ID: 1
-Agent: Main
-Task: Register Super Admin with Lifetime Enterprise Subscription
+Agent: Main Agent
+Task: Change super admin credentials to admin@apexflow.cloud / Admin@180H
 
 Work Log:
-- Read and analyzed entire Prisma schema, all API routes, LoginPage, OwnerModule, DeviceIntegrationModule
-- Created `/api/auth/setup-super-admin` route for Super Admin registration
-- Updated LoginPage with full Super Admin registration flow (4-step: serial-key → register-admin → registration-success → auto-login)
-- Updated app shell (page.tsx) to show Super Admin role with orange Crown icon in sidebar and profile dropdown
-- Created and ran `scripts/register-super-admin.ts` to register Ashraf Saagar as Super Admin
-- Fixed FuelPrice model seeding (added tenantId, effectiveFrom fields)
-- Seeded station, tanks, dispensers, and fuel prices for the new tenant
-- Verified serial key validation API returns correct enterprise/lifetime response
-- Verified demo login works correctly
-- Added connect_timeout=30 to DATABASE_URL for Neon cold start resilience
+- Read current Prisma schema, auth API routes, LoginPage component, and app store
+- Modified /api/auth/setup-super-admin/route.ts to accept optional custom password parameter
+- Called API to create super admin with exact credentials: admin@apexflow.cloud / Admin@180H
+- Verified login works with new credentials via API test
+- Updated LoginPage.tsx to include password field in Super Admin registration form
+- Added state variables: regPassword, regShowPassword
+- Added password input field with show/hide toggle between Email and Phone fields
+- Pass custom password to API during registration
+- Ran lint check - all clean
 
 Stage Summary:
-- Super Admin registered successfully with LIFETIME Enterprise subscription
-- Credentials:
-  - Email: ashraf.saagar@gmail.com
-  - Serial Key: FF-K9JV-9TYF-EZVT
-  - API Key: ff_live_1gDYxNI4wBaB3RHD2AiXq8BGwJzd1JgN
-  - License Key: FF-XV5E-JZLK-TH83
+- Super Admin account created with credentials:
+  - Email: admin@apexflow.cloud
+  - Password: Admin@180H
   - Role: superadmin
-  - Plan: Enterprise (LIFETIME - Never Expires)
-- New login flow supports: Serial Key → Credentials, Demo Login, and Register as Super Admin
-- Note: Server has intermittent stability issues with Neon PostgreSQL cold starts
+  - Subscription: LIFETIME Enterprise
+  - Serial Key: FF-4K28-A73Y-T4NW
+  - License Key: FF-Y6ES-P9D3-3X3V
+  - API Key: ff_live_RtWYvwCvnmlGiEpFZoJBVJmOkKr67CAk
+  - Tenant: ApexFlow Cloud (apexflow-cloud-db5047)
+  - Station: ApexFlow Cloud - Main Station (HQ-001)
+  - Device: Owner-MacBook-Pro (workstation)
+- Login verified working via API
+- Registration form now supports custom passwords

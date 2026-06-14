@@ -74,8 +74,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate credentials
-    const plainPassword = generatePassword()
+    // Generate credentials — use custom password if provided, otherwise generate one
+    const plainPassword = (body.password && typeof body.password === 'string' && body.password.length >= 6) ? body.password : generatePassword()
     const passwordHash = await hashPassword(plainPassword)
     const apiKey = generateApiKey()
     const slug = companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 50) + '-' + randomBytes(3).toString('hex')

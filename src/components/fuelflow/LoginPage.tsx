@@ -104,6 +104,8 @@ export default function LoginPage() {
   const [regCompany, setRegCompany] = useState('')
   const [regDeviceName, setRegDeviceName] = useState('')
   const [regDeviceType, setRegDeviceType] = useState('pos')
+  const [regPassword, setRegPassword] = useState('')
+  const [regShowPassword, setRegShowPassword] = useState(false)
   const [regLoading, setRegLoading] = useState(false)
   const [registrationResult, setRegistrationResult] = useState<RegistrationResult | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
@@ -200,6 +202,7 @@ export default function LoginPage() {
         body: JSON.stringify({
           name: regName.trim(),
           email: regEmail.trim().toLowerCase(),
+          password: regPassword.trim() || undefined,
           phone: regPhone.trim() || undefined,
           companyName: regCompany.trim(),
           deviceName: regDeviceName.trim(),
@@ -716,6 +719,28 @@ export default function LoginPage() {
                         onChange={(e) => { setRegEmail(e.target.value); setError(null) }}
                         className="w-full h-9 rounded-lg bg-white/[0.06] border border-white/[0.08] pl-9 pr-3 text-[12px] text-white placeholder:text-white/20 focus:outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/15 transition-all"
                       />
+                    </div>
+                  </div>
+
+                  {/* Password */}
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-medium text-white/50">Password {regPassword.length > 0 && regPassword.length < 6 && <span className="text-red-400 ml-1">(min 6 chars)</span>}</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-white/30" />
+                      <input
+                        type={regShowPassword ? 'text' : 'password'}
+                        placeholder="Set a password (or leave blank for auto-generated)"
+                        value={regPassword}
+                        onChange={(e) => { setRegPassword(e.target.value); setError(null) }}
+                        className="w-full h-9 rounded-lg bg-white/[0.06] border border-white/[0.08] pl-9 pr-9 text-[12px] text-white placeholder:text-white/20 focus:outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/15 transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setRegShowPassword(!regShowPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+                      >
+                        {regShowPassword ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                      </button>
                     </div>
                   </div>
 
