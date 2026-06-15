@@ -8,11 +8,6 @@ export const db =
   globalForPrisma.prisma ??
   new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
-    datasources: {
-      db: {
-        url: process.env.DATABASE_URL,
-      },
-    },
   })
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
@@ -33,7 +28,9 @@ export async function dbRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> 
           error.message.includes('ECONNREFUSED') ||
           error.message.includes('Closed') ||
           error.message.includes('P1001') ||
-          error.message.includes('P1002')
+          error.message.includes('P1002') ||
+          error.message.includes('SQLITE_BUSY') ||
+          error.message.includes('locked')
         )
       if (!isConnectionError || i === retries - 1) throw error
       // Exponential backoff: 500ms, 1000ms, 2000ms
