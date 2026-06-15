@@ -4,15 +4,23 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-export const db =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+function createPrismaClient() {
+  return new PrismaClient({
+    log: ['error'],
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL,
+      },
+    },
   })
+}
+
+export const db = globalForPrisma.prisma ?? createPrismaClient()
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
 
 // Helper: retry a database operation up to 3 times with exponential backoff
+// This is critical for Neon serverless PostgreSQL which can drop idle connections
 export async function dbRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
   let lastError: unknown
   for (let i = 0; i < retries; i++) {
@@ -20,22 +28,29 @@ export async function dbRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> 
       return await fn()
     } catch (error) {
       lastError = error
+      const err = error instanceof Error ? error : new Error(String(error))
       const isConnectionError =
-        error instanceof Error && (
-          error.message.includes('connect') ||
-          error.message.includes('Connection') ||
-          error.message.includes('timed out') ||
-          error.message.includes('ECONNREFUSED') ||
-          error.message.includes('Closed') ||
-          error.message.includes('P1001') ||
-          error.message.includes('P1002') ||
-          error.message.includes('SQLITE_BUSY') ||
-          error.message.includes('locked')
-        )
-      if (!isConnectionError || i === retries - 1) throw error
-      // Exponential backoff: 500ms, 1000ms, 2000ms
-      const delay = Math.min(500 * Math.pow(2, i), 3000)
-      console.warn(`[dbRetry] Attempt ${i + 1} failed, retrying in ${delay}ms...`, error instanceof Error ? error.message : '')
+        err.message.includes('connect') ||
+        err.message.includes('Connection') ||
+        err.message.includes('timed out') ||
+        err.message.includes('ECONNREFUSED') ||
+        err.message.includes('Closed') ||
+        err.message.includes('P1001') ||
+        err.message.includes('P1002') ||
+        err.message.includes('P1006') ||
+        err.message.includes('P1008') ||
+        err.message.includes("Can't reach database server") ||
+        err.message.includes('Connection terminated') ||
+        err.message.includes('Operation was interrupted')
+
+      if (!isConnectionError) throw error
+
+      if (i === retries - 1) throw error
+
+      // Exponential backoff: 2000ms, 4000ms
+      const delay = 2000 * Math.pow(2, i)
+      console.warn(`[dbRetry] Attempt ${i + 1} failed, retrying in ${delay}ms...`)
+
       await new Promise((resolve) => setTimeout(resolve, delay))
     }
   }

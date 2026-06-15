@@ -60,27 +60,29 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useAppStore, type ModuleKey } from '@/stores/app-store'
 import { useIsMobile } from '@/hooks/use-mobile'
+import dynamic from 'next/dynamic'
 
-import DashboardOverview from '@/components/fuelflow/DashboardOverview'
-import ForecourtModule from '@/components/fuelflow/ForecourtModule'
-import TanksModule from '@/components/fuelflow/TanksModule'
-import SalesModule from '@/components/fuelflow/SalesModule'
-import FleetModule from '@/components/fuelflow/FleetModule'
-import PricingModule from '@/components/fuelflow/PricingModule'
-import RetailModule from '@/components/fuelflow/RetailModule'
-import EmployeesModule from '@/components/fuelflow/EmployeesModule'
-import FinanceModule from '@/components/fuelflow/FinanceModule'
-import MultiSiteModule from '@/components/fuelflow/MultiSiteModule'
-import AISuiteModule from '@/components/fuelflow/AISuiteModule'
-import EVCNGModule from '@/components/fuelflow/EVCNGModule'
-import SettingsModule from '@/components/fuelflow/SettingsModule'
-import DeviceIntegrationModule from '@/components/fuelflow/DeviceIntegrationModule'
-import SecurityCenterModule from '@/components/fuelflow/SecurityCenterModule'
-import CommsLayerModule from '@/components/fuelflow/CommsLayerModule'
-import ReportBuilderModule from '@/components/fuelflow/ReportBuilderModule'
-import APIWebhooksModule from '@/components/fuelflow/APIWebhooksModule'
-import LoginPage from '@/components/fuelflow/LoginPage'
-import OwnerModule from '@/components/fuelflow/OwnerModule'
+// Lazy-load heavy module components to reduce initial compilation memory
+const DashboardOverview = dynamic(() => import('@/components/fuelflow/DashboardOverview'), { ssr: false })
+const ForecourtModule = dynamic(() => import('@/components/fuelflow/ForecourtModule'), { ssr: false })
+const TanksModule = dynamic(() => import('@/components/fuelflow/TanksModule'), { ssr: false })
+const SalesModule = dynamic(() => import('@/components/fuelflow/SalesModule'), { ssr: false })
+const FleetModule = dynamic(() => import('@/components/fuelflow/FleetModule'), { ssr: false })
+const PricingModule = dynamic(() => import('@/components/fuelflow/PricingModule'), { ssr: false })
+const RetailModule = dynamic(() => import('@/components/fuelflow/RetailModule'), { ssr: false })
+const EmployeesModule = dynamic(() => import('@/components/fuelflow/EmployeesModule'), { ssr: false })
+const FinanceModule = dynamic(() => import('@/components/fuelflow/FinanceModule'), { ssr: false })
+const MultiSiteModule = dynamic(() => import('@/components/fuelflow/MultiSiteModule'), { ssr: false })
+const AISuiteModule = dynamic(() => import('@/components/fuelflow/AISuiteModule'), { ssr: false })
+const EVCNGModule = dynamic(() => import('@/components/fuelflow/EVCNGModule'), { ssr: false })
+const SettingsModule = dynamic(() => import('@/components/fuelflow/SettingsModule'), { ssr: false })
+const DeviceIntegrationModule = dynamic(() => import('@/components/fuelflow/DeviceIntegrationModule'), { ssr: false })
+const SecurityCenterModule = dynamic(() => import('@/components/fuelflow/SecurityCenterModule'), { ssr: false })
+const CommsLayerModule = dynamic(() => import('@/components/fuelflow/CommsLayerModule'), { ssr: false })
+const ReportBuilderModule = dynamic(() => import('@/components/fuelflow/ReportBuilderModule'), { ssr: false })
+const APIWebhooksModule = dynamic(() => import('@/components/fuelflow/APIWebhooksModule'), { ssr: false })
+const LoginPage = dynamic(() => import('@/components/fuelflow/LoginPage'), { ssr: false })
+const OwnerModule = dynamic(() => import('@/components/fuelflow/OwnerModule'), { ssr: false })
 
 // ── Navigation Configuration ──────────────────────────────
 

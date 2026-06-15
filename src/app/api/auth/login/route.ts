@@ -173,10 +173,17 @@ export async function POST(request: Request) {
     console.error('[login] Error:', error)
     const isDbError = error instanceof Error && (
       error.message.includes('connect') ||
+      error.message.includes('Connection') ||
       error.message.includes('Closed') ||
       error.message.includes('timed out') ||
+      error.message.includes('ECONNREFUSED') ||
       error.message.includes('P1001') ||
-      error.message.includes('P1002')
+      error.message.includes('P1002') ||
+      error.message.includes('P1006') ||
+      error.message.includes('P1008') ||
+      error.message.includes("Can't reach database server") ||
+      error.message.includes('Connection terminated') ||
+      error.message.includes('Operation was interrupted')
     )
     const message = isDbError
       ? 'Unable to connect to database. Please try again in a moment.'

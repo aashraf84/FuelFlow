@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
     const normalizedEmail = email.trim().toLowerCase()
 
     // Check if user already exists
-    const existingUser = await db.user.findUnique({ where: { email: normalizedEmail } })
+    const existingUser = await dbRetry(() => db.user.findUnique({ where: { email: normalizedEmail } }))
     if (existingUser) {
       return NextResponse.json(
         { error: 'A user with this email already exists. Please use a different email or login.' },
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
     // Generate unique serial key
     let serialKey = generateSerialKey()
     let attempts = 0
-    while (await db.serialKey.findUnique({ where: { key: serialKey } })) {
+    while (await dbRetry(() => db.serialKey.findUnique({ where: { key: serialKey } }))) {
       serialKey = generateSerialKey()
       attempts++
       if (attempts > 100) {
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
     // Also generate a unique license key for the owner system
     let licenseKeyStr = generateSerialKey()
     attempts = 0
-    while (await db.licenseKey.findUnique({ where: { key: licenseKeyStr } })) {
+    while (await dbRetry(() => db.licenseKey.findUnique({ where: { key: licenseKeyStr } }))) {
       licenseKeyStr = generateSerialKey()
       attempts++
       if (attempts > 100) {
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 1. Create Tenant ──
-    const tenant = await db.tenant.create({
+    const tenant = await dbRetry(() => db.tenant.create({
       data: {
         name: companyName,
         slug,
@@ -126,10 +126,10 @@ export async function POST(request: NextRequest) {
         subscription: 'enterprise',
         isActive: true,
       },
-    })
+    }))
 
     // ── 2. Create Super Admin User ──
-    const user = await db.user.create({
+    const user = await dbRetry(() => db.user.create({
       data: {
         tenantId: tenant.id,
         email: normalizedEmail,
@@ -140,10 +140,10 @@ export async function POST(request: NextRequest) {
         isDemo: false,
         lastLogin: new Date(),
       },
-    })
+    }))
 
     // ── 3. Create Serial Key (Enterprise / Lifetime) ──
-    const serialKeyRecord = await db.serialKey.create({
+    const serialKeyRecord = await dbRetry(() => db.serialKey.create({
       data: {
         key: serialKey,
         tenantId: tenant.id,
@@ -157,10 +157,10 @@ export async function POST(request: NextRequest) {
         hardwareBinding: `superadmin-${user.id}`,
         notes: `LIFETIME Enterprise license for ${name} (Super Admin) - Never expires`,
       },
-    })
+    }))
 
     // ── 4. Create Owner Client ──
-    const owner = await db.ownerClient.create({
+    const owner = await dbRetry(() => db.ownerClient.create({
       data: {
         companyName,
         slug,
@@ -173,12 +173,12 @@ export async function POST(request: NextRequest) {
         status: 'active',
         databaseStatus: 'active',
       },
-    })
+    }))
 
     // ── 5. Create Subscription Plan (Enterprise Lifetime) ──
-    let planRecord = await db.subscriptionPlan.findUnique({ where: { slug: 'enterprise' } })
+    let planRecord = await dbRetry(() => db.subscriptionPlan.findUnique({ where: { slug: 'enterprise' } }))
     if (!planRecord) {
-      planRecord = await db.subscriptionPlan.create({
+      planRecord = await dbRetry(() => db.subscriptionPlan.create({
         data: {
           name: 'Enterprise',
           slug: 'enterprise',
@@ -194,11 +194,11 @@ export async function POST(request: NextRequest) {
           isPopular: true,
           sortOrder: 2,
         },
-      })
+      }))
     }
 
     // ── 6. Create Lifetime Subscription ──
-    await db.clientSubscription.create({
+    await dbRetry(() => db.clientSubscription.create({
       data: {
         clientId: owner.id,
         planId: planRecord.id,
@@ -209,10 +209,10 @@ export async function POST(request: NextRequest) {
         autoRenew: false,
         notes: `LIFETIME subscription for ${name} (Super Admin) - Never expires`,
       },
-    })
+    }))
 
     // ── 7. Create License Key (Owner-level, Lifetime) ──
-    const license = await db.licenseKey.create({
+    const license = await dbRetry(() => db.licenseKey.create({
       data: {
         key: licenseKeyStr,
         clientId: owner.id,
@@ -225,10 +225,10 @@ export async function POST(request: NextRequest) {
         expiresAt: LIFETIME_DATE,
         notes: `LIFETIME Enterprise license for ${name} (Super Admin)`,
       },
-    })
+    }))
 
     // ── 8. Create Client Device ──
-    const device = await db.clientDevice.create({
+    const device = await dbRetry(() => db.clientDevice.create({
       data: {
         clientId: owner.id,
         deviceName,
@@ -236,10 +236,10 @@ export async function POST(request: NextRequest) {
         serialNumber: serialKey,
         status: 'active',
       },
-    })
+    }))
 
     // ── 9. Seed a default station for the tenant ──
-    const station = await db.station.create({
+    const station = await dbRetry(() => db.station.create({
       data: {
         tenantId: tenant.id,
         name: `${companyName} - Main Station`,
@@ -258,7 +258,7 @@ export async function POST(request: NextRequest) {
         timezone: 'Asia/Karachi',
         currency: 'PKR',
       },
-    })
+    }))
 
     // ── 10. Seed tanks for the station ──
     const tankData = [
@@ -268,7 +268,7 @@ export async function POST(request: NextRequest) {
       { name: 'Diesel Tank 2', code: 'T-HSD-02', fuelType: 'diesel', capacity: 25000, currentLevel: 21000 },
     ]
     for (const t of tankData) {
-      await db.tank.create({
+      await dbRetry(() => db.tank.create({
         data: {
           stationId: station.id,
           name: t.name,
@@ -281,7 +281,7 @@ export async function POST(request: NextRequest) {
           status: 'normal',
           lastReading: new Date(),
         },
-      })
+      }))
     }
 
     // ── 11. Seed dispensers ──
@@ -292,7 +292,7 @@ export async function POST(request: NextRequest) {
       { name: 'Dispenser 4', code: 'D-04', pumpLane: 4, nozzleCount: 2 },
     ]
     for (const d of dispenserData) {
-      await db.dispenser.create({
+      await dbRetry(() => db.dispenser.create({
         data: {
           stationId: station.id,
           name: d.name,
@@ -302,7 +302,7 @@ export async function POST(request: NextRequest) {
           status: 'idle',
           isActive: true,
         },
-      })
+      }))
     }
 
     // ── 12. Seed fuel prices ──
@@ -312,7 +312,7 @@ export async function POST(request: NextRequest) {
       { fuelType: 'premium', pricePerUnit: 305.0 },
     ]
     for (const p of priceData) {
-      await db.fuelPrice.create({
+      await dbRetry(() => db.fuelPrice.create({
         data: {
           tenantId: tenant.id,
           stationId: station.id,
@@ -321,7 +321,7 @@ export async function POST(request: NextRequest) {
           effectiveFrom: new Date(),
           updatedBy: user.id,
         },
-      })
+      }))
     }
 
     // Return credentials (plain password shown only once!)
@@ -371,10 +371,17 @@ export async function POST(request: NextRequest) {
     console.error('[setup-super-admin] Error:', error)
     const isDbError = error instanceof Error && (
       error.message.includes('connect') ||
+      error.message.includes('Connection') ||
       error.message.includes('Closed') ||
       error.message.includes('timed out') ||
+      error.message.includes('ECONNREFUSED') ||
       error.message.includes('P1001') ||
-      error.message.includes('P1002')
+      error.message.includes('P1002') ||
+      error.message.includes('P1006') ||
+      error.message.includes('P1008') ||
+      error.message.includes("Can't reach database server") ||
+      error.message.includes('Connection terminated') ||
+      error.message.includes('Operation was interrupted')
     )
     const message = isDbError
       ? 'Unable to connect to database. Please try again in a moment.'

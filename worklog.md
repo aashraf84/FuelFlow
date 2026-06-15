@@ -75,3 +75,32 @@ Stage Summary:
 - 39 reports across 6 categories: Sales (9), Inventory (7), Finance (9), Operations (6), Customer (3), Compliance (5)
 - Export: Print, PDF (via browser Save as PDF), CSV, JSON
 - Pushed to GitHub: e07fa68
+
+---
+Task ID: 6
+Agent: Main Agent
+Task: Fix "An unexpected error occurred" on Device Registration page - Neon PostgreSQL connection issues
+
+Work Log:
+- Analyzed error screenshot: "An unexpected error occurred. Please try again." on Device Registration page
+- Checked dev.log: Found "Error in PostgreSQL connection: Error { kind: Closed, cause: None }" errors
+- Root cause: Neon serverless PostgreSQL connections being dropped/closed, causing API failures
+- Initially attempted to switch to SQLite but user requested keeping PostgreSQL
+- Reverted all SQLite changes, restored PostgreSQL configuration
+- Fixed dbRetry function: removed `$disconnect()` call that was crashing the process on retry
+- Added comprehensive connection error detection (P1006, P1008, "Can't reach database server", etc.)
+- Converted static imports to dynamic imports in page.tsx (20 component modules) to reduce compilation memory
+- Switched from Turbopack to Webpack (--webpack flag) for better memory stability
+- Optimized dashboard route: replaced 18 parallel Promise.all queries with sequential queries + small parallel groups
+- Added dbRetry wrapper to all database operations in setup-super-admin route
+- Updated .env and package.json with correct DATABASE_URL (removed channel_binding=require which caused crashes)
+- Added connect_timeout=60 for better Neon serverless connection handling
+
+Stage Summary:
+- Core fix: Removed $disconnect() from dbRetry (was causing process crashes on Neon connection drops)
+- Memory optimization: Dynamic imports for all 20 module components, webpack bundler
+- Dashboard optimization: Sequential queries instead of 18 parallel, aggregate queries for counts
+- Error handling: Extended error detection for all Neon serverless connection error types
+- All auth APIs verified working: validate-serial, login, setup-super-admin
+- Dashboard API verified: Returns tank levels, KPIs, revenue data
+- Note: Agent Browser testing limited due to memory constraints (Chrome + Next.js exceeds sandbox limits)

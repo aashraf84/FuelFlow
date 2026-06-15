@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, dbRetry } from '@/lib/db'
 
 export async function GET() {
   try {
-    const station = await db.station.findFirst({ where: { isActive: true } })
+    const station = await dbRetry(() => db.station.findFirst({ where: { isActive: true } }))
     if (!station) return NextResponse.json({ error: 'No station' }, { status: 404 })
 
     const tid = station.tenantId
@@ -12,59 +12,111 @@ export async function GET() {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const weekStart = new Date(now.getTime() - 7 * 86400000)
 
-    // Parallel core queries
-    const [
-      todayFuelings, weekFuelings, dispensers, tanks, currentShift,
-      alerts, notifications, expenses, retailProducts, envAlerts,
-      fleetAccounts, carWashSessions, lotterySales, supplierInvoices,
-      allStations, dailyReports, recentFuelings, customers
-    ] = await Promise.all([
-      // Today's fuelings
-      db.fueling.findMany({ where: { stationId: sid, status: 'completed', completedAt: { gte: todayStart } } }),
-      // Week fuelings
-      db.fueling.findMany({ where: { stationId: sid, status: 'completed', completedAt: { gte: weekStart } } }),
-      // Dispensers
-      db.dispenser.findMany({ where: { stationId: sid, isActive: true }, include: { nozzles: true } }),
-      // Tanks
-      db.tank.findMany({ where: { stationId: sid } }),
-      // Current shift
-      db.shift.findFirst({ where: { stationId: sid, status: 'open' }, include: { attendant: true, supervisor: true } }),
-      // AI alerts
-      db.aIAlert.findMany({ where: { tenantId: tid, isResolved: false } }),
-      // Notifications
-      db.notification.findMany({ where: { tenantId: tid, isRead: false }, orderBy: { createdAt: 'desc' }, take: 5 }),
-      // Expenses today
-      db.expense.findMany({ where: { stationId: sid, date: { gte: todayStart } } }),
-      // Retail products
-      db.retailProduct.findMany({ where: { stationId: sid, isActive: true }, orderBy: { stockQty: 'asc' }, take: 5 }),
-      // Environmental alerts
-      db.environmentalAlert.findMany({ where: { stationId: sid, isResolved: false } }),
-      // Fleet accounts
-      db.fleetAccount.findMany({ where: { tenantId: tid, status: 'active' }, include: { _count: { select: { vehicles: true, drivers: true, fuelCards: true } } } }),
-      // Car wash
-      db.carWashSession.findMany({ where: { stationId: sid, startedAt: { gte: todayStart } } }),
-      // Lottery
-      db.lotterySale.findMany({ where: { stationId: sid, createdAt: { gte: todayStart } } }),
-      // Supplier invoices pending
-      db.supplierInvoice.findMany({ where: { stationId: sid, status: 'pending' } }),
-      // All stations
-      db.station.findMany({ where: { isActive: true }, select: { id: true, name: true, code: true, city: true, stationType: true } }),
-      // Daily reports
-      db.dailyReport.findMany({ where: { stationId: sid }, orderBy: { reportDate: 'desc' }, take: 7 }),
-      // Recent fuelings
-      db.fueling.findMany({ where: { stationId: sid, status: 'completed' }, include: { dispenser: true, attendant: true }, orderBy: { completedAt: 'desc' }, take: 10 }),
-      // Customers count
-      db.customer.count({ where: { tenantId: tid, isActive: true } }),
+    // Use sequential queries to avoid overwhelming Neon serverless connections
+    // This is more memory-efficient than Promise.all with many parallel queries
+    const todayFuelings = await dbRetry(() =>
+      db.fueling.findMany({
+        where: { stationId: sid, status: 'completed', completedAt: { gte: todayStart } },
+        select: { id: true, fuelType: true, volume: true, totalAmount: true, paymentMethod: true, completedAt: true, startedAt: true },
+      })
+    )
+
+    const weekFuelings = await dbRetry(() =>
+      db.fueling.findMany({
+        where: { stationId: sid, status: 'completed', completedAt: { gte: weekStart } },
+        select: { totalAmount: true },
+      })
+    )
+
+    const dispensers = await dbRetry(() =>
+      db.dispenser.findMany({ where: { stationId: sid, isActive: true }, select: { status: true, nozzles: { select: { id: true } } } })
+    )
+
+    const tanks = await dbRetry(() => db.tank.findMany({ where: { stationId: sid } }))
+
+    const currentShift = await dbRetry(() =>
+      db.shift.findFirst({ where: { stationId: sid, status: 'open' }, include: { attendant: true, supervisor: true } })
+    )
+
+    // Lightweight counts instead of full records for alerts
+    const [criticalAlerts, warningAlerts, totalAlerts] = await Promise.all([
+      dbRetry(() => db.aIAlert.count({ where: { tenantId: tid, isResolved: false, severity: 'critical' } })),
+      dbRetry(() => db.aIAlert.count({ where: { tenantId: tid, isResolved: false, severity: 'warning' } })),
+      dbRetry(() => db.aIAlert.count({ where: { tenantId: tid, isResolved: false } })),
+    ])
+
+    const notifications = await dbRetry(() =>
+      db.notification.findMany({
+        where: { tenantId: tid, isRead: false },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: { id: true, title: true, message: true, type: true, priority: true, isRead: true, createdAt: true },
+      })
+    )
+
+    const totalExpenses = await dbRetry(() =>
+      db.expense.aggregate({ where: { stationId: sid, date: { gte: todayStart } }, _sum: { amount: true } })
+    )
+
+    const envAlertsCount = await dbRetry(() => db.environmentalAlert.count({ where: { stationId: sid, isResolved: false } }))
+
+    const retailProducts = await dbRetry(() =>
+      db.retailProduct.findMany({
+        where: { stationId: sid, isActive: true },
+        orderBy: { stockQty: 'asc' },
+        take: 5,
+        select: { id: true, name: true, category: true, price: true, stockQty: true, minStock: true },
+      })
+    )
+
+    const fleetAccounts = await dbRetry(() =>
+      db.fleetAccount.findMany({
+        where: { tenantId: tid, status: 'active' },
+        select: { id: true, companyName: true, currentBalance: true, creditLimit: true, _count: { select: { vehicles: true, drivers: true, fuelCards: true } } },
+      })
+    )
+
+    const [carWashCount, carWashRevenue] = await Promise.all([
+      dbRetry(() => db.carWashSession.count({ where: { stationId: sid, startedAt: { gte: todayStart } } })),
+      dbRetry(() => db.carWashSession.aggregate({ where: { stationId: sid, startedAt: { gte: todayStart } }, _sum: { amount: true } })),
+    ])
+
+    const [lotteryCount, lotteryRevenue, lotteryCommission] = await Promise.all([
+      dbRetry(() => db.lotterySale.count({ where: { stationId: sid, createdAt: { gte: todayStart } } })),
+      dbRetry(() => db.lotterySale.aggregate({ where: { stationId: sid, createdAt: { gte: todayStart } }, _sum: { saleAmount: true } })),
+      dbRetry(() => db.lotterySale.aggregate({ where: { stationId: sid, createdAt: { gte: todayStart } }, _sum: { commission: true } })),
+    ])
+
+    const supplierInvoicesPending = await dbRetry(() => db.supplierInvoice.count({ where: { stationId: sid, status: 'pending' } }))
+
+    const allStations = await dbRetry(() =>
+      db.station.findMany({ where: { isActive: true }, select: { id: true, name: true, code: true, city: true, stationType: true } })
+    )
+
+    const dailyReports = await dbRetry(() =>
+      db.dailyReport.findMany({ where: { stationId: sid }, orderBy: { reportDate: 'desc' }, take: 7 })
+    )
+
+    const recentFuelings = await dbRetry(() =>
+      db.fueling.findMany({
+        where: { stationId: sid, status: 'completed' },
+        include: { dispenser: { select: { name: true } }, attendant: { select: { name: true } } },
+        orderBy: { completedAt: 'desc' },
+        take: 10,
+      })
+    )
+
+    const [employeesOnDuty, customers] = await Promise.all([
+      dbRetry(() => db.employee.count({ where: { stationId: sid, status: 'active' } })),
+      dbRetry(() => db.customer.count({ where: { tenantId: tid, isActive: true } })),
     ])
 
     // Compute KPIs
     const revenueToday = todayFuelings.reduce((s, f) => s + f.totalAmount, 0)
     const revenueWeek = weekFuelings.reduce((s, f) => s + f.totalAmount, 0)
-    const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0)
+    const expenseTotal = totalExpenses._sum.amount || 0
     const fuelSoldToday = todayFuelings.reduce((s, f) => s + f.volume, 0)
     const activeDispensers = dispensers.filter(d => d.status !== 'maintenance' && d.status !== 'error').length
-    const criticalAlerts = alerts.filter(a => a.severity === 'critical').length
-    const warningAlerts = alerts.filter(a => a.severity === 'warning').length
 
     // Hourly revenue chart
     const revenueChart = []
@@ -114,20 +166,13 @@ export async function GET() {
       accounts: fleetAccounts.map(a => ({ id: a.id, companyName: a.companyName, balance: a.currentBalance, creditLimit: a.creditLimit, vehicles: a._count?.vehicles || 0, drivers: a._count?.drivers || 0, fuelCards: a._count?.fuelCards || 0 })),
     }
 
-    // Car wash & lottery summary
-    const carWash = { sessionsToday: carWashSessions.length, revenue: carWashSessions.reduce((s, c) => s + c.amount, 0) }
-    const lottery = { salesToday: lotterySales.length, revenue: lotterySales.reduce((s, l) => s + l.saleAmount, 0), commission: lotterySales.reduce((s, l) => s + l.commission, 0) }
-
-    // Employees on duty (from attendance)
-    const employeesOnDuty = await db.employee.count({ where: { stationId: sid, status: 'active' } })
-
     return NextResponse.json({
       kpis: {
         revenue: { today: Math.round(revenueToday), week: Math.round(revenueWeek), month: Math.round(revenueWeek), currency: 'PKR' },
         fuelSold: { value: Math.round(fuelSoldToday), unit: 'litres' },
         activePumps: { value: activeDispensers, total: dispensers.length },
-        alerts: { value: alerts.length, critical: criticalAlerts, warning: warningAlerts },
-        netProfit: { value: Math.round(revenueToday - totalExpenses), currency: 'PKR' },
+        alerts: { value: totalAlerts, critical: criticalAlerts, warning: warningAlerts },
+        netProfit: { value: Math.round(revenueToday - expenseTotal), currency: 'PKR' },
       },
       tankLevels,
       recentTransactions,
@@ -150,10 +195,10 @@ export async function GET() {
       } : null,
       allStations,
       notifications: notifications.map(n => ({ id: n.id, title: n.title, message: n.message, type: n.type, priority: n.priority, isRead: n.isRead, createdAt: n.createdAt })),
-      environmentalAlertsCount: envAlerts.length,
-      carWash,
-      lottery,
-      supplierInvoicesPending: supplierInvoices.length,
+      environmentalAlertsCount: envAlertsCount,
+      carWash: { sessionsToday: carWashCount, revenue: carWashRevenue._sum.amount || 0 },
+      lottery: { salesToday: lotteryCount, revenue: lotteryRevenue._sum.saleAmount || 0, commission: lotteryCommission._sum.commission || 0 },
+      supplierInvoicesPending,
       fleetSummary,
       dailyReport: dailyReports[0] || null,
       topSellingProducts: retailProducts.map(p => ({ id: p.id, name: p.name, category: p.category, price: p.price, stockQty: p.stockQty, minStock: p.minStock })),
@@ -162,6 +207,19 @@ export async function GET() {
     })
   } catch (error) {
     console.error('Dashboard error:', error)
-    return NextResponse.json({ error: 'Dashboard load failed' }, { status: 500 })
+    const isDbError = error instanceof Error && (
+      error.message.includes('connect') ||
+      error.message.includes('Connection') ||
+      error.message.includes('Closed') ||
+      error.message.includes('timed out') ||
+      error.message.includes('P1001') ||
+      error.message.includes('P1002') ||
+      error.message.includes('P1006') ||
+      error.message.includes('P1008')
+    )
+    return NextResponse.json(
+      { error: isDbError ? 'Database connection issue. Please refresh.' : 'Dashboard load failed' },
+      { status: isDbError ? 503 : 500 }
+    )
   }
 }
