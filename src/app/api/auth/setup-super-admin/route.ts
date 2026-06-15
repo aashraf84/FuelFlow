@@ -44,8 +44,17 @@ const LIFETIME_DATE = new Date('9999-12-31T23:59:59.999Z')
 // ── POST: Setup Super Admin with Lifetime Subscription ──────────────
 
 export async function POST(request: NextRequest) {
+  let body: Record<string, unknown>
   try {
-    const body = await request.json()
+    body = await request.json()
+  } catch {
+    return NextResponse.json(
+      { error: 'Invalid request format' },
+      { status: 400 }
+    )
+  }
+
+  try {
     const {
       name,
       email,
@@ -53,7 +62,7 @@ export async function POST(request: NextRequest) {
       companyName,
       deviceName,
       deviceType,
-    } = body
+    } = body as { name?: string; email?: string; phone?: string; companyName?: string; deviceName?: string; deviceType?: string }
 
     // Validate required fields
     if (!name || !email || !companyName || !deviceName || !deviceType) {
@@ -75,7 +84,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate credentials — use custom password if provided, otherwise generate one
-    const plainPassword = (body.password && typeof body.password === 'string' && body.password.length >= 6) ? body.password : generatePassword()
+    const rawPassword = body.password as string | undefined
+    const plainPassword = (rawPassword && typeof rawPassword === 'string' && rawPassword.length >= 6) ? rawPassword : generatePassword()
     const passwordHash = await hashPassword(plainPassword)
     const apiKey = generateApiKey()
     const slug = companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 50) + '-' + randomBytes(3).toString('hex')
@@ -359,9 +369,12 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
   } catch (error) {
     console.error('[setup-super-admin] Error:', error)
+    const message = error instanceof Error && error.message.includes('connect')
+      ? 'Unable to connect to database. Please try again.'
+      : 'Service temporarily unavailable. Please try again.'
     return NextResponse.json(
-      { error: 'Failed to setup super admin. Please try again.' },
-      { status: 500 }
+      { error: message },
+      { status: 503 }
     )
   }
 }

@@ -108,9 +108,12 @@ export async function POST() {
     })
   } catch (error) {
     console.error('[demo-login] Error:', error)
+    const message = error instanceof Error && error.message.includes('connect')
+      ? 'Unable to connect to database. Please try again.'
+      : 'Service temporarily unavailable. Please try again.'
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: message },
+      { status: 503 }
     )
   }
 }

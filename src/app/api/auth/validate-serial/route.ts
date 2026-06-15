@@ -2,8 +2,17 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 export async function POST(request: Request) {
+  let body: { key?: string }
   try {
-    const body = await request.json()
+    body = await request.json()
+  } catch {
+    return NextResponse.json(
+      { valid: false, error: 'Invalid request format' },
+      { status: 400 }
+    )
+  }
+
+  try {
     const { key } = body
 
     if (!key || typeof key !== 'string') {
@@ -152,9 +161,13 @@ export async function POST(request: Request) {
     )
   } catch (error) {
     console.error('[validate-serial] Error:', error)
+    // Check if it's a database connection error
+    const message = error instanceof Error && error.message.includes('connect')
+      ? 'Unable to connect to database. Please try again.'
+      : 'Service temporarily unavailable. Please try again.'
     return NextResponse.json(
-      { valid: false, error: 'Internal server error' },
-      { status: 500 }
+      { valid: false, error: message },
+      { status: 503 }
     )
   }
 }

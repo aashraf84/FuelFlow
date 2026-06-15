@@ -3,8 +3,17 @@ import { db } from '@/lib/db'
 import { verifyPassword } from '@/lib/auth'
 
 export async function POST(request: Request) {
+  let body: { email?: string; password?: string; serialKey?: string }
   try {
-    const body = await request.json()
+    body = await request.json()
+  } catch {
+    return NextResponse.json(
+      { error: 'Invalid request format' },
+      { status: 400 }
+    )
+  }
+
+  try {
     const { email, password, serialKey } = body
 
     // Validate required fields
@@ -158,9 +167,13 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     console.error('[login] Error:', error)
+    // Check if it's a database connection error
+    const message = error instanceof Error && error.message.includes('connect')
+      ? 'Unable to connect to database. Please try again.'
+      : 'Service temporarily unavailable. Please try again.'
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: message },
+      { status: 503 }
     )
   }
 }

@@ -68,9 +68,12 @@ export async function GET(request: Request) {
     })
   } catch (error) {
     console.error('[session GET] Error:', error)
+    const message = error instanceof Error && error.message.includes('connect')
+      ? 'Unable to connect to database. Please try again.'
+      : 'Service temporarily unavailable. Please try again.'
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: message },
+      { status: 503 }
     )
   }
 }

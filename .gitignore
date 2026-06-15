@@ -55,3 +55,6 @@ server.log
 agent-ctx/
 tool-results/
 fuel-reports-search*.json
+agent-ctx/
+tool-results/
+.zscripts/
