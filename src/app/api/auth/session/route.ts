@@ -68,12 +68,19 @@ export async function GET(request: Request) {
     })
   } catch (error) {
     console.error('[session GET] Error:', error)
-    const message = error instanceof Error && error.message.includes('connect')
-      ? 'Unable to connect to database. Please try again.'
-      : 'Service temporarily unavailable. Please try again.'
+    const isDbError = error instanceof Error && (
+      error.message.includes('connect') ||
+      error.message.includes('Closed') ||
+      error.message.includes('timed out') ||
+      error.message.includes('P1001') ||
+      error.message.includes('P1002')
+    )
+    const message = isDbError
+      ? 'Unable to connect to database. Please try again in a moment.'
+      : 'An unexpected error occurred. Please try again.'
     return NextResponse.json(
       { error: message },
-      { status: 503 }
+      { status: isDbError ? 503 : 500 }
     )
   }
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, dbRetry } from '@/lib/db'
 import { hashPassword } from '@/lib/auth'
 import { randomBytes } from 'crypto'
 
@@ -369,12 +369,19 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
   } catch (error) {
     console.error('[setup-super-admin] Error:', error)
-    const message = error instanceof Error && error.message.includes('connect')
-      ? 'Unable to connect to database. Please try again.'
-      : 'Service temporarily unavailable. Please try again.'
+    const isDbError = error instanceof Error && (
+      error.message.includes('connect') ||
+      error.message.includes('Closed') ||
+      error.message.includes('timed out') ||
+      error.message.includes('P1001') ||
+      error.message.includes('P1002')
+    )
+    const message = isDbError
+      ? 'Unable to connect to database. Please try again in a moment.'
+      : 'Registration service temporarily unavailable. Please try again.'
     return NextResponse.json(
       { error: message },
-      { status: 503 }
+      { status: isDbError ? 503 : 500 }
     )
   }
 }

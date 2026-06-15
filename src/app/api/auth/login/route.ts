@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, dbRetry } from '@/lib/db'
 import { verifyPassword } from '@/lib/auth'
 
 export async function POST(request: Request) {
@@ -34,9 +34,11 @@ export async function POST(request: Request) {
     // If a serial key is provided, validate and potentially activate it
     let activatedSerialKey: { id: string; status: string; tenantId: string | null } | null = null
     if (serialKey && typeof serialKey === 'string') {
-      const foundKey = await db.serialKey.findUnique({
-        where: { key: serialKey.trim() },
-      })
+      const foundKey = await dbRetry(() =>
+        db.serialKey.findUnique({
+          where: { key: serialKey.trim() },
+        })
+      )
 
       if (!foundKey) {
         return NextResponse.json(
@@ -59,32 +61,32 @@ export async function POST(request: Request) {
         )
       }
 
-      // Activate inactive key — associate it with the user's tenant on login
       if (foundKey.status === 'inactive') {
         activatedSerialKey = { id: foundKey.id, status: foundKey.status, tenantId: foundKey.tenantId }
       }
 
-      // If already active, just note it
       if (foundKey.status === 'active') {
         activatedSerialKey = { id: foundKey.id, status: foundKey.status, tenantId: foundKey.tenantId }
       }
     }
 
     // Find user by email
-    const user = await db.user.findUnique({
-      where: { email: email.trim().toLowerCase() },
-      include: {
-        tenant: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            subscription: true,
-            isActive: true,
+    const user = await dbRetry(() =>
+      db.user.findUnique({
+        where: { email: email.trim().toLowerCase() },
+        include: {
+          tenant: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              subscription: true,
+              isActive: true,
+            },
           },
         },
-      },
-    })
+      })
+    )
 
     if (!user) {
       return NextResponse.json(
@@ -93,7 +95,6 @@ export async function POST(request: Request) {
       )
     }
 
-    // Check if user is active
     if (!user.isActive) {
       return NextResponse.json(
         { error: 'Account is deactivated. Please contact your administrator.' },
@@ -101,7 +102,7 @@ export async function POST(request: Request) {
       )
     }
 
-    // Check password (demo users might not have a passwordHash)
+    // Check password
     if (user.passwordHash) {
       const passwordValid = await verifyPassword(password, user.passwordHash)
       if (!passwordValid) {
@@ -111,36 +112,39 @@ export async function POST(request: Request) {
         )
       }
     } else {
-      // User has no password set — cannot log in with password
       return NextResponse.json(
         { error: 'Account is not configured for password login' },
         { status: 401 }
       )
     }
 
-    // Activate serial key if it was inactive and we now have the user's tenantId
+    // Activate serial key if it was inactive
     if (
       activatedSerialKey &&
       activatedSerialKey.status === 'inactive' &&
       !activatedSerialKey.tenantId
     ) {
-      await db.serialKey.update({
-        where: { id: activatedSerialKey.id },
-        data: {
-          tenantId: user.tenantId,
-          status: 'active',
-          activatedAt: new Date(),
-        },
-      })
+      await dbRetry(() =>
+        db.serialKey.update({
+          where: { id: activatedSerialKey.id },
+          data: {
+            tenantId: user.tenantId,
+            status: 'active',
+            activatedAt: new Date(),
+          },
+        })
+      )
     }
 
     // Update last login
-    await db.user.update({
-      where: { id: user.id },
-      data: { lastLogin: new Date() },
-    })
+    await dbRetry(() =>
+      db.user.update({
+        where: { id: user.id },
+        data: { lastLogin: new Date() },
+      })
+    )
 
-    // Build response — exclude sensitive fields
+    // Build response
     const userResponse = {
       id: user.id,
       name: user.name,
@@ -167,13 +171,19 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     console.error('[login] Error:', error)
-    // Check if it's a database connection error
-    const message = error instanceof Error && error.message.includes('connect')
-      ? 'Unable to connect to database. Please try again.'
-      : 'Service temporarily unavailable. Please try again.'
+    const isDbError = error instanceof Error && (
+      error.message.includes('connect') ||
+      error.message.includes('Closed') ||
+      error.message.includes('timed out') ||
+      error.message.includes('P1001') ||
+      error.message.includes('P1002')
+    )
+    const message = isDbError
+      ? 'Unable to connect to database. Please try again in a moment.'
+      : 'An unexpected error occurred. Please try again.'
     return NextResponse.json(
       { error: message },
-      { status: 503 }
+      { status: isDbError ? 503 : 500 }
     )
   }
 }

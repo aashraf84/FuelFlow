@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, dbRetry } from '@/lib/db'
 
 export async function POST(request: Request) {
   let body: { key?: string }
@@ -25,21 +25,22 @@ export async function POST(request: Request) {
     const trimmedKey = key.trim()
 
     // ── First check SerialKey table (tenant-level keys) ──
-    const serialKey = await db.serialKey.findUnique({
-      where: { key: trimmedKey },
-      include: {
-        tenant: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
+    const serialKey = await dbRetry(() =>
+      db.serialKey.findUnique({
+        where: { key: trimmedKey },
+        include: {
+          tenant: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+            },
           },
         },
-      },
-    })
+      })
+    )
 
     if (serialKey) {
-      // Check key status
       if (serialKey.status === 'expired') {
         return NextResponse.json(
           { valid: false, error: 'This serial key has expired', status: 'expired', expiredAt: serialKey.expiresAt },
@@ -54,7 +55,6 @@ export async function POST(request: Request) {
         )
       }
 
-      // If inactive — valid key, not yet activated
       if (serialKey.status === 'inactive') {
         return NextResponse.json({
           valid: true,
@@ -69,7 +69,6 @@ export async function POST(request: Request) {
         })
       }
 
-      // If active — already assigned to a tenant
       if (serialKey.status === 'active') {
         return NextResponse.json({
           valid: true,
@@ -95,27 +94,29 @@ export async function POST(request: Request) {
     }
 
     // ── Fallback: Check LicenseKey table (owner-level keys) ──
-    const licenseKey = await db.licenseKey.findUnique({
-      where: { key: trimmedKey },
-      include: {
-        client: {
-          select: {
-            id: true,
-            companyName: true,
-            slug: true,
-            email: true,
-            phone: true,
+    const licenseKey = await dbRetry(() =>
+      db.licenseKey.findUnique({
+        where: { key: trimmedKey },
+        include: {
+          client: {
+            select: {
+              id: true,
+              companyName: true,
+              slug: true,
+              email: true,
+              phone: true,
+            },
+          },
+          plan: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+            },
           },
         },
-        plan: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
-        },
-      },
-    })
+      })
+    )
 
     if (licenseKey) {
       if (licenseKey.status === 'revoked') {
@@ -132,7 +133,6 @@ export async function POST(request: Request) {
         )
       }
 
-      // assigned or available — valid key
       const planSlug = licenseKey.plan?.slug || 'starter'
       return NextResponse.json({
         valid: true,
@@ -161,13 +161,19 @@ export async function POST(request: Request) {
     )
   } catch (error) {
     console.error('[validate-serial] Error:', error)
-    // Check if it's a database connection error
-    const message = error instanceof Error && error.message.includes('connect')
-      ? 'Unable to connect to database. Please try again.'
-      : 'Service temporarily unavailable. Please try again.'
+    const isDbError = error instanceof Error && (
+      error.message.includes('connect') ||
+      error.message.includes('Closed') ||
+      error.message.includes('timed out') ||
+      error.message.includes('P1001') ||
+      error.message.includes('P1002')
+    )
+    const message = isDbError
+      ? 'Unable to connect to database. Please try again in a moment.'
+      : 'An unexpected error occurred. Please try again.'
     return NextResponse.json(
       { valid: false, error: message },
-      { status: 503 }
+      { status: isDbError ? 503 : 500 }
     )
   }
 }
